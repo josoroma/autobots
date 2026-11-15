@@ -5,12 +5,16 @@
  * status the service returned. Every decision except a `changed` press reads the list again through
  * `reload`, which reads the tab shown then, not the one the press came from (WTAP-04).
  */
-import { parseApprovalResult, type ApprovalView } from "@autobots/api-client";
+import {
+  decideApproval,
+  type ApprovalDecision as DecisionBody,
+  type ApprovalView,
+} from "@autobots/api-client";
 import { useCallback, useState } from "react";
 
+import { writes } from "@/lib/api/browser";
 import type { Decision } from "@/lib/approval-shortcut";
 import { decisionText } from "@/lib/approval-text";
-import { csrfFetch } from "@/lib/csrf-fetch";
 import { useSubmit } from "@/lib/use-submit";
 
 export interface ApprovalDecision {
@@ -21,7 +25,7 @@ export interface ApprovalDecision {
 }
 
 export function useApprovalDecision(reload: () => void): ApprovalDecision {
-  const { submit } = useSubmit();
+  const { submit } = useSubmit<DecisionBody>();
   const [message, setMessage] = useState<string | null>(null);
   const clearMessage = useCallback(() => setMessage(null), []);
 
@@ -29,21 +33,9 @@ export function useApprovalDecision(reload: () => void): ApprovalDecision {
     async (approval: ApprovalView, decision: Decision): Promise<void> => {
       setMessage(null);
       const result = await submit({
-        body: () =>
-          JSON.stringify({ decision, argument_hash: approval.argument_hash }),
+        body: () => ({ decision, argument_hash: approval.argument_hash }),
         send: ({ key, body }) =>
-          csrfFetch(
-            `/api/v1/approvals/${encodeURIComponent(approval.id)}/decision`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Idempotency-Key": key,
-              },
-              body,
-            },
-          ),
-        parse: parseApprovalResult,
+          decideApproval(writes, approval.id, body, { "Idempotency-Key": key }),
         scope: approval.id,
         choice: decision,
       });

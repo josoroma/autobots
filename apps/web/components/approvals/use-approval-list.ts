@@ -4,18 +4,21 @@
  * its counts, and a failed read shows why in place of the list, with Retry for an outage (WTAP-05).
  */
 import {
-  parseApprovalList,
+  listApprovals,
   type ApprovalCounts,
   type ApprovalList,
+  type ListApprovalsQuery,
 } from "@autobots/api-client";
 import { useEffect, useState } from "react";
 
 import type { Tab } from "@/components/approvals/approval-tabs";
+import { readOf } from "@/lib/load";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
-const PATHS: Readonly<Record<Tab, string>> = {
-  waiting: "/api/v1/approvals",
-  decided: "/api/v1/approvals?status=decided",
+// The waiting tab sends no query, so its read is plain /api/v1/approvals.
+const QUERIES: Readonly<Record<Tab, ListApprovalsQuery>> = {
+  waiting: {},
+  decided: { status: "decided" },
 };
 
 const LOADING = { kind: "loading" } as const;
@@ -34,7 +37,7 @@ export interface ApprovalListRead {
 }
 
 export function useApprovalList(tab: Tab): ApprovalListRead {
-  const read = useResource(PATHS[tab], parseApprovalList);
+  const read = useResource(readOf(listApprovals, QUERIES[tab]));
   const [tick, setTick] = useState(() => Date.now());
 
   // Time left before an expiry is read against a clock that keeps moving, so a page left open never

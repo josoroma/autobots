@@ -21,6 +21,15 @@ export function profileField(
 }
 
 /**
+ * A select's choice of profile: "" for none, the profile chosen, or null for a value that isn't a
+ * profile, which a form then ignores, so it never becomes a default (PRD-Model-Providers MP-A08).
+ */
+export function profileChoice(value: string): ModelProfileId | "" | null {
+  if (value === "") return "";
+  return profileField(value)?.run_profile ?? null;
+}
+
+/**
  * One short name per approved profile, for every screen that names one (XDUP-10, R-37). /api/models
  * carries no display name, only canonical_id, so the web keeps this one table, keyed by the
  * generated union so that a profile the contract gains fails the type check until it has a name.

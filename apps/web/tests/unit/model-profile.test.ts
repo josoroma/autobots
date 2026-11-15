@@ -3,9 +3,16 @@ import { test } from "node:test";
 
 import {
   PROFILE_NAME,
+  profileChoice,
   profileField,
   profileName,
 } from "../../lib/model-profile.ts";
+
+test("a select's choice is none, a profile, or ignored, so it never becomes a default", () => {
+  assert.equal(profileChoice(""), "");
+  assert.equal(profileChoice("openrouter_sol"), "openrouter_sol");
+  assert.equal(profileChoice("terra"), null);
+});
 
 test("an empty choice means the default, so no field is sent", () => {
   assert.deepEqual(profileField(""), {});

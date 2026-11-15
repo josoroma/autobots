@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Select } from "@/components/ui/field";
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { chooseWorkspace } from "@/lib/api/browser";
 
 type Workspace = { id: string; name: string };
 
@@ -19,12 +19,9 @@ export function WorkspaceChooser({
   const [failed, setFailed] = useState(false);
   async function choose(id: string): Promise<void> {
     setFailed(false);
-    const reply = await csrfFetch("/api/workspace", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace_id: id }),
-    }).catch(() => null);
-    if (reply === null || !reply.ok) {
+    try {
+      await chooseWorkspace({ workspace_id: id });
+    } catch {
       setFailed(true);
       return;
     }

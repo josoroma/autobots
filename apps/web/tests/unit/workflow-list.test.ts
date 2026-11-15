@@ -6,13 +6,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { WorkflowExecutionSummary } from "@autobots/api-client";
+import {
+  listWorkflowExecutions,
+  previewWorkflowVersion,
+  type WorkflowExecutionSummary,
+} from "@autobots/api-client";
 
+import { load, readOf, type Read } from "../../lib/load.ts";
 import {
   durationText,
-  executionsPath,
   inWorkflowTab,
-  previewPath,
   previewVersion,
   spendText,
   WORKFLOW_TAB_IDS,
@@ -76,14 +79,29 @@ test("a preview shows the version asked for, else the latest published, else the
   assert.equal(previewVersion(neither, null), null);
 });
 
-test("a preview's and the executions' reads name the workflow", () => {
-  assert.equal(executionsPath("w 1"), "/api/v1/workflows/w%201/executions");
+/** The URL the browser asks for with this read. */
+async function urlOf(source: Read<unknown>): Promise<string> {
+  const asked: string[] = [];
+  await load(source, {
+    fetch: async (input) => {
+      asked.push(String(input));
+      return new Response("{}", { status: 503 });
+    },
+  });
+  return asked[0] ?? "";
+}
+
+test("a preview's and the executions' reads name the workflow", async () => {
   assert.equal(
-    previewPath("w 1", "draft"),
+    await urlOf(readOf(listWorkflowExecutions, "w 1")),
+    "/api/v1/workflows/w%201/executions",
+  );
+  assert.equal(
+    await urlOf(readOf(previewWorkflowVersion, "w 1", { version: "draft" })),
     "/api/v1/workflows/w%201/preview?version=draft",
   );
   assert.equal(
-    previewPath("w-1", "2"),
+    await urlOf(readOf(previewWorkflowVersion, "w-1", { version: "2" })),
     "/api/v1/workflows/w-1/preview?version=2",
   );
 });

@@ -12,6 +12,7 @@ import {
   withOverride,
   type PolicyDraft,
 } from "@/lib/model-policy";
+import { profileChoice } from "@/lib/model-profile";
 
 interface Own {
   saved: ModelPolicyState;
@@ -50,12 +51,19 @@ export function usePolicyDraft(
     draft,
     dirty: saved !== null && draft !== null && !sameForm(saved, draft),
     adopt,
-    setDefault: (profile) =>
-      edit((current) => ({ ...current, defaultProfile: profile })),
-    setOverride: (role, profile) =>
-      edit((current) => ({
-        ...current,
-        overrides: withOverride(current.overrides, role, profile),
-      })),
+    // A value that isn't a profile is ignored, so it never becomes a default (MP-A08).
+    setDefault: (value) => {
+      const profile = profileChoice(value);
+      if (profile !== null)
+        edit((current) => ({ ...current, defaultProfile: profile }));
+    },
+    setOverride: (role, value) => {
+      const profile = profileChoice(value);
+      if (profile !== null)
+        edit((current) => ({
+          ...current,
+          overrides: withOverride(current.overrides, role, profile),
+        }));
+    },
   };
 }

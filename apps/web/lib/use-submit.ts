@@ -1,11 +1,13 @@
 /**
  * A write sent at most once at a time, with its key held per target until an accepted reply
- * settles it (R-18, R-19, Decision 0027 D2). A press while a write is pending does nothing.
+ * settles it (R-18, R-19, Decision 0027 D2). A press while a write is pending does nothing. Each
+ * write is a generated operation called with the browser's write client (R-48), which parses its
+ * reply; `B` is the operation's request body type.
  */
 import { type ErrorResponse } from "@autobots/api-client";
 import { useCallback, useRef, useState } from "react";
 
-import { readErrorResponse, readReply } from "@/lib/replies";
+import { failureOf } from "@/lib/api/browser";
 import {
   heldFor,
   nextAttempt,
@@ -21,6 +23,7 @@ export interface Submitted<T> {
   outcome: Outcome | "changed";
   value: T | null;
   refusal: ErrorResponse | null;
+  /** The status of a reply that wasn't accepted, or null when none arrived or it drifted. */
   status: number | null;
   /** This press resent a write whose outcome was unknown. */
   retried: boolean;
@@ -30,11 +33,14 @@ export interface Submitted<T> {
   heldChoice: string | null;
 }
 
-export interface SubmitSteps<T> {
-  /** The body for a new intent, or null to send nothing. Skipped while a write is held. */
-  body: () => Promise<string | null> | string | null;
-  send: (attempt: Attempt) => Promise<Response>;
-  parse: (value: unknown) => T;
+export interface SubmitSteps<B, T> {
+  /**
+   * The body for a new intent, built anew for each, or null to send nothing. Skipped while a write
+   * is held, whose body is resent as it was.
+   */
+  body: () => Promise<B | null> | B | null;
+  /** Sends one attempt with a generated operation, which parses the reply. */
+  send: (attempt: Attempt<B>) => Promise<T>;
   /** The write's target, when one hook serves several. Each target holds its own write. */
   scope?: string;
   /** What was chosen for the target, such as approve or reject. */
@@ -53,26 +59,30 @@ interface Reply<T> {
   status: number | null;
 }
 
-/** Sends one attempt and reads its reply as an outcome. */
-async function sendOnce<T>(
-  attempt: Attempt,
-  steps: SubmitSteps<T>,
+/**
+ * Sends one attempt and reads its outcome. No reply, a 5xx, a refusal without the envelope or a
+ * success that drifted from its contract is unknown: the write may have happened.
+ */
+async function sendOnce<B, T>(
+  attempt: Attempt<B>,
+  steps: SubmitSteps<B, T>,
 ): Promise<Reply<T>> {
-  const reply = await steps.send(attempt).catch(() => null);
-  const value = reply?.ok === true ? await readReply(reply, steps.parse) : null;
-  const refusal =
-    reply !== null && !reply.ok ? await readErrorResponse(reply) : null;
-  const status = reply?.status ?? null;
-  return {
-    outcome: outcomeOf(status, value !== null, refusal !== null),
-    value,
-    refusal,
-    status,
-  };
+  try {
+    const value = await steps.send(attempt);
+    return { outcome: "accepted", value, refusal: null, status: null };
+  } catch (error) {
+    const { status, refusal } = failureOf(error);
+    return {
+      outcome: outcomeOf(status, false, refusal !== null),
+      value: null,
+      refusal,
+      status,
+    };
+  }
 }
 
 /** Another choice pressed for a held target: nothing is sent. */
-function changed<T>(held: Attempt | null): Submitted<T> {
+function changed<B, T>(held: Attempt<B> | null): Submitted<T> {
   return {
     outcome: "changed",
     value: null,
@@ -84,17 +94,18 @@ function changed<T>(held: Attempt | null): Submitted<T> {
   };
 }
 
-export function useSubmit() {
+/** One hook per kind of body: `B` is the generated request type its writes send. */
+export function useSubmit<B>() {
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
-  const holds = useRef<Holds>(new Map());
+  const holds = useRef<Holds<B>>(new Map());
   // The held targets, as state, so a screen can show its inputs as sent while one is held.
   const [heldScopes, setHeldScopes] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
 
   const submit = useCallback(
-    async <T>(steps: SubmitSteps<T>): Promise<Submitted<T> | null> => {
+    async <T>(steps: SubmitSteps<B, T>): Promise<Submitted<T> | null> => {
       if (busy.current) return null;
       const { scope = "", choice = "", keyed = true } = steps;
       const { changed: other, held } = heldFor(
@@ -103,7 +114,7 @@ export function useSubmit() {
         choice,
         keyed,
       );
-      if (other) return changed<T>(held);
+      if (other) return changed<B, T>(held);
       busy.current = true;
       setPending(true);
       try {

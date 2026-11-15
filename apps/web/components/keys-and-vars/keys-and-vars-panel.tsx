@@ -1,16 +1,17 @@
 "use client";
 
-import { parseKeysAndVars, type KeyOrVar } from "@autobots/api-client";
+import { getKeysAndVars, type KeyOrVar } from "@autobots/api-client";
 
 import { ItemCard } from "@/components/keys-and-vars/item-card";
 import { useItemWrites } from "@/components/keys-and-vars/use-item-writes";
 import { LoadState } from "@/components/ui/load-state";
+import { readOf } from "@/lib/load";
 import { useSettingsRead } from "@/lib/use-settings-read";
 
 // Decisions 0024 and 0025, PRD-Tool-Catalog PK-04 to PK-08: the workspace's keys and vars, each
 // saved here over the environment and .env, from the next tool call, with no restart.
 export function KeysAndVarsPanel() {
-  const read = useSettingsRead("/api/settings/keys-and-vars", parseKeysAndVars);
+  const read = useSettingsRead(readOf(getKeysAndVars));
   const writes = useItemWrites(read);
   const items = read.value;
   if (items === null) {

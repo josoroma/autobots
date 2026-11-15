@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  parseApprovalList,
-  parseRunList,
+  listApprovals,
+  listRuns,
   type ApprovalList,
   type RunList,
 } from "@autobots/api-client";
@@ -13,7 +13,7 @@ import { LoadEmpty, LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
 import { spendOf } from "@/lib/budget";
 import { formatRelative, formatUsd } from "@/lib/format";
-import { worstFailure } from "@/lib/load";
+import { readOf, worstFailure } from "@/lib/load";
 import { RUN_STATUS_LABEL } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
 
@@ -41,9 +41,9 @@ const QUIET = "text-muted-foreground border-t py-3 text-sm";
 
 // PRD-Studio HM-04 and Decision 0022 D9: what waits for a person, then the newest runs.
 export function HomeActivity() {
-  const approvalRead = useResource("/api/v1/approvals", parseApprovalList);
-  const waitingRead = useResource("/api/v1/runs?group=needs_you", parseRunList);
-  const recentRead = useResource("/api/v1/runs", parseRunList);
+  const approvalRead = useResource(readOf(listApprovals));
+  const waitingRead = useResource(readOf(listRuns, { group: "needs_you" }));
+  const recentRead = useResource(readOf(listRuns));
   const reads = [approvalRead, waitingRead, recentRead];
   // One message for the three reads, since either section alone would mislead.
   const failure = worstFailure(reads.map((read) => read.state));

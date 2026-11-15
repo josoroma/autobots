@@ -1,7 +1,7 @@
-import { parseRunAccepted, type RunRequest } from "@autobots/api-client";
+import { admitRun, type RunRequest } from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import { profileField } from "@/lib/model-profile";
 import { admissionRefusal, CHOICE_NOT_OFFERED } from "@/lib/run-admission";
 import { type Attempt, type Outcome, withHeld } from "@/lib/submit";
@@ -11,12 +11,8 @@ const UNKNOWN =
   "The reply was lost, so it may have started. Running this again won't start a second one.";
 
 // One key until the outcome is known, so a lost reply never starts a second run (Decision 0027 D2).
-function sendAdmission({ key, body }: Attempt): Promise<Response> {
-  return csrfFetch("/api/v1/runs", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": key },
-    body,
-  });
+function sendAdmission({ key, body }: Attempt<RunRequest>) {
+  return admitRun(writes, body, { "Idempotency-Key": key });
 }
 
 export interface ContinueProblem {
@@ -31,7 +27,7 @@ export function useContinueRun(runId: string) {
   const [problem, setProblem] = useState<ContinueProblem | null>(null);
   const [already, setAlready] = useState(false);
   // One key until the outcome is known, and one press at a time (Decision 0027 D2).
-  const admission = useSubmit();
+  const admission = useSubmit<RunRequest>();
 
   async function run(): Promise<void> {
     setProblem(null);
@@ -42,14 +38,13 @@ export function useContinueRun(runId: string) {
         choice.refused = field === null;
         return field === null
           ? null
-          : JSON.stringify({
+          : {
               // Left out on purpose: the server repeats the goal it stored, whole.
               continues_run_id: runId,
               ...field,
-            } satisfies RunRequest);
+            };
       },
       send: sendAdmission,
-      parse: parseRunAccepted,
     });
     if (choice.refused)
       setProblem({ outcome: "refused", text: CHOICE_NOT_OFFERED });

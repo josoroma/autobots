@@ -44,16 +44,6 @@ export function previewVersion(
   return workflow.draft !== null ? "draft" : null;
 }
 
-/** Where a preview of one version, or the draft, is read. */
-export function previewPath(workflowId: string, version: string): string {
-  return `/api/v1/workflows/${encodeURIComponent(workflowId)}/preview?version=${encodeURIComponent(version)}`;
-}
-
-/** Where one workflow's recent executions are read. */
-export function executionsPath(workflowId: string): string {
-  return `/api/v1/workflows/${encodeURIComponent(workflowId)}/executions`;
-}
-
 /** An execution's spend, an estimate while a reservation is held or a charge went unreported. */
 export function spendText(execution: WorkflowExecutionSummary): string {
   const { micro, estimated } = spendOf(

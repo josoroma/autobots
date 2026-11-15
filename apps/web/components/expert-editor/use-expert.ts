@@ -2,9 +2,10 @@
  * One Expert's read (XWEB-05, WBLD-10), with its own loading and unavailable states. After a save,
  * the view the service returned is shown instead, until another Expert is opened.
  */
-import { parseExpertView, type ExpertView } from "@autobots/api-client";
+import { getExpert, type ExpertView } from "@autobots/api-client";
 import { useState } from "react";
 
+import { readOf } from "@/lib/load";
 import { useResource, type Resource } from "@/lib/use-resource";
 
 export interface ExpertRead {
@@ -15,10 +16,7 @@ export interface ExpertRead {
 }
 
 export function useExpert(expertId: string): ExpertRead {
-  const read = useResource(
-    `/api/v1/experts/${encodeURIComponent(expertId)}`,
-    parseExpertView,
-  );
+  const read = useResource(readOf(getExpert, expertId));
   const [written, setWritten] = useState<{
     expertId: string;
     view: ExpertView;

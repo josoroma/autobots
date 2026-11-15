@@ -1,6 +1,6 @@
 "use client";
 
-import { parseExecutionView, type ExecutionView } from "@autobots/api-client";
+import { getWorkflowExecution, type ExecutionView } from "@autobots/api-client";
 import Link from "next/link";
 
 import { StateLine } from "@/components/runs/run-state";
@@ -12,7 +12,7 @@ import { useToolUses } from "@/components/runs/tool-uses/use-tool-uses";
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
-import { backoff, type Loaded } from "@/lib/load";
+import { backoff, readOf, type Loaded } from "@/lib/load";
 import { isRunStatus, isTerminal, stopReasonText } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
@@ -52,8 +52,7 @@ function nextPoll(
 /** Shows what's saved. It only reads, so reconnecting can't start or repeat anything. */
 export function WorkflowMonitor({ executionId }: { executionId: string }) {
   const { state, value: view } = useResource(
-    `/api/v1/workflow-executions/${encodeURIComponent(executionId)}`,
-    parseExecutionView,
+    readOf(getWorkflowExecution, executionId),
     { poll: nextPoll },
   );
   const connection =

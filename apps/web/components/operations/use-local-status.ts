@@ -3,8 +3,9 @@
  * a retention save, and a reply that arrives late never replaces a newer one (WTAP-04). The status
  * stays shown while a newer read is pending; a failed read shows why in its place.
  */
-import { parseLocalStatus, type LocalStatus } from "@autobots/api-client";
+import { getLocalStatus, type LocalStatus } from "@autobots/api-client";
 
+import { readOf } from "@/lib/load";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
 export interface LocalStatusRead {
@@ -21,7 +22,7 @@ export interface LocalStatusRead {
 }
 
 export function useLocalStatus(): LocalStatusRead {
-  const read = useResource("/api/v1/operations/local-status", parseLocalStatus);
+  const read = useResource(readOf(getLocalStatus));
   const failed = !read.pending && read.state.kind !== "ready";
   return {
     status: failed ? null : read.value,

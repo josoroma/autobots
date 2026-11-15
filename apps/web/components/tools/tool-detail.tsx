@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  parseToolGrants,
-  parseToolVersions,
+  getToolGrants,
+  getToolVersions,
   type ToolDescriptor,
 } from "@autobots/api-client";
 import { useState } from "react";
@@ -20,6 +20,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { LoadState } from "@/components/ui/load-state";
+import { readOf } from "@/lib/load";
 import {
   keySource,
   OPERATION_CLASS_LABEL,
@@ -84,14 +85,10 @@ function ToolIdentity({
  */
 export function ToolDetail({ toolId }: { toolId: string }) {
   const { state, pending, reload } = useResource(
-    `/api/v1/tools/${encodeURIComponent(toolId)}`,
-    parseToolVersions,
+    readOf(getToolVersions, toolId),
   );
   // Who grants the tool needs only its ID, so it's read alongside its versions, not after them.
-  const grants = useResource(
-    `/api/v1/tools/${encodeURIComponent(toolId)}/grants`,
-    parseToolGrants,
-  );
+  const grants = useResource(readOf(getToolGrants, toolId));
   const [chosen, setChosen] = useState<number | null>(null);
   if (state.kind !== "ready") {
     return (

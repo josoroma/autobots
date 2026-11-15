@@ -1,6 +1,6 @@
 "use client";
 
-import { parseRunWorkspace } from "@autobots/api-client";
+import { getRunWorkspace } from "@autobots/api-client";
 import { CircleAlert, RotateCw } from "lucide-react";
 import Link from "next/link";
 
@@ -15,6 +15,7 @@ import {
 } from "@/components/runs/panel/use-panel-commands";
 import { RunCommandButtons } from "@/components/runs/run-command-buttons";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { readOf } from "@/lib/load";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
 // PRD-Studio RN-04: one run's progress and controls, under the list so Tab never climbs back up.
@@ -25,10 +26,7 @@ export function RunPanel({
   runId: string;
   onChanged: () => void;
 }) {
-  const { state, reload } = useResource(
-    `/api/v1/runs/${encodeURIComponent(runId)}/workspace`,
-    parseRunWorkspace,
-  );
+  const { state, reload } = useResource(readOf(getRunWorkspace, runId));
   const commands = usePanelCommands(runId, () => {
     reload();
     onChanged();

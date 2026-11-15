@@ -4,13 +4,13 @@
  * must act on first (XERR-04), with Retry for an outage.
  */
 import {
-  parseModelList,
-  parseModelPolicyState,
+  getModelPolicy,
+  getModels,
   type ModelList,
   type ModelPolicyState,
 } from "@autobots/api-client";
 
-import { worstFailure } from "@/lib/load";
+import { readOf, worstFailure } from "@/lib/load";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
 const LOADING: ResourceState<unknown> = { kind: "loading" };
@@ -25,11 +25,8 @@ export interface PolicyRead {
 }
 
 export function usePolicyRead(): PolicyRead {
-  const models = useResource("/api/models", parseModelList);
-  const policy = useResource(
-    "/api/settings/model-policy",
-    parseModelPolicyState,
-  );
+  const models = useResource(readOf(getModels));
+  const policy = useResource(readOf(getModelPolicy));
   return {
     models: models.value,
     policy: policy.value,

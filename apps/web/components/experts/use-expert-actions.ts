@@ -3,7 +3,7 @@
  * Experts chosen, and a new Expert. Session starts share one write at a time; each says why it
  * didn't open in the create section's message, as a create does.
  */
-import { parseExpertView } from "@autobots/api-client";
+import { createExpert } from "@autobots/api-client";
 import { useState } from "react";
 
 import { useStartSession } from "@/components/experts/use-start-session";
@@ -39,9 +39,8 @@ export function useExpertActions(): ExpertActions {
   const [routed, setRouted] = useState<ReadonlySet<string>>(() => new Set());
   const create = useCreateByName(
     {
-      endpoint: "/api/v1/experts",
+      operation: createExpert,
       body: (name) => ({ name, config: {} }),
-      parse: parseExpertView,
       hrefFor: (expert) => `/experts/${expert.id}`,
       refusals: CREATE_REFUSALS,
     },

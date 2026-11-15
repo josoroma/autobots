@@ -1,5 +1,5 @@
 import {
-  parseRunPreview,
+  previewRun,
   type RunPreview,
   type WorkflowView,
 } from "@autobots/api-client";
@@ -15,6 +15,7 @@ import { FIELD_LABEL } from "@/components/workflow-editor/field-label";
 import { useVersionRun } from "@/components/workflow-editor/use-version-run";
 import { budgetOffer, type BudgetOffer } from "@/lib/budget";
 import { formatUsd } from "@/lib/format";
+import { readOf } from "@/lib/load";
 import { useResource, type Resource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
@@ -85,7 +86,7 @@ export function RunVersionCard({
   workflow: WorkflowView;
   className?: string;
 }) {
-  const preview = useResource("/api/v1/run-preview", parseRunPreview);
+  const preview = useResource(readOf(previewRun));
   const offer =
     preview.state.kind === "ready"
       ? budgetOffer(preview.state.value.budget)

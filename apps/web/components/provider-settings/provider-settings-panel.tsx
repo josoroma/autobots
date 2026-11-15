@@ -1,6 +1,6 @@
 "use client";
 
-import { parseProviderStatus } from "@autobots/api-client";
+import { getModelProviders } from "@autobots/api-client";
 
 import { ConnectionBar } from "@/components/provider-settings/connection-bar";
 import { KeyActions } from "@/components/provider-settings/key-actions";
@@ -12,15 +12,13 @@ import { RouteQualifications } from "@/components/provider-settings/route-qualif
 import { useProviderWrites } from "@/components/provider-settings/use-provider-writes";
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
+import { readOf } from "@/lib/load";
 import { useSettingsRead } from "@/lib/use-settings-read";
 
 // PRD-Model-Providers: the OpenRouter key's source and status, its field and actions, and each
 // route's live qualification. Saving checks the key's metadata only and starts no model call.
 export function ProviderSettingsPanel() {
-  const read = useSettingsRead(
-    "/api/settings/model-providers",
-    parseProviderStatus,
-  );
+  const read = useSettingsRead(readOf(getModelProviders));
   const writes = useProviderWrites(read);
   const status = read.value;
   if (status === null) {

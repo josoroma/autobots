@@ -6,6 +6,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { ContractError } from "@autobots/api-client/runtime";
+
 import { forgetCsrfToken } from "../../lib/csrf-fetch.ts";
 import {
   COMMAND_LABEL,
@@ -36,10 +38,10 @@ test("Pause and Resume share the run as their target, and Cancel has its own", (
 });
 
 test("the body carries the version the sender means", () => {
-  assert.equal(commandBody(7), '{"expected_version":7}');
+  assert.deepEqual(commandBody(7), { expected_version: 7 });
 });
 
-test("a command is one POST to its route, with its key, body and write token", async () => {
+test("each command is one POST to its own route, with its key, body and write token", async () => {
   forgetCsrfToken();
   const sent: { url: string; init: RequestInit | undefined }[] = [];
   const real = globalThis.fetch;
@@ -53,28 +55,36 @@ test("a command is one POST to its route, with its key, body and write token", a
     return new Response("{}");
   };
   try {
-    await sendRunCommand(`${RUN}/x`, "pause", {
-      key: "k1",
-      body: commandBody(3),
-    });
+    // That reply isn't a command's result, so it's refused as drift; the request is what's checked.
+    for (const command of ["pause", "resume", "cancel"] as const) {
+      await assert.rejects(
+        sendRunCommand(`${RUN}/x`, command, {
+          key: `k-${command}`,
+          body: commandBody(3),
+        }),
+        ContractError,
+      );
+    }
   } finally {
     globalThis.fetch = real;
     forgetCsrfToken();
   }
-  assert.deepEqual(sent, [
-    {
-      url: `/api/v1/runs/${encodeURIComponent(`${RUN}/x`)}/pause`,
+  // Each command to its own route, so a swapped mapping fails.
+  assert.deepEqual(
+    sent,
+    (["pause", "resume", "cancel"] as const).map((command) => ({
+      url: `/api/v1/runs/${encodeURIComponent(`${RUN}/x`)}/${command}`,
       init: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": "k1",
+          "Idempotency-Key": `k-${command}`,
           "x-autobots-csrf": "t1",
         },
         body: '{"expected_version":3}',
       },
-    },
-  ]);
+    })),
+  );
 });
 
 const summary = (version: number) => ({

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { NextResponse, type NextRequest } from "next/server";
 
+import type { CsrfToken } from "@/lib/api/bff-bodies";
 import { failed } from "@/lib/bff";
 import { cookieOptions } from "@/lib/bff-policy";
 import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/request-guard";
@@ -25,7 +26,10 @@ export function GET(request: NextRequest): NextResponse {
   } catch (error) {
     return failed("GET /api/csrf", error);
   }
-  const response = NextResponse.json({ header: CSRF_HEADER, token });
+  const response = NextResponse.json({
+    header: CSRF_HEADER,
+    token,
+  } satisfies CsrfToken);
   // Secure on an https origin, as the session and workspace cookies are (WSHL-05).
   response.cookies.set(CSRF_COOKIE, token, cookieOptions(origin, false));
   response.headers.set("Cache-Control", "no-store");

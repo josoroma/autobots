@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  readWorkspaceChoice,
+  type WorkspaceChoice,
+} from "@/lib/api/bff-bodies";
 import { failed, jsonError, refusalFor } from "@/lib/bff";
 import { cookieOptions, readJsonObject } from "@/lib/bff-policy";
 import { API_UNAVAILABLE, NOT_SIGNED_IN } from "@/lib/failure";
@@ -29,7 +33,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (refused !== null) {
       return refused;
     }
-    const chosen = (await readJsonObject(request))?.workspace_id;
+    const chosen = readWorkspaceChoice(
+      await readJsonObject(request),
+    )?.workspace_id;
     if (!isWorkspaceId(chosen)) {
       return jsonError(INVALID_WORKSPACE);
     }
@@ -44,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return jsonError(NOT_A_MEMBER);
     }
     const reply = NextResponse.json(
-      { workspace_id: chosen },
+      { workspace_id: chosen } satisfies WorkspaceChoice,
       { headers: { "Cache-Control": "no-store" } },
     );
     reply.cookies.set(

@@ -1,6 +1,6 @@
 "use client";
 
-import { parseRunInspector } from "@autobots/api-client";
+import { getRunInspector } from "@autobots/api-client";
 import Link from "next/link";
 
 import {
@@ -11,6 +11,7 @@ import {
 import { ModelCalls } from "@/components/runs/inspector/model-calls";
 import { LoadState } from "@/components/ui/load-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { readOf } from "@/lib/load";
 import { RUN_NOT_FOUND } from "@/lib/runs/workspace-load";
 import { useResource } from "@/lib/use-resource";
 
@@ -18,8 +19,7 @@ import { useResource } from "@/lib/use-resource";
 // outage offers Retry (WRUN-02, PRD-Development-Harness DH-06). It reads once; Retry reads again.
 export function RunInspectorView({ runId }: { runId: string }) {
   const { state, pending, reload } = useResource(
-    `/api/v1/runs/${encodeURIComponent(runId)}/inspector`,
-    parseRunInspector,
+    readOf(getRunInspector, runId),
   );
   if (state.kind !== "ready") {
     return (

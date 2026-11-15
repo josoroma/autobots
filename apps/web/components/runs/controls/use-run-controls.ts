@@ -4,14 +4,14 @@
  * other is pending.
  */
 import {
-  parseReconciliationResult,
-  parseRunCommandResult,
+  reconcileRunModelCalls,
   type ErrorResponse,
   type ModelCallReconciliation,
+  type RunCommandRequest,
 } from "@autobots/api-client";
 import { useState, type FormEvent } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes as writeClient } from "@/lib/api/browser";
 import { chargeEntry } from "@/lib/runs/charges";
 import {
   COMMAND_LABEL,
@@ -21,7 +21,7 @@ import {
   sendRunCommand,
   type RunCommand,
 } from "@/lib/runs/commands";
-import { changedChoice, labelOf, withHeld, type Attempt } from "@/lib/submit";
+import { changedChoice, labelOf, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 function refusalOf(failure: ErrorResponse | null): string {
@@ -63,14 +63,13 @@ function useCommandWrites(
   onChanged: () => void,
   say: Say,
 ) {
-  const writes = useSubmit();
+  const writes = useSubmit<RunCommandRequest>();
   async function send(command: RunCommand): Promise<void> {
     say(QUIET);
     const result = await writes.submit({
       // A worker moves the version often, so each press reads the run's current one.
       body: async () => commandBody(await currentVersion(runId, version)),
       send: (attempt) => sendRunCommand(runId, command, attempt),
-      parse: parseRunCommandResult,
       scope: commandTarget(command),
       choice: command,
     });
@@ -85,17 +84,6 @@ function useCommandWrites(
     onChanged();
   }
   return { pending: writes.pending, send };
-}
-
-function sendCharge(runId: string, { key, body }: Attempt): Promise<Response> {
-  return csrfFetch(
-    `/api/v1/runs/${encodeURIComponent(runId)}/model-calls/reconcile`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
-      body,
-    },
-  );
 }
 
 export interface ChargeWrites {
@@ -113,7 +101,7 @@ function useChargeWrites(
   onChanged: () => void,
   say: Say,
 ): ChargeWrites {
-  const writes = useSubmit();
+  const writes = useSubmit<ModelCallReconciliation>();
   const [value, setValue] = useState("");
   async function reconcile(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -125,12 +113,12 @@ function useChargeWrites(
           say(refuse(entry.problem));
           return null;
         }
-        return JSON.stringify({
-          charged_micro_usd: entry.micro,
-        } satisfies ModelCallReconciliation);
+        return { charged_micro_usd: entry.micro };
       },
-      send: (attempt) => sendCharge(runId, attempt),
-      parse: parseReconciliationResult,
+      send: ({ key, body }) =>
+        reconcileRunModelCalls(writeClient, runId, body, {
+          "Idempotency-Key": key,
+        }),
     });
     if (result === null) return;
     if (result.outcome === "accepted" && result.value !== null) {

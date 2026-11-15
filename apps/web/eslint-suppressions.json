@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "lib/service-status.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
   "tests/browser/appearance.spec.ts": {
     "max-lines": {
       "count": 1

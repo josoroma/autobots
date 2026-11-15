@@ -13,16 +13,17 @@ import {
   expansion,
   expansionText,
   grantable,
+  type GrantCatalog,
   grantGroups,
+  type GrantTool,
   groupGrantLabel,
   groupLocked,
   toolGrant,
   toolGrantLabel,
+  type ToolGroup,
   unavailableText,
   withGroup,
   withTool,
-  type GrantCatalog,
-  type GrantTool,
 } from "../../lib/experts/grants.ts";
 
 const tool = (
@@ -58,7 +59,7 @@ const catalog: GrantCatalog<GrantTool> = {
   ],
 };
 
-const draft = (tools: string[] = [], groups: string[] = []) => ({
+const draft = (tools: string[] = [], groups: ToolGroup[] = []) => ({
   tools,
   groups,
   purpose: "kept",

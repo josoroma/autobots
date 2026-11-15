@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { readSignInRequest, type SessionState } from "@/lib/api/bff-bodies";
 import { failed, jsonError, refusalFor } from "@/lib/bff";
 import { readJsonObject } from "@/lib/bff-policy";
 import { SIGN_IN_FAILED, signInRefusal } from "@/lib/failure";
@@ -23,21 +24,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (refused !== null) {
       return refused;
     }
-    const body = await readJsonObject(request);
-    const email = body?.email;
-    const password = body?.password;
-    if (
-      typeof email !== "string" ||
-      typeof password !== "string" ||
-      email === "" ||
-      password === ""
-    ) {
+    const credentials = readSignInRequest(await readJsonObject(request));
+    if (credentials === null) {
       return jsonError(SIGN_IN_FAILED);
     }
     const client = await sessionClient();
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { error } = await client.auth.signInWithPassword(credentials);
     if (error === null) {
-      return NextResponse.json({ signed_in: true });
+      return NextResponse.json({ signed_in: true } satisfies SessionState);
     }
     const refusal = signInRefusal(error);
     if (refusal !== SIGN_IN_FAILED) {
@@ -70,7 +64,9 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
         return jsonError(SIGN_OUT_FAILED);
       }
     }
-    const reply = NextResponse.json({ signed_in: false });
+    const reply = NextResponse.json({
+      signed_in: false,
+    } satisfies SessionState);
     reply.cookies.delete(WORKSPACE_COOKIE);
     return reply;
   } catch (error) {

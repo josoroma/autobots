@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  parseModelList,
-  parseToolCatalog,
+  getModels,
+  listTools,
   type ExpertView,
   type ModelList,
   type ToolCatalog,
@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { expansion } from "@/lib/experts/grants";
+import { readOf } from "@/lib/load";
+import { profileChoice } from "@/lib/model-profile";
 import { useResource, type Resource } from "@/lib/use-resource";
 
 /**
@@ -86,7 +88,11 @@ function EditorLayout({
             models={models}
             held={held}
             dropped={form.dropped}
-            onChange={(executor) => setDraft({ ...draft, executor })}
+            onChange={(value) => {
+              // A value that isn't a profile is ignored (PRD-Model-Providers MP-A08).
+              const executor = profileChoice(value);
+              if (executor !== null) setDraft({ ...draft, executor });
+            }}
           />
           {held ? <HeldNote /> : null}
           <div className="flex flex-wrap gap-2 border-t pt-5">
@@ -122,8 +128,8 @@ function EditorLayout({
  */
 export function ExpertEditor({ expertId }: { expertId: string }) {
   const { read, expert, saved } = useExpert(expertId);
-  const catalog = useResource("/api/v1/tools", parseToolCatalog);
-  const models = useResource("/api/models", parseModelList);
+  const catalog = useResource(readOf(listTools));
+  const models = useResource(readOf(getModels));
   if (expert === null) {
     return (
       <LoadState

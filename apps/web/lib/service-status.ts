@@ -37,16 +37,13 @@ export function readValue<T>(read: MemberRead<T>): T | null {
 }
 
 function client(headers: Record<string, string>): ClientOptions {
-  return {
-    baseUrl: serverConfig().apiUrl,
-    fetch: ((input, init) =>
-      fetch(input, {
-        ...init,
-        cache: "no-store",
-        signal: AbortSignal.timeout(3_000),
-      })) as typeof fetch,
-    headers,
-  };
+  const timed: typeof fetch = (input, init) =>
+    fetch(input, {
+      ...init,
+      cache: "no-store",
+      signal: AbortSignal.timeout(3_000),
+    });
+  return { baseUrl: serverConfig().apiUrl, fetch: timed, headers };
 }
 
 /**

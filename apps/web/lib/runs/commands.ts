@@ -7,13 +7,17 @@
  * browser and under `node --test`.
  */
 import {
-  parseRunSummary,
+  cancelRun,
+  getRun,
+  pauseRun,
+  resumeRun,
   type RunCommandRequest,
+  type RunCommandResult,
   type RunWorkspace,
 } from "@autobots/api-client";
 
-import { csrfFetch } from "../csrf-fetch.ts";
-import { loadJson, type LoadOptions } from "../load.ts";
+import { writes } from "../api/browser.ts";
+import { load, readOf, type LoadOptions } from "../load.ts";
 
 export type RunCommand = RunWorkspace["allowed_commands"][number];
 
@@ -29,11 +33,16 @@ export function commandTarget(command: RunCommand): string {
 }
 
 /** The body of every command: the version the sender means, which the service checks. */
-export function commandBody(expectedVersion: number): string {
-  return JSON.stringify({
-    expected_version: expectedVersion,
-  } satisfies RunCommandRequest);
+export function commandBody(expectedVersion: number): RunCommandRequest {
+  return { expected_version: expectedVersion };
 }
+
+// Each command's generated operation, which takes the same body and key.
+const SEND: Readonly<Record<RunCommand, typeof pauseRun>> = {
+  pause: pauseRun,
+  resume: resumeRun,
+  cancel: cancelRun,
+};
 
 /**
  * One attempt at a command, with the key the submit hook holds until its outcome is known, so a
@@ -42,15 +51,10 @@ export function commandBody(expectedVersion: number): string {
 export function sendRunCommand(
   runId: string,
   command: RunCommand,
-  attempt: { key: string; body: string },
-): Promise<Response> {
-  return csrfFetch(`/api/v1/runs/${encodeURIComponent(runId)}/${command}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Idempotency-Key": attempt.key,
-    },
-    body: attempt.body,
+  attempt: { key: string; body: RunCommandRequest },
+): Promise<RunCommandResult> {
+  return SEND[command](writes, runId, attempt.body, {
+    "Idempotency-Key": attempt.key,
   });
 }
 
@@ -63,10 +67,6 @@ export async function currentVersion(
   shown: number,
   options: LoadOptions = {},
 ): Promise<number> {
-  const loaded = await loadJson(
-    `/api/v1/runs/${encodeURIComponent(runId)}`,
-    parseRunSummary,
-    options,
-  );
+  const loaded = await load(readOf(getRun, runId), options);
   return loaded.kind === "ready" ? loaded.value.version : shown;
 }

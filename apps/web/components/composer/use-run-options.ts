@@ -3,14 +3,15 @@
  * the person's model, Expert and budget choices. A list that can't be read offers only its default.
  */
 import {
+  getModels,
+  listExperts,
   type ExpertView,
   type ModelAvailability,
   type ModelProfileId,
-  parseExpertList,
-  parseModelList,
 } from "@autobots/api-client";
 import { useState } from "react";
 
+import { readOf } from "@/lib/load";
 import { useResource } from "@/lib/use-resource";
 
 /** The Expert choice for a goal run, which starts no session. */
@@ -33,8 +34,8 @@ export interface RunOptions {
 }
 
 export function useRunOptions(): RunOptions {
-  const expertRead = useResource("/api/v1/experts", parseExpertList);
-  const modelRead = useResource("/api/models", parseModelList);
+  const expertRead = useResource(readOf(listExperts));
+  const modelRead = useResource(readOf(getModels));
   const [profile, chooseProfile] = useState("");
   const [expertId, chooseExpert] = useState(NO_EXPERT);
   const [chosenBudget, setChosenBudget] = useState<number | null>(null);

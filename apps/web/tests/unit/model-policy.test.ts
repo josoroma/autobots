@@ -107,7 +107,7 @@ test("the form starts as saved, and only a different default or override is a ch
 });
 
 test("choosing Workspace default removes a role's override, and the old overrides are kept", () => {
-  const before = { coder: "openrouter_terra" };
+  const before = { coder: "openrouter_terra" } as const;
   assert.deepEqual(withOverride(before, "planner", "openrouter_sol"), {
     coder: "openrouter_terra",
     planner: "openrouter_sol",
@@ -173,12 +173,10 @@ test("prices, the fetch time and a model's label read as the suites expect", () 
 test("a save sends the version it was loaded at, and the built-in default as null", () => {
   const saved = policy("openrouter_terra", {});
   assert.deepEqual(
-    JSON.parse(
-      policyBody(saved, {
-        defaultProfile: BUILTIN_DEFAULT,
-        overrides: { coder: "openrouter_sol" },
-      }),
-    ),
+    policyBody(saved, {
+      defaultProfile: BUILTIN_DEFAULT,
+      overrides: { coder: "openrouter_sol" },
+    }),
     {
       expected_version: 7,
       default_profile: null,
@@ -186,10 +184,9 @@ test("a save sends the version it was loaded at, and the built-in default as nul
     },
   );
   assert.deepEqual(
-    JSON.parse(
-      policyBody(saved, { defaultProfile: "openrouter_sol", overrides: {} }),
-    ).default_profile,
+    policyBody(saved, { defaultProfile: "openrouter_sol", overrides: {} })
+      .default_profile,
     "openrouter_sol",
   );
-  assert.deepEqual(JSON.parse(resetBody(saved)), { expected_version: 7 });
+  assert.deepEqual(resetBody(saved), { expected_version: 7 });
 });

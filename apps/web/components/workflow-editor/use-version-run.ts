@@ -2,15 +2,26 @@
  * Starting an execution of a published version, with its inputs and a budget from the server's
  * range (PRD-Studio WF-02, WF-05). Runs bind published versions only; the service owns the run.
  */
-import { parseExecutionBinding, type WorkflowView } from "@autobots/api-client";
+import {
+  parseExecutionBinding,
+  type ExecutionCreate,
+  type WorkflowView,
+} from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { writeAsTyped } from "@/lib/api/browser";
 import { budgetFor, type BudgetOffer } from "@/lib/budget";
-import { csrfFetch } from "@/lib/csrf-fetch";
 import { withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 import { parseJsonText } from "@/lib/workflow-ir";
+import { executionRoute } from "@/lib/workflows/unchecked-writes";
+
+/**
+ * createWorkflowExecution's body, with the inputs as the person typed them, which only the service
+ * validates against the version's input blocks (R-48).
+ */
+type Execution = Omit<ExecutionCreate, "inputs"> & { inputs: unknown };
 
 export interface VersionRun {
   /** The version a run binds, or null while none is published. */
@@ -39,7 +50,7 @@ export function useVersionRun(
 ): VersionRun {
   // One key per press until its outcome is known (Decision 0027 D2): a double click or a lost reply
   // starts one execution, with one budget (WBLD-02).
-  const executions = useSubmit();
+  const executions = useSubmit<Execution>();
   const router = useRouter();
   const [choice, setChoice] = useState<Choice | null>(null);
   const [inputs, setInputs] = useState("{}");
@@ -60,27 +71,21 @@ export function useVersionRun(
           setMessage("The inputs aren't valid JSON.");
           return null;
         }
-        return JSON.stringify({
+        return {
           version,
           inputs: values,
           ...(offer.kind === "unknown" || offer.choices.length === 0
             ? {}
             : { budget_micro_usd: budget }),
-        });
+        };
       },
       send: ({ key, body }) =>
-        csrfFetch(
-          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/executions`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Idempotency-Key": key,
-            },
-            body,
-          },
+        writeAsTyped(
+          executionRoute(workflow.id),
+          body,
+          parseExecutionBinding,
+          key,
         ),
-      parse: parseExecutionBinding,
     });
     if (result === null) return;
     if (result.outcome === "accepted" && result.value !== null) {

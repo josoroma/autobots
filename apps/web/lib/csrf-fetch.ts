@@ -5,31 +5,16 @@
  * and is sent once more. The request guard refuses before anything is forwarded, so that resend
  * can't repeat a write.
  */
-interface Token {
-  header: string;
-  token: string;
-}
+import { parseCsrfToken, type CsrfToken } from "./api/bff-bodies.ts";
 
 const REFUSED_TOKEN = new Set(["invalid_csrf", "missing_csrf"]);
-let cached: Promise<Token> | null = null;
+let cached: Promise<CsrfToken> | null = null;
 
-function csrfToken(fresh: boolean): Promise<Token> {
+function csrfToken(fresh: boolean): Promise<CsrfToken> {
   if (fresh || cached === null) {
     cached = fetch("/api/csrf", { cache: "no-store" })
       .then((reply) => reply.json())
-      .then((body: unknown) => {
-        if (
-          typeof body === "object" &&
-          body !== null &&
-          "header" in body &&
-          "token" in body &&
-          typeof body.header === "string" &&
-          typeof body.token === "string"
-        ) {
-          return { header: body.header, token: body.token };
-        }
-        throw new Error("the CSRF token reply is malformed");
-      });
+      .then(parseCsrfToken);
     // A failed fetch isn't kept, so the next write asks again.
     cached.catch(() => {
       cached = null;

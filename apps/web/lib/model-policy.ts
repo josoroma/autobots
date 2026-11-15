@@ -7,8 +7,11 @@
  */
 import type {
   BindingSource,
+  ExpectedVersion,
   ModelAvailability,
   ModelPolicyState,
+  ModelPolicyUpdate,
+  ModelProfileId,
   RoleBinding,
 } from "@autobots/api-client";
 
@@ -22,8 +25,8 @@ export const BUILTIN_DEFAULT = "";
 
 /** The form's choices, a UI model apart from the contract's ModelPolicyUpdate. */
 export interface PolicyDraft {
-  defaultProfile: string;
-  overrides: Record<string, string>;
+  defaultProfile: ModelProfileId | typeof BUILTIN_DEFAULT;
+  overrides: Record<string, ModelProfileId>;
 }
 
 export function draftOf(state: ModelPolicyState): PolicyDraft {
@@ -48,10 +51,10 @@ export function sameForm(state: ModelPolicyState, draft: PolicyDraft): boolean {
 
 /** The overrides with one role's choice, where Workspace default removes its override. */
 export function withOverride(
-  overrides: Readonly<Record<string, string>>,
+  overrides: Readonly<Record<string, ModelProfileId>>,
   role: string,
-  profile: string,
-): Record<string, string> {
+  profile: ModelProfileId | typeof WORKSPACE_DEFAULT,
+): Record<string, ModelProfileId> {
   const next = { ...overrides };
   if (profile === WORKSPACE_DEFAULT) delete next[role];
   else next[role] = profile;
@@ -121,18 +124,18 @@ export function modelLabel(canonicalId: string, wireId: string): string {
 export function policyBody(
   state: ModelPolicyState,
   draft: PolicyDraft,
-): string {
-  return JSON.stringify({
+): ModelPolicyUpdate {
+  return {
     expected_version: state.version,
     default_profile:
       draft.defaultProfile === BUILTIN_DEFAULT ? null : draft.defaultProfile,
     role_overrides: draft.overrides,
-  });
+  };
 }
 
 /** MD-03: Reset all clears every role override under the version this screen loaded. */
-export function resetBody(state: ModelPolicyState): string {
-  return JSON.stringify({ expected_version: state.version });
+export function resetBody(state: ModelPolicyState): ExpectedVersion {
+  return { expected_version: state.version };
 }
 
 export const POLICY_SAVED =

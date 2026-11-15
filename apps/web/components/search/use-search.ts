@@ -3,10 +3,15 @@
  * once it pauses, and a newer read aborts an older one. `current` says whether the results shown are
  * for the words typed now, since the last ones stay shown while a newer search is pending.
  */
-import { parseSearchResults, type SearchResult } from "@autobots/api-client";
+import { search, type SearchResult } from "@autobots/api-client";
 
 import { useMismatchLog } from "@/components/ui/load-state";
-import { failureWords, worstFailure, type LoadFailure } from "@/lib/load";
+import {
+  failureWords,
+  readOf,
+  worstFailure,
+  type LoadFailure,
+} from "@/lib/load";
 import {
   SEARCH_DELAY_MS,
   SEARCH_WHAT,
@@ -32,11 +37,9 @@ export interface Search {
 
 export function useSearch(query: string): Search {
   const term = query.trim();
-  const read = useResource(
-    term === "" ? null : `/api/v1/search?q=${encodeURIComponent(term)}`,
-    parseSearchResults,
-    { delayMs: SEARCH_DELAY_MS },
-  );
+  const read = useResource(term === "" ? null : readOf(search, { q: term }), {
+    delayMs: SEARCH_DELAY_MS,
+  });
   useMismatchLog(read.state);
   const results = read.state.kind === "ready" ? read.state.value.results : [];
   const failure = worstFailure([read.state]);

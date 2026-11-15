@@ -41,11 +41,11 @@ for (const typed of [
 // R-59: the retention form's request and outcome, which the Operations suites read.
 test("two windows in the contract's range make one request", () => {
   assert.deepEqual(retentionRequest("30", "60"), {
-    body: JSON.stringify({ run_days: 30, receipt_days: 60 }),
+    body: { run_days: 30, receipt_days: 60 },
     invalid: { run: false, receipt: false },
   });
   assert.deepEqual(retentionRequest("", " "), {
-    body: JSON.stringify({ run_days: null, receipt_days: null }),
+    body: { run_days: null, receipt_days: null },
     invalid: { run: false, receipt: false },
   });
 });
@@ -60,7 +60,7 @@ test("a malformed or out-of-range window is marked, and nothing is sent", () => 
     invalid: { run: true, receipt: true },
   });
   assert.deepEqual(retentionRequest("36500", "1"), {
-    body: JSON.stringify({ run_days: 36500, receipt_days: 1 }),
+    body: { run_days: 36500, receipt_days: 1 },
     invalid: { run: false, receipt: false },
   });
 });

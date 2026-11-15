@@ -5,13 +5,14 @@
  * (Decision 0027 D2).
  */
 import {
-  parseExpertView,
+  addExpertVersion,
+  type ExpertRevision,
   type ExpertView,
   type ModelList,
 } from "@autobots/api-client";
 import { useState, type FormEvent } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import {
   draftOf,
   revisionBody,
@@ -38,7 +39,7 @@ export function useExpertDraft(
   onSaved: (view: ExpertView) => void,
   say: (message: string | null) => void,
 ): ExpertDraft {
-  const revisions = useSubmit();
+  const revisions = useSubmit<ExpertRevision>();
   const [draft, setDraft] = useState<Draft>(() => draftOf(expert));
   const { kept, dropped } = splitBindings(expert, models);
 
@@ -48,15 +49,7 @@ export function useExpertDraft(
     const result = await revisions.submit({
       body: () => revisionBody(expert, draft, kept),
       send: ({ key, body }) =>
-        csrfFetch(`/api/v1/experts/${encodeURIComponent(expert.id)}/versions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": key,
-          },
-          body,
-        }),
-      parse: parseExpertView,
+        addExpertVersion(writes, expert.id, body, { "Idempotency-Key": key }),
     });
     if (result === null) return;
     if (result.outcome === "accepted" && result.value !== null) {

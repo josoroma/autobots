@@ -1,7 +1,7 @@
-import { parseToolUseList, type ToolUseView } from "@autobots/api-client";
+import { listRunToolUses, type ToolUseView } from "@autobots/api-client";
 import { useCallback, useEffect, useState } from "react";
 
-import { loadJson, type LoadFailure } from "@/lib/load";
+import { load, readOf, type LoadFailure } from "@/lib/load";
 
 export interface ToolUses {
   uses: ToolUseView[] | null;
@@ -26,13 +26,12 @@ export function useToolUses(runId: string, version: number | string): ToolUses {
   useEffect(() => {
     // A newer read replaces this one, so this one is aborted rather than left open.
     const controller = new AbortController();
-    const load = async (): Promise<void> => {
+    const readAll = async (): Promise<void> => {
       const all: ToolUseView[] = [];
       let after = 0;
       for (;;) {
-        const page = await loadJson(
-          `/api/v1/runs/${encodeURIComponent(runId)}/tool-uses?after=${after}&limit=200`,
-          parseToolUseList,
+        const page = await load(
+          readOf(listRunToolUses, runId, { after, limit: 200 }),
           { signal: controller.signal },
         );
         if (controller.signal.aborted) return;
@@ -46,7 +45,7 @@ export function useToolUses(runId: string, version: number | string): ToolUses {
       }
       setState({ key, uses: all, failure: null });
     };
-    void load();
+    void readAll();
     return () => controller.abort();
   }, [runId, key]);
   const reload = useCallback(() => setRequest((count) => count + 1), []);

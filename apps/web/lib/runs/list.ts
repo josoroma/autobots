@@ -1,15 +1,19 @@
 /**
- * The runs list's pure parts (PRD-Studio RN-01 to RN-03): the read's path from its filters, a row's
+ * The runs list's pure parts (PRD-Studio RN-01 to RN-03): the read's query from its filters, a row's
  * state line and spend bar, and what Load more adds to one first page. Pure and JSX-free;
  * `components/runs/list/` shows them.
  */
-import type { RunList } from "@autobots/api-client";
+import type {
+  ListRunsQuery,
+  ModelProfileId,
+  RunList,
+} from "@autobots/api-client";
 
 import type { LoadFailure } from "../load.ts";
 import { RUN_STATUS_LABEL, stopReasonText } from "./status.ts";
 
-// The API's run groups, by the counts it sends (the generator emits no type for the query).
-export type RunGroup = keyof RunList["counts"];
+// The API's run groups, as the list's query names them.
+export type RunGroup = NonNullable<ListRunsQuery["group"]>;
 
 export const RUN_GROUPS: readonly { id: RunGroup; label: string }[] = [
   { id: "all", label: "All" },
@@ -21,21 +25,22 @@ export const RUN_GROUPS: readonly { id: RunGroup; label: string }[] = [
 export interface RunFilters {
   group: RunGroup;
   query: string;
-  profile: string;
+  /** A profile, or "" for any. */
+  profile: ModelProfileId | "";
 }
 
-/** The list's read. Defaults send no query string, so the first load is plain /api/v1/runs. */
-export function runListPath(
+/** The list's query. Defaults are left out, so the first load is plain /api/v1/runs. */
+export function runListQuery(
   filters: RunFilters,
   cursor: string | null,
-): string {
-  const params = new URLSearchParams();
-  if (filters.group !== "all") params.set("group", filters.group);
-  if (filters.query.trim() !== "") params.set("q", filters.query.trim());
-  if (filters.profile !== "") params.set("profile", filters.profile);
-  if (cursor !== null) params.set("cursor", cursor);
-  const search = params.toString();
-  return search === "" ? "/api/v1/runs" : `/api/v1/runs?${search}`;
+): ListRunsQuery {
+  const query = filters.query.trim();
+  return {
+    group: filters.group === "all" ? undefined : filters.group,
+    q: query === "" ? undefined : query,
+    profile: filters.profile === "" ? undefined : filters.profile,
+    cursor: cursor ?? undefined,
+  };
 }
 
 export type RunRow = RunList["runs"][number];

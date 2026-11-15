@@ -5,16 +5,20 @@
  * baseline, so the saved draft can't be published from under unsaved edits.
  */
 import {
+  discardWorkflowDraft,
   parseWorkflowValidation,
   parseWorkflowView,
+  publishWorkflowDraft,
+  type WorkflowDraftPublish,
+  type WorkflowDraftSave,
+  type WorkflowPublish,
   type WorkflowValidation,
   type WorkflowView,
 } from "@autobots/api-client";
 import { useMemo, useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
-import { readReply } from "@/lib/replies";
-import { refusalText, withHeld, type Attempt } from "@/lib/submit";
+import { writeAsTyped, writes as writeClient } from "@/lib/api/browser";
+import { refusalText, withHeld } from "@/lib/submit";
 import { useSubmit, type Submitted } from "@/lib/use-submit";
 import {
   editorGraph,
@@ -24,6 +28,11 @@ import {
   withLabel,
   type EditorGraph,
 } from "@/lib/workflow-ir";
+import {
+  draftRoute,
+  publishRoute,
+  VALIDATE_ROUTE,
+} from "@/lib/workflows/unchecked-writes";
 
 const NOT_JSON = "That isn't valid JSON.";
 const NOTHING_CHANGED = "That could not be done. Nothing changed.";
@@ -35,15 +44,12 @@ const DRAFT_REFUSALS: Readonly<Record<string, string>> = {
     "A newer version was published, so the draft wasn't. Reload and try again.",
 };
 
-// PRD-Studio WF-02: one saved draft, published under the expected version or discarded. Only
-// publishing carries a key; a save or a discard replaces the draft whole, so each press sends the
-// latest and nothing is held (Decision 0027 D2).
-const DRAFT_WRITES = {
-  save: { method: "PUT", suffix: "/draft", keyed: false },
-  discard: { method: "DELETE", suffix: "/draft", keyed: false },
-  publish: { method: "POST", suffix: "/draft/publish", keyed: true },
-} as const;
-type DraftWrite = keyof typeof DRAFT_WRITES;
+/**
+ * A body whose graph is the person's, as they typed it. Only the service validates a graph
+ * (PRD-Studio WF-02), so the editor sends it unchecked, and the rest of the body keeps its
+ * generated type (R-48).
+ */
+type WithTypedGraph<B> = Omit<B, "graph"> & { graph: unknown };
 
 export interface GraphDraft {
   /** What the Graph field shows. */
@@ -100,39 +106,13 @@ function publishWords(result: Submitted<WorkflowView>): string {
   );
 }
 
-/** Sends one draft write; only publishing the saved draft carries a key. */
-function sendDraftWrite(
-  base: string,
-  write: DraftWrite,
-  { key, body }: Attempt,
-): Promise<Response> {
-  const { method, suffix, keyed } = DRAFT_WRITES[write];
-  return csrfFetch(`${base}${suffix}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(keyed ? { "Idempotency-Key": key } : {}),
-    },
-    ...(body === "" ? {} : { body }),
-  });
-}
-
-function sendPublish(base: string, { key, body }: Attempt): Promise<Response> {
-  return csrfFetch(`${base}/versions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": key },
-    body,
-  });
-}
-
-/** The service's check of a graph, or null when it refused the shape or didn't answer. */
+/** validateWorkflow's check of a graph, or null when it refused the shape or didn't answer. */
 async function checkGraph(json: unknown): Promise<WorkflowValidation | null> {
-  const reply = await csrfFetch("/api/v1/workflows/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(json),
-  }).catch(() => null);
-  return reply?.ok === true ? readReply(reply, parseWorkflowValidation) : null;
+  try {
+    return await writeAsTyped(VALIDATE_ROUTE, json, parseWorkflowValidation);
+  } catch {
+    return null;
+  }
 }
 
 export function useGraphDraft(
@@ -141,11 +121,13 @@ export function useGraphDraft(
   say: (message: string | null) => void,
 ): GraphDraft {
   // One write at a time, and one key per intent until its outcome is known (Decision 0027 D2).
-  const publishing = useSubmit();
-  const saves = useSubmit();
-  const discards = useSubmit();
-  const draftPublishes = useSubmit();
-  const writes = { save: saves, discard: discards, publish: draftPublishes };
+  // PRD-Studio WF-02: one saved draft, published under the expected version or discarded. Only
+  // publishing carries a key; a save or a discard replaces the draft whole, so each press sends
+  // the latest and nothing is held.
+  const publishing = useSubmit<WithTypedGraph<WorkflowPublish>>();
+  const saves = useSubmit<WithTypedGraph<WorkflowDraftSave>>();
+  const discards = useSubmit<undefined>();
+  const draftPublishes = useSubmit<WorkflowDraftPublish>();
   const baseline = useMemo(() => baselineOf(workflow), [workflow]);
   // Null while the text follows the baseline.
   const [edited, setEdited] = useState<string | null>(null);
@@ -154,7 +136,6 @@ export function useGraphDraft(
   const isDirty = text !== baseline;
   const json = useMemo(() => parseJsonText(text), [text]);
   const graph = useMemo(() => editorGraph(json), [json]);
-  const base = `/api/v1/workflows/${encodeURIComponent(workflow.id)}`;
 
   function edit(next: string): void {
     setEdited(next);
@@ -168,17 +149,11 @@ export function useGraphDraft(
     );
   }
 
-  async function draftWrite(
-    write: DraftWrite,
-    body?: unknown,
-  ): Promise<WorkflowView | null> {
-    const { keyed } = DRAFT_WRITES[write];
-    const result = await writes[write].submit({
-      body: () => (body === undefined ? "" : JSON.stringify(body)),
-      send: (attempt) => sendDraftWrite(base, write, attempt),
-      parse: parseWorkflowView,
-      keyed,
-    });
+  /** What a draft write's reply leaves: the saved view, or null once it has said why not. */
+  function settled(
+    result: Submitted<WorkflowView> | null,
+    keyed: boolean,
+  ): WorkflowView | null {
     // A press while the same write is pending sends nothing, so it says nothing.
     if (result === null) return null;
     if (result.outcome === "accepted" && result.value !== null) {
@@ -209,13 +184,9 @@ export function useGraphDraft(
     }
     const sent = text;
     const result = await publishing.submit({
-      body: () =>
-        JSON.stringify({
-          expected_version: workflow.latest_version,
-          graph: json,
-        }),
-      send: (attempt) => sendPublish(base, attempt),
-      parse: parseWorkflowView,
+      body: () => ({ expected_version: workflow.latest_version, graph: json }),
+      send: ({ key, body }) =>
+        writeAsTyped(publishRoute(workflow.id), body, parseWorkflowView, key),
     });
     if (result === null) return;
     if (result.outcome !== "accepted" || result.value === null) {
@@ -238,7 +209,13 @@ export function useGraphDraft(
       return;
     }
     const sent = text;
-    if ((await draftWrite("save", { graph: json })) === null) return;
+    const result = await saves.submit({
+      body: () => ({ graph: json }),
+      send: ({ body }) =>
+        writeAsTyped(draftRoute(workflow.id), body, parseWorkflowView),
+      keyed: false,
+    });
+    if (settled(result, false) === null) return;
     follow(sent);
     say("Draft saved. Runs keep using the published versions.");
   }
@@ -247,9 +224,14 @@ export function useGraphDraft(
     if (isDirty) return;
     say(null);
     const sent = text;
-    const view = await draftWrite("publish", {
-      expected_version: workflow.latest_version,
+    const result = await draftPublishes.submit({
+      body: () => ({ expected_version: workflow.latest_version }),
+      send: ({ key, body }) =>
+        publishWorkflowDraft(writeClient, workflow.id, body, {
+          "Idempotency-Key": key,
+        }),
     });
+    const view = settled(result, true);
     if (view === null) return;
     follow(sent);
     say(
@@ -259,7 +241,12 @@ export function useGraphDraft(
 
   async function discard(): Promise<void> {
     say(null);
-    if ((await draftWrite("discard")) === null) return;
+    const result = await discards.submit({
+      body: () => undefined,
+      send: () => discardWorkflowDraft(writeClient, workflow.id),
+      keyed: false,
+    });
+    if (settled(result, false) === null) return;
     setEdited(null);
     setCheck(null);
     say("Draft discarded. The published versions are unchanged.");

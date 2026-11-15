@@ -140,7 +140,7 @@ test("a save keeps the other offered bindings and drops one that isn't offered",
 test("a revision keeps what the form doesn't edit, and binds the executor only when chosen", () => {
   const saved = expert({ skills: ["summarize"], purpose: "Old", tools: [] }, 3);
   assert.deepEqual(
-    JSON.parse(revisionBody(saved, draft(), { reviewer: "openrouter_terra" })),
+    revisionBody(saved, draft(), { reviewer: "openrouter_terra" }),
     {
       expected_version: 3,
       config: {
@@ -153,12 +153,10 @@ test("a revision keeps what the form doesn't edit, and binds the executor only w
       },
     },
   );
-  const chosen = JSON.parse(
-    revisionBody(
-      saved,
-      draft({ executor: "openrouter_sol", groups: ["files"] }),
-      {},
-    ),
+  const chosen = revisionBody(
+    saved,
+    draft({ executor: "openrouter_sol", groups: ["files"] }),
+    {},
   );
   assert.deepEqual(chosen.config.role_bindings, { executor: "openrouter_sol" });
   assert.deepEqual(chosen.config.tool_groups, ["files"]);

@@ -1,9 +1,9 @@
-import { parseRunList } from "@autobots/api-client";
+import { listRuns } from "@autobots/api-client";
 import { useState } from "react";
 
-import { loadJson } from "@/lib/load";
+import { load, readOf } from "@/lib/load";
 import {
-  runListPath,
+  runListQuery,
   withMore,
   type More,
   type RunFilters,
@@ -22,8 +22,7 @@ export function useRunList() {
   });
   const [more, setMore] = useState<More | null>(null);
   const { state, pending, reload } = useResource(
-    runListPath(filters, null),
-    parseRunList,
+    readOf(listRuns, runListQuery(filters, null)),
     { delayMs: 150 },
   );
   const base = state.kind === "ready" ? state.value : null;
@@ -34,9 +33,8 @@ export function useRunList() {
     if (base === null || list?.next_cursor == null) return;
     const kept = shown ?? { base, runs: [], next: null, failure: null };
     setMore({ ...kept, loading: true });
-    const loaded = await loadJson(
-      runListPath(filters, list.next_cursor),
-      parseRunList,
+    const loaded = await load(
+      readOf(listRuns, runListQuery(filters, list.next_cursor)),
     );
     setMore(
       loaded.kind === "ready"

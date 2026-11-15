@@ -4,7 +4,10 @@
  * The contract owns each window's range and the service the cross-field rule; this refuses
  * malformed text and checks the range with the generated parser, never a copy of it.
  */
-import { parseRetentionSettings } from "@autobots/api-client";
+import {
+  parseRetentionSettings,
+  type RetentionSettings,
+} from "@autobots/api-client";
 
 import { refusalText } from "./submit.ts";
 
@@ -32,7 +35,7 @@ function allowed(
 
 export interface RetentionRequest {
   /** The request's body, or null when either window was refused, so nothing is sent. */
-  body: string | null;
+  body: RetentionSettings | null;
   invalid: { run: boolean; receipt: boolean };
 }
 
@@ -52,7 +55,7 @@ export function retentionRequest(
     return { body: null, invalid };
   }
   return {
-    body: JSON.stringify({ run_days: run.days, receipt_days: receipt.days }),
+    body: { run_days: run.days, receipt_days: receipt.days },
     invalid,
   };
 }

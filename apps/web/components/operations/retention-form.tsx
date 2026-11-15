@@ -68,7 +68,7 @@ export function RetentionForm({
   const runDays = own.run ?? retention.run_days?.toString() ?? "";
   const receiptDays = own.receipt ?? retention.receipt_days?.toString() ?? "";
 
-  function request(): string | null {
+  function request(): RetentionSettings | null {
     const next = retentionRequest(runDays, receiptDays);
     setInvalid(next.invalid);
     return next.body;

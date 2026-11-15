@@ -2,10 +2,10 @@
  * Saves the retention windows (WSYS-01, R-19). One save at a time; it sends no key and replaces the
  * windows whole, so it's never held. An accepted save reads the status again through `onSaved`.
  */
-import { parseRetentionSettings } from "@autobots/api-client";
+import { setRetention, type RetentionSettings } from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import { retentionOutcome } from "@/lib/retention";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -14,24 +14,18 @@ export interface RetentionSave {
   /** What the newest save said, or null. */
   message: string | null;
   /** Sends the body `request` returns, or nothing when it returns null. */
-  save: (request: () => string | null) => Promise<void>;
+  save: (request: () => RetentionSettings | null) => Promise<void>;
 }
 
 export function useRetentionSave(onSaved: () => void): RetentionSave {
-  const saves = useSubmit();
+  const saves = useSubmit<RetentionSettings>();
   const [message, setMessage] = useState<string | null>(null);
 
-  async function save(request: () => string | null): Promise<void> {
+  async function save(request: () => RetentionSettings | null): Promise<void> {
     setMessage(null);
     const result = await saves.submit({
       body: request,
-      send: ({ body }) =>
-        csrfFetch("/api/v1/operations/retention", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body,
-        }),
-      parse: parseRetentionSettings,
+      send: ({ body }) => setRetention(writes, body),
       keyed: false,
     });
     if (result === null) return;

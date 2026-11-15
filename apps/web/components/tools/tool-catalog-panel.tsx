@@ -1,12 +1,13 @@
 "use client";
 
-import { parseToolCatalog } from "@autobots/api-client";
+import { listTools } from "@autobots/api-client";
 
 import { CatalogToolbar } from "@/components/tools/catalog-toolbar";
 import { ToolDialog } from "@/components/tools/tool-dialog";
 import { ToolGroupSection } from "@/components/tools/tool-group-section";
 import { useCatalogFilters } from "@/components/tools/use-catalog-filters";
 import { LoadState } from "@/components/ui/load-state";
+import { readOf } from "@/lib/load";
 import { filterTools, groupTools } from "@/lib/tools/filters";
 import { useResource } from "@/lib/use-resource";
 
@@ -24,10 +25,7 @@ function focusOpener(toolId: string): void {
  */
 export function ToolCatalogPanel() {
   const filters = useCatalogFilters();
-  const { state, pending, reload } = useResource(
-    "/api/v1/tools",
-    parseToolCatalog,
-  );
+  const { state, pending, reload } = useResource(readOf(listTools));
   if (state.kind !== "ready") {
     return (
       <LoadState

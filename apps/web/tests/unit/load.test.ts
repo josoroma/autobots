@@ -1,22 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parseSearchResults } from "@autobots/api-client";
+import { search, type SearchQuery } from "@autobots/api-client";
+import type { ClientOptions } from "@autobots/api-client/runtime";
 
+import { readsInFlight } from "../../lib/api/browser.ts";
 import {
   backoff,
   failureWords,
-  loadJson,
+  keptRead,
+  load,
   mismatchRecord,
   OUT_OF_DATE,
-  readsInFlight,
+  readOf,
+  sameRead,
   worstFailure,
   type Loaded,
   type LoadFailure,
+  type Read,
 } from "../../lib/load.ts";
 
 // One read's classification, shared by every screen that reads through lib/load.ts (XERR-03,
-// XERR-04, refactor plan R-27).
+// XERR-04, refactor plan R-27), with each read a generated operation (R-48).
 
 const FOUND = { schema_version: 1, query: "a", results: [] };
 
@@ -48,21 +53,18 @@ const json = (status: number, body: unknown) =>
     headers: { "content-type": "application/json" },
   });
 
-async function load(
-  path: string,
+/** A search for `q`, read through the browser's read client with an arranged fetch. */
+async function searched(
+  q: string,
   answer: () => Response | Promise<Response>,
 ): Promise<{ loaded: Loaded<unknown>; arranged: Arranged }> {
   const arranged = arrange(answer);
-  const loaded = await loadJson(path, parseSearchResults, {
-    fetch: arranged.fetch,
-  });
+  const loaded = await load(readOf(search, { q }), { fetch: arranged.fetch });
   return { loaded, arranged };
 }
 
 test("a ready read is parsed, asked for with GET and never from the HTTP cache", async () => {
-  const { loaded, arranged } = await load("/api/v1/search?q=a", () =>
-    json(200, FOUND),
-  );
+  const { loaded, arranged } = await searched("a", () => json(200, FOUND));
   assert.deepEqual(loaded, { kind: "ready", value: FOUND });
   assert.equal(arranged.calls.length, 1);
   assert.equal(arranged.calls[0]?.url, "/api/v1/search?q=a");
@@ -71,22 +73,22 @@ test("a ready read is parsed, asked for with GET and never from the HTTP cache",
 });
 
 test("401 is signed out", async () => {
-  const { loaded } = await load("/api/v1/tools", () =>
+  const { loaded } = await searched("tools", () =>
     json(401, { code: "not_signed_in", message: "Sign in first." }),
   );
   assert.deepEqual(loaded, { kind: "signed_out" });
 });
 
 test("403 is denied, with the envelope's message when the reply carries one", async () => {
-  const { loaded } = await load("/api/v1/tools", () =>
+  const { loaded } = await searched("tools", () =>
     json(403, { code: "not_owner", message: "Only the owner can see this." }),
   );
   assert.deepEqual(loaded, {
     kind: "denied",
     message: "Only the owner can see this.",
   });
-  const { loaded: bare } = await load(
-    "/api/v1/tools",
+  const { loaded: bare } = await searched(
+    "tools",
     () => new Response("<html>Forbidden</html>", { status: 403 }),
   );
   assert.deepEqual(bare, { kind: "denied", message: null });
@@ -94,7 +96,7 @@ test("403 is denied, with the envelope's message when the reply carries one", as
 
 test("404 and 422 are not found", async () => {
   for (const status of [404, 422]) {
-    const { loaded } = await load("/api/v1/tools/nope", () =>
+    const { loaded } = await searched("nope", () =>
       json(status, { code: "not_found", message: "Not found." }),
     );
     assert.deepEqual(loaded, { kind: "not_found" }, `status ${status}`);
@@ -103,12 +105,12 @@ test("404 and 422 are not found", async () => {
 
 test("a 5xx, any other refusal and a network failure are unavailable, with the status if any", async () => {
   for (const status of [500, 502, 503, 504, 409, 429]) {
-    const { loaded } = await load("/api/v1/runs", () =>
+    const { loaded } = await searched("runs", () =>
       json(status, { code: "service_unavailable", message: "Down." }),
     );
     assert.deepEqual(loaded, { kind: "unavailable", status }, `${status}`);
   }
-  const { loaded } = await load("/api/v1/runs", () => {
+  const { loaded } = await searched("runs", () => {
     throw new TypeError("Failed to fetch");
   });
   assert.deepEqual(loaded, { kind: "unavailable", status: null });
@@ -120,13 +122,13 @@ test("a refused reply's body is read, so its connection is released", async () =
     () => new Response("<html>Bad Gateway</html>", { status: 502 }),
     () => json(403, { code: "not_owner", message: "No." }),
   ]) {
-    const { arranged } = await load("/api/v1/runs", reply);
+    const { arranged } = await searched("runs", reply);
     assert.equal(arranged.replies[0]?.bodyUsed, true);
   }
 });
 
 test("a drifted reply is out of date, naming the schema and the field, never a value", async () => {
-  const { loaded } = await load("/api/v1/search?q=private+words", () =>
+  const { loaded } = await searched("private words", () =>
     json(200, { schema_version: 1, query: "private words", results: "x" }),
   );
   assert.deepEqual(loaded, {
@@ -138,16 +140,24 @@ test("a drifted reply is out of date, naming the schema and the field, never a v
 });
 
 test("a reply that isn't JSON is out of date, naming the route without its query", async () => {
-  const { loaded } = await load(
-    "/api/v1/search?q=private+words",
+  const { loaded } = await searched(
+    "private words",
     () => new Response("<html>not it</html>", { status: 200 }),
   );
   assert.deepEqual(loaded, {
     kind: "out_of_date",
     schema: null,
-    path: "/api/v1/search",
+    path: "/v1/search",
   });
 });
+
+/** The number of results a search found: a read shaped like a generated operation. */
+async function resultCount(
+  client: ClientOptions,
+  query: SearchQuery,
+): Promise<number> {
+  return (await search(client, query)).results.length;
+}
 
 test("reads of one path in flight together share one request, and nothing is kept after it settles", async () => {
   let release: (reply: Response) => void = () => undefined;
@@ -158,28 +168,18 @@ test("reads of one path in flight together share one request, and nothing is kep
       }),
   );
   const options = { fetch: arranged.fetch };
-  const first = loadJson(
-    "/api/v1/search?q=shared",
-    parseSearchResults,
-    options,
-  );
-  const second = loadJson(
-    "/api/v1/search?q=shared",
-    (value) => parseSearchResults(value).results.length,
-    options,
-  );
+  const first = load(readOf(search, { q: "shared" }), options);
+  const second = load(readOf(resultCount, { q: "shared" }), options);
   assert.equal(readsInFlight(), 1);
   release(json(200, FOUND));
-  // Each reader parses the shared body with its own parser.
+  // Each reader parses its own copy of the one reply.
   assert.deepEqual(await first, { kind: "ready", value: FOUND });
   assert.deepEqual(await second, { kind: "ready", value: 0 });
   assert.equal(arranged.calls.length, 1);
   assert.equal(readsInFlight(), 0);
 
   const later = arrange(() => json(200, FOUND));
-  await loadJson("/api/v1/search?q=shared", parseSearchResults, {
-    fetch: later.fetch,
-  });
+  await load(readOf(search, { q: "shared" }), { fetch: later.fetch });
   assert.equal(later.calls.length, 1, "a settled read is asked for again");
   assert.equal(readsInFlight(), 0);
 });
@@ -193,11 +193,11 @@ test("the shared request is aborted only when every reader has left", async () =
     });
   const one = new AbortController();
   const two = new AbortController();
-  const first = loadJson("/api/v1/runs?left", parseSearchResults, {
+  const first = load(readOf(search, { q: "left" }), {
     fetch: fetcher,
     signal: one.signal,
   });
-  const second = loadJson("/api/v1/runs?left", parseSearchResults, {
+  const second = load(readOf(search, { q: "left" }), {
     fetch: fetcher,
     signal: two.signal,
   });
@@ -209,6 +209,36 @@ test("the shared request is aborted only when every reader has left", async () =
   await second;
   assert.equal(signal?.aborted, true);
   assert.equal(readsInFlight(), 0);
+});
+
+test("a hook keeps its read across a re-render that builds an equal one, and replaces it when the read changes", () => {
+  // useResource reads again only when keptRead returns another read (lib/use-resource.ts).
+  const first: Read<unknown> = readOf(search, { q: "a" });
+  assert.equal(keptRead(first, readOf(search, { q: "a" })), first);
+  const changed = readOf(search, { q: "b" });
+  assert.equal(keptRead(first, changed), changed);
+  const other = readOf(resultCount, { q: "a" });
+  assert.equal(keptRead(first, other), other);
+  assert.equal(keptRead(first, null), null);
+  assert.equal(keptRead(null, first), first);
+  assert.equal(keptRead(null, null), null);
+});
+
+test("two reads are the same when their operation and arguments are", () => {
+  assert.equal(
+    sameRead(readOf(search, { q: "a" }), readOf(search, { q: "a" })),
+    true,
+  );
+  assert.equal(
+    sameRead(readOf(search, { q: "a" }), readOf(search, { q: "b" })),
+    false,
+  );
+  assert.equal(
+    sameRead(readOf(search, { q: "a" }), readOf(resultCount, { q: "a" })),
+    false,
+  );
+  assert.equal(sameRead(null, null), true);
+  assert.equal(sameRead(null, readOf(search, { q: "a" })), false);
 });
 
 test("the log record of a mismatch carries the schema and path only", () => {

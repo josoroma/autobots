@@ -4,19 +4,17 @@
  * the card says comes from run-admission's one table (R-18).
  */
 import {
-  parseRunAccepted,
-  parseSessionView,
+  admitRun,
+  createWorkSession,
   type RunAccepted,
   type RunRequest,
-  type SessionCreate,
 } from "@autobots/api-client";
 import { useState } from "react";
 
 import { NO_EXPERT } from "@/components/composer/use-run-options";
+import { writes } from "@/lib/api/browser";
 import type { Attached } from "@/lib/attachments";
-import { csrfFetch } from "@/lib/csrf-fetch";
 import { profileField } from "@/lib/model-profile";
-import { readReply } from "@/lib/replies";
 import {
   ADMISSION_UNKNOWN,
   admissionKind,
@@ -103,30 +101,24 @@ function saidFor(result: Submitted<RunAccepted>): Said {
 
 // PRD-Studio HM-02: with an Expert, a direct session starts first and the run belongs to it.
 async function startSession(expertId: string): Promise<string | null> {
-  const reply = await csrfFetch("/api/v1/sessions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
-    },
-    body: JSON.stringify({
-      kind: "direct",
-      experts: [{ expert_id: expertId }],
-    } satisfies SessionCreate),
-  }).catch(() => null);
-  if (reply?.ok !== true) {
-    await reply?.text().catch(() => null);
+  try {
+    const session = await createWorkSession(
+      writes,
+      { kind: "direct", experts: [{ expert_id: expertId }] },
+      { "Idempotency-Key": crypto.randomUUID() },
+    );
+    return session.id;
+  } catch {
     return null;
   }
-  return (await readReply(reply, parseSessionView))?.id ?? null;
 }
 
 function runBody(
   inputs: RunInputs,
   field: NonNullable<ReturnType<typeof profileField>>,
   sessionId: string | null,
-): string {
-  return JSON.stringify({
+): RunRequest {
+  return {
     goal_text: inputs.goal,
     budget_micro_usd: inputs.budget,
     ...(sessionId === null ? {} : { session_id: sessionId }),
@@ -138,12 +130,12 @@ function runBody(
             ({ path, content, media_type }) => ({ path, content, media_type }),
           ),
         }),
-  } satisfies RunRequest);
+  };
 }
 
 /** `onAccepted` runs once a run is admitted, before the card says so, such as to drop its files. */
 export function useRunAdmission(onAccepted: () => void): RunAdmission {
-  const admission = useSubmit();
+  const admission = useSubmit<RunRequest>();
   const [said, setSaid] = useState<Said | null>(null);
 
   async function run(inputs: RunInputs): Promise<void> {
@@ -168,15 +160,7 @@ export function useRunAdmission(onAccepted: () => void): RunAdmission {
         return runBody(inputs, field, sessionId);
       },
       send: ({ key, body }) =>
-        csrfFetch("/api/v1/runs", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": key,
-          },
-          body,
-        }),
-      parse: parseRunAccepted,
+        admitRun(writes, body, { "Idempotency-Key": key }),
     });
     if (local.said !== null) {
       setSaid(local.said);

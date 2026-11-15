@@ -6,6 +6,7 @@
  */
 import type {
   ExpertConfig,
+  ExpertRevision,
   ExpertView,
   ModelList,
   ModelProfileId,
@@ -21,7 +22,7 @@ export interface Draft extends Grants {
   purpose: string;
   instructions: string;
   /** A profile, or WORKSPACE_SETTING. */
-  executor: string;
+  executor: ModelProfileId | typeof WORKSPACE_SETTING;
 }
 
 /** The executor choice that binds no profile, so runs use the workspace's setting. */
@@ -58,8 +59,8 @@ export function offeredFor(
 export function splitBindings(
   expert: ExpertView,
   models: ModelList | null,
-): { kept: Record<string, string>; dropped: string[] } {
-  const saved: Readonly<Record<string, string>> =
+): { kept: Record<string, ModelProfileId>; dropped: string[] } {
+  const saved: Readonly<Record<string, ModelProfileId>> =
     expert.versions.at(-1)?.config.role_bindings ?? {};
   const others = Object.entries(saved).filter(([role]) => role !== "executor");
   return {
@@ -76,17 +77,17 @@ export function splitBindings(
 export function revisionBody(
   expert: ExpertView,
   draft: Draft,
-  kept: Readonly<Record<string, string>>,
-): string {
-  return JSON.stringify({
+  kept: Readonly<Record<string, ModelProfileId>>,
+): ExpertRevision {
+  return {
     expected_version: expert.latest_version,
     config: {
       // What this form doesn't edit, such as skills, stays as it was.
       ...expert.versions.at(-1)?.config,
       purpose: draft.purpose,
       instructions: draft.instructions,
-      tools: draft.tools,
-      tool_groups: draft.groups,
+      tools: [...draft.tools],
+      tool_groups: [...draft.groups],
       role_bindings: {
         ...kept,
         ...(draft.executor === WORKSPACE_SETTING
@@ -94,7 +95,7 @@ export function revisionBody(
           : { executor: draft.executor }),
       },
     },
-  });
+  };
 }
 
 /** The editor's words for a refusal's code; `model_not_offered` says the service's own. */

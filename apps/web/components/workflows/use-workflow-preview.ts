@@ -5,18 +5,19 @@
  * an outage, instead of staying on Loading.
  */
 import {
-  parseWorkflowPreview,
+  previewWorkflowVersion,
   type WorkflowExecutionList,
   type WorkflowStepView,
   type WorkflowView,
 } from "@autobots/api-client";
 
+import { readOf } from "@/lib/load";
 import {
   useResource,
   type Resource,
   type ResourceState,
 } from "@/lib/use-resource";
-import { previewPath, previewVersion } from "@/lib/workflows/list";
+import { previewVersion } from "@/lib/workflows/list";
 
 const LOADING = { kind: "loading" } as const;
 
@@ -46,8 +47,9 @@ export function useWorkflowPreview(
 ): WorkflowPreviewRead {
   const shown = previewVersion(workflow, version);
   const preview = useResource(
-    shown === null ? null : previewPath(workflow.id, shown),
-    parseWorkflowPreview,
+    shown === null
+      ? null
+      : readOf(previewWorkflowVersion, workflow.id, { version: shown }),
   );
   const steps =
     preview.value !== null && String(preview.value.version) === shown

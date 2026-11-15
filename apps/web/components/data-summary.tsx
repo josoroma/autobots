@@ -1,11 +1,10 @@
 "use client";
 
-import {
-  parseRetentionSummary,
-  type RetentionSummary,
-} from "@autobots/api-client";
+import { getRetentionSummary } from "@autobots/api-client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+
+import { readOf } from "@/lib/load";
+import { useResource } from "@/lib/use-resource";
 
 function kept(days: number | null, what: string): string {
   return days === null
@@ -16,29 +15,10 @@ function kept(days: number | null, what: string): string {
 // PRD-Studio SE-06: what this workspace keeps, read-only for every member. Only the owner changes it,
 // on Operations, so only the owner is offered the link.
 export function DataSummary() {
-  const [summary, setSummary] = useState<RetentionSummary | null>(null);
-  const [failed, setFailed] = useState(false);
+  const { state } = useResource(readOf(getRetentionSummary));
+  const summary = state.kind === "ready" ? state.value : null;
 
-  useEffect(() => {
-    let live = true;
-    fetch("/api/v1/retention", { cache: "no-store" })
-      .then(async (reply) => {
-        if (!live) return;
-        if (reply.ok) setSummary(parseRetentionSummary(await reply.json()));
-        else {
-          await reply.text();
-          setFailed(true);
-        }
-      })
-      .catch(() => {
-        if (live) setFailed(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  if (failed)
+  if (state.kind !== "ready" && state.kind !== "loading")
     return (
       <p role="alert" className="text-sm">
         The retention summary is unavailable. Sign in, and check that the local

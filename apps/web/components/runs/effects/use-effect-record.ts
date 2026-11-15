@@ -1,11 +1,8 @@
-import {
-  parseReconciliationResult,
-  type EffectEvidence,
-} from "@autobots/api-client";
+import { reconcileRunEffect, type EffectEvidence } from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
-import { changedChoice, withHeld, type Attempt } from "@/lib/submit";
+import { writes as writeClient } from "@/lib/api/browser";
+import { changedChoice, withHeld } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 export type Seen = EffectEvidence["outcome"];
@@ -29,26 +26,11 @@ const REFUSALS: Record<string, string> = {
     "This operation has been tried again since this page loaded. Reload, then check the destination again.",
 };
 
-function sendEvidence(
-  runId: string,
-  operationId: string,
-  { key, body }: Attempt,
-): Promise<Response> {
-  return csrfFetch(
-    `/api/v1/runs/${encodeURIComponent(runId)}/effects/${encodeURIComponent(operationId)}/reconcile`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
-      body,
-    },
-  );
-}
-
 /** An owner's report of what a destination's own records show, for an effect of unknown outcome. */
 export function useEffectRecord(runId: string, onResolved: () => void) {
   const [evidence, setEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const writes = useSubmit();
+  const writes = useSubmit<EffectEvidence>();
 
   // One key per press until its outcome is known (Decision 0027 D2), so a lost reply records once.
   async function record(
@@ -58,14 +40,11 @@ export function useEffectRecord(runId: string, onResolved: () => void) {
   ): Promise<void> {
     setMessage(null);
     const result = await writes.submit({
-      body: () =>
-        JSON.stringify({
-          outcome,
-          evidence,
-          generation,
-        } satisfies EffectEvidence),
-      send: (attempt) => sendEvidence(runId, operationId, attempt),
-      parse: parseReconciliationResult,
+      body: () => ({ outcome, evidence, generation }),
+      send: ({ key, body }) =>
+        reconcileRunEffect(writeClient, runId, operationId, body, {
+          "Idempotency-Key": key,
+        }),
       scope: operationId,
       // A press for the other answer while this one is held sends nothing (Decision 0027 D2).
       choice: outcome,

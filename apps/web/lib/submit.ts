@@ -6,9 +6,10 @@
  */
 export type Outcome = "accepted" | "refused" | "unknown";
 
-export interface Attempt {
+/** One write's key and body. `B` is the generated request type, or a string in tests. */
+export interface Attempt<B = unknown> {
   key: string;
-  body: string;
+  body: B;
   /** What the write targets, such as an approval or a command. A retry never crosses targets. */
   scope: string;
   /** What was chosen for the target, such as approve or reject. */
@@ -40,13 +41,13 @@ export function keeps(outcome: Outcome, retried: boolean): boolean {
 }
 
 /** The attempt to send: the held one for this target, or a new key for this body. */
-export function nextAttempt(
-  held: Attempt | null,
-  body: string | null,
+export function nextAttempt<B>(
+  held: Attempt<B> | null,
+  body: B | null,
   mint: () => string,
   scope = "",
   choice = "",
-): Attempt | null {
+): Attempt<B> | null {
   if (held !== null) return held;
   return body === null ? null : { key: mint(), body, scope, choice };
 }
@@ -56,22 +57,25 @@ export function nextAttempt(
  * Approve. Resending the held body would do what wasn't pressed, and sending the new one could
  * contradict a decision already made, so neither is sent.
  */
-export function changesChoice(held: Attempt | null, choice = ""): boolean {
+export function changesChoice<B>(
+  held: Attempt<B> | null,
+  choice = "",
+): boolean {
   return held !== null && held.choice !== choice;
 }
 
-export type Holds = ReadonlyMap<string, Attempt>;
+export type Holds<B = unknown> = ReadonlyMap<string, Attempt<B>>;
 
 /**
  * The held attempt a press resends for its target, or `changed` when it chose otherwise for a held
  * target. An unkeyed write never resends.
  */
-export function heldFor(
-  holds: Holds,
+export function heldFor<B>(
+  holds: Holds<B>,
   scope: string,
   choice: string,
   keyed: boolean,
-): { changed: boolean; held: Attempt | null } {
+): { changed: boolean; held: Attempt<B> | null } {
   const held = keyed ? (holds.get(scope) ?? null) : null;
   return { changed: changesChoice(held, choice), held };
 }
@@ -80,13 +84,13 @@ export function heldFor(
  * The holds after a reply. Each target holds its own write, so a reply settles only its own, and an
  * unkeyed write holds nothing and clears nothing.
  */
-export function settle(
-  holds: Holds,
-  attempt: Attempt,
+export function settle<B>(
+  holds: Holds<B>,
+  attempt: Attempt<B>,
   outcome: Outcome,
   retried: boolean,
   keyed: boolean,
-): Holds {
+): Holds<B> {
   if (!keyed) return holds;
   const next = new Map(holds);
   if (keeps(outcome, retried)) next.set(attempt.scope, attempt);

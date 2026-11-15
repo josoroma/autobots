@@ -8,19 +8,32 @@
  * deduplication and live text stay one state machine, since a refusal on any read stops them all.
  */
 import {
-  parseRunWorkspace,
+  getRunWorkspace,
+  parseErrorResponse,
   type RunEvent,
   type RunWorkspace,
   type StreamFrame,
 } from "@autobots/api-client";
+import {
+  queryString,
+  requestJson,
+  type ClientOptions,
+} from "@autobots/api-client/runtime";
 
 import { coalesce } from "../coalesce.ts";
-import { loadJson, type Loaded, type LoadFailure } from "../load.ts";
+import {
+  load,
+  readOf,
+  type Loaded,
+  type LoadFailure,
+  type Read,
+} from "../load.ts";
 import { mergeEvents, withDelta, type LiveText } from "./run-events.ts";
 import {
   parseCursorFrame,
   parseEventFrame,
   splitEventPage,
+  type SplitPage,
   type Stream,
   type StreamHandlers,
 } from "./stream.ts";
@@ -50,6 +63,29 @@ export const EMPTY_VIEW: RunView = {
   live: null,
 };
 
+/**
+ * listRunEvents's page after `after`, read with `splitEventPage` rather than the generated parser,
+ * which would refuse a whole page for one event type this build doesn't know. Such events are
+ * skipped and counted instead (Decision 0017 Q13).
+ */
+async function eventPage(
+  client: ClientOptions,
+  runId: string,
+  after: number,
+): Promise<SplitPage> {
+  const path = `/v1/runs/${encodeURIComponent(runId)}/events`;
+  return splitEventPage(
+    await requestJson(
+      client,
+      "GET",
+      `${path}${queryString({ after }, ["after"])}`,
+      undefined,
+      undefined,
+      parseErrorResponse,
+    ),
+  );
+}
+
 export interface RunConnectionOptions {
   runId: string;
   open: (url: string, on: StreamHandlers) => Stream;
@@ -66,6 +102,7 @@ export interface RunConnectionOptions {
 
 export class RunConnection {
   readonly #options: RunConnectionOptions;
+  /** The run's BFF route, under which the event stream is opened; the stream isn't a JSON operation. */
   readonly #base: string;
   readonly #controller = new AbortController();
   readonly #refresh: () => Promise<Loaded<RunWorkspace>>;
@@ -142,8 +179,7 @@ export class RunConnection {
   async #replay(): Promise<boolean> {
     for (;;) {
       const loaded = await this.#read(
-        `${this.#base}/events?after=${this.#cursor}`,
-        splitEventPage,
+        readOf(eventPage, this.#options.runId, this.#cursor),
       );
       if (this.#halted) return false;
       if (loaded.kind !== "ready") {
@@ -159,8 +195,7 @@ export class RunConnection {
 
   async #readSnapshot(): Promise<Loaded<RunWorkspace>> {
     const loaded = await this.#read(
-      `${this.#base}/workspace`,
-      parseRunWorkspace,
+      readOf(getRunWorkspace, this.#options.runId),
     );
     if (this.#halted) return loaded;
     if (loaded.kind === "ready") {
@@ -171,9 +206,9 @@ export class RunConnection {
     return loaded;
   }
 
-  #read<T>(path: string, parse: (value: unknown) => T): Promise<Loaded<T>> {
+  #read<T>(source: Read<T>): Promise<Loaded<T>> {
     const { fetch } = this.#options;
-    return loadJson(path, parse, {
+    return load(source, {
       signal: this.#controller.signal,
       ...(fetch === undefined ? {} : { fetch }),
     });

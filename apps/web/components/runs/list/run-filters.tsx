@@ -1,7 +1,7 @@
 import type { RunList } from "@autobots/api-client";
 
 import { Input, Select } from "@/components/ui/field";
-import { PROFILE_NAME } from "@/lib/model-profile";
+import { PROFILE_NAME, profileChoice } from "@/lib/model-profile";
 import { RUN_GROUPS, type RunFilters, type RunGroup } from "@/lib/runs/list";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,11 @@ export function RunListFilters({
         <span className="text-muted-foreground">Model</span>
         <Select
           value={filters.profile}
-          onChange={(event) => onChange({ profile: event.target.value })}
+          onChange={(event) => {
+            // A value that isn't a profile is ignored (PRD-Model-Providers MP-A08).
+            const profile = profileChoice(event.target.value);
+            if (profile !== null) onChange({ profile });
+          }}
           className="h-8 w-40"
         >
           <option value="">Any model</option>

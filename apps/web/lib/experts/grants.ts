@@ -12,6 +12,9 @@ import {
   type ToolState,
 } from "../tools/text.ts";
 
+/** A group of tools, as the catalog and a stored version name it. */
+export type ToolGroup = ToolGroupDescriptor["group"];
+
 /** What the grant rules read from a tool. */
 export type GrantTool = Pick<
   ToolDescriptor,
@@ -28,12 +31,12 @@ export interface GrantCatalog<T extends GrantTool> {
 /** A draft's grants: the tools it names and the groups it grants whole. */
 export interface Grants {
   tools: readonly string[];
-  groups: readonly string[];
+  groups: readonly ToolGroup[];
 }
 
 /** One group an Expert may be granted whole, with its grantable tools. */
 export interface GrantGroup<T extends GrantTool> {
-  group: string;
+  group: ToolGroup;
   title: string;
   tools: readonly T[];
   /** It holds an unavailable tool, so it can be unchecked but not checked. */
@@ -117,7 +120,7 @@ export function expansionText(
 /** The grants with a group checked or unchecked. */
 export function withGroup<T extends Grants>(
   draft: T,
-  group: string,
+  group: ToolGroup,
   checked: boolean,
 ): T {
   return {

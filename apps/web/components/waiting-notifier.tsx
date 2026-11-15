@@ -1,9 +1,10 @@
 "use client";
 
-import { parseRunList, type RunListItem } from "@autobots/api-client";
+import { listRuns, type RunListItem } from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { load, readOf } from "@/lib/load";
 import {
   NOTIFY_CHANGED,
   notificationsSupported,
@@ -23,21 +24,17 @@ type WaitingRead =
 
 /** This workspace's runs that need the person. Never rejects: every outcome is a result. */
 async function readWaiting(): Promise<WaitingRead> {
-  try {
-    const reply = await fetch("/api/v1/runs?group=needs_you", {
-      cache: "no-store",
-    });
-    if (reply.ok) {
-      return { result: "runs", runs: parseRunList(await reply.json()).runs };
-    }
-    await reply.text();
-    return {
-      result:
-        reply.status === 401 || reply.status === 403 ? "signed_out" : "failed",
-    };
-  } catch {
-    // No reply, a body that isn't JSON or one that has drifted from its contract.
-    return { result: "failed" };
+  const loaded = await load(readOf(listRuns, { group: "needs_you" }));
+  switch (loaded.kind) {
+    case "ready":
+      return { result: "runs", runs: loaded.value.runs };
+    // A 401 or a 403.
+    case "signed_out":
+    case "denied":
+      return { result: "signed_out" };
+    // No reply, any other refusal, or a body that isn't JSON or has drifted from its contract.
+    default:
+      return { result: "failed" };
   }
 }
 

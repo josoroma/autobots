@@ -1,14 +1,13 @@
 "use client";
 
 import {
-  parseRunAccepted,
-  parseSessionView,
+  admitRun,
+  getWorkSession,
   type RunRequest,
-  type SessionView,
 } from "@autobots/api-client";
 import { Play } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { AdmissionMessage } from "@/components/admission-message";
 import { HeldNote } from "@/components/held-note";
@@ -17,7 +16,8 @@ import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Card } from "@/components/ui/card";
 import { Choice, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
+import { readOf } from "@/lib/load";
 import { profileField } from "@/lib/model-profile";
 import {
   ADMISSION_UNKNOWN,
@@ -25,15 +25,19 @@ import {
   CHOICE_NOT_OFFERED,
 } from "@/lib/run-admission";
 import { type Outcome, withHeld } from "@/lib/submit";
+import { useResource } from "@/lib/use-resource";
 import { useSubmit } from "@/lib/use-submit";
 
 const KEPT = "Your goal is kept.";
 
 export function SessionPanel({ sessionId }: { sessionId: string }) {
   // One key until the outcome is known, and one press at a time (Decision 0027 D2).
-  const admission = useSubmit();
-  const [session, setSession] = useState<SessionView | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
+  const admission = useSubmit<RunRequest>();
+  const sessionRead = useResource(readOf(getWorkSession, sessionId));
+  const session =
+    sessionRead.state.kind === "ready" ? sessionRead.state.value : null;
+  const unavailable =
+    sessionRead.state.kind !== "ready" && sessionRead.state.kind !== "loading";
   const [goal, setGoal] = useState("");
   const [chosen, setChosen] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
@@ -42,27 +46,6 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     text: string;
   } | null>(null);
   const [profile, setProfile] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
-      cache: "no-store",
-    })
-      .then(async (reply) => {
-        if (!active) return;
-        if (!reply.ok) {
-          setUnavailable(true);
-          return;
-        }
-        setSession(parseSessionView(await reply.json()));
-      })
-      .catch(() => {
-        if (active) setUnavailable(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sessionId]);
 
   async function run(): Promise<void> {
     if (session === null) return;
@@ -78,23 +61,15 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         choice.refused = field === null;
         return field === null
           ? null
-          : JSON.stringify({
+          : {
               goal_text: goal,
               session_id: session.id,
               expert_id: expertId ?? null,
               ...field,
-            } satisfies RunRequest);
+            };
       },
       send: ({ key, body }) =>
-        csrfFetch("/api/v1/runs", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": key,
-          },
-          body,
-        }),
-      parse: parseRunAccepted,
+        admitRun(writes, body, { "Idempotency-Key": key }),
     });
     if (choice.refused)
       setProblem({ outcome: "refused", text: CHOICE_NOT_OFFERED });

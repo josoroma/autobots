@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 
+import type { Read } from "@/lib/load";
 import { shownValue, type Written } from "@/lib/settings-value";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
@@ -19,11 +20,8 @@ export interface SettingsRead<T> {
   adopt: (next: T) => void;
 }
 
-export function useSettingsRead<T>(
-  path: string,
-  parse: (value: unknown) => T,
-): SettingsRead<T> {
-  const read = useResource(path, parse);
+export function useSettingsRead<T>(source: Read<T>): SettingsRead<T> {
+  const read = useResource(source);
   const [written, setWritten] = useState<Written<T> | null>(null);
   const failed = !read.pending && read.state.kind !== "ready";
   return {

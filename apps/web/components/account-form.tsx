@@ -1,12 +1,12 @@
 "use client";
 
-import { parseProfileView } from "@autobots/api-client";
+import { updateProfile, type ProfileUpdate } from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import { refusalText } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -25,20 +25,14 @@ export function AccountForm({ initial }: { initial: string }) {
   const [name, setName] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   // One save at a time. It sends no key and replaces the name whole, so it's never held (R-19).
-  const saves = useSubmit();
+  const saves = useSubmit<ProfileUpdate>();
 
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setMessage(null);
     const result = await saves.submit({
-      body: () => JSON.stringify({ display_name: name }),
-      send: ({ body }) =>
-        csrfFetch("/api/v1/profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body,
-        }),
-      parse: parseProfileView,
+      body: () => ({ display_name: name }),
+      send: ({ body }) => updateProfile(writes, body),
       keyed: false,
     });
     if (result === null) return;

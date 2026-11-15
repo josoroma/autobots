@@ -3,10 +3,14 @@
  * and each replaces an item whole, so none is held. `saving` names the item being written, so only
  * its card says Saving (WSYS-14). An accepted reply is shown; any other says why and reads again.
  */
-import { parseKeysAndVars, type KeysAndVars } from "@autobots/api-client";
+import {
+  deleteKeyOrVar,
+  putKeyOrVar,
+  type KeysAndVars,
+} from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes as writeClient } from "@/lib/api/browser";
 import {
   ITEM_REMOVED,
   ITEM_SAVED,
@@ -32,27 +36,22 @@ export function useItemWrites({
   adopt: (next: KeysAndVars) => void;
   reload: () => void;
 }): ItemWrites {
-  const writes = useSubmit();
+  // Each press builds its own request and nothing is held (keyed: false), so the hook carries no
+  // body.
+  const writes = useSubmit<undefined>();
   const [message, setMessage] = useState<string | null>(null);
   const [target, setTarget] = useState<Name | null>(null);
 
   async function send(
     name: Name,
-    method: "PUT" | "DELETE",
-    body: Record<string, unknown>,
+    request: () => Promise<KeysAndVars>,
     done: string,
   ): Promise<void> {
     setMessage(null);
     setTarget(name);
     const result = await writes.submit({
-      body: () => JSON.stringify(body),
-      send: ({ body: text }) =>
-        csrfFetch(`/api/settings/keys-and-vars/${name}`, {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body: text,
-        }),
-      parse: parseKeysAndVars,
+      body: () => undefined,
+      send: request,
       keyed: false,
     });
     if (result === null) return;
@@ -67,8 +66,17 @@ export function useItemWrites({
     saving: writes.pending ? target : null,
     message,
     save: (name, value, version) =>
-      send(name, "PUT", { value, expected_version: version }, ITEM_SAVED),
+      send(
+        name,
+        () =>
+          putKeyOrVar(writeClient, name, { value, expected_version: version }),
+        ITEM_SAVED,
+      ),
     remove: (name, version) =>
-      send(name, "DELETE", { expected_version: version }, ITEM_REMOVED),
+      send(
+        name,
+        () => deleteKeyOrVar(writeClient, name, { expected_version: version }),
+        ITEM_REMOVED,
+      ),
   };
 }

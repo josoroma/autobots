@@ -1,8 +1,9 @@
-import { parseBlockCatalog } from "@autobots/api-client";
+import { listWorkflowBlocks } from "@autobots/api-client";
 
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
+import { readOf } from "@/lib/load";
 import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +15,7 @@ const CELL = "text-muted-foreground py-2 font-mono text-[12px] wrap-anywhere";
  * states, with Retry, beside an editor that stays usable (WBLD-04).
  */
 export function BlockCatalogTable({ className }: { className?: string }) {
-  const catalog = useResource("/api/v1/workflow-blocks", parseBlockCatalog);
+  const catalog = useResource(readOf(listWorkflowBlocks));
   const { state } = catalog;
   return (
     <Card

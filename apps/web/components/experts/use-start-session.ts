@@ -4,11 +4,11 @@
  * key per target until its outcome is known (Decision 0027 D2). The Experts list and the Expert
  * editor share it.
  */
-import { parseSessionView, type SessionCreate } from "@autobots/api-client";
+import { createWorkSession, type SessionCreate } from "@autobots/api-client";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import { sessionBody, sessionText } from "@/lib/studio-writes";
 import { useSubmit } from "@/lib/use-submit";
 
@@ -25,7 +25,7 @@ export interface StartSession {
 }
 
 export function useStartSession(): StartSession {
-  const { submit, pending, holding } = useSubmit();
+  const { submit, pending, holding } = useSubmit<SessionCreate>();
   const router = useRouter();
 
   const start = useCallback(
@@ -35,17 +35,9 @@ export function useStartSession(): StartSession {
       scope = "",
     ): Promise<string | null> => {
       const result = await submit({
-        body: () => JSON.stringify(sessionBody(kind, expertIds)),
+        body: () => sessionBody(kind, expertIds),
         send: ({ key, body }) =>
-          csrfFetch("/api/v1/sessions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Idempotency-Key": key,
-            },
-            body,
-          }),
-        parse: parseSessionView,
+          createWorkSession(writes, body, { "Idempotency-Key": key }),
         scope,
       });
       if (result === null) return null;

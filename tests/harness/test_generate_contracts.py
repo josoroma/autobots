@@ -27,6 +27,30 @@ DOCUMENT = {
 }
 
 
+ITEM = {'application/json': {'schema': {'$ref': '#/components/schemas/Item'}}}
+BFF = [{'in': 'header', 'name': name, 'required': False, 'schema': {'anyOf': [{'type': 'string'}, {'type': 'null'}]}}
+       for name in ('x-autobots-internal', 'x-autobots-workspace', 'authorization')]
+PARAMETERS = {
+    'components': DOCUMENT['components'],
+    'paths': {
+        '/v1/items': {
+            'get': {'operationId': 'listItems', 'responses': {'200': {'content': ITEM}}, 'parameters': [
+                {'in': 'query', 'name': 'status', 'required': False, 'schema': {'$ref': '#/components/schemas/Status'}},
+                {'in': 'query', 'name': 'q', 'required': False,
+                 'schema': {'anyOf': [{'type': 'string'}, {'type': 'null'}]}},
+                {'in': 'query', 'name': 'limit', 'schema': {'type': 'integer', 'default': 10}}, *BFF]},
+            'post': {'operationId': 'createItem', 'responses': {'201': {'content': ITEM}},
+                     'requestBody': {'content': ITEM}, 'parameters': [
+                         {'in': 'header', 'name': 'Idempotency-Key', 'required': True,
+                          'schema': {'type': 'string', 'minLength': 1}}, *BFF]},
+        },
+        '/v1/items/search': {'get': {'operationId': 'searchItems', 'responses': {'200': {'content': ITEM}},
+                                     'parameters': [{'in': 'query', 'name': 'q', 'required': True,
+                                                     'schema': {'type': 'string'}}]}},
+    },
+}
+
+
 class Generation(unittest.TestCase):
     def test_types_and_parsers(self):
         text = generate.typescript_client(DOCUMENT)
@@ -78,6 +102,57 @@ class Generation(unittest.TestCase):
                                              'day': {'type': 'string', 'format': 'date'}}}}}}
         self.assertEqual(generate.unknown_keywords(document, generate.runtime_keywords(ROOT)),
                          ['format:email', 'multipleOf', 'uniqueItems'])
+
+    def test_a_query_is_a_typed_argument_written_in_the_contracts_order(self):
+        # R-48: the browser reads through the generated functions, filters included.
+        text = generate.typescript_client(PARAMETERS)
+        self.assertIn('export type ListItemsQuery = {\n  status?: Status | undefined;\n  q?: string | null | undefined;\n'
+                      '  limit?: number | undefined;\n};\n', text)
+        self.assertIn('export async function listItems(options: ClientOptions, query?: ListItemsQuery, '
+                      'request?: RequestOptions): Promise<Item> {\n  return parseItem(await requestJson(options, "GET", '
+                      '`/v1/items${queryString(query, ["status", "q", "limit"])}`, undefined, request, undefined));\n}\n', text)
+
+    def test_a_required_query_must_be_passed(self):
+        text = generate.typescript_client(PARAMETERS)
+        self.assertIn('export type SearchItemsQuery = {\n  q: string;\n};\n', text)
+        self.assertIn('export async function searchItems(options: ClientOptions, query: SearchItemsQuery, '
+                      'request?: RequestOptions): Promise<Item> {', text)
+
+    def test_a_declared_header_is_a_typed_argument_and_the_bffs_are_not(self):
+        # The BFF sets the bearer, the internal token and the workspace from the session.
+        text = generate.typescript_client(PARAMETERS)
+        self.assertIn('export type CreateItemHeaders = {\n  "Idempotency-Key": string;\n};\n', text)
+        self.assertIn('export async function createItem(options: ClientOptions, body: Item, headers: CreateItemHeaders, '
+                      'request?: RequestOptions): Promise<Item> {\n  return parseItem(await requestJson(options, "POST", '
+                      '`/v1/items`, body, withHeaders(request, headers), undefined));\n}\n', text)
+        for name in generate.BFF_HEADERS:
+            self.assertNotIn(name, text.lower())
+
+    def test_an_optional_query_before_a_required_argument_is_still_an_argument(self):
+        document = json.loads(json.dumps(PARAMETERS))
+        create = document['paths']['/v1/items']['post']
+        create['parameters'].append({'in': 'query', 'name': 'dry_run', 'required': False, 'schema': {'type': 'boolean'}})
+        text = generate.typescript_client(document)
+        self.assertIn('export async function createItem(options: ClientOptions, query: CreateItemQuery | undefined, '
+                      'body: Item, headers: CreateItemHeaders, request?: RequestOptions): Promise<Item> {', text)
+
+    def test_a_parameter_type_that_takes_a_schemas_name_is_refused(self):
+        document = json.loads(json.dumps(PARAMETERS))
+        document['components']['schemas']['ListItemsQuery'] = {'type': 'string'}
+        with self.assertRaises(ValueError):
+            generate.typescript_client(document)
+
+    def test_two_operation_ids_that_normalize_alike_are_refused(self):
+        document = json.loads(json.dumps(PARAMETERS))
+        document['paths']['/v1/other'] = {'get': {'operationId': 'list-items', 'responses': {'200': {'content': ITEM}}}}
+        with self.assertRaisesRegex(ValueError, 'listItems is already emitted'):
+            generate.typescript_client(document)
+
+    def test_an_operation_named_like_a_parser_is_refused(self):
+        document = json.loads(json.dumps(PARAMETERS))
+        document['paths']['/v1/other'] = {'get': {'operationId': 'parseItem', 'responses': {'200': {'content': ITEM}}}}
+        with self.assertRaisesRegex(ValueError, 'parseItem is already emitted'):
+            generate.typescript_client(document)
 
     def test_a_missing_environment_is_a_prerequisite_error(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,13 +1,14 @@
-import { parseJobsChart } from "@autobots/api-client";
+import { getJobsChart } from "@autobots/api-client";
 import { BarChart3 } from "lucide-react";
 
 import { JobsPlot } from "@/components/operations/jobs-plot";
 import { LoadState } from "@/components/ui/load-state";
+import { readOf } from "@/lib/load";
 import { useResource } from "@/lib/use-resource";
 
 // PRD-Studio OP-03 and Decision 0022 D14: one read of the last 24 hours' job counts by outcome.
 export function JobsChart() {
-  const read = useResource("/api/v1/operations/jobs", parseJobsChart);
+  const read = useResource(readOf(getJobsChart));
   const chart = read.state.kind === "ready" ? read.state.value : null;
   return (
     <section

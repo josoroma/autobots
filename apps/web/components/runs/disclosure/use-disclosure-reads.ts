@@ -1,10 +1,11 @@
 import {
-  parseModelList,
-  parseModelPolicyState,
+  getModelPolicy,
+  getModels,
   type ModelList,
   type ModelPolicyState,
 } from "@autobots/api-client";
 
+import { readOf } from "@/lib/load";
 import { useResource, type ResourceState } from "@/lib/use-resource";
 
 function failed(state: ResourceState<unknown>): boolean {
@@ -22,11 +23,8 @@ export function useDisclosureReads(): {
   policy: ModelPolicyState | null;
   failed: boolean;
 } {
-  const models = useResource("/api/models", parseModelList);
-  const policy = useResource(
-    "/api/settings/model-policy",
-    parseModelPolicyState,
-  );
+  const models = useResource(readOf(getModels));
+  const policy = useResource(readOf(getModelPolicy));
   const both =
     models.state.kind === "ready" && policy.state.kind === "ready"
       ? { models: models.state.value, policy: policy.state.value }

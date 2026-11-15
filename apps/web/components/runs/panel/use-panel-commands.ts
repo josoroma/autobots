@@ -1,4 +1,4 @@
-import { parseRunCommandResult } from "@autobots/api-client";
+import { type RunCommandRequest } from "@autobots/api-client";
 import { useState } from "react";
 
 import {
@@ -22,14 +22,13 @@ export const STALE =
  */
 export function usePanelCommands(runId: string, onAccepted: () => void) {
   const [refusal, setRefusal] = useState<string | null>(null);
-  const writes = useSubmit();
+  const writes = useSubmit<RunCommandRequest>();
 
   async function send(command: RunCommand, version: number): Promise<void> {
     setRefusal(null);
     const result = await writes.submit({
       body: () => commandBody(version),
       send: (attempt) => sendRunCommand(runId, command, attempt),
-      parse: parseRunCommandResult,
       scope: commandTarget(command),
       choice: command,
     });

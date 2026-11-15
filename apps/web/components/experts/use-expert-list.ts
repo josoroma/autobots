@@ -4,8 +4,8 @@
  * is read, no Expert is classified.
  */
 import {
-  parseExpertList,
-  parseToolCatalog,
+  listExperts,
+  listTools,
   type ExpertList,
   type ExpertView,
   type ToolCatalog,
@@ -14,6 +14,7 @@ import {
 import { useMemo } from "react";
 
 import { classify, type ClassifiedExpert } from "@/lib/experts/card";
+import { readOf } from "@/lib/load";
 import { useResource, type Resource } from "@/lib/use-resource";
 
 export interface ExpertListRead {
@@ -29,8 +30,8 @@ export interface ExpertListRead {
 }
 
 export function useExpertList(): ExpertListRead {
-  const list = useResource("/api/v1/experts", parseExpertList);
-  const catalog = useResource("/api/v1/tools", parseToolCatalog);
+  const list = useResource(readOf(listExperts));
+  const catalog = useResource(readOf(listTools));
   const experts = list.value?.experts ?? null;
   const tools = useMemo(
     () =>

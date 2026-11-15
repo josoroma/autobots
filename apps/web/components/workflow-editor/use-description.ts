@@ -3,10 +3,14 @@
  * key, so each press sends what's on screen, one at a time (Decision 0027 D2), and changes no
  * version.
  */
-import { parseWorkflowView, type WorkflowView } from "@autobots/api-client";
+import {
+  setWorkflowDescription,
+  type WorkflowDescription,
+  type WorkflowView,
+} from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes } from "@/lib/api/browser";
 import { useSubmit } from "@/lib/use-submit";
 
 // The description write's refusals, in this screen's words (R-19 step 4).
@@ -26,7 +30,7 @@ export function useDescription(
   onSaved: (view: WorkflowView) => void,
   say: (message: string | null) => void,
 ): DescriptionDraft {
-  const saves = useSubmit();
+  const saves = useSubmit<WorkflowDescription>();
   // Null while the field shows the saved description.
   const [edited, setEdited] = useState<string | null>(null);
   const text = edited ?? workflow.description ?? "";
@@ -35,17 +39,8 @@ export function useDescription(
     say(null);
     const sent = text.trim();
     const result = await saves.submit({
-      body: () => JSON.stringify({ description: sent === "" ? null : sent }),
-      send: ({ body }) =>
-        csrfFetch(
-          `/api/v1/workflows/${encodeURIComponent(workflow.id)}/description`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body,
-          },
-        ),
-      parse: parseWorkflowView,
+      body: () => ({ description: sent === "" ? null : sent }),
+      send: ({ body }) => setWorkflowDescription(writes, workflow.id, body),
       keyed: false,
     });
     if (result === null) return;

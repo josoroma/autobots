@@ -1,15 +1,16 @@
 /**
- * The runs list's pure parts (PRD-Studio RN-01 to RN-03, R-49, WRUN-05, WRUN-15): the read's path
+ * The runs list's pure parts (PRD-Studio RN-01 to RN-03, R-49, WRUN-05, WRUN-15): the read's query
  * from its filters, each row's state line and spend bar, and Load more appending only to the first
  * page it was read for.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parseRunList, type RunList } from "@autobots/api-client";
+import { listRuns, parseRunList, type RunList } from "@autobots/api-client";
 
+import { load, readOf } from "../../lib/load.ts";
 import {
-  runListPath,
+  runListQuery,
   spendShare,
   stateLine,
   withMore,
@@ -17,16 +18,37 @@ import {
 
 const ALL = { group: "all", query: "", profile: "" } as const;
 
-test("defaults send no query string, and each filter and the cursor add theirs", () => {
-  assert.equal(runListPath(ALL, null), "/api/v1/runs");
+/** The URL the browser asks for with this query. */
+async function urlOf(query: Parameters<typeof listRuns>[1]): Promise<string> {
+  const asked: string[] = [];
+  await load(readOf(listRuns, query), {
+    fetch: async (input) => {
+      asked.push(String(input));
+      return new Response("{}", { status: 503 });
+    },
+  });
+  return asked[0] ?? "";
+}
+
+test("defaults send no query string, and each filter and the cursor add theirs", async () => {
+  assert.equal(await urlOf(runListQuery(ALL, null)), "/api/v1/runs");
   assert.equal(
-    runListPath(
-      { group: "needs_you", query: "  quarter figures ", profile: "terra" },
-      "c1",
+    await urlOf(
+      runListQuery(
+        {
+          group: "needs_you",
+          query: "  quarter figures ",
+          profile: "openrouter_terra",
+        },
+        "c1",
+      ),
     ),
-    "/api/v1/runs?group=needs_you&q=quarter+figures&profile=terra&cursor=c1",
+    "/api/v1/runs?group=needs_you&q=quarter+figures&profile=openrouter_terra&cursor=c1",
   );
-  assert.equal(runListPath({ ...ALL, query: "   " }, null), "/api/v1/runs");
+  assert.equal(
+    await urlOf(runListQuery({ ...ALL, query: "   " }, null)),
+    "/api/v1/runs",
+  );
 });
 
 function row(patch: Record<string, unknown>): RunList["runs"][number] {

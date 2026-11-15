@@ -1,6 +1,6 @@
 "use client";
 
-import { parseWorkflowView, type WorkflowView } from "@autobots/api-client";
+import { getWorkflow, type WorkflowView } from "@autobots/api-client";
 import { useState } from "react";
 
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { RunVersionCard } from "@/components/workflow-editor/run-version-card";
 import { useDescription } from "@/components/workflow-editor/use-description";
 import { useGraphDraft } from "@/components/workflow-editor/use-graph-draft";
 import { WorkflowHeading } from "@/components/workflow-editor/workflow-heading";
+import { readOf } from "@/lib/load";
 import { useResource } from "@/lib/use-resource";
 
 /**
@@ -61,10 +62,7 @@ function EditorLayout({
  * loading and unavailable states; after a write, the view the service returned is shown instead.
  */
 export function WorkflowEditor({ workflowId }: { workflowId: string }) {
-  const read = useResource(
-    `/api/v1/workflows/${encodeURIComponent(workflowId)}`,
-    parseWorkflowView,
-  );
+  const read = useResource(readOf(getWorkflow, workflowId));
   const [written, setWritten] = useState<{
     workflowId: string;
     view: WorkflowView;

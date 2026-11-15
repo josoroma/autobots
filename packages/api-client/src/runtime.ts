@@ -263,6 +263,38 @@ export class HttpFailure extends Error {
   }
 }
 
+/** A value a query parameter can take. Null and undefined leave the parameter out. */
+export type QueryValue = string | number | boolean | null | undefined;
+
+/**
+ * A query string from `names`, in that order, which is the contract's (R-48). Null, undefined and
+ * any name not listed are left out, and spaces are written as `+`, as a form would.
+ */
+export function queryString(
+  query: Readonly<Record<string, QueryValue>> | undefined,
+  names: readonly string[],
+): string {
+  const params = new URLSearchParams();
+  for (const name of names) {
+    const value = query?.[name];
+    if (value !== undefined && value !== null) params.set(name, String(value));
+  }
+  const text = params.toString();
+  return text === "" ? "" : `?${text}`;
+}
+
+/** A call's options with its declared headers, which the call's own headers can't replace (R-48). */
+export function withHeaders(
+  request: RequestOptions | undefined,
+  headers: Readonly<Record<string, string | null | undefined>> | undefined,
+): RequestOptions {
+  const declared: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (typeof value === "string") declared[name] = value;
+  }
+  return { ...request, headers: { ...request?.headers, ...declared } };
+}
+
 async function readEnvelope(
   response: Response,
   parseError: ((value: unknown) => ErrorEnvelope) | undefined,
@@ -304,6 +336,7 @@ export async function requestJson(
   try {
     return (await response.json()) as unknown;
   } catch {
-    throw new ContractError(path, "not JSON");
+    // The route alone: a query can carry what a person typed, and the path reaches logs.
+    throw new ContractError(path.split("?", 1)[0] ?? path, "not JSON");
   }
 }

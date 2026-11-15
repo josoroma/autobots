@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { failureOf, signIn } from "@/lib/api/browser";
 import {
   SIGN_IN_FAILURE_TEXT,
   signInFailure,
@@ -25,20 +25,22 @@ export function SignInForm() {
     setPending(true);
     setFailed(null);
     const form = new FormData(event.currentTarget);
-    const reply = await csrfFetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.get("email"),
-        password: form.get("password"),
-      }),
-    }).catch(() => null);
+    const field = (name: string) => {
+      const value = form.get(name);
+      return typeof value === "string" ? value : "";
+    };
+    let failure: SignInFailure | null = null;
+    try {
+      await signIn({ email: field("email"), password: field("password") });
+    } catch (error) {
+      failure = signInFailure(failureOf(error).status);
+    }
     setPending(false);
-    if (reply?.ok === true) {
+    if (failure === null) {
       router.push("/");
       router.refresh();
     } else {
-      setFailed(signInFailure(reply?.status ?? null));
+      setFailed(failure);
     }
   }
 

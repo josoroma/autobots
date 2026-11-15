@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  parseWorkflowExecutionList,
-  parseWorkflowList,
-  parseWorkflowView,
+  createWorkflow,
+  listWorkflowExecutions,
+  listWorkflows,
 } from "@autobots/api-client";
 import { useState } from "react";
 
@@ -16,12 +16,9 @@ import { WorkflowPreview } from "@/components/workflows/workflow-preview";
 import { WorkflowTable } from "@/components/workflows/workflow-table";
 import { WorkflowToolbar } from "@/components/workflows/workflow-toolbar";
 import { filterList, tabCounts } from "@/lib/list-filter";
+import { readOf } from "@/lib/load";
 import { useResource } from "@/lib/use-resource";
-import {
-  executionsPath,
-  inWorkflowTab,
-  WORKFLOW_TAB_IDS,
-} from "@/lib/workflows/list";
+import { inWorkflowTab, WORKFLOW_TAB_IDS } from "@/lib/workflows/list";
 
 const CREATE_REFUSALS: Readonly<Record<string, string>> = {
   owner_required: "Only the workspace owner can create a workflow.",
@@ -34,18 +31,18 @@ const CREATE_REFUSALS: Readonly<Record<string, string>> = {
  */
 export function WorkflowsPanel() {
   const filter = useWorkflowFilter();
-  const read = useResource("/api/v1/workflows", parseWorkflowList);
+  const read = useResource(readOf(listWorkflows));
   // The chosen workflow's executions need only its ID, so a linked preview reads them with the list.
   const executions = useResource(
-    filter.selected === null ? null : executionsPath(filter.selected),
-    parseWorkflowExecutionList,
+    filter.selected === null
+      ? null
+      : readOf(listWorkflowExecutions, filter.selected),
   );
   const [message, say] = useState<string | null>(null);
   const create = useCreateByName(
     {
-      endpoint: "/api/v1/workflows",
+      operation: createWorkflow,
       body: (name) => ({ name }),
-      parse: parseWorkflowView,
       hrefFor: (workflow) => `/workflows/${workflow.id}`,
       refusals: CREATE_REFUSALS,
     },

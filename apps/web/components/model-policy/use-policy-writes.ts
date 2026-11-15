@@ -4,12 +4,13 @@
  * adopted as saved; any other says why in this screen's words.
  */
 import {
-  parseModelPolicyState,
+  putModelPolicy,
+  resetModelPolicyOverrides,
   type ModelPolicyState,
 } from "@autobots/api-client";
 import { useState } from "react";
 
-import { csrfFetch } from "@/lib/csrf-fetch";
+import { writes as writeClient } from "@/lib/api/browser";
 import {
   POLICY_LOST,
   POLICY_RESET,
@@ -24,9 +25,7 @@ import { refusalText } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
 
 interface Write {
-  path: string;
-  method: "PUT" | "POST";
-  body: string;
+  send: () => Promise<ModelPolicyState>;
   done: string;
   refusals: Readonly<Record<string, string>>;
 }
@@ -43,20 +42,16 @@ export interface PolicyWrites {
 export function usePolicyWrites(
   adopt: (next: ModelPolicyState) => void,
 ): PolicyWrites {
-  const writes = useSubmit();
+  // Each press builds its own request and nothing is held (keyed: false), so the hook carries no
+  // body.
+  const writes = useSubmit<undefined>();
   const [message, setMessage] = useState<string | null>(null);
 
-  async function write({ path, method, body, done, refusals }: Write) {
+  async function write({ send, done, refusals }: Write) {
     setMessage(null);
     const result = await writes.submit({
-      body: () => body,
-      send: ({ body: text }) =>
-        csrfFetch(path, {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body: text,
-        }),
-      parse: parseModelPolicyState,
+      body: () => undefined,
+      send,
       keyed: false,
     });
     if (result === null) return;
@@ -74,17 +69,13 @@ export function usePolicyWrites(
     say: setMessage,
     save: (saved, draft) =>
       write({
-        path: "/api/settings/model-policy",
-        method: "PUT",
-        body: policyBody(saved, draft),
+        send: () => putModelPolicy(writeClient, policyBody(saved, draft)),
         done: POLICY_SAVED,
         refusals: SAVE_REFUSALS,
       }),
     reset: (saved) =>
       write({
-        path: "/api/settings/model-policy/reset",
-        method: "POST",
-        body: resetBody(saved),
+        send: () => resetModelPolicyOverrides(writeClient, resetBody(saved)),
         done: POLICY_RESET,
         refusals: RESET_REFUSALS,
       }),
