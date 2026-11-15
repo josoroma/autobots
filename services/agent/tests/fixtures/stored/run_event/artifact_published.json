@@ -1,0 +1,9 @@
+{
+  "written_by": "artifacts._publish_row, as reconcile_run publishes a verified staged artifact, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "artifact.published",
+    "artifact_id": "0d000000-0000-4000-8000-0000000000b3",
+    "name": "total.md",
+    "sha256": "68816637fa30242f5443ddfdc4949b94c8416242cc7c58690cf43130047cd21d"
+  }
+}

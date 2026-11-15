@@ -1,0 +1,8 @@
+{
+  "written_by": "artifacts.reconcile_run, for a published artifact whose object is gone, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "artifact.missing",
+    "artifact_id": "0d000000-0000-4000-8000-0000000000b4",
+    "name": "notes.md"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "written_by": "runs._snapshot from US-4.1 (2cc419e) until 4b0e816: bindings and version only. The upgrade qualifier's prior release, 8cba043, writes this shape, with its default, DeepSeek, for every role",
+  "stored": {
+    "bindings": {
+      "coordinator": "openrouter_deepseek_flash",
+      "router": "openrouter_deepseek_flash",
+      "planner": "openrouter_deepseek_flash",
+      "executor": "openrouter_deepseek_flash",
+      "researcher": "openrouter_deepseek_flash",
+      "coder": "openrouter_deepseek_flash",
+      "reviewer": "openrouter_deepseek_flash",
+      "evaluator": "openrouter_deepseek_flash",
+      "summarizer": "openrouter_deepseek_flash",
+      "memory_curator": "openrouter_deepseek_flash",
+      "skill_learner": "openrouter_deepseek_flash",
+      "tool_repair": "openrouter_deepseek_flash",
+      "workflow_generator": "openrouter_deepseek_flash",
+      "general_purpose": "openrouter_deepseek_flash"
+    },
+    "version": 1
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "written_by": "runs.record_transition: a person's pause through apply_command, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "run.status_changed",
+    "previous": "running",
+    "current": "paused"
+  }
+}

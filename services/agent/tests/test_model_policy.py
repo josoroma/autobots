@@ -467,11 +467,11 @@ def test_each_binding_records_where_it_came_from() -> None:
 
 
 def test_a_frozen_snapshot_keeps_its_sources_and_an_older_one_has_none() -> None:
-    from autobots.application.runs import _snapshot
+    from autobots.contracts.persisted import PolicySnapshot
     from autobots.domain.models import BindingSource
 
     policy = resolve_role_policy(run_role_overrides={"executor": "openrouter_sol"})
-    snapshot = json.loads(_snapshot(policy))
+    snapshot = json.loads(PolicySnapshot.of(policy).stored())
     assert snapshot["sources"]["executor"] == "run_override"
     assert snapshot["sources"]["researcher"] == "builtin_default"
     assert frozen_policy(snapshot).sources[ModelRole.EXECUTOR] is BindingSource.RUN_OVERRIDE

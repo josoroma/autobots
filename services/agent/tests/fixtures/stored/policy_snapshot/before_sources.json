@@ -1,0 +1,28 @@
+{
+  "written_by": "runs._snapshot from 4b0e816, which froze each profile's routes, until US-15.8 (6f31f38) recorded where each binding came from (PRD-Studio MD-02): Terra for every role, the default from d4c1c22 until Sol (ada547a)",
+  "stored": {
+    "bindings": {
+      "coordinator": "openrouter_terra",
+      "router": "openrouter_terra",
+      "planner": "openrouter_terra",
+      "executor": "openrouter_terra",
+      "researcher": "openrouter_terra",
+      "coder": "openrouter_terra",
+      "reviewer": "openrouter_terra",
+      "evaluator": "openrouter_terra",
+      "summarizer": "openrouter_terra",
+      "memory_curator": "openrouter_terra",
+      "skill_learner": "openrouter_terra",
+      "tool_repair": "openrouter_terra",
+      "workflow_generator": "openrouter_terra",
+      "general_purpose": "openrouter_terra"
+    },
+    "routes": {
+      "openrouter_terra": {
+        "canonical_id": "openai/gpt-6.1-terra-20261026",
+        "wire_id": "openai/gpt-6.1-terra"
+      }
+    },
+    "version": 1
+  }
+}

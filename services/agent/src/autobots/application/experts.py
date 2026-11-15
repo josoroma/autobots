@@ -21,6 +21,11 @@ from autobots.contracts.experts import (
     SessionExpert,
     SessionView,
 )
+from autobots.contracts.persisted import (
+    ExpertCreatedReceipt,
+    ExpertVersionReceipt,
+    SessionCreatedReceipt,
+)
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import UnknownModelProfile, approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
@@ -175,9 +180,9 @@ async def create_expert(
     validate_config(config, catalog, keys)
     scope = (workspace_id, actor_id, "create_expert", str(workspace_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, ExpertCreatedReceipt)
         if existing is not None:
-            return await get_expert(connection, workspace_id, UUID(existing["expert_id"]))
+            return await get_expert(connection, workspace_id, existing.expert_id)
         cursor = await connection.execute(
             "select 1 from public.experts where workspace_id = %s and name = %s",
             (workspace_id, name),
@@ -194,7 +199,9 @@ async def create_expert(
             "values (%s, 1, %s, %s)",
             (expert_id, expert_record(config).stored(), actor_id),
         )
-        await store_receipt(connection, scope, fingerprint, {"expert_id": str(expert_id)})
+        await store_receipt(
+            connection, scope, fingerprint, ExpertCreatedReceipt(expert_id=expert_id)
+        )
     return await get_expert(connection, workspace_id, expert_id)
 
 
@@ -218,7 +225,7 @@ async def add_version(
     validate_config(config, catalog, keys)
     scope = (workspace_id, actor_id, "add_expert_version", str(expert_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, ExpertVersionReceipt)
         if existing is not None:
             return await get_expert(connection, workspace_id, expert_id)
         cursor = await connection.execute(
@@ -240,7 +247,7 @@ async def add_version(
         await connection.execute(
             "update public.experts set latest_version = %s where id = %s", (version, expert_id)
         )
-        await store_receipt(connection, scope, fingerprint, {"version": version})
+        await store_receipt(connection, scope, fingerprint, ExpertVersionReceipt(version=version))
     return await get_expert(connection, workspace_id, expert_id)
 
 
@@ -300,16 +307,18 @@ async def create_session(
     fingerprint = request_hash({"kind": kind, "experts": pinned})
     scope = (workspace_id, actor_id, "create_session", str(workspace_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, SessionCreatedReceipt)
         if existing is not None:
-            return await get_session(connection, workspace_id, UUID(existing["session_id"]))
+            return await get_session(connection, workspace_id, existing.session_id)
         session_id = uuid4()
         await connection.execute(
             "insert into public.sessions (id, workspace_id, kind, experts, created_by) "
             "values (%s, %s, %s, %s, %s)",
             (session_id, workspace_id, kind, json.dumps(pinned), actor_id),
         )
-        await store_receipt(connection, scope, fingerprint, {"session_id": str(session_id)})
+        await store_receipt(
+            connection, scope, fingerprint, SessionCreatedReceipt(session_id=session_id)
+        )
     return await get_session(connection, workspace_id, session_id)
 
 

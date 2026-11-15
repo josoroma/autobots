@@ -16,7 +16,7 @@ from uuid import UUID
 from autobots.application.runs import LeaseLost, append_event
 from autobots.application.tool_definitions import ToolDefinition, ToolResult, ToolScope
 from autobots.application.tool_gateway import Call, Refused, hold_lease
-from autobots.contracts.runs import ToolUseList, ToolUseView
+from autobots.contracts.runs import ToolUseCompleted, ToolUseList, ToolUseStarted, ToolUseView
 from autobots.domain.tool_catalog import CostClass
 
 # Decision 0017 Q4: a root run tree may make this many metered tool calls.
@@ -150,14 +150,14 @@ async def begin_use(
             await append_event(
                 connection,
                 scope.run_id,
-                {
-                    "type": "tool.use.started",
-                    "tool_use_id": use_id,
-                    "tool_id": name[:100],
-                    "tool_version": version,
-                    "group": tool.group.value if tool else None,
-                    "task_id": task_id,
-                },
+                ToolUseStarted(
+                    type="tool.use.started",
+                    tool_use_id=use_id,
+                    tool_id=name[:100],
+                    tool_version=version,
+                    group=tool.group.value if tool else None,
+                    task_id=task_id,
+                ),
             )
     except LeaseLost:
         return None
@@ -237,16 +237,16 @@ async def complete_use(
             await append_event(
                 connection,
                 scope.run_id,
-                {
-                    "type": "tool.use.completed",
-                    "tool_use_id": use_id,
-                    "tool_id": name[:100],
-                    "tool_version": version,
-                    "outcome": result.outcome.value,
-                    "code": result.code,
-                    "duration_ms": max(int(row[0]), 0),
-                    "operation_id": result.operation_id,
-                },
+                ToolUseCompleted(
+                    type="tool.use.completed",
+                    tool_use_id=use_id,
+                    tool_id=name[:100],
+                    tool_version=version,
+                    outcome=result.outcome.value,
+                    code=result.code,
+                    duration_ms=max(int(row[0]), 0),
+                    operation_id=result.operation_id,
+                ),
             )
     except LeaseLost:
         return

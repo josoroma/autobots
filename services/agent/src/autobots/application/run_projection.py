@@ -2,8 +2,10 @@
 ids, steps and sources only."""
 
 import base64
+import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -18,10 +20,11 @@ from autobots.application.model_admission import (
 from autobots.application.plans import GoalMissing, latest_plan, load_goal
 from autobots.application.reconciliation import unknown_operations
 from autobots.application.recovery import outstanding
-from autobots.application.runs import RunNotFound
+from autobots.application.runs import RunNotFound, frozen_snapshot
 from autobots.application.tool_uses import METERED_TOOL_CALLS
 from autobots.contracts.adapters import run_from_row, run_summary_from_domain
 from autobots.contracts.artifacts import ArtifactSummary
+from autobots.contracts.persisted import FrozenRoute, PolicySnapshot, read_policy_snapshot
 from autobots.contracts.run_workspace import (
     AssignmentView,
     CheckpointView,
@@ -53,10 +56,10 @@ from autobots.domain.models import (
     CONTEXT_TOKENS,
     MAX_OUTPUT_TOKENS,
     PROFILES,
-    BindingSource,
     UnknownModelProfile,
     approved_profile,
 )
+from autobots.domain.repetition import Repeated
 from autobots.domain.runs import (
     IN_PROGRESS,
     NEEDS_YOU,
@@ -70,6 +73,7 @@ from autobots.domain.runs import (
 from autobots.domain.secret_patterns import redact_shown
 from autobots.domain.tools import PLAN_TOOLS
 
+logger = logging.getLogger("autobots.runs")
 PAGE_SIZE = 200
 RUN_LIST_SIZE = 100
 INSPECTOR_CHECKPOINTS = 500
@@ -107,8 +111,23 @@ def public_text(text: str, *, limit: int = MAX_TEXT) -> str:
     return redact_shown(text)[:limit]
 
 
+# The payload types the public stream carries (contracts/runs.py RunEvent).
+PUBLIC_EVENT_TYPES = frozenset(
+    literal
+    for payload in get_args(RunEvent.model_fields["payload"].annotation)
+    for literal in get_args(payload.model_fields["type"].annotation)
+)
+# A stored event that fails is read again by every page that reaches it, so its line is written
+# the first time and then every Nth, with the count (autobots.logs conventions).
+_NOT_PROJECTED = Repeated()
+
+
 def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -> RunEvent | None:
-    """Only what the public contract accepts. Anything else stays out, and the cursor moves on."""
+    """Only what the public contract accepts. Anything else stays out, and the cursor moves on.
+
+    A payload of a public type that fails is logged by its type and sequence, never its content
+    (refactor plan R-51, XTYP-03). Any other type, such as a raw framework event, stays out quietly
+    (Decision 0017 Q13)."""
     try:
         return RunEvent.model_validate(
             {
@@ -122,6 +141,15 @@ def project_event(run_id: UUID, sequence: int, payload: Any, occurred_at: Any) -
             strict=False,
         )
     except ValidationError:
+        kind = payload.get("type") if isinstance(payload, Mapping) else None
+        if isinstance(kind, str) and kind in PUBLIC_EVENT_TYPES and _NOT_PROJECTED.failed():
+            fields = {
+                "run": run_id,
+                "type": kind,
+                "sequence": sequence,
+                "failures": _NOT_PROJECTED.count,
+            }
+            logger.log(logging.WARNING, "run.event.not_projected", extra={"fields": fields})
         return None
 
 
@@ -286,27 +314,37 @@ async def _expert(connection: Any, run_id: UUID) -> ExpertBinding | None:
     )
 
 
-BINDING_SOURCES = frozenset(source.value for source in BindingSource)
+def _shown_snapshot(stored: object) -> PolicySnapshot:
+    """A stored snapshot as the run's pages show it. One this release can't read, such as a newer
+    record version after a rollback, shows nothing bound; routing refuses it (frozen_policy)."""
+    try:
+        return read_policy_snapshot(stored)
+    except UnknownModelProfile:
+        return PolicySnapshot()
 
 
 async def _role_map(connection: Any, run_id: UUID) -> list[FrozenBinding]:
-    cursor = await connection.execute(
-        "select policy_snapshot from public.runs where id = %s", (run_id,)
-    )
-    row = await cursor.fetchone()
-    snapshot = (row[0] if row else None) or {}
-    routes = snapshot.get("routes") or {}
-    sources = snapshot.get("sources") or {}
-    return [
-        FrozenBinding(
-            role=role,
-            profile=profile,
-            canonical_id=_canonical_id(profile, routes),
-            wire_id=str((routes.get(profile) or {}).get("wire_id") or "unknown"),
-            source=sources.get(role) if sources.get(role) in BINDING_SOURCES else None,
+    """Each role as the run froze it, older snapshots included (PolicySnapshot): a profile frozen
+    before routes were shows what it means now, and one since retired shows only its name."""
+    try:
+        snapshot = await frozen_snapshot(connection, run_id)
+    except UnknownModelProfile:
+        # Shown as nothing bound, as `_shown_snapshot` shows one.
+        snapshot = PolicySnapshot()
+    shown: list[FrozenBinding] = []
+    for role, profile in sorted(snapshot.bindings.items()):
+        route = snapshot.routes.get(profile)
+        source = snapshot.source(role)
+        shown.append(
+            FrozenBinding(
+                role=role,
+                profile=profile,
+                canonical_id=_canonical_id(profile, snapshot.routes),
+                wire_id=(route.wire_id if route else "") or "unknown",
+                source=None if source is None else source.value,
+            )
         )
-        for role, profile in sorted((snapshot.get("bindings") or {}).items())
-    ]
+    return shown
 
 
 async def _metered_calls(connection: Any, run_id: UUID) -> int:
@@ -565,11 +603,11 @@ async def read_run_list(
     )
 
 
-def _canonical_id(profile: str, routes: dict[str, Any]) -> str:
+def _canonical_id(profile: str, routes: Mapping[str, FrozenRoute]) -> str:
     """What this run froze, then what the profile means now. A retired one keeps only its name."""
     frozen = routes.get(profile)
-    if isinstance(frozen, dict) and frozen.get("canonical_id"):
-        return str(frozen["canonical_id"])
+    if frozen is not None and frozen.canonical_id:
+        return frozen.canonical_id
     try:
         return PROFILES[approved_profile(profile)].canonical_id
     except UnknownModelProfile:
@@ -615,7 +653,7 @@ async def read_inspector(connection: Any, workspace_id: UUID, run_id: UUID) -> R
         (run_id,),
     )
     goal_summary, snapshot, thread = await cursor.fetchone()
-    routes = (snapshot or {}).get("routes") or {}
+    routes = _shown_snapshot(snapshot).routes
     cursor = await connection.execute(
         "select id, run_id, role, attempt, status, profile, wire_id, upstream_provider, "
         "input_tokens, output_tokens, reasoning_tokens, charged_micro_usd, reserved_micro_usd, "

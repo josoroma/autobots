@@ -1,0 +1,8 @@
+{
+  "written_by": "reconciliation.record_evidence: a person's ruling that an effect was delivered, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "effect.reconciled",
+    "operation_id": "op-1",
+    "outcome": "delivered"
+  }
+}

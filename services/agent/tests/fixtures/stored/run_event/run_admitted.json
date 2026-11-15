@@ -1,0 +1,8 @@
+{
+  "written_by": "runs.admit: the first event of a queued run, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "run.status_changed",
+    "previous": "queued",
+    "current": "queued"
+  }
+}

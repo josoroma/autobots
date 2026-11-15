@@ -29,6 +29,8 @@ from autobots.application.runs import (
 )
 from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.contracts.approvals import ApprovalVerdict
+from autobots.contracts.persisted import ApprovalDecisionReceipt
+from autobots.contracts.runs import ApprovalDecided, ApprovalRequested
 from autobots.domain.effects import (
     ApprovalCommand,
     ApprovalStatus,
@@ -152,8 +154,8 @@ async def _version(connection: Any, run_id: UUID) -> int:
     return version
 
 
-def _requested(approval_id: UUID, tool_id: str) -> dict[str, Any]:
-    return {"type": "approval.requested", "approval_id": str(approval_id), "tool_id": tool_id}
+def _requested(approval_id: UUID, tool_id: str) -> ApprovalRequested:
+    return ApprovalRequested(type="approval.requested", approval_id=approval_id, tool_id=tool_id)
 
 
 async def _reopen(
@@ -432,7 +434,7 @@ async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id:
     await append_event(
         connection,
         run_id,
-        {"type": "approval.decided", "approval_id": str(approval_id), "decision": "expired"},
+        ApprovalDecided(type="approval.decided", approval_id=approval_id, decision="expired"),
     )
     if await current_status(connection, run_id) is RunStatus.WAITING_APPROVAL:
         # The system's pause, not a person's: it leaves a live owner its job, as theirs would
@@ -500,9 +502,9 @@ async def decide(
     )
     expired_row = False
     async with connection.transaction():
-        existing = await command.replayed(connection)
+        existing = await command.replayed(connection, ApprovalDecisionReceipt)
         if existing is not None:
-            return DecisionResult(approval_id, existing["status"], True)
+            return DecisionResult(approval_id, existing.status.value, True)
         # A request's run never changes, so it is read before any lock. Then the job's row, the
         # run's and the request's, in the order a person's cancel takes them as it withdraws
         # pending requests, so a decision and a cancel can't deadlock (SP-012).
@@ -566,13 +568,13 @@ async def decide(
             await append_event(
                 connection,
                 run_id,
-                {
-                    "type": "approval.decided",
-                    "approval_id": str(approval_id),
-                    "decision": wanted.value,
-                },
+                ApprovalDecided(
+                    type="approval.decided",
+                    approval_id=approval_id,
+                    decision="approved" if wanted is ApprovalStatus.APPROVED else "rejected",
+                ),
             )
-            await command.store(connection, {"status": wanted.value})
+            await command.store(connection, ApprovalDecisionReceipt(status=wanted))
     if expired_row:
         raise ApprovalRefused("approval_expired")
     return DecisionResult(approval_id, wanted.value, False)

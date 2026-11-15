@@ -1,0 +1,48 @@
+{
+  "written_by": "runs.admit through runs._snapshot, for the policy resolve_role_policy() gives with nothing chosen: Terra, and Sol for researcher (Decision 0019), captured 2026-11-15",
+  "stored": {
+    "bindings": {
+      "coder": "openrouter_terra",
+      "coordinator": "openrouter_terra",
+      "evaluator": "openrouter_terra",
+      "executor": "openrouter_terra",
+      "general_purpose": "openrouter_terra",
+      "memory_curator": "openrouter_terra",
+      "planner": "openrouter_terra",
+      "researcher": "openrouter_sol",
+      "reviewer": "openrouter_terra",
+      "router": "openrouter_terra",
+      "skill_learner": "openrouter_terra",
+      "summarizer": "openrouter_terra",
+      "tool_repair": "openrouter_terra",
+      "workflow_generator": "openrouter_terra"
+    },
+    "routes": {
+      "openrouter_sol": {
+        "canonical_id": "openai/gpt-6.1-sol-20260929",
+        "wire_id": "openai/gpt-6.1-sol"
+      },
+      "openrouter_terra": {
+        "canonical_id": "openai/gpt-6.1-terra-20261026",
+        "wire_id": "openai/gpt-6.1-terra"
+      }
+    },
+    "sources": {
+      "coder": "builtin_default",
+      "coordinator": "builtin_default",
+      "evaluator": "builtin_default",
+      "executor": "builtin_default",
+      "general_purpose": "builtin_default",
+      "memory_curator": "builtin_default",
+      "planner": "builtin_default",
+      "researcher": "builtin_default",
+      "reviewer": "builtin_default",
+      "router": "builtin_default",
+      "skill_learner": "builtin_default",
+      "summarizer": "builtin_default",
+      "tool_repair": "builtin_default",
+      "workflow_generator": "builtin_default"
+    },
+    "version": 1
+  }
+}

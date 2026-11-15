@@ -38,6 +38,7 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.contracts.persisted import ModelCallReconciliationReceipt
 from autobots.contracts.run_commands import (
     EffectEvidence,
     ModelCallReconciliation,
@@ -320,10 +321,12 @@ async def post_reconcile(
         scope = (workspace, user, "reconcile_model_call", str(run_id), key)
         fingerprint = request_hash({"charged": body.charged_micro_usd})
         async with connection.transaction():
-            existing = await existing_receipt(connection, scope, fingerprint)
+            existing = await existing_receipt(
+                connection, scope, fingerprint, ModelCallReconciliationReceipt
+            )
             if existing is not None:
                 return ReconciliationResult(
-                    schema_version=1, reconciled_calls=existing["reconciled_calls"]
+                    schema_version=1, reconciled_calls=existing.reconciled_calls
                 )
             cursor = await connection.execute(
                 "select id from app_private.model_invocations "
@@ -336,7 +339,12 @@ async def post_reconcile(
             if row is not None:
                 await ModelAdmission(connection).reconcile(row[0], body.charged_micro_usd)
             reconciled = 0 if row is None else 1
-            await store_receipt(connection, scope, fingerprint, {"reconciled_calls": reconciled})
+            await store_receipt(
+                connection,
+                scope,
+                fingerprint,
+                ModelCallReconciliationReceipt(reconciled_calls=reconciled),
+            )
     return ReconciliationResult(schema_version=1, reconciled_calls=reconciled)
 
 

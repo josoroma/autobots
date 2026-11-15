@@ -1,0 +1,4 @@
+{
+  "written_by": "the column's default, '{}'::jsonb, from migration 20261105000007_run_admission.sql: a run row inserted without a snapshot, such as one from before admission existed",
+  "stored": {}
+}

@@ -1,0 +1,11 @@
+{
+  "written_by": "tool_uses.begin_use, for a call that served a plan task, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "tool.use.started",
+    "tool_use_id": 41,
+    "tool_id": "calculate",
+    "tool_version": 1,
+    "group": "general",
+    "task_id": "t1"
+  }
+}

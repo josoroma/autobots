@@ -28,6 +28,7 @@ from autobots.contracts.improvements import (
     ReplayRunView,
     ReplayView,
 )
+from autobots.contracts.persisted import ReplayReceipt
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import TERMINAL, RunStatus
@@ -367,9 +368,9 @@ async def request_replay(
     fingerprint = request_hash({"tasks": tasks, "limit_micro_usd": limit_micro_usd})
     scope = (workspace_id, actor_id, "replay_candidate", str(candidate_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, ReplayReceipt)
         if existing is not None:
-            return UUID(existing["replay_id"])
+            return existing.replay_id
         cursor = await connection.execute(
             "select kind, key, content, status, evidence, source from "
             "public.improvement_candidates where id = %s and workspace_id = %s for update",
@@ -427,7 +428,7 @@ async def request_replay(
                 "task) values (%s, %s, %s, %s)",
                 (replay_id, admitted.run_id, position, json.dumps(task)),
             )
-        await store_receipt(connection, scope, fingerprint, {"replay_id": str(replay_id)})
+        await store_receipt(connection, scope, fingerprint, ReplayReceipt(replay_id=replay_id))
     return replay_id
 
 

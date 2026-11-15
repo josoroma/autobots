@@ -1,0 +1,6 @@
+{
+  "written_by": "POST /v1/runs/{run_id}/model-calls/reconcile with no uncertain call left, since US-4.8 (e99143f), captured 2026-11-15",
+  "stored": {
+    "reconciled_calls": 0
+  }
+}

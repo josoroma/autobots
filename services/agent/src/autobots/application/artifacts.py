@@ -17,6 +17,7 @@ from autobots.application.tool_definitions import (
 )
 from autobots.application.tool_gateway import hold_lease
 from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
+from autobots.contracts.runs import ArtifactMissing, ArtifactPublished
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
@@ -57,12 +58,9 @@ async def _publish_row(
     await append_event(
         connection,
         run_id,
-        {
-            "type": "artifact.published",
-            "artifact_id": str(artifact_id),
-            "name": name,
-            "sha256": digest,
-        },
+        ArtifactPublished(
+            type="artifact.published", artifact_id=artifact_id, name=name, sha256=digest
+        ),
     )
 
 
@@ -192,7 +190,7 @@ async def reconcile_run(
                 await append_event(
                     connection,
                     run_id,
-                    {"type": "artifact.missing", "artifact_id": str(artifact_id), "name": name},
+                    ArtifactMissing(type="artifact.missing", artifact_id=artifact_id, name=name),
                 )
             missing.append(name)
     known = {row[2] for row in rows}

@@ -1,0 +1,8 @@
+{
+  "written_by": "approvals.expire, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "approval.decided",
+    "approval_id": "0d000000-0000-4000-8000-0000000000b2",
+    "decision": "expired"
+  }
+}

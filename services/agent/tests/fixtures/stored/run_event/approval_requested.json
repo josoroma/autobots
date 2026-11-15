@@ -1,0 +1,8 @@
+{
+  "written_by": "approvals._request_review, as the approval gate holds a call, captured 2026-11-15. The payload's shape is unchanged since its type was added",
+  "stored": {
+    "type": "approval.requested",
+    "approval_id": "0d000000-0000-4000-8000-0000000000b2",
+    "tool_id": "mock_send"
+  }
+}

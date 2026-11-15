@@ -41,12 +41,12 @@ from autobots.application.run_lifecycle import (
 # `LoopConfig` is re-exported for the disposable checks that import it from here.
 from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
-from autobots.application.runs import LeaseLost, apply_worker_command
+from autobots.application.runs import LeaseLost, apply_worker_command, frozen_snapshot
 from autobots.application.tool_definitions import ToolRegistry, ToolScope
 from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.models import ModelRoute
+from autobots.domain.models import ModelRoute, UnknownModelProfile
 from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
 
@@ -232,23 +232,24 @@ async def _obligation_holds(connection: Any, lease: Lease) -> bool:
     return True
 
 
+async def _bound_profile(connection: Any, lease: Lease, role: str) -> str | None:
+    """The profile the run's frozen policy binds to `role`, or None when it binds none or its
+    snapshot can't be read (PolicySnapshot)."""
+    try:
+        return (await frozen_snapshot(connection, lease.run_id)).bindings.get(role)
+    except UnknownModelProfile:
+        return None
+
+
 async def _summary_route(connection: Any, lease: Lease, config: LoopConfig) -> ModelRoute | None:
     """Compaction uses the run's frozen summarizer binding. A different one has no route here."""
-    cursor = await connection.execute(
-        "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
-    )
-    snapshot = (await cursor.fetchone())[0]
-    bound = snapshot.get("bindings", {}).get("summarizer")
-    if bound != config.route.profile:
+    bound = await _bound_profile(connection, lease, "summarizer")
+    if bound is None or bound != config.route.profile:
         return None
     return replace(config.route, role="summarizer", profile=bound)
 
 
 async def _route_is_bound(connection: Any, lease: Lease, config: LoopConfig) -> bool:
     """A resumed run keeps its frozen policy. A changed workspace default doesn't reach it."""
-    cursor = await connection.execute(
-        "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
-    )
-    snapshot = (await cursor.fetchone())[0]
-    bound: str | None = snapshot.get("bindings", {}).get(config.route.role)
-    return bound == config.route.profile
+    bound = await _bound_profile(connection, lease, config.route.role)
+    return bound is not None and bound == config.route.profile

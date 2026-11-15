@@ -23,6 +23,11 @@ from autobots.application.runs import (
 )
 from autobots.application.workflow_overview import expert_chain, recent_executions, run_count
 from autobots.contracts.experts import SessionExpert
+from autobots.contracts.persisted import (
+    ExecutionReceipt,
+    WorkflowCreatedReceipt,
+    WorkflowVersionReceipt,
+)
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import (
     EmissionView,
@@ -183,9 +188,9 @@ async def create_workflow(
     )
     scope = (workspace_id, actor_id, "create_workflow", str(workspace_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, WorkflowCreatedReceipt)
         if existing is not None:
-            return await get_workflow(connection, workspace_id, UUID(existing["workflow_id"]))
+            return await get_workflow(connection, workspace_id, existing.workflow_id)
         cursor = await connection.execute(
             "select 1 from public.workflows where workspace_id = %s and name = %s",
             (workspace_id, name),
@@ -198,7 +203,9 @@ async def create_workflow(
             "values (%s, %s, %s, %s)",
             (workflow_id, workspace_id, name, description),
         )
-        await store_receipt(connection, scope, fingerprint, {"workflow_id": str(workflow_id)})
+        await store_receipt(
+            connection, scope, fingerprint, WorkflowCreatedReceipt(workflow_id=workflow_id)
+        )
     return await get_workflow(connection, workspace_id, workflow_id)
 
 
@@ -299,7 +306,7 @@ async def publish_version(
     fingerprint = request_hash({"expected": expected_version, "graph": digest, "source": source})
     scope = (workspace_id, actor_id, "publish_workflow", str(workflow_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, WorkflowVersionReceipt)
         if existing is not None:
             return await get_workflow(connection, workspace_id, workflow_id)
         cursor = await connection.execute(
@@ -329,7 +336,7 @@ async def publish_version(
         await connection.execute(
             "update public.workflows set latest_version = %s where id = %s", (version, workflow_id)
         )
-        await store_receipt(connection, scope, fingerprint, {"version": version})
+        await store_receipt(connection, scope, fingerprint, WorkflowVersionReceipt(version=version))
     return await get_workflow(connection, workspace_id, workflow_id)
 
 
@@ -351,6 +358,23 @@ async def _agent_session(
         experts=[SessionExpert(expert_id=UUID(expert)) for expert in experts],
     )
     return session.id
+
+
+async def _receipt_run(connection: Any, workspace_id: UUID, receipt: ExecutionReceipt) -> UUID:
+    """The run a stored execution receipt names. One stored from US-6.1 (9a0fb39) until US-6.2
+    (902d1cd) names none, so its execution's own is read. An execution from then has none, and the
+    retry is refused as not found instead of failing (refactor plan R-51)."""
+    if receipt.run_id is not None:
+        return receipt.run_id
+    cursor = await connection.execute(
+        "select run_id from public.workflow_executions where id = %s and workspace_id = %s",
+        (receipt.execution_id, workspace_id),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] is None:
+        raise WorkflowRefused("execution_not_found")
+    run_id: UUID = row[0]
+    return run_id
 
 
 async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
@@ -385,9 +409,9 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
     fingerprint = request_hash({"version": version, "inputs": inputs})
     scope = (workspace_id, actor_id, "create_execution", str(workflow_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
-        execution_id = UUID(existing["execution_id"]) if existing else uuid4()
-        run_id = UUID(existing["run_id"]) if existing else None
+        existing = await existing_receipt(connection, scope, fingerprint, ExecutionReceipt)
+        execution_id = existing.execution_id if existing else uuid4()
+        run_id = await _receipt_run(connection, workspace_id, existing) if existing else None
         if existing is None:
             session_id = await _agent_session(connection, workspace_id, actor_id, graph)
             if policy is None:
@@ -450,7 +474,7 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
                 connection,
                 scope,
                 fingerprint,
-                {"execution_id": str(execution_id), "run_id": str(run_id)},
+                ExecutionReceipt(execution_id=execution_id, run_id=run_id),
             )
     assert run_id is not None
     return ExecutionBinding(

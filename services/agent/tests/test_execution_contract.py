@@ -10,8 +10,8 @@ from autobots.application.artifacts import ObjectStore
 from autobots.application.assignments import Delegation
 from autobots.application.run_lifecycle import pass_registry
 from autobots.application.run_usage import RootLimits
-from autobots.application.runs import _snapshot
 from autobots.application.worker_inference import frozen_policy
+from autobots.contracts.persisted import PolicySnapshot
 from autobots.domain.execution import (
     GRAPH_STATE_VERSION,
     TOOL_VERSIONS,
@@ -68,7 +68,8 @@ def test_the_adapter_identity_names_the_pinned_release() -> None:
 
 
 def test_a_snapshot_records_its_models_and_a_changed_mapping_stops_the_run() -> None:
-    snapshot = json.loads(_snapshot(resolve_role_policy(run_profile="openrouter_deepseek_flash")))
+    policy = resolve_role_policy(run_profile="openrouter_deepseek_flash")
+    snapshot = json.loads(PolicySnapshot.of(policy).stored())
     assert frozen_policy(snapshot).bindings
     route = snapshot["routes"]["openrouter_deepseek_flash"]
     assert route["wire_id"] == "deepseek/deepseek-v4.1-flash-1017"
@@ -78,7 +79,7 @@ def test_a_snapshot_records_its_models_and_a_changed_mapping_stops_the_run() -> 
 
 
 def test_a_snapshot_saved_before_routes_were_recorded_still_reads() -> None:
-    snapshot = json.loads(_snapshot(resolve_role_policy()))
+    snapshot = json.loads(PolicySnapshot.of(resolve_role_policy()).stored())
     del snapshot["routes"]
     assert frozen_policy(snapshot).bindings
 

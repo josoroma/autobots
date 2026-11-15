@@ -1,0 +1,22 @@
+{
+  "written_by": "the prior release 8cba043's runs._snapshot for a workspace whose default was openrouter_astra, a profile since retired (Decision 0004)",
+  "stored": {
+    "bindings": {
+      "coordinator": "openrouter_astra",
+      "router": "openrouter_astra",
+      "planner": "openrouter_astra",
+      "executor": "openrouter_astra",
+      "researcher": "openrouter_astra",
+      "coder": "openrouter_astra",
+      "reviewer": "openrouter_astra",
+      "evaluator": "openrouter_astra",
+      "summarizer": "openrouter_astra",
+      "memory_curator": "openrouter_astra",
+      "skill_learner": "openrouter_astra",
+      "tool_repair": "openrouter_astra",
+      "workflow_generator": "openrouter_astra",
+      "general_purpose": "openrouter_astra"
+    },
+    "version": 1
+  }
+}

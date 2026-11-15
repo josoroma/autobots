@@ -9,11 +9,20 @@ from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
 from autobots.application.model_admission import ACTIVE
+from autobots.contracts.persisted import (
+    AdmissionReceipt,
+    PolicySnapshot,
+    StoredEvent,
+    StoredReceipt,
+    TransitionReceipt,
+    read_policy_snapshot,
+)
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
+from autobots.contracts.runs import RunStatusChanged
 from autobots.domain.effects import ReceiptStatus
 from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.execution import current_contract
-from autobots.domain.models import PROFILES, RolePolicy
+from autobots.domain.models import RolePolicy
 from autobots.domain.runs import (
     INTERRUPTING,
     TERMINAL,
@@ -165,8 +174,10 @@ def request_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-async def append_event(connection: Any, run_id: UUID, payload: dict[str, Any]) -> int:
-    """Sequences are gapless per run, and the row update serializes concurrent writers."""
+async def append_event(connection: Any, run_id: UUID, payload: StoredEvent) -> int:
+    """Sequences are gapless per run, and the row update serializes concurrent writers. Each
+    payload is its public contract, built and validated by its writer in the write's transaction
+    (refactor plan R-51), so what is stored is what `run_projection.project_event` shows."""
     cursor = await connection.execute(
         "update public.runs set event_sequence = event_sequence + 1 where id = %s "
         "returning event_sequence",
@@ -176,19 +187,23 @@ async def append_event(connection: Any, run_id: UUID, payload: dict[str, Any]) -
     await connection.execute(
         "insert into public.run_events (run_id, sequence, schema_version, payload, occurred_at) "
         "values (%s, %s, 1, %s, now())",
-        (run_id, sequence, json.dumps(payload)),
+        (run_id, sequence, json.dumps(payload.model_dump(mode="json"))),
     )
     return sequence
 
 
-def _status_changed(previous: str, current: str) -> dict[str, str]:
-    return {"type": "run.status_changed", "previous": previous, "current": current}
+def _status_changed(previous: str, current: str) -> RunStatusChanged:
+    return RunStatusChanged(
+        type="run.status_changed", previous=RunStatus(previous), current=RunStatus(current)
+    )
 
 
-async def existing_receipt(
-    connection: Any, scope: tuple[UUID, UUID, str, str, str], fingerprint: str
-) -> dict[str, Any] | None:
-    """Serializes this exact key, so concurrent duplicates wait and then see the first result."""
+async def existing_receipt[T: StoredReceipt](
+    connection: Any, scope: tuple[UUID, UUID, str, str, str], fingerprint: str, kind: type[T]
+) -> T | None:
+    """Serializes this exact key, so concurrent duplicates wait and then see the first result,
+    read as `kind`, its operation's receipt (contracts/persisted.py). A stored result that can't be
+    read raises, so a repeat never runs the operation again."""
     await connection.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
         ("|".join(str(part) for part in scope),),
@@ -204,20 +219,19 @@ async def existing_receipt(
         return None
     if row[0] != fingerprint:
         raise IdempotencyConflict("this key was used with different content")
-    result: dict[str, Any] = row[1]
-    return result
+    return kind.model_validate(row[1])
 
 
 async def store_receipt(
     connection: Any,
     scope: tuple[UUID, UUID, str, str, str],
     fingerprint: str,
-    result: dict[str, Any],
+    result: StoredReceipt,
 ) -> None:
     await connection.execute(
         "insert into app_private.idempotency_receipts (workspace_id, actor_id, operation, target, "
         "idempotency_key, request_hash, result) values (%s, %s, %s, %s, %s, %s, %s)",
-        (*scope, fingerprint, json.dumps(result)),
+        (*scope, fingerprint, result.stored()),
     )
 
 
@@ -247,11 +261,12 @@ class Idempotent:
         scope = (key.workspace_id, key.actor_id, operation, target, key.idempotency_key)
         return cls(scope, request_hash(payload))
 
-    async def replayed(self, connection: Any) -> dict[str, Any] | None:
-        """The first result under this key, inside the caller's transaction, or None."""
-        return await existing_receipt(connection, self.scope, self.fingerprint)
+    async def replayed[T: StoredReceipt](self, connection: Any, kind: type[T]) -> T | None:
+        """The first result under this key, as its operation's receipt `kind`, inside the
+        caller's transaction, or None."""
+        return await existing_receipt(connection, self.scope, self.fingerprint, kind)
 
-    async def store(self, connection: Any, result: dict[str, Any]) -> None:
+    async def store(self, connection: Any, result: StoredReceipt) -> None:
         await store_receipt(connection, self.scope, self.fingerprint, result)
 
 
@@ -281,23 +296,15 @@ async def ancestors_running(connection: Any, parent_run_id: UUID) -> bool:
     return not (await cursor.fetchone())[0]
 
 
-def _snapshot(policy: RolePolicy) -> str:
-    return json.dumps(
-        {
-            "version": policy.version,
-            "bindings": {role.value: profile.value for role, profile in policy.bindings.items()},
-            # Where each binding came from, PRD-Studio MD-02. Older snapshots have none.
-            "sources": {role.value: source.value for role, source in policy.sources.items()},
-            "routes": {
-                profile.value: {
-                    "wire_id": PROFILES[profile].wire_id,
-                    "canonical_id": PROFILES[profile].canonical_id,
-                }
-                for profile in set(policy.bindings.values())
-            },
-        },
-        sort_keys=True,
+async def frozen_snapshot(connection: Any, run_id: UUID) -> PolicySnapshot:
+    """The policy admission froze for this run, as stored (PolicySnapshot). A run with no row has
+    nothing bound, and one whose snapshot can't be read raises UnknownModelProfile, so neither is
+    routed on (refactor plan R-51, PRUN-08)."""
+    cursor = await connection.execute(
+        "select policy_snapshot from public.runs where id = %s", (run_id,)
     )
+    row = await cursor.fetchone()
+    return read_policy_snapshot({} if row is None else row[0])
 
 
 async def _goal_to_repeat(connection: Any, workspace_id: UUID, run_id: UUID | None) -> str:
@@ -352,11 +359,12 @@ async def _require_continuable(connection: Any, workspace_id: UUID, run_id: UUID
 
 def _lineage(origin: Fresh | Inherited) -> tuple[str, UUID | None, UUID | None, UUID | None]:
     """The policy snapshot, parent, root and started_by a run row records. A child's started_by is
-    None here, so the insert takes its parent's, Decision 0015."""
+    None here, so the insert takes its parent's, Decision 0015. A child stores its parent's
+    snapshot document as it was read, older shapes included, so nothing a parent froze changes."""
     if isinstance(origin, Inherited):
         inherited = origin.inheritance
         return json.dumps(inherited.snapshot), inherited.parent_run_id, inherited.root_run_id, None
-    return _snapshot(origin.policy), None, None, origin.started_by
+    return PolicySnapshot.of(origin.policy).stored(), None, None, origin.started_by
 
 
 async def _insert_run_and_job(
@@ -463,11 +471,9 @@ async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
         admission.idempotency_key,
     )
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, AdmissionReceipt)
         if existing is not None:
-            return AdmissionResult(
-                UUID(existing["run_id"]), existing["version"], existing["status"], True
-            )
+            return AdmissionResult(existing.run_id, existing.version, existing.status.value, True)
         await _require_continuable(connection, workspace_id, admission.continues_run_id)
         run_id = uuid4()
         status = RunStatus.QUEUED.value
@@ -475,7 +481,7 @@ async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
         await _insert_inputs(connection, run_id, admission.input_documents)
         await _insert_goal_spec(connection, run_id, admission, request, goal, criteria)
         await append_event(connection, run_id, _status_changed(status, status))
-        result = {"run_id": str(run_id), "version": 1, "status": status}
+        result = AdmissionReceipt(run_id=run_id, version=1, status=RunStatus.QUEUED)
         await store_receipt(connection, scope, fingerprint, result)
     return AdmissionResult(run_id, 1, status, False)
 
@@ -729,9 +735,9 @@ async def _apply(connection: Any, move: _Move) -> TransitionResult:
     run's."""
     async with connection.transaction():
         if move.receipt is not None:
-            existing = await move.receipt.replayed(connection)
+            existing = await move.receipt.replayed(connection, TransitionReceipt)
             if existing is not None:
-                return TransitionResult(move.run_id, existing["version"], existing["status"], False)
+                return TransitionResult(move.run_id, existing.version, existing.status.value, False)
         job = await _lock_job(connection, move.workspace_id, move.run_id)
         if move.actor is Actor.WORKER and (
             move.generation is None or not job.held_by(move.generation)
@@ -760,8 +766,9 @@ async def _apply(connection: Any, move: _Move) -> TransitionResult:
         if move.stop_reason is not Unset.UNSET:
             await _record_stop_reason(connection, move.run_id, move.stop_reason)
         if move.receipt is not None:
-            result = {"version": new_version, "status": following.value}
-            await move.receipt.store(connection, result)
+            await move.receipt.store(
+                connection, TransitionReceipt(version=new_version, status=following)
+            )
     return TransitionResult(move.run_id, new_version, following.value, True)
 
 
@@ -876,5 +883,6 @@ __all__ = [
     "apply_worker_command",
     "cascade_command",
     "current_status",
+    "frozen_snapshot",
     "record_transition",
 ]

@@ -8,6 +8,7 @@ import sys
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.application.run_projection import project_event
 from autobots.application.runs import (
     CommandReceipt,
     IdempotencyConflict,
@@ -18,8 +19,10 @@ from autobots.application.runs import (
     apply_worker_command,
 )
 from autobots.application.worker_leases import Lease
+from autobots.contracts.persisted import AdmissionReceipt, PolicySnapshot, read_policy_snapshot
+from autobots.contracts.runs import RunStatusChanged
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
@@ -65,6 +68,21 @@ async def main() -> None:
         check('one run, one job and one event are committed', '(1, 1, 1)', counts, counts == (1, 1, 1))
         snapshot = (await (await connection.execute('select policy_snapshot from public.runs where id = %s', (run_id,))).fetchone())[0]
         check('the role policy is frozen at admission', '14 bindings', len(snapshot['bindings']), len(snapshot['bindings']) == 14)
+        # Read back as Postgres stored them, normalized as jsonb, through the records the writers share (refactor plan R-51).
+        stored, result, payload, occurred_at = await (await connection.execute(
+            "select r.policy_snapshot, i.result, e.payload, e.occurred_at from public.runs r "
+            "join app_private.idempotency_receipts i on i.workspace_id = r.workspace_id and i.actor_id = %s "
+            "and i.operation = 'admit_run' and i.idempotency_key = 'key-1' "
+            'join public.run_events e on e.run_id = r.id and e.sequence = 1 where r.id = %s', (ACTOR, run_id))).fetchone()
+        frozen, receipt, event = read_policy_snapshot(stored), AdmissionReceipt.model_validate(result), project_event(run_id, 1, payload, occurred_at)
+        written = PolicySnapshot.of(POLICY)
+        check('the stored snapshot, receipt and first event read back through their records',
+              'the frozen policy, which reads back equal and serializes as admission wrote it, the queued run at version 1, run.status_changed',
+              (frozen == written, frozen.stored() == written.stored(), receipt, event and event.payload),
+              frozen == written and frozen.stored() == written.stored()
+              and receipt == AdmissionReceipt(run_id=run_id, version=1, status=RunStatus.QUEUED)
+              and event is not None
+              and event.payload == RunStatusChanged(type='run.status_changed', previous=RunStatus.QUEUED, current=RunStatus.QUEUED))
 
         try:
             await admit('key-1', goal='something else')

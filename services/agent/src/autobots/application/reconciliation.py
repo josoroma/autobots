@@ -11,7 +11,9 @@ from uuid import UUID
 
 from autobots.application import receipts
 from autobots.application.runs import RUN_TREE, CommandKey, Idempotent, append_event
+from autobots.contracts.persisted import EffectRulingReceipt
 from autobots.contracts.run_commands import EffectOutcome
+from autobots.contracts.runs import EffectReconciled
 from autobots.domain.effects import ReceiptStatus
 from autobots.domain.errors import Refusal, RefusalKind
 
@@ -78,9 +80,9 @@ async def record_evidence(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (
     )
     status = _ruled(outcome)
     async with connection.transaction():
-        existing = await command.replayed(connection)
+        existing = await command.replayed(connection, EffectRulingReceipt)
         if existing is not None:
-            return str(existing["status"])
+            return existing.status.value
         # A parent's page lists its children's effects, so it can settle them too.
         cursor = await connection.execute(
             RUN_TREE + "select status, generation from app_private.tool_receipts "
@@ -99,7 +101,7 @@ async def record_evidence(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (
         await append_event(
             connection,
             run_id,
-            {"type": "effect.reconciled", "operation_id": operation_id, "outcome": outcome},
+            EffectReconciled(type="effect.reconciled", operation_id=operation_id, outcome=outcome),
         )
-        await command.store(connection, {"status": status.value})
+        await command.store(connection, EffectRulingReceipt(status=status))
     return status.value

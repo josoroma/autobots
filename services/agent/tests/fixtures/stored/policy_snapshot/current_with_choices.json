@@ -1,0 +1,52 @@
+{
+  "written_by": "runs.admit through runs._snapshot, for a run override (executor Sol), a workspace override (summarizer DeepSeek) and a workspace default (Terra), captured 2026-11-15",
+  "stored": {
+    "bindings": {
+      "coder": "openrouter_terra",
+      "coordinator": "openrouter_terra",
+      "evaluator": "openrouter_terra",
+      "executor": "openrouter_sol",
+      "general_purpose": "openrouter_terra",
+      "memory_curator": "openrouter_terra",
+      "planner": "openrouter_terra",
+      "researcher": "openrouter_terra",
+      "reviewer": "openrouter_terra",
+      "router": "openrouter_terra",
+      "skill_learner": "openrouter_terra",
+      "summarizer": "openrouter_deepseek_flash",
+      "tool_repair": "openrouter_terra",
+      "workflow_generator": "openrouter_terra"
+    },
+    "routes": {
+      "openrouter_deepseek_flash": {
+        "canonical_id": "deepseek/deepseek-v4.1-flash-20261017",
+        "wire_id": "deepseek/deepseek-v4.1-flash-1017"
+      },
+      "openrouter_sol": {
+        "canonical_id": "openai/gpt-6.1-sol-20260929",
+        "wire_id": "openai/gpt-6.1-sol"
+      },
+      "openrouter_terra": {
+        "canonical_id": "openai/gpt-6.1-terra-20261026",
+        "wire_id": "openai/gpt-6.1-terra"
+      }
+    },
+    "sources": {
+      "coder": "workspace_default",
+      "coordinator": "workspace_default",
+      "evaluator": "workspace_default",
+      "executor": "run_override",
+      "general_purpose": "workspace_default",
+      "memory_curator": "workspace_default",
+      "planner": "workspace_default",
+      "researcher": "workspace_default",
+      "reviewer": "workspace_default",
+      "router": "workspace_default",
+      "skill_learner": "workspace_default",
+      "summarizer": "workspace_override",
+      "tool_repair": "workspace_default",
+      "workflow_generator": "workspace_default"
+    },
+    "version": 1
+  }
+}
