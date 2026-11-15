@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { ApprovalsPanel } from "@/components/approvals-panel";
+import { ApprovalsPanel } from "@/components/approvals/approvals-panel";
 import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = { title: "Approvals" };

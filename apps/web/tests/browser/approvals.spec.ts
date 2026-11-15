@@ -4,7 +4,7 @@ import {
   parsePendingApprovals,
   type ApprovalList,
 } from "@autobots/api-client";
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
 import { expectRefusal, getJson, send, writeHeaders } from "./support/api.ts";
@@ -485,4 +485,122 @@ test("after a lost Approve, Reject sends nothing and says the first choice may b
   expect(waiting.approvals.some((item) => item.id === approval.loud)).toBe(
     true,
   );
+});
+
+// WTAP-05: a failed read says why under the tabs, and only an outage offers Retry. The replies are
+// arranged with page.route on the Waiting read.
+test("a failed load says why, keeps the tabs, and Retry reads it again", async ({
+  page,
+}) => {
+  await signIn(page, users.owner);
+  let arranged: Parameters<Route["fulfill"]>[0] | null = {
+    status: 503,
+    json: {
+      code: "service_unavailable",
+      message: "The local API is unavailable.",
+    },
+  };
+  await page.route("**/api/v1/approvals", (route) =>
+    arranged === null || route.request().method() !== "GET"
+      ? route.continue()
+      : route.fulfill(arranged),
+  );
+  await page.goto("/approvals");
+  const state = page.locator('[data-state="unavailable"]');
+  await expect(state).toHaveAttribute("data-reason", "unavailable");
+  await expect(state.getByRole("alert")).toHaveText(
+    "Approvals can't be read right now. Check that the local services are running, then try again.",
+  );
+  await expect(page.locator('[data-tab="waiting"]')).toBeVisible();
+  await expect(page.locator('[data-tab="decided"]')).toBeVisible();
+  arranged = null;
+  await state.getByRole("button", { name: "Retry" }).click();
+  await expect(state).toHaveCount(0);
+  const waiting = await approvals(page);
+  await expect(page.locator('[data-tab="waiting"]')).toHaveText(
+    `Waiting ${waiting.counts.waiting}`,
+  );
+  await expect(page.locator("[data-approval-item]")).toHaveCount(
+    waiting.approvals.length,
+  );
+
+  // A signed-out read links to Sign in instead of offering Retry.
+  arranged = {
+    status: 401,
+    json: { code: "not_signed_in", message: "Sign in first." },
+  };
+  await page.goto("/approvals");
+  await expect(state).toHaveAttribute("data-reason", "signed_out");
+  await expect(state.getByRole("button", { name: "Retry" })).toHaveCount(0);
+  await expect(state.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    "href",
+    "/sign-in",
+  );
+  await page.unroute("**/api/v1/approvals");
+});
+
+// WTAP-04: a decision that settles after a switch to Decided reloads Decided, so no waiting request
+// is listed under it. The route answers for the API, so the arranged request is never decided.
+test("a decision that settles under Decided reloads Decided, never Waiting", async ({
+  page,
+}) => {
+  await signIn(page, users.owner);
+  await page.goto("/approvals");
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const reads: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "GET" &&
+      /\/api\/v1\/approvals(\?|$)/.test(request.url())
+    )
+      reads.push(new URL(request.url()).search);
+  });
+  await page.route(
+    `**/api/v1/approvals/${approval.loud}/decision`,
+    async (route) => {
+      await held;
+      await route.fulfill({
+        status: 200,
+        json: {
+          approval_id: approval.loud,
+          replayed: false,
+          schema_version: 1,
+          status: "approved",
+        },
+      });
+    },
+  );
+  const card = await open(page, approval.loud);
+  await card.getByRole("button", { name: "Approve" }).click();
+  const loaded = page.waitForResponse((reply) =>
+    reply.url().includes("/api/v1/approvals?status=decided"),
+  );
+  await page.locator('[data-tab="decided"]').click();
+  await loaded;
+  reads.length = 0;
+  const reloaded = page.waitForResponse((reply) =>
+    reply.url().includes("/api/v1/approvals?status=decided"),
+  );
+  release();
+  await expect(page.locator('[data-message="decision"]')).toContainText(
+    "Only this exact request",
+  );
+  await reloaded;
+  expect(reads).toEqual(["?status=decided"]);
+  const decided = await approvals(page, "?status=decided");
+  const list = page.getByRole("list", { name: "Decided requests" });
+  await expect(list.locator("[data-approval-item]")).toHaveCount(
+    decided.approvals.length,
+  );
+  await expect(list).not.toContainText("Expires");
+  await expect(
+    page.locator(`[data-approval-item="${approval.loud}"]`),
+  ).toHaveCount(0);
+  await page.unroute(`**/api/v1/approvals/${approval.loud}/decision`);
+  expect(
+    (await approvals(page)).approvals.some((item) => item.id === approval.loud),
+  ).toBe(true);
 });

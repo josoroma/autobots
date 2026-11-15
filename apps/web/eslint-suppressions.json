@@ -1,18 +1,4 @@
 {
-  "components/approvals-panel.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "components/expert-editor.tsx": {
     "max-lines": {
       "count": 1

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RAW = re.compile(r'\b(?:csrfFetch|fetch)\(')
 BASELINE = frozenset({
     'components/account-form.tsx',
-    'components/approvals-panel.tsx',
+    'components/approvals/use-approval-decision.ts',
     'components/composer/use-run-admission.ts',
     'components/continue-run.tsx',
     'components/data-summary.tsx',

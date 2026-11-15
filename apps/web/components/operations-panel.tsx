@@ -29,16 +29,18 @@ import {
   Server,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { JobsChart } from "@/components/jobs-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { LoadState } from "@/components/ui/load-state";
 import { csrfFetch } from "@/lib/csrf-fetch";
 import { formatInstant } from "@/lib/format";
 import { parseDays } from "@/lib/retention";
 import { schemaValue } from "@/lib/schema-value";
 import { refusalText } from "@/lib/submit";
+import { useResource } from "@/lib/use-resource";
 import { useSubmit } from "@/lib/use-submit";
 import { cn } from "@/lib/utils";
 
@@ -184,58 +186,33 @@ const RETENTION_REFUSALS: Readonly<Record<string, string>> = {
 const RETENTION_LOST =
   "The reply was lost, so this may have saved. Saving again sends these windows again.";
 
+// The windows as typed, for the read they were typed against. A newer read, such as after a save or
+// Check again, shows its own windows again.
+interface Typed {
+  read: number;
+  run: string | null;
+  receipt: string | null;
+}
+
 export function OperationsPanel() {
-  const [status, setStatus] = useState<LocalStatus | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  const [runDays, setRunDays] = useState("");
-  const [receiptDays, setReceiptDays] = useState("");
+  // One read, again on Check again and after a save, so a reply that arrives late never replaces a
+  // newer one (WTAP-04, R-27).
+  const read = useResource("/api/v1/operations/local-status", parseLocalStatus);
+  const [typed, setTyped] = useState<Typed>({
+    read: 0,
+    run: null,
+    receipt: null,
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [invalid, setInvalid] = useState({ run: false, receipt: false });
   // One save at a time. It sends no key and replaces the windows whole, so it's never held (R-19).
   const saves = useSubmit();
-
-  const load = useCallback(async (): Promise<void> => {
-    const reply = await fetch("/api/v1/operations/local-status", {
-      cache: "no-store",
-    }).catch(() => null);
-    if (reply === null) {
-      setFailed("The service didn't answer.");
-    } else if (reply.status === 403) {
-      setFailed("Only the workspace owner can see Operations.");
-    } else if (!reply.ok) {
-      setFailed("The service didn't answer.");
-    } else {
-      const parsed = parseLocalStatus(await reply.json());
-      setStatus(parsed);
-      setFailed(null);
-      setRunDays(parsed.retention?.run_days?.toString() ?? "");
-      setReceiptDays(parsed.retention?.receipt_days?.toString() ?? "");
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/v1/operations/local-status", { cache: "no-store" })
-      .then(async (reply) => {
-        if (!active) return;
-        if (reply.status === 403) {
-          setFailed("Only the workspace owner can see Operations.");
-        } else if (!reply.ok) {
-          setFailed("The service didn't answer.");
-        } else {
-          const parsed = parseLocalStatus(await reply.json());
-          setStatus(parsed);
-          setRunDays(parsed.retention?.run_days?.toString() ?? "");
-          setReceiptDays(parsed.retention?.receipt_days?.toString() ?? "");
-        }
-      })
-      .catch(() => {
-        if (active) setFailed("The service didn't answer.");
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const status = read.value;
+  const own =
+    typed.read === read.settled ? typed : { run: null, receipt: null };
+  const runDays = own.run ?? status?.retention?.run_days?.toString() ?? "";
+  const receiptDays =
+    own.receipt ?? status?.retention?.receipt_days?.toString() ?? "";
 
   // WSYS-01: a misread window would feed an irreversible pass, so nothing malformed is sent.
   function windows(): string | null {
@@ -276,11 +253,23 @@ export function OperationsPanel() {
       return;
     }
     setMessage("Saved. Nothing is removed until the next retention pass.");
-    await load();
+    read.reload();
   }
 
-  if (failed !== null) return <p role="alert">{failed}</p>;
-  if (status === null) return <p role="status">Loading…</p>;
+  const failed = !read.pending && read.state.kind !== "ready";
+  if (read.state.kind === "denied" && failed) {
+    return <p role="alert">Only the workspace owner can see Operations.</p>;
+  }
+  if (failed || status === null) {
+    return (
+      <LoadState
+        state={read.state}
+        what="operations"
+        onRetry={read.reload}
+        pending={read.pending}
+      />
+    );
+  }
   const passing = status.conditions.filter((item) => item.state === "ok");
   const hold = status.conditions.find((item) => item.name === "hold");
   const workers = status.values.workers;
@@ -338,7 +327,7 @@ export function OperationsPanel() {
             </span>
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}>
+        <Button variant="outline" size="sm" onClick={read.reload}>
           <RotateCw aria-hidden="true" />
           Check again
         </Button>
@@ -566,7 +555,11 @@ export function OperationsPanel() {
                     aria-invalid={invalid.run || undefined}
                     aria-describedby={invalid.run ? RETENTION_ERROR : undefined}
                     onChange={(event) => {
-                      setRunDays(event.target.value);
+                      setTyped({
+                        ...own,
+                        read: read.settled,
+                        run: event.target.value,
+                      });
                       setInvalid((now) => ({ ...now, run: false }));
                     }}
                   />
@@ -582,7 +575,11 @@ export function OperationsPanel() {
                       invalid.receipt ? RETENTION_ERROR : undefined
                     }
                     onChange={(event) => {
-                      setReceiptDays(event.target.value);
+                      setTyped({
+                        ...own,
+                        read: read.settled,
+                        receipt: event.target.value,
+                      });
                       setInvalid((now) => ({ ...now, receipt: false }));
                     }}
                   />
