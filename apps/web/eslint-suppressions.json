@@ -32,17 +32,6 @@
       "count": 1
     }
   },
-  "components/goal-composer.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/jobs-chart.tsx": {
     "max-lines-per-function": {
       "count": 1

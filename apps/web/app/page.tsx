@@ -4,7 +4,7 @@ import { Server, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { AboutServices } from "@/components/about-services";
-import { GoalComposer } from "@/components/goal-composer";
+import { GoalComposer } from "@/components/composer/goal-composer";
 import { HomeActivity } from "@/components/home-activity";
 import { HomeGreeting } from "@/components/home-greeting";
 import { ServiceChips } from "@/components/readiness";

@@ -15,11 +15,11 @@ RAW = re.compile(r'\b(?:csrfFetch|fetch)\(')
 BASELINE = frozenset({
     'components/account-form.tsx',
     'components/approvals-panel.tsx',
+    'components/composer/use-run-admission.ts',
     'components/continue-run.tsx',
     'components/data-summary.tsx',
     'components/expert-editor.tsx',
     'components/experts-panel.tsx',
-    'components/goal-composer.tsx',
     'components/jobs-chart.tsx',
     'components/keys-and-vars-panel.tsx',
     'components/model-policy-panel.tsx',

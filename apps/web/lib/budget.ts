@@ -48,6 +48,33 @@ export function budgetFor(offer: BudgetOffer, chosen: number | null): number {
 }
 
 /**
+ * What the goal composer's budget chip shows (PRD-Studio HM-02, Decision 0022 D11). `exhausted` when
+ * nothing is left today, which leaves no choice and no run to start; an `unknown` offer isn't, as the
+ * server still decides. `remainingMicroUsd` is what's left of today's cap, never below zero, or null
+ * while no range is read.
+ */
+export interface BudgetChoices {
+  offer: BudgetOffer;
+  budget: number;
+  exhausted: boolean;
+  remainingMicroUsd: number | null;
+}
+
+export function budgetChoices(
+  range: BudgetRange | null,
+  chosen: number | null,
+): BudgetChoices {
+  const offer = budgetOffer(range);
+  return {
+    offer,
+    budget: budgetFor(offer, chosen),
+    exhausted: offer.kind === "offered" && offer.choices.length === 0,
+    remainingMicroUsd:
+      range === null ? null : Math.max(range.remaining_daily_micro_usd, 0),
+  };
+}
+
+/**
  * What a run has spent, counting what its reservations hold, and whether that is an estimate: it is
  * while a reservation is held or a charge went unreported (RN-03).
  */

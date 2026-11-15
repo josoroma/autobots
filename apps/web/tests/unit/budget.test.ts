@@ -8,6 +8,7 @@ import { test } from "node:test";
 import type { BudgetRange } from "@autobots/api-client";
 
 import {
+  budgetChoices,
   budgetFor,
   budgetOffer,
   FALLBACK_BUDGET_MICRO_USD,
@@ -99,6 +100,45 @@ test("until the range is known, the budget is D11's default of US$1.00", () => {
   assert.equal(FALLBACK_BUDGET_MICRO_USD, 1_000_000);
   assert.equal(budgetFor({ kind: "unknown" }, null), 1_000_000);
   assert.equal(budgetFor({ kind: "unknown" }, 1_500_000), 1_000_000);
+});
+
+test("the composer's chip offers the range, sends the choice and says what's left of today's cap", () => {
+  const choices = budgetChoices(range(), 1_500_000);
+  assert.deepEqual(choices.offer, budgetOffer(range()));
+  assert.equal(choices.budget, 1_500_000);
+  assert.equal(choices.exhausted, false);
+  assert.equal(choices.remainingMicroUsd, 2_100_000);
+  assert.equal(budgetChoices(range(), null).budget, 1_000_000);
+});
+
+test("nothing left today exhausts the chip, and what's left never reads below zero", () => {
+  const spent = budgetChoices(
+    range({
+      max_micro_usd: 0,
+      default_micro_usd: 0,
+      remaining_daily_micro_usd: -50_000,
+    }),
+    1_000_000,
+  );
+  assert.equal(spent.exhausted, true);
+  assert.equal(spent.budget, 0);
+  assert.equal(spent.remainingMicroUsd, 0);
+});
+
+test("a range not read yet, or one that can't be expanded, isn't exhausted and sends D11's default", () => {
+  assert.deepEqual(budgetChoices(null, 1_500_000), {
+    offer: { kind: "unknown" },
+    budget: FALLBACK_BUDGET_MICRO_USD,
+    exhausted: false,
+    remainingMicroUsd: null,
+  });
+  // A step of zero is refused rather than looped over, and today's cap still shows.
+  assert.deepEqual(budgetChoices(range({ step_micro_usd: 0 }), 1_500_000), {
+    offer: { kind: "unknown" },
+    budget: FALLBACK_BUDGET_MICRO_USD,
+    exhausted: false,
+    remainingMicroUsd: 2_100_000,
+  });
 });
 
 test("a run's spend counts held reservations, and is an estimate while one is held or unreported", () => {
