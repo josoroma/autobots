@@ -11,7 +11,7 @@ import httpx
 
 from autobots.adapters.url_guard import Resolver, guarded_fetch, system_resolver
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
-from autobots.application.tools import write_run_file
+from autobots.application.tools import stored_file, write_run_file
 from autobots.contracts.tools import StoreRemoteFileInput, StoreRemoteFileOutput
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
@@ -55,20 +55,18 @@ def store_remote_file_tool(
     async def stored_already(
         arguments: StoreRemoteFileInput, context: ToolContext
     ) -> StoreRemoteFileOutput | None:
-        cursor = await context.connection.execute(
-            "select version, sha256, content, media_type from app_private.run_files "
-            "where operation_id = %s",
-            (context.operation_id,),
-        )
-        row = await cursor.fetchone()
-        if row is None:
+        stored = await stored_file(context)
+        if stored is None:
             return None
-        return StoreRemoteFileOutput(
-            path=arguments.path,
-            version=row[0],
-            sha256=row[1],
-            size_bytes=len(row[2].encode()),
-            media_type=row[3],
+        # Validated, so the stored media type meets the output's field as the one `store` saved did.
+        return StoreRemoteFileOutput.model_validate(
+            {
+                "path": arguments.path,
+                "version": stored.version,
+                "sha256": stored.sha256,
+                "size_bytes": len(stored.content.encode()),
+                "media_type": stored.media_type,
+            }
         )
 
     common: dict[str, Any] = {"group": ToolGroup.FILES, "network": True}

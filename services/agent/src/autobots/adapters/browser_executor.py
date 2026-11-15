@@ -331,15 +331,11 @@ async def attempt_alive(connection: Any, scope: Any) -> bool:
 
 
 def lease_alive(connection: Any) -> Callable[[str, int], Awaitable[bool]]:
-    """For the sweeper: a session lives only while its run's job is claimed at its generation."""
+    """For the sweeper: a session lives only while its run's job is claimed at its generation
+    (worker_leases.generation_alive, which owns the query)."""
+    from autobots.application.worker_leases import generation_alive
 
     async def alive(run_id: str, generation: int) -> bool:
-        cursor = await connection.execute(
-            "select 1 from app_private.run_jobs j join public.runs r on r.id = j.run_id "
-            "where j.run_id::text = %s and j.generation = %s and j.status = 'claimed' "
-            "and j.lease_expires_at > clock_timestamp() and r.status = 'running'",
-            (run_id, generation),
-        )
-        return await cursor.fetchone() is not None
+        return await generation_alive(connection, run_id, generation)
 
     return alive

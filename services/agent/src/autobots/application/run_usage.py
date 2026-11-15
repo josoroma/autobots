@@ -106,6 +106,15 @@ async def discount_sleep(connection: Any, lease: Any, seconds: float) -> None:
     )
 
 
+async def model_calls_used(connection: Any, run_id: UUID) -> int:
+    """The model calls the run tree whose root is `run_id` has counted so far."""
+    cursor = await connection.execute(
+        "select model_calls from app_private.run_usage where run_id = %s", (run_id,)
+    )
+    used: int = (await cursor.fetchone())[0]
+    return used
+
+
 async def active_seconds_used(connection: Any, run_id: UUID) -> float:
     cursor = await connection.execute(
         "select active_seconds + greatest(coalesce(extract(epoch from clock_timestamp() - "

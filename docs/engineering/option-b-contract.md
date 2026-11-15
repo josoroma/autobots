@@ -172,6 +172,32 @@ Cancellation is also valid from **every nonterminal state**. Move directly to `c
 
 Transition commands require expected version, actor authorization, guard evaluation and an atomic domain update/outbox event where possible. Competing completion/cancellation writes are serialized by version/fencing. Document the separate state machines for steps, tool attempts, approvals and credential connections; do not conflate them with Run status. Tests cover every permitted transition and representative invalid/concurrent cases.
 
+#### Tool-attempt receipts and approval requests
+
+These states are separate from run status: a run's `waiting_approval` is the run's wait, and a request's `pending` is the request's own state (Decision 0029 F8). Stored values are the lowercase names below. `services/agent/src/autobots/domain/effects.py` holds both tables. `application/receipts.py` is the only writer of a receipt's status and `application/approvals.py` the only writer of a request's. Each status write admits only the states its command moves from, so a move outside a table matches no row. `none` means no row yet.
+
+| Receipt command | From | To |
+|---|---|---|
+| `start` | none | `started` |
+| `reopen` | `started`, `failed`, `unknown` | `started` |
+| `record` | `started` | `succeeded`, `failed`, `unknown` |
+| `record` | `failed`, `unknown` | `succeeded` |
+| `mark_unknown` | `started` | `unknown` |
+| `rule` | `unknown` | `succeeded`, `failed` |
+
+| Approval command | From | To |
+|---|---|---|
+| `request` | none | `pending` |
+| `decide` | `pending` | `approved`, `rejected` |
+| `expire` | `pending` | `expired` |
+| `withdraw` | `pending` | `withdrawn` |
+| `return_to_review` | `approved` | `pending` |
+
+Notes:
+
+- A `succeeded` receipt never moves. A `record` of a success lands over any earlier outcome, as repeating an effect that happened is the worse mistake. Any other `record` speaks only for the attempt still `started` at its generation or an earlier one. `rejected`, `expired` and `withdrawn` requests never move, and an expiry never overwrites a decision or a withdrawal.
+- An approval that releases a call leaving no receipt, such as `browse_goal`'s, records `consumed_at` in the releasing transaction. That is not a state. The same call again takes `return_to_review` and waits for a person (Decisions 0018 B6 and 0020 L5). A call the metered budget refuses after its release has still consumed its approval, which fails safe.
+
 ### SP-011 — plans, graph state and events
 
 Store original goal, normalized criteria, constraints and budget. Version plans and revisions with task dependencies, expected output, ownership and revision reason. Completed evidence survives replanning. The model proposes; deterministic application logic commits status and validates completion.

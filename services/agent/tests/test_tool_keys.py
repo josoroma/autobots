@@ -224,8 +224,8 @@ def test_saving_seals_the_key_and_opens_no_connection(
 
 
 class Approvals:
-    """A receipt table and an approval table, as `_target_unchanged` reads them: the receipt's
-    status, and the approved request's target and review detail (`approvals.approved_request`)."""
+    """A receipt table and an approval table: the receipt's status, as `_target_unchanged` reads
+    it, and the approved request's target and review detail."""
 
     def __init__(self, receipt: str | None, recorded: str | None) -> None:
         self.receipt, self.recorded = receipt, recorded
@@ -260,13 +260,18 @@ def test_an_approved_write_runs_only_against_its_recorded_target(
 ) -> None:
     """Decision 0025 V7 and V8. An empty recorded target fails closed. One already sent is left
     to its receipt, and its readback uses the recorded repository."""
+    from autobots.application.approvals import ApprovedRequest
     from autobots.application.tool_gateway import _target_unchanged
 
-    assert asyncio.run(_target_unchanged(Approvals(receipt, recorded), "op", now)) is runs
+    approval = ApprovedRequest(recorded, None)
+    assert asyncio.run(_target_unchanged(Approvals(receipt, None), "op", approval, now)) is runs
 
 
 def test_a_write_uses_the_repository_its_approval_recorded() -> None:
+    """The gateway hands the attempt what was approved, and the adapter reads its repository from
+    there, never from the database (XMOD-02)."""
     from autobots.adapters.github_issues import attempt_target
+    from autobots.application.approvals import ApprovedRequest
 
     class Recorded(Approvals):
         async def execute(self, query: str, params: Any = None) -> Any:
@@ -280,7 +285,8 @@ def test_a_write_uses_the_repository_its_approval_recorded() -> None:
             return await super().execute(query, params)
 
     scope = ToolScope(uuid4(), uuid4(), 1, {"create_github_issue": 1})
-    context = ToolContext(Recorded(None, "GitHub repository owner/approved"), scope, "op")
+    approval = ApprovedRequest("GitHub repository owner/approved", None)
+    context = ToolContext(Recorded(None, None), scope, "op", approval)
     environ = {"GITHUB_REPOSITORY": "owner/now", "GITHUB_TOKEN": "github_pat_fixture0001"}
     assert asyncio.run(attempt_target(context, environ)) == (
         "owner/approved",

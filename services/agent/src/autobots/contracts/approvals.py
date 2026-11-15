@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from autobots.contracts.primitives import Identifier
 
 VIEW = ConfigDict(extra="forbid", frozen=True)
+# A person's answer to a request. The decision command takes the same values (PTOL-15).
+ApprovalVerdict = Literal["approve", "reject"]
 
 
 class ApprovalRequester(BaseModel):
@@ -112,7 +114,7 @@ class PendingApprovals(BaseModel):
 class ApprovalDecision(BaseModel):
     model_config = VIEW
 
-    decision: Literal["approve", "reject"]
+    decision: ApprovalVerdict
     argument_hash: str = Field(min_length=64, max_length=64)
 
 

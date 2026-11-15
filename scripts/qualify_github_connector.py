@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import sys
 import time
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -195,24 +197,43 @@ def counting_transport(cap: int, ledger: dict) -> Any:
 
 
 class ApprovedReview:
-    """Stands in for the approvals table: the review the owner approved, for the connector's own lookup."""
+    """Stands in for the database, which this qualification never opens: the review the owner approved, as
+    `approvals.approved_request` reads it, and this one attempt's lease, so a moved base can send the request back
+    to review through `approvals.return_to_review`. The connector itself is handed the review through its
+    context's `approval`, as the gateway hands it over (XMOD-02). Anything else reads as no row."""
 
-    def __init__(self, detail: dict) -> None:
+    def __init__(self, repository: str, detail: dict) -> None:
+        self.target = f'GitHub repository {repository}'
         self.detail = detail
+        self.request_id = uuid4()
         self.returned_to_review = False
 
+    @contextlib.asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
+
     async def execute(self, sql: str, _params: Any = None) -> Any:
-        connection = self
+        query = sql.lstrip()
+        if query.startswith('update public.approval_requests set status = %s'):
+            self.returned_to_review = True
+        row = self._answer(query)
 
         class Cursor:
             async def fetchone(self) -> Any:
-                if sql.lstrip().startswith('select review_detail'):
-                    return (connection.detail,)
-                return None
+                return row
 
-        if 'set status = \'pending\'' in sql:
-            self.returned_to_review = True
         return Cursor()
+
+    def _answer(self, query: str) -> tuple[Any, ...] | None:
+        if query.startswith('select resource_target, review_detail from public.approval_requests'):
+            return (self.target, self.detail)
+        if query.startswith('select 1 from app_private.run_jobs'):
+            return (1,)
+        if query.startswith('select id from public.approval_requests'):
+            return (self.request_id,)
+        if 'event_sequence = event_sequence + 1' in query:
+            return (1,)
+        return None
 
 
 def _shape(model: Any) -> dict:
@@ -289,6 +310,7 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
     )
     from autobots.adapters.github_pulls import branch_for, github_pull_request_tool
     from autobots.adapters.github_reads import github_read_tools
+    from autobots.application.approvals import ApprovedRequest
     from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolScope
     from autobots.contracts.tools import CreateGithubIssueV2Input, GithubOpenPullRequestInput
 
@@ -306,8 +328,9 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
     operation = str(review['operation_id'])
     branch = branch_for(operation)
     arguments = GithubOpenPullRequestInput.model_validate(review['arguments'])
-    approved = ApprovedReview(review['review_detail'])
-    pr_context = ToolContext(approved, ToolScope(uuid4(), uuid4(), 1, {}), operation)
+    approved = ApprovedReview(repository, review['review_detail'])
+    pr_context = ToolContext(approved, ToolScope(uuid4(), uuid4(), 1, {}), operation,
+                             ApprovedRequest(approved.target, approved.detail))
     issue_operation = f'qualification-{uuid4().hex[:16]}'
     issue_context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), issue_operation)
     reads = {tool.tool_id: tool for tool in github_read_tools(transport, environ)}

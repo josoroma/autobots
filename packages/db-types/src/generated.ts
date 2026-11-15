@@ -24,6 +24,7 @@ export interface ApprovalRequestsRow {
   policy_version: string | null;
   policy_rule: string | null;
   review_detail: unknown | null;
+  consumed_at: string | null;
 }
 
 export interface ArtifactsRow {

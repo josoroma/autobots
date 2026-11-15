@@ -25,7 +25,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `services/agent/src/autobots/`: the Python service (`domain/`, `contracts/`, `application/`, `adapters/`, `api/`, `operations/`, `persistence/`).
   - `apps/web/`: Next.js (`app/`, `components/`, `lib/`).
   - `packages/api-client/src/runtime.ts`: the client runtime.
-  - SQL: `supabase/migrations/` (55 files), `supabase/seeds/`, `supabase/bootstrap/`.
+  - SQL: `supabase/migrations/` (56 files), `supabase/seeds/`, `supabase/bootstrap/`.
   - `infra/`: Compose files, the vendored Supabase release in `infra/supabase/upstream/`, and the browser executor images in `infra/browser/`.
 - **Generated:**
   - `contracts/generated/openapi.json`;
@@ -153,7 +153,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 55 ordered files, from `20261105000001_workspaces.sql` to `20261114000055_run_job_failures.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, and R-35's private `failed_attempts` and `last_failure_type` on `app_private.run_jobs`, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 56 ordered files, from `20261105000001_workspaces.sql` to `20261115000056_approval_consumed.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, R-35's private `failed_attempts` and `last_failure_type` on `app_private.run_jobs`, and R-50's `approval_requests.consumed_at`, which makes an approval that releases a call leaving no receipt single-use, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|
@@ -186,7 +186,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 55), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 56), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**
@@ -233,6 +233,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - Public signup is disabled ([local app runbook](docs/engineering/runbooks/local-app.md)).
 - **Effects and approvals:**
   - `application/approvals.py` binds a proposal to its exact arguments before the wait.
+  - Since R-50, after the analyzed revision, `domain/effects.py` holds the receipt and approval state machines, `application/receipts.py` is the only writer of receipt status and `approvals.py` the only writer of approval status, each guarding its write with the states its move starts from. The tables are in the [Option B contract](docs/engineering/option-b-contract.md) beside SP-010 (Decision 0029 F8). Adapters read an approved call from `ToolContext.approval` and send no SQL to these tables.
   - Effect rulings must carry the receipt's `generation`.
   - Requests store the requester, agent, scope snapshot and `APPROVAL_POLICY_VERSION`, immutable by trigger ([Decision 0015](docs/engineering/decisions/0015-approval-request-fields.md)).
   - `arbitrary_execution` is admitted only for a tool whose executor reports qualified.

@@ -63,12 +63,16 @@ class RunInputRequest(BaseModel):
     value: str = Field(min_length=1, max_length=20000)
 
 
+# What a person found at the destination. Reconciliation takes the same values (PTOL-15).
+EffectOutcome = Literal["delivered", "not_delivered"]
+
+
 class EffectEvidence(BaseModel):
     """What the destination's own records show. This is a person's report, kept as evidence."""
 
     model_config = STRICT_CONTRACT
 
-    outcome: Literal["delivered", "not_delivered"]
+    outcome: EffectOutcome
     evidence: str = Field(min_length=1, max_length=2000)
     generation: int
 

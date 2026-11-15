@@ -11,13 +11,18 @@ import io
 import json
 import logging
 from collections.abc import AsyncIterator, Callable, Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 import pytest
 from pydantic import BaseModel
 
-from autobots.application.approvals import ApprovalProposal, scope_hash, scope_snapshot
+from autobots.application.approvals import (
+    ApprovalProposal,
+    ApprovedRequest,
+    scope_hash,
+    scope_snapshot,
+)
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     ToolContext,
@@ -84,7 +89,7 @@ class Database:
         request = (
             None
             if self.request is None
-            else (UUID(int=7), self.request, scope_hash(SCOPE.tools, SCOPE.paths), False)
+            else (UUID(int=7), self.request, scope_hash(SCOPE.tools, SCOPE.paths), False, False)
         )
         rows: tuple[tuple[str, tuple[object, ...] | None], ...] = (
             ("insert into app_private.tool_uses", (1,)),
@@ -202,6 +207,51 @@ async def test_every_step_names_the_one_pinned_operation() -> None:
     ):
         params = next(params for query, params in database.statements if part in query)
         assert OPERATION in params, part
+
+
+@pytest.mark.asyncio
+async def test_an_approved_dispatch_hands_its_tool_what_the_person_approved() -> None:
+    """XMOD-02: the gateway loads the approved request once the gate released the call, so an
+    adapter reads its target and review detail from its context, never from the database. A call
+    no policy holds is handed none."""
+    handed: list[ApprovedRequest | None] = []
+
+    async def handler(arguments: CalculateInput, context: ToolContext) -> BaseModel:
+        handed.append(context.approval)
+        return CalculateOutput(result=sum(arguments.values))
+
+    gated = replace(gated_tool(Seen()), handler=handler)
+    plain = replace(
+        simple_tool(OperationClass.REVERSIBLE_INTERNAL_WRITE, lambda: CalculateOutput(result=3)),
+        handler=handler,
+    )
+    for tool in (gated, plain):
+        result = await call(tool, Database())
+        assert result.outcome is ToolOutcome.SUCCEEDED
+    assert handed == [ApprovedRequest(TARGET, None), None]
+
+
+@pytest.mark.asyncio
+async def test_an_approved_read_uses_up_its_approval() -> None:
+    """A read leaves no receipt, so the gate consumes the approval that released it, in the gate's
+    own transaction (PTOL-06; Decisions 0018 B6 and 0020 L5)."""
+    handed: list[ApprovedRequest | None] = []
+
+    async def handler(arguments: CalculateInput, context: ToolContext) -> BaseModel:
+        handed.append(context.approval)
+        return CalculateOutput(result=sum(arguments.values))
+
+    read = replace(
+        simple_tool(OperationClass.READ_ONLY, lambda: CalculateOutput(result=3)),
+        handler=handler,
+        approval=ApprovalPolicy(always=True),
+    )
+    database = Database()
+    result = await call(read, database)
+    assert result.outcome is ToolOutcome.SUCCEEDED
+    assert handed == [ApprovedRequest(TARGET, None)]
+    assert database.index(GATE) < database.index("set consumed_at = clock_timestamp()")
+    assert not database.ran("tool_receipts set")
 
 
 @pytest.mark.asyncio

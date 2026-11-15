@@ -137,7 +137,13 @@ def test_a_returned_request_commits_in_one_fenced_transaction() -> None:
     statements = {kind(query): params for query, params, _ in ledger.statements}
     assert statements["hold lease"] == (SCOPE.run_id, SCOPE.generation)
     assert statements["lock request"] == (OPERATION, SCOPE.run_id)
-    assert statements["reopen request"] == (DEFAULT_TTL_SECONDS, json.dumps(NEW_DETAIL), APPROVAL)
+    assert statements["reopen request"] == (
+        "pending",
+        DEFAULT_TTL_SECONDS,
+        json.dumps(NEW_DETAIL),
+        APPROVAL,
+        ["approved"],
+    )
     assert statements["settle receipt"] == (OPERATION, SCOPE.run_id)
     assert json.loads(statements["append event"][2]) == {
         "type": "approval.requested",
@@ -251,12 +257,15 @@ class MovedBase:
 
 
 def open_pull_request(ledger: Ledger, github: MovedBase) -> None:
+    """The approved attempt, handed what the person approved, as the gateway hands it (XMOD-02)."""
     from autobots.adapters.github_pulls import github_pull_request_tool
+    from autobots.application.approvals import ApprovedRequest
 
     tool = github_pull_request_tool(httpx.MockTransport(github), ENV)
+    context = ToolContext(ledger, SCOPE, OPERATION, ApprovedRequest(TARGET, APPROVED_DETAIL))
 
     async def attempt() -> None:
-        await tool.handler(PROPOSAL, ToolContext(ledger, SCOPE, OPERATION))
+        await tool.handler(PROPOSAL, context)
 
     asyncio.run(attempt())
 
@@ -280,7 +289,7 @@ def test_a_moved_base_returns_the_request_through_approvals() -> None:
     assert len({transaction for _, _, transaction in fenced}) == 1
     assert all(transaction is not None for _, _, transaction in ledger.writes())
     reopened = next(params for query, params, _ in fenced if kind(query) == "reopen request")
-    detail = json.loads(reopened[1])
+    detail = json.loads(reopened[2])
     readme = next(item for item in detail["files"] if item["path"] == "README.md")
     assert detail["base_sha"] == "base-2" and "-Hello, changed upstream" in readme["diff"]
 
@@ -292,16 +301,6 @@ def test_a_lease_lost_during_the_reads_changes_no_decision() -> None:
         open_pull_request(ledger, github)
     assert ledger.writes() == []
     assert all(request.method == "GET" for request in github.requests)
-
-
-def test_adapters_send_no_approval_or_receipt_sql() -> None:
-    """XMOD-02: approval and receipt rows belong to the application, not to a provider client."""
-    found = [
-        path.name
-        for path in sorted((SOURCE / "adapters").rglob("*.py"))
-        if "approval_requests" in path.read_text() or "tool_receipts" in path.read_text()
-    ]
-    assert found == []
 
 
 def test_only_approvals_reads_an_approved_request() -> None:

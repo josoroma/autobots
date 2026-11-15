@@ -215,6 +215,66 @@ async def store_receipt(
     )
 
 
+@dataclass(frozen=True)
+class CommandKey:
+    """Who sent a command, in which workspace, under which idempotency key (PTOL-15)."""
+
+    workspace_id: UUID
+    actor_id: UUID
+    idempotency_key: str
+
+
+@dataclass(frozen=True)
+class Idempotent:
+    """One command's idempotency receipt: its key's scope for an operation and target, and the
+    fingerprint of what it asked. A repeat with the same content replays the stored result, and
+    one with other content is refused (`existing_receipt`). Commands share this skeleton, built by
+    `of`, so none rebuilds the scope or fingerprint by hand (PTOL-15)."""
+
+    scope: tuple[UUID, UUID, str, str, str]
+    fingerprint: str
+
+    @classmethod
+    def of(
+        cls, key: CommandKey, operation: str, target: str, payload: dict[str, Any]
+    ) -> "Idempotent":
+        scope = (key.workspace_id, key.actor_id, operation, target, key.idempotency_key)
+        return cls(scope, request_hash(payload))
+
+    async def replayed(self, connection: Any) -> dict[str, Any] | None:
+        """The first result under this key, inside the caller's transaction, or None."""
+        return await existing_receipt(connection, self.scope, self.fingerprint)
+
+    async def store(self, connection: Any, result: dict[str, Any]) -> None:
+        await store_receipt(connection, self.scope, self.fingerprint, result)
+
+
+# A run and every run below it, by parent, for a statement that continues `select ... from tree`.
+RUN_TREE = (
+    "with recursive tree as (select id from public.runs where id = %s union all "
+    "select r.id from public.runs r join tree t on r.parent_run_id = t.id) "
+)
+
+
+async def current_status(connection: Any, run_id: UUID) -> RunStatus | None:
+    """The run's status now, or None when there is no such run."""
+    cursor = await connection.execute("select status from public.runs where id = %s", (run_id,))
+    row = await cursor.fetchone()
+    return None if row is None else RunStatus(row[0])
+
+
+async def ancestors_running(connection: Any, parent_run_id: UUID) -> bool:
+    """Whether a child's parent and every run above it are running, so the child may go on."""
+    cursor = await connection.execute(
+        "with recursive up as (select id, parent_run_id, status from public.runs "
+        "where id = %s union all select r.id, r.parent_run_id, r.status "
+        "from public.runs r join up u on r.id = u.parent_run_id) "
+        "select count(*) from up where status <> %s",
+        (parent_run_id, RunStatus.RUNNING.value),
+    )
+    return not (await cursor.fetchone())[0]
+
+
 def _snapshot(policy: RolePolicy) -> str:
     return json.dumps(
         {
@@ -610,11 +670,11 @@ async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (ST
         )
         await _record_obligation(connection, run_id, command, detail, response)
         if command is RunCommand.CANCEL:
-            await connection.execute(
-                "update public.approval_requests set status = 'withdrawn' "
-                "where run_id = %s and status = 'pending'",
-                (run_id,),
-            )
+            # Imported here: approvals imports this module for its run commands, so importing it
+            # at module level would be circular. It stays the one writer of request status.
+            from autobots.application.approvals import withdraw_pending
+
+            await withdraw_pending(connection, run_id)
             # Nothing is waiting on an answer any more, so nothing can stay open against it.
             await connection.execute(
                 "update app_private.run_obligations set status = 'met', response = 'cancelled', "
@@ -656,11 +716,14 @@ async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (ST
 
 
 __all__ = [
+    "RUN_TREE",
     "Actor",
     "AdmissionGrant",
+    "CommandKey",
     "CommandRefused",
     "Fresh",
     "IdempotencyConflict",
+    "Idempotent",
     "Inheritance",
     "Inherited",
     "LeaseLost",
@@ -671,7 +734,9 @@ __all__ = [
     "VersionConflict",
     "admit",
     "admit_run",
+    "ancestors_running",
     "append_event",
     "apply_command",
+    "current_status",
     "record_transition",
 ]

@@ -26,7 +26,6 @@ from autobots.adapters.github_issues import (
     github_client,
     marker,
 )
-from autobots.application.approvals import approved_request, return_to_review
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     NotDelivered,
@@ -116,12 +115,10 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         async with github_client(token, transport) as http:
             return await detail_against(http, repository, arguments)
 
-    async def approved_detail(context: ToolContext) -> tuple[str, dict[str, Any]]:
-        """This attempt's operation and the diffs its approval bound (PRD-Studio GH-06)."""
-        operation_id = context.operation_id
-        approved = None
-        if operation_id is not None:
-            approved = await approved_request(context.connection, operation_id)
+    def approved_detail(context: ToolContext) -> tuple[str, dict[str, Any]]:
+        """This attempt's operation and the diffs its approval bound (PRD-Studio GH-06), as the
+        gateway handed them over (XMOD-02)."""
+        operation_id, approved = context.operation_id, context.approval
         if operation_id is None or approved is None or approved.review_detail is None:
             raise ToolFailed("review_detail_missing")
         return operation_id, approved.review_detail
@@ -160,7 +157,7 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         arguments: GithubOpenPullRequestInput, context: ToolContext
     ) -> GithubOpenPullRequestOutput:
         repository, token = await attempt_target(context, environ)
-        operation_id, approved = await approved_detail(context)
+        operation_id, approved = approved_detail(context)
         branch = branch_for(operation_id)
         async with github_client(token, transport) as http:
             head = await head_of(http, repository, arguments.base)
@@ -168,12 +165,8 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
                 if head is not None:
                     # A person approves again, against the new head (Decision 0022 D15). The run
                     # keeps running and waits once the call is tried again (Decision 0028 E1).
-                    await return_to_review(
-                        context.connection,
-                        context.scope,
-                        operation_id=operation_id,
-                        tool_id=TOOL_ID,
-                        detail=await detail_against(http, repository, arguments),
+                    await context.return_to_review(
+                        TOOL_ID, await detail_against(http, repository, arguments)
                     )
                 raise ToolFailed("base_moved")
             commit = await head_of(http, repository, branch)

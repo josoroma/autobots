@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from autobots.application.approvals import approved_request
+from autobots.application.approvals import ApprovedRequest
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     NotDelivered,
@@ -78,7 +78,8 @@ async def attempt_target(
 
     A write that already has an approval uses the repository that approval recorded (V7), so
     neither a fresh attempt nor a readback can be pointed at another repository by a changed
-    setting. The gateway refuses a fresh approved call whose repository now resolves differently.
+    setting. The gateway refuses a fresh approved call whose repository now resolves differently,
+    and hands an approved attempt what was approved (XMOD-02).
     """
     from autobots.application.tool_keys import ToolKeyUnavailable, github_target
 
@@ -88,18 +89,16 @@ async def attempt_target(
         repository, token = await github_target(connection, workspace, environ)
     except ToolKeyUnavailable as error:
         raise ToolFailed(error.code) from None
-    if connection is not None and context is not None and context.operation_id:
-        approved = await approved_repository(connection, context.operation_id)
-        if approved is not None:
-            repository = approved
+    approved = approved_repository(context.approval if context is not None else None)
+    if approved is not None:
+        repository = approved
     if not token or not repository or not _REPOSITORY.fullmatch(repository):
         raise ToolFailed("connector_not_configured")
     return repository, token
 
 
-async def approved_repository(connection: Any, operation_id: str) -> str | None:
-    """The repository the operation's approval recorded, or None without one (Decision 0025 V7)."""
-    approved = await approved_request(connection, operation_id)
+def approved_repository(approved: ApprovedRequest | None) -> str | None:
+    """The repository an approval recorded, or None without one (Decision 0025 V7)."""
     target = (approved.resource_target if approved is not None else None) or ""
     return target.removeprefix(TARGET_PREFIX) if target.startswith(TARGET_PREFIX) else None
 

@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import re
+from dataclasses import dataclass
 from typing import Literal
 
 from autobots.application.tool_gateway import (
@@ -100,6 +101,29 @@ async def write_run_file(
             ),
         )
     return version, digest
+
+
+@dataclass(frozen=True)
+class StoredFile:
+    """The run-file version one operation wrote."""
+
+    version: int
+    sha256: str
+    content: str
+    media_type: str
+
+
+async def stored_file(context: ToolContext) -> StoredFile | None:
+    """The version this attempt's operation saved through `write_run_file`, or None. That write
+    commits under a unique operation ID in one transaction, so no row means nothing was saved, and
+    a readback can tell an adapter so without its own SQL (PADP-13, XMOD-02)."""
+    cursor = await context.connection.execute(
+        "select version, sha256, content, media_type from app_private.run_files "
+        "where operation_id = %s",
+        (context.operation_id,),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else StoredFile(row[0], row[1], row[2], row[3])
 
 
 async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtifactOutput:

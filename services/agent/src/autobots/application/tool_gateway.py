@@ -11,17 +11,21 @@ from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
+from autobots.application import receipts
 from autobots.application.approvals import (
     ApprovalProposal,
+    ApprovedRequest,
     approval_gate,
     approved_request,
     receipt_may_have_sent,
     scope_snapshot,
 )
+from autobots.application.approvals import return_to_review as send_back_to_review
 from autobots.application.runs import LeaseLost
 
 # The gateway's own fenced writes use it, and so do the writers that import it from this module.
 from autobots.application.worker_leases import hold_lease as hold_lease
+from autobots.domain.effects import ReceiptStatus, leaves_receipt
 from autobots.domain.runs import RunStatus
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
@@ -86,9 +90,32 @@ class ToolScope:
 
 @dataclass(frozen=True)
 class ToolContext:
+    """What a tool's handler, readback, target resolver and review are handed.
+
+    Application tools read and write the tables they own through `connection`. External adapters
+    use the capabilities instead: `approval` and `return_to_review`, and they hand the connection
+    only to `tool_keys` to resolve a key, which tests/test_effect_writers.py counts (XMOD-02)."""
+
     connection: Any
     scope: ToolScope
     operation_id: str | None
+    # What a person approved for this dispatch, loaded once the approval gate released the call,
+    # and None when no approval held it (XMOD-02).
+    approval: ApprovedRequest | None = None
+
+    async def return_to_review(self, tool_id: str, detail: dict[str, Any]) -> UUID | None:
+        """Nothing was sent, so this operation's approved request goes back to a person with
+        `detail`, under this attempt's lease (approvals.return_to_review, Decision 0022 D15).
+        None when it has no approved request, or no operation."""
+        if self.operation_id is None:
+            return None
+        return await send_back_to_review(
+            self.connection,
+            self.scope,
+            operation_id=self.operation_id,
+            tool_id=tool_id,
+            detail=detail,
+        )
 
 
 Handler = Callable[[Any, ToolContext], Awaitable[BaseModel]]
@@ -329,7 +356,9 @@ def resolve(registry: ToolRegistry, scope: ToolScope, name: str, arguments: Any)
     return Call(tool, parsed, argument_hash, _identity(scope, tool, argument_hash))
 
 
-async def _target_unchanged(connection: Any, operation_id: str, target: str | None) -> bool:
+async def _target_unchanged(
+    connection: Any, operation_id: str, approval: ApprovedRequest | None, target: str | None
+) -> bool:
     """Decision 0025 V7 and V8: an approved effect runs only against the target it was approved
     for, and an empty recorded target fails closed. One already sent, or possibly sent, is left to
     its receipt and reconciliation, as refusing it would report an effect that happened as not."""
@@ -339,8 +368,7 @@ async def _target_unchanged(connection: Any, operation_id: str, target: str | No
     receipt = await cursor.fetchone()
     if receipt_may_have_sent(None if receipt is None else receipt[0]):
         return True
-    approved = await approved_request(connection, operation_id)
-    recorded = approved.resource_target if approved is not None else None
+    recorded = approval.resource_target if approval is not None else None
     return bool(recorded) and recorded == target
 
 
@@ -453,17 +481,26 @@ def _proposal(
     )
 
 
+@dataclass(frozen=True)
+class Released:
+    """A call the approval step lets through, with what a person approved for it, or None when no
+    policy held it (XMOD-02)."""
+
+    approval: ApprovedRequest | None = None
+
+
 async def hold_for_approval(
     connection: Any, scope: ToolScope, call: Call
-) -> GatewayCode | str | None:
-    """None lets the call through: its policy doesn't hold it, or a person approved this operation
-    and its target still resolves to the one they approved (Decision 0015, Decision 0025 V7).
+) -> GatewayCode | str | Released:
+    """Released lets the call through: its policy doesn't hold it, or a person approved this
+    operation and its target still resolves to the one they approved (Decision 0015, Decision 0025
+    V7). The approved request is read once here, for the tool's context.
 
     A code means it waits for a person or is refused. A tool's own code from its target resolver
     or review passes through."""
     tool, policy = call.tool, call.tool.approval
     if not policy.applies(tool.operation_class, call.parsed):
-        return None
+        return Released()
     reviewing = ToolContext(connection, scope, call.operation_id)
     target = policy.resource_target(call.parsed)
     if policy.target_resolver is not None:
@@ -487,11 +524,12 @@ async def hold_for_approval(
     code = await approval_gate(connection, scope, _proposal(scope, call, target, detail))
     if code is not None:
         return code
+    approved = await approved_request(connection, call.operation_id)
     if policy.target_resolver is not None and not await _target_unchanged(
-        connection, call.operation_id, target
+        connection, call.operation_id, approved, target
     ):
         return GatewayCode.APPROVAL_TARGET_CHANGED
-    return None
+    return Released(approved)
 
 
 async def admit_budget(
@@ -537,21 +575,29 @@ class ToolGateway:
         if isinstance(resolved, Refused):
             return _denied(resolved.code)
         call = resolved
+        approval = None
         refusal: GatewayCode | str | None = await admission_refusal(connection, scope, call)
         if refusal is None:
-            refusal = await hold_for_approval(connection, scope, call)
+            held = await hold_for_approval(connection, scope, call)
+            if isinstance(held, Released):
+                approval = held.approval
+            else:
+                refusal = held
         if refusal is None:
             refusal = await admit_budget(connection, scope, call, use)
         if refusal is not None:
             return _denied(refusal)
-        if call.tool.operation_class in EFFECTFUL:
-            return await self.admit_effect(connection, scope, call)
-        return await self._read(connection, scope, call)
+        if leaves_receipt(call.tool.operation_class):
+            return await self.admit_effect(connection, scope, call, approval)
+        return await self._read(connection, scope, call, approval)
 
-    async def _read(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
-        """No effect, so no receipt. A repeated read must see current content."""
+    async def _read(
+        self, connection: Any, scope: ToolScope, call: Call, approval: ApprovedRequest | None
+    ) -> ToolResult:
+        """No effect, so no receipt. A repeated read must see current content. One a person
+        approved has used that approval up (PTOL-06)."""
         tool = call.tool
-        context = ToolContext(connection, scope, None)
+        context = ToolContext(connection, scope, None, approval)
         for attempt in range(tool.retries + 1):
             try:
                 output = await asyncio.wait_for(
@@ -577,35 +623,35 @@ class ToolGateway:
                     return _denied(refusal)
         return ToolResult(ToolOutcome.FAILED, code)
 
-    async def admit_effect(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
-        """The effect step `_dispatch` takes once every check passed. The receipt commits as
-        started, under the lease, before the effect runs, so a worker that stalled after its checks
-        admits nothing (SP-012, SP-013). A database check drives it as that stalled worker;
-        everything else calls `execute`."""
+    async def admit_effect(
+        self,
+        connection: Any,
+        scope: ToolScope,
+        call: Call,
+        approval: ApprovedRequest | None = None,
+    ) -> ToolResult:
+        """The effect step `_dispatch` takes once every check passed, with what a person approved
+        for it. The receipt commits as started, under the lease, before the effect runs, so a
+        worker that stalled after its checks admits nothing (SP-012, SP-013). A database check
+        drives it as that stalled worker; everything else calls `execute`."""
         operation_id = call.operation_id
-        context = ToolContext(connection, scope, operation_id)
+        context = ToolContext(connection, scope, operation_id, approval)
+        attempt = receipts.Attempt(
+            operation_id,
+            scope.run_id,
+            scope.workspace_id,
+            call.tool.tool_id,
+            call.tool.version,
+            call.argument_hash,
+            scope.generation,
+            call.tool.reconcile is not None,
+        )
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
         # The lease is held for it, so a worker that stalled after its check can't admit anything.
         try:
             async with connection.transaction():
                 await hold_running(connection, scope)
-                cursor = await connection.execute(
-                    "insert into app_private.tool_receipts (operation_id, run_id, workspace_id, "
-                    "tool_id, tool_version, argument_hash, status, generation, can_readback) "
-                    "values (%s, %s, %s, %s, %s, %s, 'started', %s, %s) "
-                    "on conflict (operation_id) do nothing returning operation_id",
-                    (
-                        operation_id,
-                        scope.run_id,
-                        scope.workspace_id,
-                        call.tool.tool_id,
-                        call.tool.version,
-                        call.argument_hash,
-                        scope.generation,
-                        call.tool.reconcile is not None,
-                    ),
-                )
-                created = await cursor.fetchone() is not None
+                created = await receipts.start(connection, attempt)
             if not created:
                 replayed = await replay_receipt(context, call)
                 if replayed is not None:
@@ -613,16 +659,7 @@ class ToolGateway:
                 # A crash during this new attempt has to be classified like any other.
                 async with connection.transaction():
                     await hold_running(connection, scope)
-                    # A ruling covered the last attempt. Its evidence stays, but this one is open.
-                    cursor = await connection.execute(
-                        "update app_private.tool_receipts set status = 'started', result = null, "
-                        "failure_code = null, failure_detail = null, generation = %s, "
-                        "reconciled_at = null, updated_at = now() "
-                        "where operation_id = %s and status <> 'succeeded' "
-                        "returning operation_id",
-                        (scope.generation, operation_id),
-                    )
-                    reopened = await cursor.fetchone() is not None
+                    reopened = await receipts.reopen(connection, operation_id, scope.generation)
                 if not reopened:
                     # A late success or a person's ruling landed since that read. Never send again.
                     replayed = await replay_receipt(context, call)
@@ -650,7 +687,9 @@ class ToolGateway:
         except LeaseLost:
             # The write's transaction refused it, so nothing happened. The code tells the approval
             # gate that this attempt didn't use a person's decision.
-            await record_receipt(context, call.operation_id, "failed", None, GatewayCode.LEASE_LOST)
+            await record_receipt(
+                context, call.operation_id, ReceiptStatus.FAILED, None, GatewayCode.LEASE_LOST
+            )
             return ToolResult(
                 ToolOutcome.DENIED, GatewayCode.LEASE_LOST, operation_id=call.operation_id
             )
@@ -658,7 +697,11 @@ class ToolGateway:
             return await _unexpected_failure(context, call, error)
         if too_large:
             await record_receipt(
-                context, call.operation_id, "unknown", None, failure_detail="output_too_large"
+                context,
+                call.operation_id,
+                ReceiptStatus.UNKNOWN,
+                None,
+                failure_detail="output_too_large",
             )
             return ToolResult(
                 ToolOutcome.UNKNOWN, GatewayCode.OUTPUT_TOO_LARGE, operation_id=call.operation_id
@@ -677,11 +720,11 @@ async def replay_receipt(context: ToolContext, call: Call) -> ToolResult | None:
         (operation_id,),
     )
     status, result = await cursor.fetchone()
-    if status == "succeeded":
+    if status == ReceiptStatus.SUCCEEDED:
         return ToolResult(
             ToolOutcome.SUCCEEDED, output=result, operation_id=operation_id, replayed=True
         )
-    if status == "failed":
+    if status == ReceiptStatus.FAILED:
         return None
     # An earlier attempt was interrupted, and this is why its outcome stays unknown.
     detail = "interrupted"
@@ -699,13 +742,13 @@ async def replay_receipt(context: ToolContext, call: Call) -> ToolResult | None:
             detail = f"readback:{_diagnosis(error)}"
             visible = None
         if visible is not None:
-            await record_receipt(context, operation_id, "succeeded", visible)
+            await record_receipt(context, operation_id, ReceiptStatus.SUCCEEDED, visible)
             return ToolResult(
                 ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id, replayed=True
             )
     if tool.safe_to_repeat:
         return None
-    await record_receipt(context, operation_id, "unknown", None, failure_detail=detail)
+    await record_receipt(context, operation_id, ReceiptStatus.UNKNOWN, None, failure_detail=detail)
     return ToolResult(
         ToolOutcome.UNKNOWN,
         GatewayCode.OUTCOME_UNKNOWN,
@@ -722,7 +765,7 @@ async def _known_failure(context: ToolContext, call: Call, error: ToolFailed) ->
         # Only the gateway may say the lease refused an attempt: the approval gate trusts that code
         # to mean nothing was written (Decision 0025 V8).
         code, detail = GatewayCode.TOOL_FAILED, f"reserved_code:{code}"
-    await record_receipt(context, call.operation_id, "failed", None, code, detail)
+    await record_receipt(context, call.operation_id, ReceiptStatus.FAILED, None, code, detail)
     return ToolResult(ToolOutcome.FAILED, code, operation_id=call.operation_id)
 
 
@@ -731,7 +774,7 @@ async def _unexpected_failure(context: ToolContext, call: Call, error: BaseExcep
     settle. Its receipt keeps the diagnosis and its log line the cause (R-25, XERR-02)."""
     _log_failure("tool.operation.unknown", call.tool, call.operation_id, error)
     await record_receipt(
-        context, call.operation_id, "unknown", None, failure_detail=_diagnosis(error)
+        context, call.operation_id, ReceiptStatus.UNKNOWN, None, failure_detail=_diagnosis(error)
     )
     return ToolResult(
         ToolOutcome.UNKNOWN, GatewayCode.OUTCOME_UNKNOWN, operation_id=call.operation_id
@@ -740,7 +783,7 @@ async def _unexpected_failure(context: ToolContext, call: Call, error: BaseExcep
 
 async def _succeeded(context: ToolContext, call: Call, visible: dict[str, Any]) -> ToolResult:
     # The effect happened, so it is recorded whoever owns the run now.
-    await record_receipt(context, call.operation_id, "succeeded", visible)
+    await record_receipt(context, call.operation_id, ReceiptStatus.SUCCEEDED, visible)
     refusal = await ownership_refusal(context.connection, context.scope)
     if refusal is not None:
         return ToolResult(ToolOutcome.DENIED, refusal, operation_id=call.operation_id)
@@ -756,32 +799,13 @@ def _visible(tool: ToolDefinition, output: BaseModel) -> tuple[dict[str, Any], b
 async def record_receipt(
     context: ToolContext,
     operation_id: str,
-    status: str,
+    status: ReceiptStatus,
     result: dict[str, Any] | None,
     failure_code: str | None = None,
     failure_detail: str | None = None,
 ) -> None:
-    """Only moves a receipt forward. A success is recorded whoever owns the run now, as the effect
-    happened, even over a ruling that it hadn't: repeating it would be the worse mistake, and the
-    ruling's evidence stays. Anything else speaks only for the attempt on record."""
-    values = (
-        status,
-        json.dumps(result) if result is not None else None,
-        failure_code,
-        failure_detail,
-        operation_id,
-    )
-    if status == "succeeded":
-        await context.connection.execute(
-            "update app_private.tool_receipts set status = %s, result = %s, failure_code = %s, "
-            "failure_detail = %s, updated_at = now() "
-            "where operation_id = %s and status <> 'succeeded'",
-            values,
-        )
-        return
-    await context.connection.execute(
-        "update app_private.tool_receipts set status = %s, result = %s, failure_code = %s, "
-        "failure_detail = %s, updated_at = now() "
-        "where operation_id = %s and status = 'started' and generation <= %s",
-        (*values, context.scope.generation),
-    )
+    """What this attempt learned, on its receipt, by receipts.record: a success whoever owns the
+    run now, anything else only for the attempt on record at this context's generation. A
+    database check passes the stored strings, which name the same statuses."""
+    outcome = receipts.Outcome(ReceiptStatus(status), result, failure_code, failure_detail)
+    await receipts.record(context.connection, operation_id, outcome, context.scope.generation)

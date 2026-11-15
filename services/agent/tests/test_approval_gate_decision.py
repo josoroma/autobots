@@ -21,6 +21,7 @@ from autobots.application.approvals import (
     gate_decision,
     scope_snapshot,
 )
+from autobots.domain.effects import ApprovalStatus, ReceiptStatus
 from autobots.domain.stops import GatewayCode
 
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
@@ -44,11 +45,11 @@ OTHER_SCOPE = "another scope"
 
 
 def request(status: str, *, expired: bool = False, scope: str = SCOPE) -> RequestRow:
-    return RequestRow(APPROVAL, status, scope, expired)
+    return RequestRow(APPROVAL, ApprovalStatus(status), scope, expired)
 
 
 def receipt(status: str, *, ruled: bool = False, code: str | None = None) -> ReceiptState:
-    return ReceiptState(status, ruled, code)
+    return ReceiptState(ReceiptStatus(status), ruled, code)
 
 
 @pytest.mark.parametrize(
@@ -147,11 +148,16 @@ RUN = Run(
 @pytest.mark.parametrize(
     ("row", "found", "code", "writes"),
     [
-        ((APPROVAL, "approved", SCOPE, False), None, None, []),
-        ((APPROVAL, "rejected", SCOPE, False), None, "approval_rejected", []),
-        ((APPROVAL, "pending", SCOPE, False), None, "approval_pending", ["wait"]),
-        ((APPROVAL, "approved", SCOPE, True), None, "approval_pending", ["reopen", "wait"]),
-        ((APPROVAL, "approved", SCOPE, True), ("started", None, None), None, []),
+        ((APPROVAL, "approved", SCOPE, False, False), None, None, []),
+        ((APPROVAL, "rejected", SCOPE, False, False), None, "approval_rejected", []),
+        ((APPROVAL, "pending", SCOPE, False, False), None, "approval_pending", ["wait"]),
+        (
+            (APPROVAL, "approved", SCOPE, True, False),
+            None,
+            "approval_pending",
+            ["reopen", "wait"],
+        ),
+        ((APPROVAL, "approved", SCOPE, True, False), ("started", None, None), None, []),
     ],
     ids=["release", "refuse", "wait", "reopen", "sent"],
 )

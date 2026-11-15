@@ -90,6 +90,19 @@ async def hold_lease(connection: Any, holder: LeaseHolder) -> None:
         raise LeaseLost("this worker no longer owns the run")
 
 
+async def generation_alive(connection: Any, run_id: str, generation: int) -> bool:
+    """Whether the run's job is still claimed at `generation` with an unexpired lease by database
+    time, and the run is running. The browser sweeper keeps a session only while this holds, by the
+    run and generation its container is labelled with (BX-04, PADP-13)."""
+    cursor = await connection.execute(
+        "select 1 from app_private.run_jobs j join public.runs r on r.id = j.run_id "
+        "where j.run_id::text = %s and j.generation = %s and j.status = 'claimed' "
+        "and j.lease_expires_at > clock_timestamp() and r.status = 'running'",
+        (run_id, generation),
+    )
+    return await cursor.fetchone() is not None
+
+
 async def is_held(connection: Any) -> bool:
     """A restored instance holds all its work until a person releases it."""
     cursor = await connection.execute("select 1 from app_private.installation_holds limit 1")

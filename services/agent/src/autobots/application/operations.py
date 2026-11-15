@@ -68,6 +68,7 @@ REQUIRED_COLUMNS = (
     ("app_private.run_jobs", "last_failure_type"),
     ("public.routines", "removed_at"),
     ("public.approval_requests", "review_detail"),
+    ("public.approval_requests", "consumed_at"),
 )
 # Decision 0023 E2: the one function that counts the applied history, migration 49.
 COUNT_FUNCTION = "app_private.applied_migration_count()"

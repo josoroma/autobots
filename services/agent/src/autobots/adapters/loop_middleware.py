@@ -64,7 +64,14 @@ from autobots.application.model_attempts import (
     call_with_policy,
     classify_status,
 )
-from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
+from autobots.application.run_usage import (
+    LimitReached,
+    RootLimits,
+    active_seconds_used,
+    consume,
+    model_calls_used,
+)
+from autobots.application.runs import ancestors_running, current_status
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
 
@@ -364,16 +371,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         refusal = await ownership_refusal(self._connection, self._scope)
         if refusal is not None:
             raise LoopStopped(refusal)
-        if self._scope.parent_run_id is not None:
-            cursor = await self._connection.execute(
-                "with recursive up as (select id, parent_run_id, status from public.runs "
-                "where id = %s union all select r.id, r.parent_run_id, r.status "
-                "from public.runs r join up u on r.id = u.parent_run_id) "
-                "select count(*) from up where status <> 'running'",
-                (self._scope.parent_run_id,),
-            )
-            if (await cursor.fetchone())[0]:
-                raise LoopStopped(StopCode.PARENT_NOT_RUNNING)
+        parent = self._scope.parent_run_id
+        if parent is not None and not await ancestors_running(self._connection, parent):
+            raise LoopStopped(StopCode.PARENT_NOT_RUNNING)
         remaining = self._limits.active_seconds - await active_seconds_used(
             self._connection, self._scope.budget_run_id
         )
@@ -399,11 +399,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                     raise ProviderFailure(
                         FailureClass.UNCERTAIN_ACCEPTANCE, reason="call_time_limit"
                     )
-                cursor = await self._connection.execute(
-                    "select status from public.runs where id = %s", (self._scope.run_id,)
-                )
-                row = await cursor.fetchone()
-                if row is not None and row[0] in INTERRUPTING:
+                if await current_status(self._connection, self._scope.run_id) in INTERRUPTING:
                     stopped.append(StopCode.RUN_NOT_RUNNING)
                     raise ProviderFailure(
                         FailureClass.UNCERTAIN_ACCEPTANCE, reason="run_interrupted"
@@ -531,10 +527,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
                 charged_micro_usd=charged(message),
             )
 
-        cursor = await self._connection.execute(
-            "select model_calls from app_private.run_usage where run_id = %s", (budget,)
-        )
-        used = (await cursor.fetchone())[0]
+        used = await model_calls_used(self._connection, budget)
         try:
             prompt_bytes = request_bytes(request)
         except UnicodeEncodeError:

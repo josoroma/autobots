@@ -1,4 +1,8 @@
-"""Tampering, expiry, rejection and interrupted replay, with a real graph. JSON cases."""
+"""Tampering, expiry, rejection and interrupted replay, with a real graph. JSON cases through checklib.
+
+It also repeats an approved browse_goal call, which leaves no receipt and so uses its approval up, and arranges
+an expiry that raced a decision or a cancel (refactor plan R-50: PTOL-06, PTOL-03).
+"""
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +15,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from autobots.application.approvals import ApprovalRefused, decide, expire_due
+from autobots.application import browsing_tool
+from autobots.application.approvals import ApprovalRefused, decide, expire, expire_due
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import Inheritance, admit_run, apply_command
 from autobots.application.tool_gateway import (
@@ -27,18 +32,15 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import PLAN_TOOLS, OperationClass
 from autobots.operations.job_dispatch import process_next
+from checklib import Cases, Db, run_check
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import BaseModel, ConfigDict
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, OTHER = UUID(sys.argv[1]), UUID(sys.argv[2])
 ACTOR = uuid4()
-cases = []
 sent: list[str] = []
-
-
-def check(name: str, expected: str, observed: object, passed: bool) -> None:
-    cases.append({'id': name, 'expected': expected, 'observed': str(observed), 'passed': bool(passed)})
+BROWSE = {'task': 'What is example.com for?', 'start_url': 'https://example.com/', 'allowed_domains': ['example.com']}
 
 
 class SendInput(BaseModel):
@@ -64,7 +66,8 @@ SEND = ('mock_send', {'to': 'team@example.invalid', 'body': 'hello'})
 CONFIG = LoopConfig(route=ROUTE, tools=(MOCK,), sleep=lambda _: asyncio.sleep(0))
 
 
-async def main() -> dict[str, str]:
+async def main(cases: Cases) -> dict[str, object]:
+    check = cases.check
     env: dict[str, str] = {}
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         async def value(sql: str, *values: object) -> Any:
@@ -224,6 +227,62 @@ async def main() -> dict[str, str]:
         refused = await gateway.execute(db, wider, *SEND)
         check('an approval doesn\'t carry to a changed scope', 'approval_scope_changed, no effect', (refused.code, sent), refused.code == 'approval_scope_changed' and sent == [])
 
+        d = Db(db, cases, WORKSPACE, ACTOR)
+
+        # Decisions 0018 B6 and 0020 L5: browse_goal leaves no receipt, so the call an approval releases uses it up,
+        # and the same call again waits for a person (PTOL-06). With no runtime bound, a released call fails
+        # browsing_unavailable before any container starts, so no executor or model is reached.
+        with cases.scenario('a repeated approved browse_goal call'):
+            browse = ToolRegistry()
+            browse.register(browsing_tool.browse_tool(None, qualified=lambda: True))
+            browsing = ToolGateway(browse)
+            browser_expert = uuid4()
+            await db.execute('insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)',
+                             (browser_expert, WORKSPACE, f'Browser {browser_expert.hex[:6]}'))
+            run = await d.admit('Browse twice', tools={'browse_goal': 1}, expert=(browser_expert, 1))
+            lease = await d.claim(run)
+            first = await browsing.execute(db, ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1}), 'browse_goal', BROWSE)
+            await d.approve(run)
+            lease = await d.claim(run)
+            scope = ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1})
+            released = await browsing.execute(db, scope, 'browse_goal', BROWSE)
+            used = await d.row('select status, consumed_at is not null from public.approval_requests where run_id = %s', run)
+            repeated = await browsing.execute(db, scope, 'browse_goal', BROWSE)
+            after = await d.row('select status, consumed_at is null, decided_by is null, count(*) over () '
+                                'from public.approval_requests where run_id = %s', run)
+            check('repeating an approved browse_goal call waits for a person again',
+                  'approval_pending; released once (failed browsing_unavailable), its approval approved and consumed; '
+                  'then approval_pending, the one request pending, undecided and unconsumed, and the run waiting_approval',
+                  (first.code, released.outcome.value, released.code, used, repeated.code, after, await state(run)),
+                  lambda seen: seen == ('approval_pending', 'failed', 'browsing_unavailable', ('approved', True),
+                                        'approval_pending', ('pending', True, True, 1), 'waiting_approval'))
+
+        # An expiry pass that read a request as pending before a person decided it, or before its run was cancelled,
+        # changes nothing (PTOL-03). Arranged: that pass's expiry is applied after the decision or the cancel, so
+        # its guarded write finds the request already settled, as the waiting write does once the lock is released.
+        with cases.scenario('an expiry racing a decision or a cancel'):
+            sending = ToolRegistry()
+            sending.register(MOCK)
+            raced = []
+            for settle in ('approve', 'cancel'):
+                run = await d.admit('Send it', tools={'mock_send': 1})
+                lease = await d.claim(run)
+                await ToolGateway(sending).execute(db, ToolScope(WORKSPACE, run, lease.generation, {'mock_send': 1}), *SEND)
+                request, _ = await approval(run)
+                if settle == 'approve':
+                    await d.approve(run)
+                else:
+                    await d.command(run, RunCommand.CANCEL, Actor.USER)
+                facts = ('select a.status, r.status, r.event_sequence from public.approval_requests a '
+                         'join public.runs r on r.id = a.run_id where a.id = %s')
+                before = await d.row(facts, request)
+                moved = await expire(db, request, run, WORKSPACE)
+                raced.append((settle, moved, before, await d.row(facts, request)))
+            check('an expiry that read a request as pending before its decision or cancel changes nothing',
+                  'not expired; approved stays approved and queued, withdrawn stays withdrawn and cancelled, no new event',
+                  raced, lambda seen: [(item[0], item[1], item[2] == item[3], item[3][:2]) for item in seen]
+                  == [('approve', False, True, ('approved', 'queued')), ('cancel', False, True, ('withdrawn', 'cancelled'))])
+
         # Left pending for the browser's inbox. The owner signs in there, so the owner started it, through an Expert.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
         owner = await value("select user_id from public.workspace_members where workspace_id = %s and role = 'owner'", WORKSPACE)
@@ -273,12 +332,7 @@ async def main() -> dict[str, str]:
         check('the approved request is linked to a plan task', '1 tool use', linked.rowcount, linked.rowcount == 1)
         env = {'AUTOBOTS_TEST_APPROVAL_EXPERT': str(expert), 'AUTOBOTS_TEST_APPROVAL_LEGACY': str(env_legacy), 'AUTOBOTS_TEST_APPROVAL_LEGACY_HASH': env_legacy_hash, 'AUTOBOTS_TEST_APPROVAL_LEGACY_RUN': str(legacy_run), 'AUTOBOTS_TEST_APPROVAL_LOUD': str(env_loud), 'AUTOBOTS_TEST_APPROVAL_MARKDOWN': str(env_markdown),
                'AUTOBOTS_TEST_APPROVAL_APPROVE': str(env_approve), 'AUTOBOTS_TEST_APPROVAL_REJECT': str(env_reject), 'AUTOBOTS_TEST_APPROVAL_HASH': env_hash, 'AUTOBOTS_TEST_APPROVAL_RUN': str(browser_run)}
-    return env
+    return {'browser_env': env}
 
 
-try:
-    browser_env = asyncio.run(main())
-    print(json.dumps({'cases': cases, 'browser_env': browser_env}))
-except Exception:
-    print(json.dumps({'cases': cases}))
-    raise
+run_check(main)

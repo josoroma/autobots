@@ -3,6 +3,9 @@
 A worker stops at a proposal, with nothing done. Its checkpoint holds the pending tool call, so the
 tool step runs again after the decision and finds the answer here. Only the approved operation's
 own identity can pass, so a changed argument is a different operation that needs its own approval.
+
+This module is the one writer of a request's status: request, decide, expire, withdraw and return
+to review, each guarded by its moves in `domain/effects.py` (PTOL-03, Decision 0029 F8).
 """
 
 import hashlib
@@ -10,22 +13,31 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Protocol
+from typing import Any, Protocol, assert_never
 from uuid import UUID, uuid4
 
+from autobots.application import receipts
 from autobots.application.runs import (
     Actor,
+    CommandKey,
     CommandRefused,
+    Idempotent,
     append_event,
     apply_command,
-    existing_receipt,
-    request_hash,
-    store_receipt,
 )
 from autobots.application.worker_leases import LeaseHolder, hold_lease
+from autobots.contracts.approvals import ApprovalVerdict
+from autobots.domain.effects import (
+    ApprovalCommand,
+    ApprovalStatus,
+    ReceiptStatus,
+    approval_sources,
+    leaves_receipt,
+)
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import GatewayCode
+from autobots.domain.tools import OperationClass
 
 DEFAULT_TTL_SECONDS = 86_400
 # The failure code of an attempt the lease refused before it wrote anything.
@@ -63,7 +75,7 @@ class ApprovedRequest:
 def receipt_may_have_sent(status: str | None) -> bool:
     """A receipt that exists and hasn't failed means the effect was sent, or may have been, so the
     receipt and its reconciliation answer for it (Decision 0025 V8). None is no receipt at all."""
-    return status is not None and status != "failed"
+    return status is not None and status != ReceiptStatus.FAILED
 
 
 async def approved_request(connection: Any, operation_id: str) -> ApprovedRequest | None:
@@ -150,15 +162,34 @@ async def _reopen(
     ttl_seconds: int,
     review_detail: dict[str, Any] | None = None,
 ) -> None:
-    """Pending again with nobody's decision on it and a fresh expiry, and announced. A new review
-    detail replaces the stored one, and None keeps it."""
+    """Approved back to pending, with nobody's decision on it, not consumed, a fresh expiry, and
+    announced. A new review detail replaces the stored one, and None keeps it. Its callers hold the
+    request's row lock, having read it approved."""
     await connection.execute(
-        "update public.approval_requests set status = 'pending', decided_by = null, "
-        "decided_at = null, expires_at = clock_timestamp() + make_interval(secs => %s), "
-        "review_detail = coalesce(%s::jsonb, review_detail) where id = %s",
-        (ttl_seconds, None if review_detail is None else json.dumps(review_detail), approval_id),
+        "update public.approval_requests set status = %s, decided_by = null, "
+        "decided_at = null, consumed_at = null, "
+        "expires_at = clock_timestamp() + make_interval(secs => %s), "
+        "review_detail = coalesce(%s::jsonb, review_detail) where id = %s and status = any(%s)",
+        (
+            ApprovalStatus.PENDING.value,
+            ttl_seconds,
+            None if review_detail is None else json.dumps(review_detail),
+            approval_id,
+            approval_sources(ApprovalCommand.RETURN_TO_REVIEW, ApprovalStatus.PENDING),
+        ),
     )
     await append_event(connection, run_id, _requested(approval_id, tool_id))
+
+
+async def _consume(connection: Any, approval_id: UUID) -> None:
+    """The approval released a call that leaves no receipt, so it can't release another: the same
+    call again goes back to a person (Decisions 0018 B6 and 0020 L5, SP-013). The request stays
+    approved, as consuming is no move of its status. The gate holds the request's row lock."""
+    await connection.execute(
+        "update public.approval_requests set consumed_at = clock_timestamp() "
+        "where id = %s and status = %s and consumed_at is null",
+        (approval_id, ApprovalStatus.APPROVED.value),
+    )
 
 
 async def _enter_wait(connection: Any, run: Requester, approval_id: UUID) -> None:
@@ -178,7 +209,8 @@ async def _request_review(
     connection: Any, run: Requester, proposal: ApprovalProposal, ttl_seconds: int
 ) -> UUID:
     """Stores the request with every Decision 0015 field and announces it. Who asked is read from
-    the run in this transaction, never from the call."""
+    the run in this transaction, never from the call. Its status takes the column's default,
+    pending, the one move a request starts with (ApprovalCommand.REQUEST)."""
     approval_id = uuid4()
     cursor = await connection.execute(
         "select started_by, expert_id, expert_version from public.runs where id = %s",
@@ -223,9 +255,11 @@ class RequestRow:
     """The operation's approval request, as the gate reads it under the request's row lock."""
 
     approval_id: UUID
-    status: str
+    status: ApprovalStatus
     scope_hash: str
     expired: bool
+    # It released a call that left no receipt, so it can't release another (PTOL-06).
+    consumed: bool = False
 
 
 @dataclass(frozen=True)
@@ -233,7 +267,7 @@ class ReceiptState:
     """The operation's receipt, as the gate reads it: whether a person ruled on its last attempt,
     and the code that attempt failed with."""
 
-    status: str
+    status: ReceiptStatus
     ruled: bool
     failure_code: str | None
 
@@ -244,7 +278,7 @@ class Gate(Enum):
     RELEASE = "release"  # the effect may run
     REQUEST = "request"  # no request yet: store one, then wait for a person
     WAIT = "wait"  # a person hasn't decided yet
-    REOPEN = "reopen"  # approved, but stale with nothing sent: back to a person, then wait
+    REOPEN = "reopen"  # approved, but stale or consumed, nothing sent: back to a person, then wait
 
 
 def gate_decision(
@@ -254,10 +288,10 @@ def gate_decision(
     receipt, or None when it has none, and is consulted only for an approved request."""
     if row is None:
         return Gate.REQUEST
-    if row.status == "pending":
+    if row.status is ApprovalStatus.PENDING:
         return GatewayCode.APPROVAL_EXPIRED if row.expired else Gate.WAIT
-    if row.status != "approved":
-        rejected = row.status == "rejected"
+    if row.status is not ApprovalStatus.APPROVED:
+        rejected = row.status is ApprovalStatus.REJECTED
         return GatewayCode.APPROVAL_REJECTED if rejected else GatewayCode.APPROVAL_EXPIRED
     if row.scope_hash != scope_hash:
         return GatewayCode.APPROVAL_SCOPE_CHANGED
@@ -270,18 +304,21 @@ def gate_decision(
         # whose lease was lost wrote nothing and wasn't the run's current owner's, so the decision
         # still stands for that owner.
         return GatewayCode.APPROVAL_CONSUMED
-    return Gate.REOPEN if row.expired else Gate.RELEASE
+    # A consumed approval released a call that left no receipt, so this one needs a person again.
+    return Gate.REOPEN if row.expired or row.consumed else Gate.RELEASE
 
 
 async def _request_row(connection: Any, operation_id: str) -> RequestRow | None:
     """Locked until the gate's transaction ends, so concurrent attempts decide one at a time."""
     cursor = await connection.execute(
-        "select id, status, scope_hash, expires_at <= clock_timestamp() "
-        "from public.approval_requests where operation_id = %s for update",
+        "select id, status, scope_hash, expires_at <= clock_timestamp(), "
+        "consumed_at is not null from public.approval_requests where operation_id = %s for update",
         (operation_id,),
     )
     row = await cursor.fetchone()
-    return None if row is None else RequestRow(row[0], row[1], row[2], bool(row[3]))
+    if row is None:
+        return None
+    return RequestRow(row[0], ApprovalStatus(row[1]), row[2], bool(row[3]), bool(row[4]))
 
 
 async def _receipt_state(connection: Any, operation_id: str) -> ReceiptState | None:
@@ -291,7 +328,7 @@ async def _receipt_state(connection: Any, operation_id: str) -> ReceiptState | N
         (operation_id,),
     )
     row = await cursor.fetchone()
-    return None if row is None else ReceiptState(row[0], row[1] is not None, row[2])
+    return None if row is None else ReceiptState(ReceiptStatus(row[0]), row[1] is not None, row[2])
 
 
 async def approval_gate(
@@ -300,18 +337,24 @@ async def approval_gate(
     proposal: ApprovalProposal,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> GatewayCode | None:
-    """None releases the operation. Any code means no effect, and says why."""
+    """None releases the operation. Any code means no effect, and says why. Releasing a call that
+    leaves no receipt consumes its approval in this transaction (PTOL-06)."""
     async with connection.transaction():
         row = await _request_row(connection, proposal.operation_id)
         receipt = (
             await _receipt_state(connection, proposal.operation_id)
-            if row is not None and row.status == "approved"
+            if row is not None and row.status is ApprovalStatus.APPROVED
             else None
         )
         decision = gate_decision(row, proposal.scope_hash, receipt)
         if isinstance(decision, GatewayCode):
             return decision
         if decision is Gate.RELEASE:
+            if row is not None and not leaves_receipt(OperationClass(proposal.operation_class)):
+                # Fenced like the wait: a worker that lost the run consumes nothing, and its
+                # LeaseLost rolls this transaction back (SP-012).
+                await hold_lease(connection, run)
+                await _consume(connection, row.approval_id)
             return None
         if row is None:
             approval_id = await _request_review(connection, run, proposal, ttl_seconds)
@@ -352,20 +395,28 @@ async def return_to_review(
         if row is None:
             return None
         approval_id: UUID = row[0]
-        await connection.execute(
-            "update app_private.tool_receipts set reconciled_at = now() "
-            "where operation_id = %s and run_id = %s",
-            (operation_id, holder.run_id),
-        )
+        await receipts.settle_for_review(connection, operation_id, holder.run_id)
         await _reopen(connection, holder.run_id, approval_id, tool_id, DEFAULT_TTL_SECONDS, detail)
     return approval_id
 
 
-async def _expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id: UUID) -> None:
-    """Expiry is not consent. The wait ends, the run pauses, and the operation stays unapproved."""
-    await connection.execute(
-        "update public.approval_requests set status = 'expired' where id = %s", (approval_id,)
+async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id: UUID) -> bool:
+    """Expiry is not consent. The wait ends, the run pauses, and the operation stays unapproved.
+
+    Only a pending request expires. A pass that read it pending before a person decided it or the
+    run was cancelled matches no row and writes nothing else, so an expiry never overwrites a
+    decision or a withdrawal. Returns whether it expired the request."""
+    cursor = await connection.execute(
+        "update public.approval_requests set status = %s where id = %s and status = any(%s) "
+        "returning id",
+        (
+            ApprovalStatus.EXPIRED.value,
+            approval_id,
+            approval_sources(ApprovalCommand.EXPIRE, ApprovalStatus.EXPIRED),
+        ),
     )
+    if await cursor.fetchone() is None:
+        return False
     await connection.execute(
         "update app_private.run_obligations set status = 'met', response = 'expired', "
         "met_at = now() where run_id = %s and kind = 'approval' and status = 'open'",
@@ -386,18 +437,44 @@ async def _expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id
             actor=Actor.USER,
             expected_version=await _version(connection, run_id),
         )
+    return True
 
 
 async def expire_due(connection: Any) -> int:
+    """Expires every pending request past its expiry, each in its own transaction, and returns how
+    many it expired."""
     cursor = await connection.execute(
         "select id, run_id, workspace_id from public.approval_requests "
         "where status = 'pending' and expires_at <= clock_timestamp()"
     )
     rows = await cursor.fetchall()
+    expired = 0
     for approval_id, run_id, workspace_id in rows:
         async with connection.transaction():
-            await _expire(connection, approval_id, run_id, workspace_id)
-    return len(rows)
+            expired += await expire(connection, approval_id, run_id, workspace_id)
+    return expired
+
+
+async def withdraw_pending(connection: Any, run_id: UUID) -> None:
+    """A cancelled run's waiting requests, in the cancel's transaction (SP-010)."""
+    await connection.execute(
+        "update public.approval_requests set status = %s where run_id = %s and status = any(%s)",
+        (
+            ApprovalStatus.WITHDRAWN.value,
+            run_id,
+            approval_sources(ApprovalCommand.WITHDRAW, ApprovalStatus.WITHDRAWN),
+        ),
+    )
+
+
+def _decided(decision: ApprovalVerdict) -> ApprovalStatus:
+    match decision:
+        case "approve":
+            return ApprovalStatus.APPROVED
+        case "reject":
+            return ApprovalStatus.REJECTED
+        case _:
+            assert_never(decision)
 
 
 async def decide(
@@ -407,16 +484,20 @@ async def decide(
     actor_id: UUID,
     approval_id: UUID,
     idempotency_key: str,
-    decision: str,
+    decision: ApprovalVerdict,
     argument_hash: str,
 ) -> DecisionResult:
     """Valid only for this workspace, while pending and unexpired, for the arguments reviewed."""
-    wanted = "approved" if decision == "approve" else "rejected"
-    fingerprint = request_hash({"decision": decision, "argument_hash": argument_hash})
-    scope = (workspace_id, actor_id, "decide_approval", str(approval_id), idempotency_key)
+    wanted = _decided(decision)
+    command = Idempotent.of(
+        CommandKey(workspace_id, actor_id, idempotency_key),
+        "decide_approval",
+        str(approval_id),
+        {"decision": decision, "argument_hash": argument_hash},
+    )
     expired_row = False
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await command.replayed(connection)
         if existing is not None:
             return DecisionResult(approval_id, existing["status"], True)
         cursor = await connection.execute(
@@ -431,15 +512,17 @@ async def decide(
         run_id, status, stored_hash, expired, arguments = row
         if stored_hash != argument_hash:
             raise ApprovalRefused("approval_mismatch")
-        if decision == "approve" and status == "pending" and exceeds_review_limit(arguments):
+        pending = status == ApprovalStatus.PENDING
+        if wanted is ApprovalStatus.APPROVED and pending and exceeds_review_limit(arguments):
             # The hash proves what's stored, not what anyone read.
             raise ApprovalRefused("approval_too_large")
-        if status != "pending":
+        if not pending:
             if status == wanted:
                 return DecisionResult(approval_id, status, True)
             raise ApprovalRefused("approval_already_decided")
         if expired:
-            await _expire(connection, approval_id, run_id, workspace_id)
+            # Read pending under this row's lock, so the expiry always moves it.
+            await expire(connection, approval_id, run_id, workspace_id)
             expired_row = True
         else:
             try:
@@ -450,28 +533,47 @@ async def decide(
                     command=RunCommand.DECIDE_APPROVAL,
                     actor=Actor.USER,
                     expected_version=await _version(connection, run_id),
-                    response=wanted,
+                    response=wanted.value,
                 )
             except CommandRefused:
                 raise ApprovalRefused("approval_run_not_waiting") from None
             await connection.execute(
                 "update public.approval_requests set status = %s, decided_by = %s, "
                 "decided_at = now(), expires_at = clock_timestamp() + make_interval(secs => %s) "
-                "where id = %s",
-                (wanted, actor_id, DEFAULT_TTL_SECONDS, approval_id),
+                "where id = %s and status = any(%s)",
+                (
+                    wanted.value,
+                    actor_id,
+                    DEFAULT_TTL_SECONDS,
+                    approval_id,
+                    approval_sources(ApprovalCommand.DECIDE, wanted),
+                ),
             )
             await append_event(
                 connection,
                 run_id,
-                {"type": "approval.decided", "approval_id": str(approval_id), "decision": wanted},
+                {
+                    "type": "approval.decided",
+                    "approval_id": str(approval_id),
+                    "decision": wanted.value,
+                },
             )
-            await store_receipt(connection, scope, fingerprint, {"status": wanted})
+            await command.store(connection, {"status": wanted.value})
     if expired_row:
         raise ApprovalRefused("approval_expired")
-    return DecisionResult(approval_id, wanted, False)
+    return DecisionResult(approval_id, wanted.value, False)
 
 
-DECIDED = ("approved", "rejected", "expired", "withdrawn")
+# The settled statuses the decided list shows (PRD-Studio AP-02), as stored strings.
+DECIDED = tuple(
+    status.value
+    for status in (
+        ApprovalStatus.APPROVED,
+        ApprovalStatus.REJECTED,
+        ApprovalStatus.EXPIRED,
+        ApprovalStatus.WITHDRAWN,
+    )
+)
 
 
 async def list_approvals(
