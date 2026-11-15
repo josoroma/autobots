@@ -997,7 +997,7 @@ class LedgerShape(unittest.TestCase):
         return states, fields, methods
 
     def test_the_scripts_ledger_type_matches_the_services(self) -> None:
-        service = self.shape(ROOT / 'services/agent/src/autobots/operations/route_qualification.py')
+        service = self.shape(ROOT / 'services/agent/src/autobots/operations/paid/ledger.py')
         self.assertEqual(self.shape(ROOT / 'scripts/paid_run.py'), service)
         self.assertIn('run_not_finished', service[0])
         self.assertIn(('reported', 'int | None'), service[1])

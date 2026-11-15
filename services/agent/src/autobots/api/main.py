@@ -1,57 +1,44 @@
-"""The native process entry: `uvicorn --factory autobots.api.main:create_configured_app`."""
+"""The native process entry: `uvicorn --factory autobots.api.main:create_configured_app`.
+
+What it builds from the environment comes from `operations/composition.py`, which the worker shares,
+so both read a key, the object store and a refusal the same way (POPS-03, XMOD-08).
+"""
 
 import os
-from pathlib import Path
 
 from fastapi import FastAPI
-from pydantic import SecretStr
 
-from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
-from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api.app import create_app
 from autobots.api.membership import PostgresMembership
 from autobots.api.settings import load_settings
-from autobots.application.provider_settings import ProviderContext
 from autobots.application.readiness import MalformedSetting
-from autobots.operations.logs import configure_logging, forbid_remote_tracing
+from autobots.logs import configure_logging, forbid_remote_tracing
+from autobots.operations.composition import (
+    object_store,
+    provider_context,
+    seconds,
+    stop_unconfigured,
+)
 
-DEFAULT_KEY_FILE = "Library/Application Support/Autobots/secrets/provider-master.key"
-
-
-def provider_context_from_environment() -> ProviderContext | None:
-    config_root = os.environ.get("AUTOBOTS_CONFIG_ROOT", "")
-    if not config_root:
-        return None
-    key_file = os.environ.get("AUTOBOTS_PROVIDER_MASTER_KEY_FILE") or str(
-        Path.home() / DEFAULT_KEY_FILE
-    )
-    return ProviderContext(
-        config_root=config_root,
-        mode=os.environ.get("NODE_ENV", "development"),
-        master_key_file=Path(key_file),
-        process_environment=dict(os.environ),
-        validate_key=key_validator(),
-        fetch_catalog=catalog_fetcher(),
-    )
+STREAM_SECONDS = "AUTOBOTS_STREAM_SECONDS"
 
 
 def create_configured_app() -> FastAPI:
+    """A setting it can't start with stops it here, exit 2 with the variable named, rather than
+    refusing every admission. A missing database isn't one: Local Operations answers without it."""
     # First, so nothing built below can see an inherited tracing setting.
     forbid_remote_tracing(os.environ)
     configure_logging()
     try:
-        settings = load_settings()
+        settings = load_settings(os.environ)
+        stream_seconds = seconds(os.environ, STREAM_SECONDS)
     except MalformedSetting as error:
-        # Stops at start with the variable named, rather than refusing every admission.
-        raise SystemExit(str(error)) from None
+        stop_unconfigured(error)
     app = create_app(settings)
     app.state.membership = PostgresMembership(app.state)
-    stream_seconds = os.environ.get("AUTOBOTS_STREAM_SECONDS", "")
-    if stream_seconds:
-        app.state.stream_seconds = float(stream_seconds)
-    storage_url = os.environ.get("AUTOBOTS_SUPABASE_URL", "")
-    storage_key = os.environ.get("AUTOBOTS_SERVICE_ROLE_KEY", "")
-    if storage_url and storage_key:
-        app.state.object_store = SupabaseObjectStore(storage_url, SecretStr(storage_key))
-    app.state.provider_context = provider_context_from_environment()
+    if stream_seconds is not None:
+        app.state.stream_seconds = stream_seconds
+    app.state.object_store = object_store(os.environ)
+    # The live mapping, so a key is resolved again for each attempt (model-gateway rule).
+    app.state.provider_context = provider_context(os.environ)
     return app

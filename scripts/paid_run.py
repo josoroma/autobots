@@ -49,7 +49,7 @@ HELPER_ERROR_SHOWN = 300
 OTHER_WORK = ("select (select count(*) from app_private.run_jobs where status in ('queued', 'claimed')) "
               "+ (select count(*) from public.routines where enabled);")
 
-# The service's ledger entry (autobots.operations.route_qualification LedgerState and LedgerEntry),
+# The service's ledger entry (autobots.operations.paid.ledger LedgerState and LedgerEntry),
 # typed here by shape: the scripts load the service at run time, from its own interpreter.
 LedgerState = Literal['reserved', 'settled', 'usage_unreported', 'uncertain', 'not_started', 'run_not_finished']
 
@@ -63,7 +63,7 @@ class LedgerEntry(TypedDict):
 
 
 class Ledger(Protocol):
-    """The shared ledger on disk (route_qualification.Ledger, Decision 0009)."""
+    """The shared ledger on disk (autobots.operations.paid.ledger.Ledger, Decision 0009)."""
 
     cap: int
 
@@ -179,11 +179,11 @@ def reserve(root: Path, path: Path, label: str, limit: int) -> tuple[Ledger, Led
     if str(root / SERVICE_SOURCE) not in sys.path:
         sys.path.insert(0, str(root / SERVICE_SOURCE))
     trial = importlib.import_module('autobots.operations.reasoning_trial')
-    qualification = importlib.import_module('autobots.operations.route_qualification')
-    ledger: Ledger = qualification.Ledger(path, trial.SHARED_CAP_MICRO_USD)
+    ledgers = importlib.import_module('autobots.operations.paid.ledger')
+    ledger: Ledger = ledgers.Ledger(path, trial.SHARED_CAP_MICRO_USD)
     try:
         return ledger, ledger.reserve(label, limit)
-    except qualification.CapReached:
+    except ledgers.CapReached:
         raise Refused(f'a run limited to {limit} micro-USD would take the shared ledger, at {ledger.committed()}, '
                       f'past {ledger.cap}. Nothing was sent') from None
 

@@ -39,9 +39,8 @@ from autobots.domain.effects import ReceiptStatus, leaves_receipt
 from autobots.domain.runs import RunStatus
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tools import OperationClass, ToolOutcome, path_granted
+from autobots.logs import log_event
 
-# Written through the standard logger, as STD-01 keeps this layer from importing
-# operations/logs.py; that module's formatter renders the record and its conventions apply.
 logger = logging.getLogger("autobots.tools")
 
 
@@ -162,7 +161,7 @@ def _log_failure(
     if operation_id is not None:
         fields["operation"] = operation_id
     level = logging.ERROR if _diagnosis(error).startswith("defect:") else logging.WARNING
-    logger.log(level, event, extra={"fields": fields})
+    log_event(logger, event, level, **fields)
 
 
 async def _expert_behind(connection: Any, scope: ToolScope) -> bool:

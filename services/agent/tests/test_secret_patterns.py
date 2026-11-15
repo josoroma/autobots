@@ -5,7 +5,7 @@ import json
 import pytest
 
 from autobots.application.run_projection import public_text
-from autobots.operations.logs import redact
+from autobots.logs import redact
 
 # Synthetic shapes, assembled so no file holds a whole token. None is a real credential.
 SECRETS = {

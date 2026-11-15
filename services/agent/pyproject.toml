@@ -113,7 +113,6 @@ select = [
 "src/autobots/application/workflows.py" = ["ANN401"]
 "src/autobots/operations/browse_trial.py" = ["ANN401"]
 "src/autobots/operations/concept_seed.py" = ["ANN401"]
-"src/autobots/operations/logs.py" = ["ANN401"]
 "src/autobots/operations/reasoning_trial.py" = ["ANN401"]
 "src/autobots/operations/route_qualification.py" = ["ANN401"]
 "src/autobots/operations/worker.py" = ["ANN401"]

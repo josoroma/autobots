@@ -15,7 +15,12 @@ from autobots.adapters.models.catalog import ModelUnavailable
 from autobots.adapters.models.factory import default_sdk_client
 from autobots.application.model_admission import Pricing, worst_case_cost
 from autobots.domain.models import PROFILES
+from autobots.operations import route_fixtures as fixtures
 from autobots.operations import route_qualification as rq
+from autobots.operations.cli import Refused
+from autobots.operations.paid import pricing as paid_pricing
+from autobots.operations.paid.keys import read_key
+from autobots.operations.paid.ledger import CapReached, Ledger
 
 WIRE_ID = "deepseek/deepseek-v4.1-flash-1017"
 CANONICAL = "deepseek/deepseek-v4.1-flash-20261017"
@@ -232,7 +237,7 @@ def test_every_request_keeps_the_route_rules(tmp_path: Path) -> None:
         assert body["model"] == WIRE_ID
         assert body["provider"]["allow_fallbacks"] is False
         assert body["provider"]["require_parameters"] is True
-        assert body["max_tokens"] <= rq.OUTPUT_TOKENS
+        assert body["max_tokens"] <= paid_pricing.OUTPUT_TOKENS
     assert fake.authorization == {f"Bearer {KEY}"}
 
 
@@ -240,7 +245,7 @@ def test_the_named_selector_is_sent_against_the_prompts_preference(tmp_path: Pat
     fake = Fake()
     run(tmp_path, fake)
     named = [b for b in fake.bodies if "Never use the Weather tool" in json.dumps(b["messages"])]
-    assert len(named) == rq.TRIALS
+    assert len(named) == fixtures.TRIALS
     for body in named:
         assert {tool["function"]["name"] for tool in body["tools"]} == {"Weather", "ClockTime"}
         assert body["tool_choice"]["function"]["name"] == "Weather"
@@ -257,9 +262,9 @@ def test_a_cancelled_stream_is_never_counted_as_free(tmp_path: Path) -> None:
     report = run(tmp_path, Fake())
     ledger = json.loads((tmp_path / "ledger.json").read_text())
     cancelled = [e for e in ledger["entries"] if e["label"].startswith("cancellation")]
-    assert len(cancelled) == rq.TRIALS
+    assert len(cancelled) == fixtures.TRIALS
     assert all(e["state"] == "uncertain" and e["reported"] is None for e in cancelled)
-    assert report["calls_without_a_reported_charge"] == rq.TRIALS
+    assert report["calls_without_a_reported_charge"] == fixtures.TRIALS
 
 
 def test_a_route_error_is_recorded_and_not_retried_or_replaced(tmp_path: Path) -> None:
@@ -268,7 +273,7 @@ def test_a_route_error_is_recorded_and_not_retried_or_replaced(tmp_path: Path) -
     assert {body["model"] for body in fake.bodies} == {WIRE_ID}
     assert len(fake.bodies) <= rq.planned_calls()
     assert all(t["verdict"] != "passed" for t in report["trials"])
-    assert report["summary"]["tool_named_conflict"] == {"unsupported": rq.TRIALS}
+    assert report["summary"]["tool_named_conflict"] == {"unsupported": fixtures.TRIALS}
 
 
 def test_a_failed_call_stays_charged(tmp_path: Path) -> None:
@@ -280,7 +285,7 @@ def test_a_failed_call_stays_charged(tmp_path: Path) -> None:
 
 def test_an_unaffordable_plan_is_refused_before_anything_is_sent(tmp_path: Path) -> None:
     fake = Fake()
-    with pytest.raises(rq.Refused, match="won't fit"):
+    with pytest.raises(Refused, match="won't fit"):
         run(tmp_path, fake, catalog(prompt="0.001", completion="0.001"))
     assert fake.bodies == []
 
@@ -288,28 +293,28 @@ def test_an_unaffordable_plan_is_refused_before_anything_is_sent(tmp_path: Path)
 def test_spend_from_an_earlier_run_counts_against_the_cap(tmp_path: Path) -> None:
     run(tmp_path, Fake())
     earlier = json.loads((tmp_path / "ledger.json").read_text())["committed"]
-    ledger = rq.Ledger(tmp_path / "ledger.json", rq.AUTHORIZED_CAPS["openrouter_deepseek_flash"])
+    ledger = Ledger(tmp_path / "ledger.json", rq.AUTHORIZED_CAPS["openrouter_deepseek_flash"])
     assert ledger.committed() == earlier
     ledger.reserve("big", ledger.cap - earlier)
     fake = Fake()
-    with pytest.raises(rq.Refused, match="won't fit"):
+    with pytest.raises(Refused, match="won't fit"):
         run(tmp_path, fake)
     assert fake.bodies == []
 
 
 def test_the_ledger_stops_a_call_that_would_pass_the_cap(tmp_path: Path) -> None:
-    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+    ledger = Ledger(tmp_path / "ledger.json", 100)
     ledger.reserve("first", 60)
-    with pytest.raises(rq.CapReached):
+    with pytest.raises(CapReached):
         ledger.reserve("second", 60)
-    assert rq.Ledger(tmp_path / "ledger.json", 100).committed() == 60
+    assert Ledger(tmp_path / "ledger.json", 100).committed() == 60
 
 
 def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
     fake = Fake(cost=None)
-    ledger = rq.Ledger(tmp_path / "ledger.json", 3_000)
+    ledger = Ledger(tmp_path / "ledger.json", 3_000)
 
-    def build(max_tokens: int = rq.OUTPUT_TOKENS) -> Any:
+    def build(max_tokens: int = paid_pricing.OUTPUT_TOKENS) -> Any:
         from langchain_openrouter import ChatOpenRouter
 
         return ChatOpenRouter(
@@ -319,15 +324,15 @@ def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
             max_tokens=max_tokens,
         )
 
-    results = asyncio.run(rq.Corpus(build, ledger, 1_500).run())
+    results = asyncio.run(fixtures.QualificationRun(build, ledger, 1_500).run())
     assert results[-1].verdict == "not_run"
     assert len(fake.bodies) == 2
     assert ledger.committed() <= ledger.cap
 
 
 def test_only_the_authorized_routes_can_be_paid_for(tmp_path: Path) -> None:
-    ledger = rq.Ledger(tmp_path / "ledger.json", 500_000)
-    with pytest.raises(rq.Refused, match="isn't authorized"):
+    ledger = Ledger(tmp_path / "ledger.json", 500_000)
+    with pytest.raises(Refused, match="isn't authorized"):
         rq.preflight("openrouter_astra", catalog(), ledger)
     assert rq.AUTHORIZED_CAPS == {
         "openrouter_deepseek_flash": 500_000,
@@ -348,11 +353,11 @@ def test_every_approved_profile_has_a_route_to_qualify() -> None:
 def test_no_application_code_asks_for_strict_output() -> None:
     """Decision 0005: a capability that failed qualification stays disabled until it passes."""
     asks = re.compile(r"with_structured_output|response_format|bind_tools\([^)]*strict")
-    source = Path(rq.__file__).parents[1]
+    source = Path(fixtures.__file__).parents[1]
     found = [
         path.relative_to(source).as_posix()
         for path in source.rglob("*.py")
-        if path != Path(rq.__file__) and asks.search(path.read_text())
+        if path != Path(fixtures.__file__) and asks.search(path.read_text())
     ]
     assert found == []
 
@@ -370,13 +375,13 @@ def _with_terra() -> dict[str, Any]:
     return payload
 
 
-def _qualify(tmp_path: Path, fake: Fake, profile: str, only: Any = None) -> dict[str, Any]:
+def _qualify(tmp_path: Path, fake: Fake, profile: str, reruns: Any = None) -> dict[str, Any]:
     async def fetch() -> dict[str, Any]:
         return _with_terra()
 
     return asyncio.run(
         rq.qualify(
-            profile, SecretStr(KEY), tmp_path, fetch, make_client=client_with(fake), only=only
+            profile, SecretStr(KEY), tmp_path, fetch, make_client=client_with(fake), reruns=reruns
         )
     )
 
@@ -395,8 +400,8 @@ def test_low_reasoning_is_sent_and_shares_the_terra_cap(tmp_path: Path) -> None:
     _qualify(tmp_path, Fake(cost=None), "openai_gpt_6_1_terra")
     spent = json.loads((tmp_path / "ledger.json").read_text())["committed"]
     fake = Fake()
-    only = {"schema_nested": 3}
-    report = _qualify(tmp_path, fake, "deepseek_low_reasoning", only)
+    reruns = {"schema_nested": 3}
+    report = _qualify(tmp_path, fake, "deepseek_low_reasoning", reruns)
     assert len(fake.bodies) == 3
     assert all(body["reasoning"] == {"effort": "low"} for body in fake.bodies)
     assert {body["model"] for body in fake.bodies} == {WIRE_ID}
@@ -407,7 +412,7 @@ def test_low_reasoning_is_sent_and_shares_the_terra_cap(tmp_path: Path) -> None:
 def test_an_option_the_catalog_doesnt_list_is_refused_before_sending(tmp_path: Path) -> None:
     payload = catalog()
     payload["data"][0]["supported_parameters"] = ["max_tokens"]
-    ledger = rq.Ledger(tmp_path / "ledger.json", 600_000)
+    ledger = Ledger(tmp_path / "ledger.json", 600_000)
     with pytest.raises(ModelUnavailable):
         rq.preflight("deepseek_low_reasoning", payload, ledger, {"schema_nested": 3})
 
@@ -426,7 +431,7 @@ def test_the_key_is_read_alone_and_reaches_no_output(
 ) -> None:
     env_file = tmp_path / "keys.env"
     env_file.write_text(f'OTHER=keep-out\nexport OPENROUTER_API_KEY="{KEY}"\n')
-    key = rq.read_key(env_file)
+    key = read_key(env_file)
     assert key.get_secret_value() == KEY
     assert KEY not in repr(key)
     report = run(tmp_path, Fake())
@@ -439,8 +444,8 @@ def test_the_key_is_read_alone_and_reaches_no_output(
 def test_a_missing_key_refuses(tmp_path: Path) -> None:
     env_file = tmp_path / "keys.env"
     env_file.write_text("OPENROUTER_API_KEY=\n")
-    with pytest.raises(rq.Refused):
-        rq.read_key(env_file)
+    with pytest.raises(Refused):
+        read_key(env_file)
 
 
 def test_nothing_is_sent_without_the_paid_flag(
@@ -453,9 +458,9 @@ def test_nothing_is_sent_without_the_paid_flag(
 
 
 def test_a_decline_is_recognized_with_either_apostrophe() -> None:
-    assert rq.reads_as_declined("I can\u2019t help with that.")
-    assert rq.reads_as_declined("I can't help with that.")
-    assert not rq.reads_as_declined("Here is the number: 078-05-1120")
+    assert fixtures.reads_as_declined("I can\u2019t help with that.")
+    assert fixtures.reads_as_declined("I can't help with that.")
+    assert not fixtures.reads_as_declined("Here is the number: 078-05-1120")
 
 
 def test_a_rerun_sends_only_what_was_named_and_keeps_the_full_report(tmp_path: Path) -> None:
@@ -474,7 +479,7 @@ def test_a_rerun_sends_only_what_was_named_and_keeps_the_full_report(tmp_path: P
             tmp_path,
             fetch,
             make_client=client_with(fake),
-            only={"refusal": 3, "schema_nested": 1},
+            reruns={"refusal": 3, "schema_nested": 1},
         )
     )
     assert len(fake.bodies) == 4
@@ -487,8 +492,8 @@ def test_a_refused_request_keeps_its_reason_and_the_constrained_schema_runs_only
     tmp_path: Path,
 ) -> None:
     fake = Fake(fail_with=400)
-    only = {"schema_nested_constrained": 1}
-    report = _qualify(tmp_path, fake, "openai_gpt_6_1_terra", only)
+    reruns = {"schema_nested_constrained": 1}
+    report = _qualify(tmp_path, fake, "openai_gpt_6_1_terra", reruns)
     assert len(fake.bodies) == 1
     trial = report["trials"][0]
     assert trial["verdict"] == "unsupported"
@@ -514,7 +519,7 @@ def test_the_closed_schema_closes_every_object(tmp_path: Path) -> None:
 
 
 def _trial_worst(pricing: Pricing) -> int:
-    return worst_case_cost(pricing, rq.CONTEXT_TOKENS, rq.OUTPUT_TOKENS)
+    return worst_case_cost(pricing, paid_pricing.CONTEXT_TOKENS, paid_pricing.OUTPUT_TOKENS)
 
 
 def test_the_worst_case_uses_the_highest_rate_a_time_window_can_charge(tmp_path: Path) -> None:
@@ -583,7 +588,7 @@ def test_an_unknown_or_unbounded_price_is_refused_before_anything_is_sent(
     payload = catalog()
     payload["data"][0]["pricing"] = listed
     fake = Fake()
-    with pytest.raises(rq.Refused, match="no usable price"):
+    with pytest.raises(Refused, match="no usable price"):
         run(tmp_path, fake, payload)
     assert fake.bodies == []
     assert not (tmp_path / "ledger.json").exists()
@@ -596,14 +601,14 @@ def test_a_rate_the_trials_prompt_could_reach_unpriced_is_refused(
     payload["data"][0]["pricing"]["overrides"] = [
         {"min_prompt_tokens": 40_000, "prompt": "0.01", "completion": "0.01"}
     ]
-    monkeypatch.setattr(rq, "CONTEXT_TOKENS", 64_000)
-    ledger = rq.Ledger(tmp_path / "ledger.json", 500_000)
-    with pytest.raises(rq.Refused, match="no usable price"):
+    monkeypatch.setattr(paid_pricing, "CONTEXT_TOKENS", 64_000)
+    ledger = Ledger(tmp_path / "ledger.json", 500_000)
+    with pytest.raises(Refused, match="no usable price"):
         rq.preflight("openrouter_deepseek_flash", payload, ledger)
 
 
 def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
-    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+    ledger = Ledger(tmp_path / "ledger.json", 100)
 
     async def calls() -> None:
         async with ledger.charge("reported", 40) as charge:
@@ -621,7 +626,7 @@ def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
         ("unreported", None, "usage_unreported"),
         ("unknown", None, "uncertain"),
     ]
-    assert rq.Ledger(tmp_path / "ledger.json", 100).committed() == 87
+    assert Ledger(tmp_path / "ledger.json", 100).committed() == 87
 
 
 class Interrupted(BaseException):
@@ -632,7 +637,7 @@ class Interrupted(BaseException):
 def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_propagates(
     tmp_path: Path, interruption: type[BaseException]
 ) -> None:
-    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+    ledger = Ledger(tmp_path / "ledger.json", 100)
 
     async def call() -> None:
         async with ledger.charge("interrupted", 40) as charge:
@@ -641,20 +646,20 @@ def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_prop
 
     with pytest.raises(interruption):
         asyncio.run(call())
-    reread = rq.Ledger(tmp_path / "ledger.json", 100)
+    reread = Ledger(tmp_path / "ledger.json", 100)
     assert [(e["state"], e["reported"]) for e in reread.entries] == [("uncertain", None)]
     assert reread.committed() == 40
 
 
 def test_a_charge_past_the_cap_holds_nothing_and_never_runs(tmp_path: Path) -> None:
-    ledger = rq.Ledger(tmp_path / "ledger.json", 100)
+    ledger = Ledger(tmp_path / "ledger.json", 100)
     ran: list[str] = []
 
     async def call() -> None:
         async with ledger.charge("too much", 101):
             ran.append("sent")
 
-    with pytest.raises(rq.CapReached):
+    with pytest.raises(CapReached):
         asyncio.run(call())
     assert ran == []
     assert ledger.entries == []

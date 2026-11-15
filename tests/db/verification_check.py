@@ -38,8 +38,8 @@ from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
+from autobots.logs import JsonFormatter, redact
 from autobots.operations.job_dispatch import drive_lease, process_next
-from autobots.operations.logs import JsonFormatter, redact
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
 from langchain_core.messages import AIMessage
 from pydantic import SecretStr

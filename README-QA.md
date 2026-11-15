@@ -271,7 +271,7 @@ Start with the run's **status and reason**, then the records that explain the la
 
 The default worker process performs maintenance without claiming inference jobs unless explicitly enabled. See [`operations/worker.py`](services/agent/src/autobots/operations/worker.py) and the [operations runbook](docs/engineering/runbooks/operations.md) for the deliberate activation procedure. Do not start services or use paid inference merely to read this guide.
 
-Useful starting points: [run projection](services/agent/src/autobots/application/run_projection.py), [public event routes](services/agent/src/autobots/api/event_routes.py), [sanitized logs](services/agent/src/autobots/operations/logs.py), [existing loop fixtures](tests/db/goal_loop_check.py), [tool unit tests](services/agent/tests/test_tools.py).
+Useful starting points: [run projection](services/agent/src/autobots/application/run_projection.py), [public event routes](services/agent/src/autobots/api/event_routes.py), [sanitized logs](services/agent/src/autobots/logs.py), [existing loop fixtures](tests/db/goal_loop_check.py), [tool unit tests](services/agent/tests/test_tools.py).
 
 ## 19. How should a developer add a tool?
 

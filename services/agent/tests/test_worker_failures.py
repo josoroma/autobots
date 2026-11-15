@@ -40,8 +40,8 @@ from autobots.application.worker_leases import (
 from autobots.domain.models import ModelRoute
 from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
+from autobots.logs import JsonFormatter
 from autobots.operations import job_dispatch
-from autobots.operations.logs import JsonFormatter
 
 MIGRATION = (
     Path(__file__).resolve().parents[3] / "supabase/migrations/20261114000055_run_job_failures.sql"

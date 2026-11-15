@@ -41,9 +41,8 @@ from autobots.domain.budgets import BudgetRefused
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE, ProfileNotOffered
 from autobots.domain.runs import CommandRefused
+from autobots.logs import log_event
 
-# The standard logger, as STD-01 keeps api/ from importing operations/logs.py, whose formatter and
-# conventions apply once api/main.py configures logging.
 logger = logging.getLogger("autobots.api")
 # psycopg's OperationalError also covers a pool timeout and transaction conflicts such as a
 # deadlock, so the wording asks for a retry without claiming an outage (XERR-06).
@@ -213,7 +212,7 @@ def _log(level: int, event: str, request: Request, error: Exception) -> None:
         "route": route if isinstance(route, str) else "unmatched",
         "error": error,
     }
-    logger.log(level, event, extra={"fields": fields})
+    log_event(logger, event, level, **fields)
 
 
 def transient(error: psycopg.OperationalError) -> bool:

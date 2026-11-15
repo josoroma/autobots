@@ -28,7 +28,7 @@ from autobots.application.worker_leases import Lease, claim_next, is_held, reset
 from autobots.application.workflow_runner import run_workflow
 from autobots.domain.runs import RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
-from autobots.operations.logs import forbid_remote_tracing
+from autobots.logs import forbid_remote_tracing
 
 # Replaces the model and route for the job just claimed: (connection, lease, config).
 JobBinder = Callable[[Any, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any], LoopConfig]]]

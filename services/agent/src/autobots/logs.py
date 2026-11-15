@@ -1,6 +1,9 @@
 """Local structured logs, PRD-LangChain-Deep-Agents 12.2 and LM-07. Nothing here sends a record
 off this machine.
 
+A leaf beside the layers: it imports only the domain's secret shapes, so every layer can log
+without importing the process entry points (R-64, POPS-03).
+
 Conventions for every service log line (R-25, XERR-12):
 
 - Event names are dotted and lower case. A new event takes the PRD-LangChain-Deep-Agents 12.2
@@ -17,8 +20,7 @@ Conventions for every service log line (R-25, XERR-12):
   step. WARNING: degraded, tolerated or retrying by itself. INFO: lifecycle.
 - A failure that can recur on every pass goes through `Repeated` (`autobots.domain.repetition`),
   which logs its first occurrence and then every Nth, with the count.
-- A module that STD-01 keeps from importing this one, such as the tool gateway or the API's error
-  handlers, writes the same record with its own logger:
+- A module that writes the record with its own logger passes the fields the same way:
   `logger.log(level, event, extra={"fields": {...}})`.
 """
 
@@ -33,9 +35,6 @@ from collections.abc import MutableMapping
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
-# Defined in the domain, so the run lifecycle uses it without importing this layer (R-33).
-# Re-exported for this module's users.
-from autobots.domain.repetition import Repeated as Repeated
 from autobots.domain.secret_patterns import LOG_SHAPES, mask
 
 # Logs also mask a key inside a word. Shown text doesn't, so "task-specific" stays readable there.
@@ -126,7 +125,7 @@ def error_fields(error: BaseException) -> dict[str, Any]:
     return fields
 
 
-def _shown(value: Any) -> Any:
+def _shown(value: object) -> object:
     if isinstance(value, bool | int | float):
         return value
     if isinstance(value, list | tuple):
@@ -174,7 +173,9 @@ def configure_logging(stream: TextIO | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def log_event(logger: logging.Logger, event: str, level: int = logging.INFO, **fields: Any) -> None:
+def log_event(
+    logger: logging.Logger, event: str, level: int = logging.INFO, **fields: object
+) -> None:
     """One line, by the conventions at the top of this module."""
     logger.log(level, event, extra={"fields": fields})
 

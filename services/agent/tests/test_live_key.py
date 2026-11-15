@@ -14,8 +14,8 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
+from autobots.application.readiness import MalformedSetting
 from autobots.operations import live_key
-from autobots.operations.route_qualification import Refused
 
 KEY = "sk-or-arranged-not-a-real-key"
 
@@ -109,12 +109,10 @@ def test_log_files_are_counted_once_each_and_only_logs(tmp_path: Path) -> None:
 
 
 def test_the_context_needs_where_the_install_keeps_its_keys() -> None:
-    with pytest.raises(live_key.ProviderContextIncomplete) as refused:
+    """Both are settings to set, so the key is saved where this install keeps it (exit 2)."""
+    with pytest.raises(MalformedSetting) as refused:
         live_key.provider_context({"NODE_ENV": "production"})
-    assert str(refused.value) == (
-        "AUTOBOTS_CONFIG_ROOT and AUTOBOTS_PROVIDER_MASTER_KEY_FILE must be set, "
-        "so the key is saved where this install keeps it"
-    )
+    assert str(refused.value) == "set AUTOBOTS_CONFIG_ROOT, AUTOBOTS_PROVIDER_MASTER_KEY_FILE"
     environ = {
         "AUTOBOTS_CONFIG_ROOT": "/install/config",
         "AUTOBOTS_PROVIDER_MASTER_KEY_FILE": "/install/config/secrets/master.key",
@@ -123,7 +121,7 @@ def test_the_context_needs_where_the_install_keeps_its_keys() -> None:
     context = live_key.provider_context(environ)
     assert (context.config_root, context.mode) == ("/install/config", "production")
     assert context.master_key_file == Path("/install/config/secrets/master.key")
-    assert context.process_environment == environ
+    assert context.process_environment is environ
 
 
 @pytest.mark.asyncio
@@ -165,10 +163,22 @@ def test_leaks_prints_two_counts_and_never_the_key(
 
 
 def test_a_key_file_without_the_key_refuses_before_any_request(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     empty = tmp_path / "empty.env"
     empty.write_text("OTHER=keep-out\n")
     monkeypatch.setattr(live_key, "http_client", lambda: pytest.fail("no request"))
-    with pytest.raises(Refused):
-        live_key.main(["usage", str(empty)])
+    assert live_key.main(["usage", str(empty)]) == 1
+    printed = capsys.readouterr()
+    assert printed.out == ""
+    assert printed.err == "REFUSED: OPENROUTER_API_KEY isn't set in that file\n"
+
+
+def test_counting_leaks_without_a_database_is_a_setting_to_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("AUTOBOTS_DATABASE_URL", raising=False)
+    assert live_key.main(["leaks", str(key_file(tmp_path)), str(tmp_path)]) == 2
+    printed = capsys.readouterr()
+    assert (printed.out, printed.err) == ("", "ERROR: set AUTOBOTS_DATABASE_URL\n")
+    assert KEY not in printed.err

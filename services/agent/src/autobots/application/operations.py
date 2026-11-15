@@ -1,27 +1,26 @@
-"""What an operator can see, LM-07: conditions and counts, never an address, path or secret."""
+"""The installation's readiness conditions, LM-07: states and codes, never an address, path or
+secret.
+
+`readiness.installation_conditions` gathers the admission gate's conditions from here, and the API
+adds the queue and worker conditions for Local Operations. Backups are read in `backups.py`, the
+jobs chart and delayed routines in `job_activity.py`, and the other values Operations shows in
+`operation_values.py` (POPS-04).
+"""
 
 import asyncio
-import errno
-import ipaddress
-import json
 import logging
 import math
-import os
 import shutil
-import socket
-import stat
 import time
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from autobots.adapters.checkpoints import adapter_identity, adapter_qualified
 from autobots.application.schema_release import SHIPPED_MIGRATIONS
-from autobots.domain.runs import NEEDS_YOU, TERMINAL, RunStatus
-from autobots.operations.logs import log_event
+from autobots.logs import log_event
 
 logger = logging.getLogger("autobots.operations")
 DB_SECONDS = 3.0
@@ -72,10 +71,6 @@ REQUIRED_COLUMNS = (
 )
 # Decision 0023 E2: the one function that counts the applied history, migration 49.
 COUNT_FUNCTION = "app_private.applied_migration_count()"
-RESTORES_SHOWN = 5
-RESTORE_FIELDS = {"at", "result", "checks_passed", "checks_total"}
-DELAYED_SHOWN = 10
-CATALOG_CHECK_SECONDS = 3.0
 # Admission stops on these. A missing worker only means a job waits.
 BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold", "adapter"})
 
@@ -85,6 +80,24 @@ class Condition:
     name: str
     state: str  # ok, degraded or unavailable
     code: str
+
+
+# Decision 0023 E2: a newer database than this code is shown, and doesn't stop admission.
+NOT_BLOCKING = frozenset({"schema_ahead"})
+
+
+def stops_admission(condition: Condition) -> bool:
+    """A blocking check that isn't ok stops admission (LM-07), unless it only degrades by Decision
+    0023 E2. The one rule behind `is_ready` and `readiness.first_blocking`."""
+    return (
+        condition.name in BLOCKING
+        and condition.state != "ok"
+        and condition.code not in NOT_BLOCKING
+    )
+
+
+def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
+    return not any(stops_admission(item) for item in conditions)
 
 
 # Decision 0022 D5: the database answer time is the p95 of the last 20 readiness probes.
@@ -213,15 +226,6 @@ async def storage_condition(store: Any) -> Condition:
     return Condition("storage", "ok", "storage_ready")
 
 
-def disk_bytes(path: Path) -> tuple[int, int] | None:
-    """Free and total bytes of the disk under the app's data. Numbers only, never the path."""
-    try:
-        usage = shutil.disk_usage(path)
-    except OSError:
-        return None
-    return int(usage.free), int(usage.total)
-
-
 def disk_condition(path: Path, minimum_free: int) -> Condition:
     """The host disk under the app's data. Docker's disk sits in its VM, with its own limit."""
     try:
@@ -231,79 +235,6 @@ def disk_condition(path: Path, minimum_free: int) -> Condition:
     if free < minimum_free:
         return Condition("disk", "degraded", "disk_low")
     return Condition("disk", "ok", "disk_ready")
-
-
-def backup_age_hours(directory: str, now: datetime) -> int | None:
-    """The newest manifest under the backup directory: when it was taken, and nothing else."""
-    newest: datetime | None = None
-    for path in Path(directory).glob("*/manifest.json") if directory else ():
-        try:
-            created = datetime.fromisoformat(json.loads(path.read_text())["created_at"])
-        except (OSError, ValueError, KeyError):
-            continue
-        newest = created if newest is None or created > newest else newest
-    return None if newest is None else max(int((now - newest).total_seconds() // 3600), 0)
-
-
-def restore_history(directory: str, limit: int = RESTORES_SHOWN) -> list[dict[str, Any]]:
-    """What `local_backup.py` wrote beside each backup, newest first. A bad line is skipped."""
-    found: list[dict[str, Any]] = []
-    for path in Path(directory).glob("*/restores.jsonl") if directory else ():
-        try:
-            lines = path.read_text().splitlines()
-        except (OSError, UnicodeDecodeError):
-            continue
-        for line in lines:
-            try:
-                item = json.loads(line)
-            except ValueError:
-                continue
-            if isinstance(item, dict) and set(item) == RESTORE_FIELDS:
-                found.append(item)
-    return sorted(found, key=lambda item: str(item.get("at")), reverse=True)[:limit]
-
-
-async def delayed_occurrences(
-    connection: Any, workspace_id: UUID, limit: int = DELAYED_SHOWN
-) -> list[tuple[Any, ...]]:
-    """Occurrences of this workspace's routines that didn't run at their time, newest first."""
-    cursor = await connection.execute(
-        "select r.name, o.occurrence_time, o.status, o.reason from public.routine_occurrences o "
-        "join public.routines r on r.id = o.routine_id where r.workspace_id = %s "
-        "and o.status in ('missed', 'skipped_overlap', 'blocked') "
-        "order by o.occurrence_time desc limit %s",
-        (workspace_id, limit),
-    )
-    return list(await cursor.fetchall())
-
-
-async def timed_catalog(
-    fetch_catalog: Any, seconds: float = CATALOG_CHECK_SECONDS
-) -> tuple[str, int | None]:
-    """`openrouter_availability`'s answer, and how long the catalog took to answer, when it did."""
-    if fetch_catalog is None:
-        return "unknown", None
-    started = time.monotonic()
-    try:
-        payload = await asyncio.wait_for(fetch_catalog(), seconds)
-    except (TimeoutError, OSError, ValueError):
-        return "unavailable", None
-    if payload is None:
-        return "unavailable", None
-    return "available", math.ceil((time.monotonic() - started) * 1000)
-
-
-async def openrouter_availability(
-    fetch_catalog: Any, seconds: float = CATALOG_CHECK_SECONDS
-) -> str:
-    """The public catalog only, as a page load must not make a model call or wait long."""
-    if fetch_catalog is None:
-        return "unknown"
-    try:
-        payload = await asyncio.wait_for(fetch_catalog(), seconds)
-    except (TimeoutError, OSError, ValueError):
-        return "unavailable"
-    return "available" if payload is not None else "unavailable"
 
 
 async def queue_counts(connection: Any, workspace_id: UUID) -> QueueCounts:
@@ -364,158 +295,6 @@ async def applied_migrations(connection: Any) -> int | None:
     return None if row is None or row[0] is None else int(row[0])
 
 
-async def stored_bytes(connection: Any, workspace_id: UUID) -> int:
-    """This workspace's published artifact bytes in Storage, from their recorded sizes."""
-    cursor = await connection.execute(
-        "select coalesce(sum(size_bytes), 0)::bigint from public.artifacts "
-        "where workspace_id = %s and status = 'published'",
-        (workspace_id,),
-    )
-    return int((await cursor.fetchone())[0])
-
-
 def checkpoint_adapter() -> str:
     """The installed checkpoint adapter's package and release."""
     return f"langgraph-checkpoint-postgres {adapter_identity()[0]}"
-
-
-def _is_loopback(address: str) -> bool:
-    try:
-        return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
-    except ValueError:
-        return False
-
-
-def loopback_only(fds: Any = None) -> bool | None:
-    """Whether every TCP socket this process listens on is bound to loopback. It reads this
-    process's own sockets and sends nothing. None when it finds no listening socket, as under a
-    test client, or the platform won't say."""
-    try:
-        descriptors = [int(name) for name in os.listdir("/dev/fd")] if fds is None else list(fds)
-    except OSError:
-        return None
-    bound: list[str] = []
-    for fd in descriptors:
-        # Only sockets are looked at, and none is duplicated or closed: macOS kills a process that
-        # duplicates or closes one of its guarded descriptors, such as the event loop's kqueue.
-        try:
-            if not stat.S_ISSOCK(os.fstat(fd).st_mode):
-                continue
-            probe = socket.socket(fileno=fd)
-        except OSError:
-            continue
-        address: Any = None
-        try:
-            if probe.type != socket.SOCK_STREAM or probe.family not in (
-                socket.AF_INET,
-                socket.AF_INET6,
-            ):
-                continue
-            address = probe.getsockname()
-            if address[1] == 0:
-                continue
-            # A connection has a peer. A bound socket without one is a listener, since macOS
-            # doesn't answer SO_ACCEPTCONN.
-            probe.getpeername()
-            continue
-        except OSError as error:
-            if error.errno != errno.ENOTCONN or address is None:
-                continue
-            bound.append(str(address[0]))
-        finally:
-            # Hands the descriptor back untouched, as this probe never owned it.
-            probe.detach()
-    if not bound:
-        return None
-    return all(_is_loopback(address) for address in bound)
-
-
-@dataclass(frozen=True)
-class JobHourCounts:
-    starts_at: datetime
-    hour: str
-    succeeded: int
-    waited: int
-    failed: int
-    in_progress: int
-
-
-# PRD-Studio OP-03 and Decision 0022 D14. Each hour of the last 24 in the workspace's timezone, from
-# the runs' own status changes: succeeded, waited for a person (entered waiting_approval or
-# waiting_input), failed with cancelled, and in progress (a run now running or paused, in the hour
-# of its latest change). Counts only.
-_JOB_HOURS = """
-with zone as (
-  select coalesce(nullif(timezone, ''), 'UTC') as name from public.workspaces
-  where id = %(workspace)s
-), hours as (
-  select local_hour at time zone zone.name as starts_at, to_char(local_hour, 'HH24:00') as hour
-  from zone, generate_series(
-    date_trunc('hour', now() at time zone zone.name) - interval '23 hours',
-    date_trunc('hour', now() at time zone zone.name), interval '1 hour') as local_hour
-), changes as (
-  select e.run_id, e.payload ->> 'current' as status, e.occurred_at
-  from public.run_events e join public.runs r on r.id = e.run_id
-  where r.workspace_id = %(workspace)s and e.payload ->> 'type' = 'run.status_changed'
-    and e.occurred_at >= (select min(starts_at) from hours)
-), latest as (
-  select distinct on (e.run_id) e.run_id, e.occurred_at
-  from public.run_events e join public.runs r on r.id = e.run_id
-  where r.workspace_id = %(workspace)s and r.status = any(%(moving)s)
-    and e.payload ->> 'type' = 'run.status_changed'
-  order by e.run_id, e.sequence desc
-)
-select h.starts_at, h.hour,
-  (select count(distinct c.run_id) from changes c where c.status = %(succeeded)s
-     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
-  (select count(distinct c.run_id) from changes c
-     where c.status = any(%(needs_you)s)
-     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
-  (select count(distinct c.run_id) from changes c where c.status = any(%(unsuccessful)s)
-     and c.occurred_at >= h.starts_at and c.occurred_at < h.starts_at + interval '1 hour'),
-  (select count(*) from latest l
-     where l.occurred_at >= h.starts_at and l.occurred_at < h.starts_at + interval '1 hour')
-from hours h order by h.starts_at
-"""
-
-
-async def job_hours(connection: Any, workspace_id: UUID) -> tuple[str, list[JobHourCounts]]:
-    """The workspace's timezone, and its last 24 hours of job counts, oldest first."""
-    cursor = await connection.execute(
-        "select coalesce(nullif(timezone, ''), 'UTC') from public.workspaces where id = %s",
-        (workspace_id,),
-    )
-    zone = await cursor.fetchone()
-    cursor = await connection.execute(
-        _JOB_HOURS,
-        {
-            "workspace": workspace_id,
-            "succeeded": RunStatus.SUCCEEDED.value,
-            "needs_you": sorted(NEEDS_YOU),
-            "unsuccessful": sorted(TERMINAL - {RunStatus.SUCCEEDED}),
-            "moving": [RunStatus.RUNNING.value, RunStatus.PAUSED.value],
-        },
-    )
-    rows = [
-        JobHourCounts(row[0], str(row[1]), int(row[2]), int(row[3]), int(row[4]), int(row[5]))
-        for row in await cursor.fetchall()
-    ]
-    return (str(zone[0]) if zone else "UTC"), rows
-
-
-# Decision 0023 E2: a newer database than this code is shown, and doesn't stop admission.
-NOT_BLOCKING = frozenset({"schema_ahead"})
-
-
-def stops_admission(condition: Condition) -> bool:
-    """A blocking check that isn't ok stops admission (LM-07), unless it only degrades by Decision
-    0023 E2. The one rule behind `is_ready` and `readiness.first_blocking`."""
-    return (
-        condition.name in BLOCKING
-        and condition.state != "ok"
-        and condition.code not in NOT_BLOCKING
-    )
-
-
-def is_ready(conditions: tuple[Condition, ...] | list[Condition]) -> bool:
-    return not any(stops_admission(item) for item in conditions)

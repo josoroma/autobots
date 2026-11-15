@@ -24,6 +24,8 @@ AUTOBOTS_SUPABASE_URL=<gateway url> AUTOBOTS_SUPABASE_ANON_KEY=<anon key> apps/w
 
 Expected: `http://127.0.0.1:3000` shows the workbench, dark on a first visit, with `Python API: available`. Without the API it shows `Python API: unavailable`. Settings → Appearance switches Dark and Light, and issues no request. `AUTOBOTS_API_URL` and `AUTOBOTS_ALLOWED_ORIGIN` change the defaults.
 
+A setting the API or the worker can't start with, such as a malformed `AUTOBOTS_MIN_FREE_BYTES` or `AUTOBOTS_STREAM_SECONDS`, or a worker without `AUTOBOTS_DATABASE_URL`, stops the process at start with `ERROR: <variable> ...` and exit 2. A missing database URL doesn't stop the API, because Local Operations answers without a database. The operator commands use the same codes: 0 done, 1 refused, 2 a setting or argument to fix.
+
 ## Bootstrap the owner
 
 Public signup is disabled, so the owner is created through the Auth admin API, and a workspace with its owner membership is added through the runtime role. Secrets come from the environment and are never arguments.
@@ -32,7 +34,34 @@ Public signup is disabled, so the owner is created through the Auth admin API, a
 AUTOBOTS_SUPABASE_URL=<gateway url> AUTOBOTS_SERVICE_ROLE_KEY=<service role key> AUTOBOTS_OWNER_PASSWORD=<password> AUTOBOTS_DATABASE_URL=<runtime role url> PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.bootstrap_owner --email <email> --workspace-name <name>
 ```
 
-Expected: one line of JSON with the new user and workspace IDs. Exit 1 means a service refused, for example an email already in use. Run it once. The files in `supabase/bootstrap/` must already have been applied as the database superuser, `storage.sql` first, because the migration role cannot alter Storage's tables. `persistent_install.py apply` applies them after the migrations and the seed.
+Expected: one line of JSON with the new user and workspace IDs. Run it once. The files in `supabase/bootstrap/` must already have been applied as the database superuser, `storage.sql` first, because the migration role cannot alter Storage's tables. `persistent_install.py apply` applies them after the migrations and the seed.
+
+It checks the database before it creates anyone: one transaction inserts the workspace and checks that the runtime role can add its owner, then Auth creates the user, then the membership commits with the workspace. That transaction stays open during the one Auth call. Its 20-second timeout applies to each socket operation, not to the whole call, so a slow answer can keep it open longer. That is acceptable for a one-shot command. Nothing it prints holds the password, the service key or the database URL.
+
+| Outcome | Exit | What exists | Recovery |
+|---|---|---|---|
+| JSON with `user_id` and `workspace_id` | 0 | The owner and the workspace | None |
+| `ERROR: set ...` | 2 | Nothing | Set the named variables |
+| `REFUSED: ...`, for example the database refused, or Auth refused an email already in use | 1 | Nothing | Fix the cause and run it again |
+| `{"status": "workspace_incomplete", "user_id": "<id>"}`, and `INCOMPLETE: ...` on stderr | 1 | The Auth user, with no workspace | Fix the cause it names, then finish it with the command below |
+| `UNRESOLVED: ...`, after a server error, a timeout or a reply cut short | 1 | Possibly the Auth user, nothing else | See below |
+
+To finish the workspace for a user that already exists, pass its ID instead of the email. It holds a lock on that ID, reads Auth through the admin API to confirm the user, and refuses a user who already owns a workspace, so running it twice, even at once, can't create a second one. It needs no password. With the install's values loaded as above (`set -a; . "$APP_ENV"; set +a`), so no key is typed:
+
+```sh
+PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.bootstrap_owner --user-id <user id> --workspace-name <name>
+```
+
+`UNRESOLVED` means Auth may have created the user: it answered with a server error, or its answer was lost or cut short. Run the original command again. If Auth refuses because the email is already in use, the first attempt did create the user. Find its ID from the same loaded values. curl reads the headers from a here-document, so the key is in neither its arguments nor the shell history, which records only the variable's name:
+
+```sh
+curl -sS -H @- "$AUTOBOTS_SUPABASE_URL/auth/v1/admin/users?per_page=1000" <<HEADERS | jq -r --arg email '<email>' '.users[] | select(.email == $email) | .id'
+apikey: $AUTOBOTS_SERVICE_ROLE_KEY
+Authorization: Bearer $AUTOBOTS_SERVICE_ROLE_KEY
+HEADERS
+```
+
+Then finish it with `--user-id`.
 
 ## Seed the concept Experts and workflows (optional)
 
@@ -101,4 +130,5 @@ Expected: exit 0. It builds, starts the real API with an arranged membership and
 | `Python API: unavailable` | Start the API, and check both processes hold the same internal token |
 | `forbidden_host` or `forbidden_origin` | Set `AUTOBOTS_ALLOWED_ORIGIN` to the exact address in the browser |
 | Every workspace returns 403 | `AUTOBOTS_DATABASE_URL` is missing or the user has no membership row. No database means no access |
+| Owner bootstrap printed `workspace_incomplete` | Finish it with `--user-id`, as in [Bootstrap the owner](#bootstrap-the-owner) |
 | Exit 2 naming the browser | Install it with the command above. No check downloads it |

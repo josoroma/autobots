@@ -43,7 +43,7 @@ from autobots.application.run_usage import COUNTER_SQL, RootLimits
 from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
-from autobots.operations.logs import JsonFormatter, redact
+from autobots.logs import JsonFormatter, redact
 from fake_openrouter import DEEPSEEK, TERRA, invoke, model_over
 
 SCOPE = ToolScope(uuid4(), uuid4(), 1, {})

@@ -18,14 +18,14 @@ from autobots.api import operation_routes
 from autobots.api.app import create_app
 from autobots.api.settings import Settings
 from autobots.application import readiness
+from autobots.application.catalog_check import OPERATIONS_SECONDS, CatalogCheck, check_catalog
+from autobots.application.operation_values import loopback_only
 from autobots.application.operations import (
     PROBES_KEPT,
     Condition,
     ProbeTimes,
     QueueCounts,
     database_conditions,
-    loopback_only,
-    timed_catalog,
 )
 from autobots.application.retention import RetentionPolicy
 from autobots.contracts.operations import JobHour, JobsChart, OperationValues
@@ -107,14 +107,46 @@ def test_the_catalog_time_is_measured_only_when_it_answers() -> None:
     async def nothing() -> None:
         return None
 
-    state, measured = asyncio.run(timed_catalog(answers))
-    assert state == "available" and measured is not None and measured >= 10
-    assert asyncio.run(timed_catalog(nothing)) == ("unavailable", None)
-    assert asyncio.run(timed_catalog(None)) == ("unknown", None)
+    answered = asyncio.run(check_catalog(answers, OPERATIONS_SECONDS))
+    assert answered.status == "available" and answered.payload == {"data": []}
+    assert answered.milliseconds is not None and answered.milliseconds >= 10
+    assert asyncio.run(check_catalog(nothing, OPERATIONS_SECONDS)) == CatalogCheck("unavailable")
+    assert asyncio.run(check_catalog(None, OPERATIONS_SECONDS)) == CatalogCheck("unknown")
+
+
+@pytest.mark.parametrize("failure", [TimeoutError(), OSError("arranged"), ValueError("not JSON")])
+def test_every_expected_catalog_failure_reads_as_unavailable(failure: Exception) -> None:
+    """POPS-13: a 200 whose body isn't JSON raises ValueError in the fetcher, as a lost connection
+    raises OSError, and none of them escapes."""
+
+    async def fails() -> dict[str, Any]:
+        raise failure
+
+    assert asyncio.run(check_catalog(fails, OPERATIONS_SECONDS)) == CatalogCheck("unavailable")
+
+
+def test_a_catalog_slower_than_its_limit_reads_as_unavailable() -> None:
+    async def slow() -> dict[str, Any]:
+        await asyncio.sleep(1)
+        return {"data": []}
+
+    assert asyncio.run(check_catalog(slow, 0.01)) == CatalogCheck("unavailable")
 
 
 def test_the_values_are_exactly_d5s_list() -> None:
     assert set(OperationValues.model_fields) == D5_VALUES
+
+
+def catalog_limits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Each time limit the Operations routes give the shared catalog check."""
+    limits: list[float] = []
+
+    async def timed(fetch: Any, seconds: float) -> CatalogCheck:
+        limits.append(seconds)
+        return await check_catalog(fetch, seconds)
+
+    monkeypatch.setattr(operation_routes, "check_catalog", timed)
+    return limits
 
 
 class Membership:
@@ -184,6 +216,7 @@ def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_m
         return original(self, address)
 
     monkeypatch.setattr(socket.socket, "connect", guarded)
+    limits = catalog_limits(monkeypatch)
     # The installation's conditions come through the admission gate's module.
     monkeypatch.setattr(readiness, "database_conditions", conditions)
     monkeypatch.setattr(readiness, "storage_condition", storage)
@@ -222,6 +255,8 @@ def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_m
     assert values["database_probes"] == 1 and values["database_p95_ms"] == 5
     assert values["disk_free_bytes"] <= values["disk_total_bytes"]
     assert values["catalog_fetch_ms"] is not None
+    # A page load waits 3 s for the catalog at most, as Operations always has.
+    assert limits == [OPERATIONS_SECONDS] == [3.0]
     assert values["checkpoint_adapter"].startswith("langgraph-checkpoint-postgres ")
     text = json.dumps(body)
     for leak in (

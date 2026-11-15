@@ -8,6 +8,9 @@ Operations reports queued work as waiting for an inference worker instead of sho
 requests for any queued run once a key exists. Nothing turns it on by default, because it spends
 real money. No environment value selects another endpoint, model or fake. The
 HTTP client does honor the usual proxy variables, as any client on this Mac would.
+
+What it reads from the environment is built by `composition.py`, as the API's is. A setting it can't
+start with stops it before it serves, exit 2 with the variable named (POPS-14).
 """
 
 import asyncio
@@ -15,22 +18,20 @@ import logging
 import os
 import secrets
 import signal
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import psycopg
-from pydantic import SecretStr
 
-from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.adapters.tool_registry import build_registry, catalog
-from autobots.api.main import provider_context_from_environment
 from autobots.application.approvals import expire_due
 from autobots.application.bounded import stop_task
 from autobots.application.goal_loop import UNBOUND
-from autobots.application.provider_settings import CatalogFetcher, ProviderSettings
+from autobots.application.provider_settings import CatalogFetcher, ConnectionReadiness
 from autobots.application.readiness import (
     LentConnection,
     MalformedSetting,
@@ -44,12 +45,28 @@ from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.tool_catalog import Catalog
 from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
+from autobots.domain.repetition import Repeated
+from autobots.logs import configure_logging, forbid_remote_tracing, log_event
+from autobots.operations.composition import (
+    CONFIG_ROOT,
+    DATABASE_URL,
+    STORAGE_URL,
+    credential_check,
+    object_store,
+    provider_context,
+    require,
+    seconds,
+    stop_unconfigured,
+)
 from autobots.operations.job_dispatch import process_next
-from autobots.operations.logs import Repeated, configure_logging, forbid_remote_tracing, log_event
 
 logger = logging.getLogger("autobots.worker")
 Step = Callable[[Any], Awaitable[bool]]
+# Opens one autocommit connection; the serve loop, its heartbeat and its last beat each use one.
+Connect = Callable[[str], Awaitable[AbstractAsyncContextManager[Any]]]
 INFERENCE_SWITCH = "AUTOBOTS_WORKER_INFERENCE"
+DRAIN_SECONDS = "AUTOBOTS_WORKER_DRAIN_SECONDS"
+DEFAULT_DRAIN_SECONDS = 30.0
 
 
 @dataclass
@@ -77,14 +94,16 @@ async def _write_beat(connection: Any, config: WorkerConfig, state: str) -> None
     )
 
 
-async def _beat(config: WorkerConfig, status: _Status) -> None:
+async def connect_database(url: str) -> psycopg.AsyncConnection[Any]:
+    return await psycopg.AsyncConnection.connect(url, autocommit=True)
+
+
+async def _beat(config: WorkerConfig, status: _Status, connect: Connect) -> None:
     """On its own connection, so a long step can't make a live worker look dead."""
     lost = Repeated()
     while True:
         try:
-            async with await psycopg.AsyncConnection.connect(
-                config.database_url, autocommit=True
-            ) as connection:
+            async with await connect(config.database_url) as connection:
                 while True:
                     await _write_beat(connection, config, status.state)
                     lost.cleared()
@@ -137,19 +156,22 @@ async def _run_step(
     return bool(task.result())
 
 
-async def serve(config: WorkerConfig, step: Step, stop: asyncio.Event) -> None:
-    """Until `stop`: no new step starts after it, and the last beat says this worker has stopped."""
+async def serve(
+    config: WorkerConfig, step: Step, stop: asyncio.Event, *, connect: Connect = connect_database
+) -> None:
+    """Until `stop`: no new step starts after it, and the last beat says this worker has stopped.
+
+    A lost database is reconnected after `idle_seconds`. `connect` is for a check's fake database.
+    """
     status = _Status()
-    beat = asyncio.create_task(_beat(config, status))
+    beat = asyncio.create_task(_beat(config, status, connect))
     log_event(
         logger, "worker.started", worker=config.worker_id, claims_inference=config.claims_inference
     )
     try:
         while not stop.is_set():
             try:
-                async with await psycopg.AsyncConnection.connect(
-                    config.database_url, autocommit=True
-                ) as connection:
+                async with await connect(config.database_url) as connection:
                     while not stop.is_set():
                         try:
                             worked = await _run_step(step, connection, stop, config, status)
@@ -166,9 +188,7 @@ async def serve(config: WorkerConfig, step: Step, stop: asyncio.Event) -> None:
     finally:
         await stop_task(beat)
         try:
-            async with await psycopg.AsyncConnection.connect(
-                config.database_url, autocommit=True
-            ) as connection:
+            async with await connect(config.database_url) as connection:
                 await _write_beat(connection, config, "stopped")
         except psycopg.OperationalError as error:
             # The stack may be stopping too. The stale heartbeat reads as absent anyway.
@@ -182,16 +202,17 @@ def install_signal_handlers(stop: asyncio.Event) -> None:
         loop.add_signal_handler(signal_number, stop.set)
 
 
-def readiness_from_environment() -> ReadinessSettings:
-    """Read once at start, so a malformed value stops the worker instead of failing every pass."""
-    try:
-        return ReadinessSettings.from_environment(os.environ)
-    except MalformedSetting as error:
-        raise SystemExit(str(error)) from None
+@dataclass
+class _Maintenance:
+    """What the maintenance step remembers between passes."""
+
+    last_retention: float | None = None
+    # The refusal last logged while routines wait, so each change is logged once.
+    said: str | None = None
 
 
 def maintenance_step(
-    credential_check: Callable[[Any, UUID], Awaitable[str]],
+    credential_check: ConnectionReadiness,
     store: Any,
     readiness: ReadinessSettings,
     retention_seconds: float = 3600,
@@ -205,8 +226,7 @@ def maintenance_step(
     changes, and `catalog` refuses an occurrence whose tools are unavailable (PK-02). Retention
     doesn't wait: it removes content, and waits on Storage by itself.
     """
-    last_retention: list[float] = []
-    said: list[str] = []
+    state = _Maintenance()
 
     async def step(connection: Any) -> bool:
         if await is_held(connection):
@@ -222,34 +242,17 @@ def maintenance_step(
         admitted = 0
         if refused is None:
             admitted = await evaluate_routines(connection, check, catalog=catalog)
-            said[:] = []
-        elif said != [refused.code]:
-            said[:] = [refused.code]
+            state.said = None
+        elif state.said != refused.code:
+            state.said = refused.code
             log_event(logger, "worker.routines_waiting", logging.WARNING, reason=refused.code)
         now = asyncio.get_running_loop().time()
-        if not last_retention or now - last_retention[0] >= retention_seconds:
-            last_retention[:] = [now]
+        if state.last_retention is None or now - state.last_retention >= retention_seconds:
+            state.last_retention = now
             await apply_all(connection, store)
         return admitted > 0
 
     return step
-
-
-async def no_credential(_: Any, __: UUID) -> str:
-    """With no provider context, nothing unattended starts. The code matches a missing key."""
-    return "credentials_required"
-
-
-def credential_check_from_environment() -> Callable[[Any, UUID], Awaitable[str]]:
-    # The same context the API uses, so a routine and a person see one answer about a key.
-    context = provider_context_from_environment()
-    if context is None:
-        return no_credential
-
-    async def check(connection: Any, workspace_id: UUID) -> str:
-        return await ProviderSettings(connection, context).run_intent(workspace_id)
-
-    return check
 
 
 def loop_config(store: Any) -> LoopConfig:
@@ -305,17 +308,18 @@ def both(first: Step, second: Step) -> Step:
 
 
 def inference_from_environment(
+    environ: Mapping[str, str],
     database_url: str,
     store: Any,
     client_factory: Callable[[str], Any] | None,
     fetch_catalog: CatalogFetcher | None,
 ) -> InferenceSource:
     """Refuses to start half-configured, since a worker with no store can't verify any run."""
-    context = provider_context_from_environment()
+    context = provider_context(environ)
     if context is None or not Path(context.config_root).is_absolute():
-        raise SystemExit(f"{INFERENCE_SWITCH} needs an absolute AUTOBOTS_CONFIG_ROOT")
+        raise MalformedSetting(f"{INFERENCE_SWITCH} needs an absolute {CONFIG_ROOT}")
     if store is None:
-        raise SystemExit(f"{INFERENCE_SWITCH} needs AUTOBOTS_SUPABASE_URL and the service key")
+        raise MalformedSetting(f"{INFERENCE_SWITCH} needs {STORAGE_URL} and the service key")
     if fetch_catalog is not None:
         context = replace(context, fetch_catalog=fetch_catalog)
     from autobots.adapters.browser_executor import BrowserExecutor
@@ -330,35 +334,47 @@ def inference_from_environment(
     )
 
 
+def worker_config(environ: Mapping[str, str]) -> WorkerConfig:
+    """Its identity, database and drain, read once at start. Inference is added only once its own
+    configuration is complete, in `main`."""
+    (url,) = require(environ, DATABASE_URL)
+    drain = seconds(environ, DRAIN_SECONDS)
+    return WorkerConfig(
+        worker_id=f"{os.uname().nodename}-{os.getpid()}-{secrets.token_hex(3)}",
+        database_url=url,
+        drain_seconds=DEFAULT_DRAIN_SECONDS if drain is None else drain,
+    )
+
+
 async def main(
     *,
     client_factory: Callable[[str], Any] | None = None,
     fetch_catalog: CatalogFetcher | None = None,
 ) -> None:
-    """The arguments are for a check's fake transport. Only Python can pass them, not a setting."""
+    """The arguments are for a check's fake transport. Only Python can pass them, not a setting.
+
+    Every setting is read before it serves, so a malformed one stops it at start, exit 2, instead
+    of failing every pass. The environment stays the live mapping, so a key is resolved again for
+    each attempt (model-gateway rule).
+    """
     forbid_remote_tracing(os.environ)
     configure_logging()
-    url = os.environ.get("AUTOBOTS_DATABASE_URL", "")
-    if not url:
-        raise SystemExit("AUTOBOTS_DATABASE_URL is required")
-    base, key = (
-        os.environ.get("AUTOBOTS_SUPABASE_URL", ""),
-        os.environ.get("AUTOBOTS_SERVICE_ROLE_KEY", ""),
-    )
-    store = SupabaseObjectStore(base, SecretStr(key)) if base and key else None
-    readiness = readiness_from_environment()
-    config = WorkerConfig(
-        worker_id=f"{os.uname().nodename}-{os.getpid()}-{secrets.token_hex(3)}",
-        database_url=url,
-        drain_seconds=float(os.environ.get("AUTOBOTS_WORKER_DRAIN_SECONDS", "30")),
-    )
+    environ = os.environ
+    source: InferenceSource | None = None
+    try:
+        config = worker_config(environ)
+        readiness = ReadinessSettings.from_environment(environ)
+        store = object_store(environ)
+        if environ.get(INFERENCE_SWITCH) == "enabled":
+            source = inference_from_environment(
+                environ, config.database_url, store, client_factory, fetch_catalog
+            )
+    except MalformedSetting as error:
+        stop_unconfigured(error)
     stop = asyncio.Event()
     # The composition edge's catalog, for the routines this process admits (XMOD-01).
-    step = maintenance_step(
-        credential_check_from_environment(), store, readiness, catalog=catalog()
-    )
-    if os.environ.get(INFERENCE_SWITCH) == "enabled":
-        source = inference_from_environment(url, store, client_factory, fetch_catalog)
+    step = maintenance_step(credential_check(environ), store, readiness, catalog=catalog())
+    if source is not None:
         config = replace(config, claims_inference=True)
         step = both(step, inference_step(config, source, store, stop))
     install_signal_handlers(stop)

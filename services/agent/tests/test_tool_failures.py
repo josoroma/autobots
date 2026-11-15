@@ -32,7 +32,7 @@ from autobots.application.tool_definitions import (
 )
 from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import OperationClass, ToolOutcome
-from autobots.operations.logs import JsonFormatter
+from autobots.logs import JsonFormatter
 
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 RUN = UUID("b0000000-0000-4000-8000-000000000002")

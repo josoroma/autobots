@@ -10,7 +10,6 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.api.main import provider_context_from_environment
 from autobots.application.artifacts import read_artifact
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.provider_settings import KeyCheck, ProviderSettings
@@ -22,6 +21,7 @@ from autobots.contracts.plans import RequiredArtifact
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
+from autobots.operations.composition import provider_context
 from pydantic import SecretStr
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -71,7 +71,7 @@ async def save_key(workspace: str) -> None:
     async def accepted(_: SecretStr) -> KeyCheck:
         return KeyCheck.VALID
 
-    context = provider_context_from_environment()
+    context = provider_context(os.environ)
     assert context is not None
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         settings = ProviderSettings(db, replace(context, validate_key=accepted))

@@ -44,9 +44,11 @@ CredentialCheck = Callable[[Any, UUID], Awaitable[str]]
 
 async def _environment_check(connection: Any, workspace_id: UUID) -> str:
     """The worker's own readiness answer, so a scheduled and an asked-for occurrence agree."""
-    from autobots.operations.worker import credential_check_from_environment
+    from os import environ
 
-    return await credential_check_from_environment()(connection, workspace_id)
+    from autobots.operations.composition import credential_check
+
+    return await credential_check(environ)(connection, workspace_id)
 
 
 def routine_config(task: CronjobTask) -> RoutineConfig:

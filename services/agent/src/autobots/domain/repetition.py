@@ -1,4 +1,4 @@
-"""How often a recurring failure is worth a log line, by `autobots.operations.logs` conventions.
+"""How often a recurring failure is worth a log line, by `autobots.logs` conventions.
 
 Pure, so the run lifecycle uses it without importing the operations layer (STD-01, R-33).
 """

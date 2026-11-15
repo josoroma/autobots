@@ -16,8 +16,7 @@ import argparse
 import asyncio
 import json
 import os
-import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
@@ -31,6 +30,8 @@ from autobots.application.tool_catalog import Catalog
 from autobots.application.workflows import create_workflow, publish_version, save_draft
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
+from autobots.operations.cli import Refused, command, uuid_argument
+from autobots.operations.composition import DATABASE_URL, require
 
 
 @dataclass(frozen=True)
@@ -151,7 +152,7 @@ class WorkflowSeed:
     # Tools whose absence makes this a draft (SD-02). Empty with `always_draft` false: published.
     needs: tuple[str, ...]
     always_draft: bool
-    graph: Any  # Callable[[Mapping[str, UUID]], dict[str, Any]]
+    graph: Callable[[Mapping[str, UUID]], dict[str, Any]]
 
 
 def _weekly(experts: Mapping[str, UUID]) -> dict[str, Any]:
@@ -332,8 +333,11 @@ async def _named(connection: Any, table: str, workspace_id: UUID, name: str) -> 
     return None if row is None else UUID(str(row[0]))
 
 
-async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) -> dict[str, Any]:
-    """Each concept Expert and workflow once. What already exists by name is kept as it is."""
+class NoOwner(Refused):
+    """The workspace has no owner to seed as."""
+
+
+async def _owner(connection: Any, workspace_id: UUID) -> UUID:
     cursor = await connection.execute(
         "select user_id from public.workspace_members where workspace_id = %s and role = 'owner' "
         "order by user_id limit 1",
@@ -341,17 +345,21 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
     )
     row = await cursor.fetchone()
     if row is None:
-        raise SystemExit("that workspace has no owner, so nothing was seeded")
-    actor = UUID(str(row[0]))
-    tools = catalog()
-    usable = available_tools(environ, tools)
-    report: dict[str, Any] = {"experts": {}, "workflows": {}}
+        raise NoOwner("that workspace has no owner, so nothing was seeded")
+    return UUID(str(row[0]))
+
+
+async def _seed_experts(
+    connection: Any, workspace_id: UUID, actor: UUID, usable: frozenset[str], tools: Catalog
+) -> tuple[dict[str, UUID], dict[str, Any]]:
+    """Each concept Expert's ID by name, and what happened to each: "kept", or what was created."""
     experts: dict[str, UUID] = {}
+    report: dict[str, Any] = {}
     for expert in EXPERTS:
         found = await _named(connection, "public.experts", workspace_id, expert.name)
         if found is not None:
             experts[expert.name] = found
-            report["experts"][expert.name] = "kept"
+            report[expert.name] = "kept"
             continue
         granted = [tool for tool in expert.tools if tool in usable]
         missing = [tool for tool in expert.tools if tool not in usable]
@@ -371,10 +379,22 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
             catalog=tools,
         )
         experts[expert.name] = view.id
-        report["experts"][expert.name] = {"created": True, "without": missing}
+        report[expert.name] = {"created": True, "without": missing}
+    return experts, report
+
+
+async def _seed_workflows(
+    connection: Any,
+    workspace_id: UUID,
+    actor: UUID,
+    usable: frozenset[str],
+    experts: Mapping[str, UUID],
+) -> dict[str, Any]:
+    """What happened to each concept workflow: "kept", left a draft, or published."""
+    report: dict[str, Any] = {}
     for workflow in WORKFLOWS:
         if await _named(connection, "public.workflows", workspace_id, workflow.name) is not None:
-            report["workflows"][workflow.name] = "kept"
+            report[workflow.name] = "kept"
             continue
         flow = await create_workflow(
             connection,
@@ -388,7 +408,7 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
         unavailable = [tool for tool in workflow.needs if tool not in usable]
         if workflow.always_draft or unavailable:
             await save_draft(connection, workspace_id, actor, flow.id, graph)
-            report["workflows"][workflow.name] = {"draft": True, "unavailable": unavailable}
+            report[workflow.name] = {"draft": True, "unavailable": unavailable}
         else:
             await publish_version(
                 connection,
@@ -400,27 +420,40 @@ async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) 
                 graph=graph,
                 source="user",
             )
-            report["workflows"][workflow.name] = {"published": 1}
+            report[workflow.name] = {"published": 1}
     return report
 
 
-async def _main(workspace: UUID, database_url: str) -> dict[str, Any]:
-    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        return await seed(connection, workspace, os.environ)
+async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) -> dict[str, Any]:
+    """Each concept Expert and workflow once. What already exists by name is kept as it is.
+
+    The owner, then the Experts, then the workflows that name them (POPS-20). Raises `NoOwner`, a
+    refusal, before anything is written when the workspace has no owner.
+    """
+    actor = await _owner(connection, workspace_id)
+    tools = catalog()
+    usable = available_tools(environ, tools)
+    experts, expert_report = await _seed_experts(connection, workspace_id, actor, usable, tools)
+    workflow_report = await _seed_workflows(connection, workspace_id, actor, usable, experts)
+    return {"experts": expert_report, "workflows": workflow_report}
+
+
+async def _main(workspace: UUID, environ: Mapping[str, str]) -> int:
+    (url,) = require(environ, DATABASE_URL)
+    async with await psycopg.AsyncConnection.connect(url, autocommit=True) as connection:
+        report = await seed(connection, workspace, environ)
+    print(json.dumps(report))
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Exit codes: 0 seeded, 1 refused, 2 not configured (`cli.py`)."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--workspace", type=UUID, required=True)
+    parser.add_argument("--workspace", type=uuid_argument, required=True)
     arguments = parser.parse_args(argv)
-    url = os.environ.get("AUTOBOTS_DATABASE_URL", "")
-    if not url:
-        print("REFUSED: AUTOBOTS_DATABASE_URL is not set", file=sys.stderr)
-        return 2
-    print(json.dumps(asyncio.run(_main(arguments.workspace, url))))
-    return 0
+    return command(lambda: asyncio.run(_main(arguments.workspace, os.environ)))
 
 
 if __name__ == "__main__":

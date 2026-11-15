@@ -46,9 +46,8 @@ from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalOutput, withi
 from autobots.domain.models import ModelRoute
 from autobots.domain.tool_catalog import CostClass, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
+from autobots.logs import log_event
 
-# The standard logger, as STD-01 keeps this layer from importing operations/logs.py, whose
-# formatter and conventions apply.
 logger = logging.getLogger("autobots.tools")
 REPOSITORY = Path(__file__).resolve().parents[5]
 # Past the call's own limit, for the container start, the request guard and the last step.
@@ -121,9 +120,7 @@ async def _browse(
     try:
         await runtime.executor.sweep(lease_alive(context.connection))
     except Exception as error:  # noqa: BLE001 - the sweep is best effort and never stops this call
-        logger.warning(
-            "browser.sweep_failed", extra={"fields": {"run": scope.run_id, "error": error}}
-        )
+        log_event(logger, "browser.sweep_failed", logging.WARNING, run=scope.run_id, error=error)
     try:
         session = await runtime.executor.start(
             str(scope.run_id), scope.generation, tuple(args.allowed_domains)

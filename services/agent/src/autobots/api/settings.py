@@ -26,7 +26,8 @@ class Settings:
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
-    """Raises `MalformedSetting` for a value the process can't start with."""
+    """Raises `MalformedSetting` for a value the process can't start with, and `api/main.py` stops
+    with exit 2 naming it (`operations/composition.py` stop_unconfigured)."""
     values = os.environ if environ is None else environ
     hosts = values.get("AUTOBOTS_ALLOWED_HOSTS", "127.0.0.1,localhost")
     return Settings(

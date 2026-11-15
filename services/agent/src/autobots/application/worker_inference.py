@@ -47,13 +47,14 @@ from autobots.application.provider_settings import (
     ProviderContext,
     ProviderSettings,
 )
+from autobots.application.runs import frozen_snapshot
 from autobots.application.tool_definitions import Browsing
 from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import Lease
+from autobots.contracts.persisted import PolicySnapshot, read_policy_snapshot
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
     PROFILES,
-    BindingSource,
     ModelRole,
     ModelRoute,
     RolePolicy,
@@ -61,7 +62,7 @@ from autobots.domain.models import (
     approved_profile,
     approved_role,
 )
-from autobots.operations.logs import log_event
+from autobots.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
 ROLE = ModelRole.EXECUTOR
@@ -107,23 +108,27 @@ class CatalogCache:
         return self._snapshot
 
 
-def frozen_policy(snapshot: Mapping[str, Any] | None) -> RolePolicy:
-    """Exactly what admission froze. Without an approved binding for this role, there's no route."""
-    bindings = (snapshot or {}).get("bindings") or {}
-    policy = {approved_role(role): approved_profile(bound) for role, bound in bindings.items()}
+def frozen_policy(snapshot: PolicySnapshot | Mapping[str, object] | None) -> RolePolicy:
+    """Exactly what admission froze, from its stored snapshot (contracts/persisted.py). Without
+    an approved binding for this role, or with a snapshot that can't be read, there's no route."""
+    stored = snapshot if isinstance(snapshot, PolicySnapshot) else read_policy_snapshot(snapshot)
+    policy = {
+        approved_role(role): approved_profile(bound) for role, bound in stored.bindings.items()
+    }
     if ROLE not in policy:
         raise UnknownModelProfile("this run has no binding for the role")
-    # A release that points a profile at another model mustn't move runs saved before it.
-    for name, route in ((snapshot or {}).get("routes") or {}).items():
+    # A release that points a profile at another model mustn't move runs saved before it. A run
+    # frozen before routes were has none to compare (PolicySnapshot).
+    for name, route in stored.routes.items():
         current = PROFILES[approved_profile(name)]
-        if route != {"wire_id": current.wire_id, "canonical_id": current.canonical_id}:
+        if (route.wire_id, route.canonical_id) != (current.wire_id, current.canonical_id):
             raise UnknownModelProfile("this run was frozen on another model for that profile")
     sources = {
-        approved_role(role): BindingSource(source)
-        for role, source in ((snapshot or {}).get("sources") or {}).items()
-        if source in BindingSource._value2member_map_
+        approved_role(role): source
+        for role in stored.sources
+        if (source := stored.source(role)) is not None
     }
-    return RolePolicy(int((snapshot or {}).get("version", 0)), policy, sources)
+    return RolePolicy(stored.version, policy, sources)
 
 
 def prepared(
@@ -306,12 +311,8 @@ class InferenceSource:
         self, connection: Any, lease: Lease, config: LoopConfig
     ) -> tuple[Callable[[], Any], LoopConfig]:
         """The route comes from this run's frozen policy, never from the worker or the workspace."""
-        cursor = await connection.execute(
-            "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
-        )
-        snapshot = (await cursor.fetchone())[0]
         try:
-            policy = frozen_policy(snapshot)
+            policy = frozen_policy(await frozen_snapshot(connection, lease.run_id))
         except UnknownModelProfile:
             return _no_model, replace(config, route=UNBOUND)
         refusal, worst_case = await self._refusal(connection, lease.workspace_id, policy)
@@ -350,12 +351,8 @@ class InferenceSource:
         Browsing calls the `researcher` route this way (Decision 0020 L3). Each call it makes is
         still admitted by the loop's middleware, on this route and the run's budget.
         """
-        cursor = await connection.execute(
-            "select policy_snapshot from public.runs where id = %s", (lease.run_id,)
-        )
-        snapshot = (await cursor.fetchone())[0]
         try:
-            policy = frozen_policy(snapshot)
+            policy = frozen_policy(await frozen_snapshot(connection, lease.run_id))
             profile = policy.profile_for(role)
         except (UnknownModelProfile, KeyError, ValueError):
             return "route_not_bound"

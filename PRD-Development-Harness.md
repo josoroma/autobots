@@ -51,22 +51,25 @@ docs/engineering/work-items/<id>.md     concise plan, implementation and review 
 docs/engineering/runbooks/<id>.md       reproducible operating/verification procedures
 docs/engineering/evidence/<id>/        versioned redacted manifests and summary.md
 scripts/verify.py                       portable local verification entry point
-scripts/db/                            target-checked migration/seed operations
+scripts/app_db.py, disposable_db.py     target-checked migration/seed operations
 tests/harness/                         accepted/rejected inputs and failure fixtures
+tests/{db,web,faults,qualification,toolchain}/  disposable-database, browser, fault, qualifier and toolchain checks
 apps/web/                              Next.js UI and BFF
 services/agent/
   pyproject.toml
   uv.lock
-  src/autobots/{api,domain,application,adapters,workers,graphs,contracts}/
+  src/autobots/{api,domain,application,adapters,contracts,persistence,operations}/
   tests/
 packages/api-client/                   generated TypeScript API boundary
-packages/db-types/                     generated allowed public-schema types
+packages/db-types/                     generated public-schema types, a drift-checked exposure artifact
 contracts/generated/                  versioned OpenAPI/JSON Schema artifacts
 supabase/migrations/                   application SQL migration source of truth
 supabase/seeds/                        bootstrap and disposable fixtures separated
 infra/supabase/                        reviewed upstream Compose plus local overlay
 .checks/<work-id>/<evidence-id>/        ignored bulky redacted logs/artifacts; declared retention
 ```
+
+The service's packages follow its layout ([Decision 0029 F6](docs/engineering/decisions/0029-refactor-decisions-delegated-r41-r68.md)). `operations/` holds the process entry points, which are the worker (`python -m autobots.operations.worker`), the operator commands and paid qualification, and the process configuration they share, which the API's entry, `api/main.py`, also builds from. `logs.py` sits beside the packages, a leaf every layer may import. LangGraph and Deep Agents wiring lives in the goal-loop modules under `application/`. The database tools are `scripts/app_db.py` and `scripts/disposable_db.py`, each refusing any target it can't verify. `packages/db-types/` exposes the columns signed-in users may select, and `scripts/app_db.py` fails when it drifts from the migrations.
 
 Keep persistent volumes, `.env` files, credentials and the provider master key outside agent-editable workspaces or explicitly protected as specified in the deployment contract. Ignore `.claude/settings.local.json`, local transcripts, bulky `.checks` outputs, caches and disposable data. Version reusable policy, hooks and redacted evidence summaries/manifests, not machine credentials, user data or preferences. Official Claude configuration distinguishes shared project settings from personal overrides; inspect effective settings rather than assuming a repository file overrides all other scopes. [Settings scopes](https://code.claude.com/docs/en/settings)
 

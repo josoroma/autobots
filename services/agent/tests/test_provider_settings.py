@@ -5,7 +5,8 @@ gates run as production runs them (PTST-01).
 """
 
 import asyncio
-from datetime import date, datetime
+from dataclasses import replace
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,6 +16,8 @@ import pytest
 from pydantic import SecretStr
 
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
+from autobots.application import provider_settings as settings_module
+from autobots.application.catalog_check import SETTINGS_SECONDS, CatalogCheck, Fetch, check_catalog
 from autobots.application.credentials.store import (
     CredentialReference,
     CredentialStorageUnavailable,
@@ -25,6 +28,7 @@ from autobots.application.credentials.store import (
 from autobots.application.provider_settings import (
     KeyCheck,
     ProviderSettings,
+    StoredSettingsRows,
     qualification_from_record,
 )
 from autobots.contracts.settings import CredentialDraft, ProviderStatus
@@ -122,18 +126,25 @@ class Keys(ProviderCredentialStore):
 
 
 class Rows:
-    """The settings row in memory: version 1 at its stored status, and each status recorded."""
+    """The settings row in memory: version 1 at its stored status, each status recorded, and every
+    call in order."""
 
     def __init__(self, stored: str = "configured") -> None:
         self.stored = stored
         self.recorded: list[str] = []
+        self.calls: list[str] = []
 
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
     ) -> tuple[int, str, datetime | None]:
+        self.calls.append("read locked" if lock else "read")
         return 1, self.stored, None
 
+    async def ensure(self, workspace_id: UUID) -> None:
+        self.calls.append("ensure")
+
     async def record(self, workspace_id: UUID, status: str) -> None:
+        self.calls.append(f"record {status}")
         self.recorded.append(status)
 
 
@@ -203,3 +214,108 @@ def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
     assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
     rows.stored = "configured"
     assert asyncio.run(settings.run_intent(uuid4())) == "ready"
+
+
+class Statements:
+    """A connection that answers every select with `row` and keeps each statement it was sent."""
+
+    def __init__(self, row: tuple[object, ...] | None) -> None:
+        self.row = row
+        self.sent: list[str] = []
+
+    async def execute(self, query: str, _params: object = None) -> "Statements":
+        self.sent.append(query)
+        return self
+
+    async def fetchone(self) -> tuple[object, ...] | None:
+        return self.row
+
+
+def test_reading_a_workspace_with_no_settings_row_writes_nothing_and_gives_the_defaults() -> None:
+    """POPS-12: every status read and run-intent check reads; only a writer creates the row, with
+    the table's own defaults (supabase/migrations/20261105000005_provider_settings.sql)."""
+    connection = Statements(None)
+    rows = StoredSettingsRows(connection)
+    assert asyncio.run(rows.read(uuid4())) == (0, "missing", None)
+    assert asyncio.run(rows.read(uuid4(), lock=True)) == (0, "missing", None)
+    assert [query.split()[0] for query in connection.sent] == ["select", "select"]
+    assert connection.sent[1].endswith(" for update")
+    asyncio.run(rows.ensure(uuid4()))
+    assert connection.sent[2].startswith("insert into app_private.provider_settings")
+
+
+def test_a_stored_row_is_read_as_it_is() -> None:
+    checked = datetime(2026, 11, 15, 9, 0, tzinfo=UTC)
+    rows = StoredSettingsRows(Statements((4, "invalid", checked)))
+    assert asyncio.run(rows.read(uuid4())) == (4, "invalid", checked)
+
+
+def test_each_writer_makes_sure_the_row_exists_before_it_records() -> None:
+    rows = Rows()
+    settings = settings_over(stored_key(2), rows)
+    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
+    assert rows.calls == ["ensure", "record invalid"]
+
+    async def valid(_key: SecretStr) -> KeyCheck:
+        return KeyCheck.VALID
+
+    rows = Rows()
+    checked = ProviderSettings(
+        NoQualifications(),
+        replace(provider_context(), validate_key=valid),
+        store=Keys(stored_key(2)),
+        rows=rows,
+    )
+    asyncio.run(checked.revalidate(uuid4()))
+    assert rows.calls == ["ensure", "record configured"]
+
+
+def test_the_gate_and_the_status_only_read_the_row() -> None:
+    rows = Rows()
+    settings = settings_over(stored_key(2), rows)
+    asyncio.run(settings.run_intent(uuid4()))
+    asyncio.run(settings.auth_status(uuid4()))
+    assert set(rows.calls) == {"read"}
+
+
+def catalog_limits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Each time limit Settings gives the shared catalog check."""
+    limits: list[float] = []
+
+    async def timed(fetch: Fetch | None, seconds: float) -> CatalogCheck:
+        limits.append(seconds)
+        return await check_catalog(fetch, seconds)
+
+    monkeypatch.setattr(settings_module, "check_catalog", timed)
+    return limits
+
+
+def test_settings_wait_for_the_catalog_as_long_as_the_http_client_does(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    limits = catalog_limits(monkeypatch)
+    settings = settings_over(stored_key(2))
+    asyncio.run(settings.status(uuid4()))
+    asyncio.run(settings.models())
+    assert limits == [SETTINGS_SECONDS, SETTINGS_SECONDS] == [15.0, 15.0]
+
+
+def test_a_catalog_reply_that_isnt_json_reads_as_unavailable_in_settings_and_the_model_list() -> (
+    None
+):
+    """POPS-13: the fetcher raises ValueError for a 200 whose body isn't JSON. Operations already
+    read that as unavailable; Settings and the model list now do too, instead of an error."""
+
+    async def not_json() -> dict[str, Any] | None:
+        raise ValueError("arranged: not JSON")
+
+    settings = ProviderSettings(
+        NoQualifications(),
+        provider_context(fetch=not_json),
+        store=Keys(stored_key(2)),
+        rows=Rows(),
+    )
+    assert asyncio.run(settings.status(uuid4())).catalog_status == "unavailable"
+    listed = asyncio.run(settings.models())
+    assert listed.catalog_status == "unavailable" and listed.fetched_at is None
+    assert not any(model.available for model in listed.models)

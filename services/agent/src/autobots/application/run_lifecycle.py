@@ -66,8 +66,8 @@ from autobots.domain.stops import (
     disposition_of,
 )
 
-# STD-01 keeps this module from importing `autobots.operations.logs`, so it writes that module's
-# record with its own logger: `logger.log(level, event, extra={"fields": {...}})`.
+# Writes the record `autobots.logs.log_event` writes, with its own logger:
+# `logger.log(level, event, extra={"fields": {...}})`.
 logger = logging.getLogger("autobots.worker")
 WAKE_LOOK_SECONDS = 1.0
 

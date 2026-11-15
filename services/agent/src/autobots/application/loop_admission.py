@@ -72,9 +72,8 @@ from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 from autobots.domain.runs import INTERRUPTING
 from autobots.domain.stops import REPAIRABLE, STOPPING, StopCode, repair_limit
+from autobots.logs import log_event
 
-# Written through the standard logger, as STD-01 keeps this layer from importing
-# operations/logs.py; that module's formatter renders the record and its conventions apply.
 logger = logging.getLogger("autobots.worker")
 
 CHECK_SECONDS = 1.0
@@ -499,14 +498,14 @@ class LoopAdmission:
         fields = uncertain_call_fields(error)
         if reason is not None:
             fields["reason"] = reason
-        logger.warning(
+        log_event(
+            logger,
             "worker.call_uncertain",
-            extra={
-                "fields": {
-                    "invocation": str(invocation),
-                    "run": str(self.scope.run_id),
-                    "failure": failure.value,
-                    **fields,
-                }
+            logging.WARNING,
+            **{
+                "invocation": str(invocation),
+                "run": str(self.scope.run_id),
+                "failure": failure.value,
+                **fields,
             },
         )

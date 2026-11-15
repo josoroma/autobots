@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage
 
 from autobots.adapters import loop_middleware
 from autobots.adapters.models import catalog
-from autobots.operations import route_qualification
+from autobots.operations.paid import pricing
 
 
 @pytest.mark.parametrize(
@@ -50,4 +50,4 @@ def test_the_worker_leaves_an_unreadable_charge_unreported(metadata: dict[str, o
 
 def test_the_trials_and_the_worker_settle_one_reply_to_one_figure() -> None:
     message = AIMessage("", response_metadata={"cost": 0.0000125})
-    assert route_qualification.reported_micro_usd(message) == loop_middleware._charged(message)
+    assert pricing.reported_micro_usd(message) == loop_middleware._charged(message)

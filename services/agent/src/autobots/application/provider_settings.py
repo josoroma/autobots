@@ -1,8 +1,8 @@
 """MP-04 and MP-05. Validation uses key metadata and the public catalog, and never a completion."""
 
 import json
-from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
+from autobots.application.catalog_check import SETTINGS_SECONDS, check_catalog
 from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
@@ -69,14 +70,25 @@ class CredentialRefused(Exception):
 
 KeyValidator = Callable[[SecretStr], Awaitable[KeyCheck]]
 CatalogFetcher = Callable[[], Awaitable[dict[str, Any] | None]]
+# `run_intent`'s answer, "ready" or the refusing code, for a workspace (XMOD-17). One takes the
+# workspace only; the other also takes the connection to read it over, as the worker holds one.
+WorkspaceReadiness = Callable[[UUID], Awaitable[str]]
+ConnectionReadiness = Callable[[Any, UUID], Awaitable[str]]
 
 
 @dataclass(frozen=True)
 class ProviderContext:
+    """What a process knows about its provider configuration.
+
+    `process_environment` is the live mapping the entry point passes, `os.environ` itself, so an
+    environment key is resolved again for each attempt and never copied (model-gateway rule). Its
+    repr is hidden, since the environment holds secrets.
+    """
+
     config_root: str
     mode: str
     master_key_file: Path
-    process_environment: dict[str, str]
+    process_environment: Mapping[str, str] = field(repr=False)
     validate_key: KeyValidator
     fetch_catalog: CatalogFetcher
 
@@ -87,6 +99,8 @@ class SettingsRows(Protocol):
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
     ) -> tuple[int, str, datetime | None]: ...
+
+    async def ensure(self, workspace_id: UUID) -> None: ...
 
     async def record(self, workspace_id: UUID, status: str) -> None: ...
 
@@ -100,12 +114,9 @@ class StoredSettingsRows:
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
     ) -> tuple[int, str, datetime | None]:
-        """Creates the row on first read, so every workspace has a version to compare against."""
-        await self._connection.execute(
-            "insert into app_private.provider_settings (workspace_id) values (%s) "
-            "on conflict (workspace_id) do nothing",
-            (workspace_id,),
-        )
+        """Writes nothing. A workspace with no row reads as the table's defaults: version 0,
+        missing and never checked (supabase/migrations/20261105000005_provider_settings.sql). A
+        writer calls `ensure` first, so `lock` has a row to hold (SP-014, POPS-12)."""
         suffix = " for update" if lock else ""
         cursor = await self._connection.execute(
             "select version, auth_status, validated_at from app_private.provider_settings "
@@ -113,7 +124,17 @@ class StoredSettingsRows:
             (workspace_id,),
         )
         row = await cursor.fetchone()
+        if row is None:
+            return 0, "missing", None
         return row[0], row[1], row[2]
+
+    async def ensure(self, workspace_id: UUID) -> None:
+        """Creates the row at its defaults if it isn't there yet, for a writer."""
+        await self._connection.execute(
+            "insert into app_private.provider_settings (workspace_id) values (%s) "
+            "on conflict (workspace_id) do nothing",
+            (workspace_id,),
+        )
 
     async def record(self, workspace_id: UUID, status: str) -> None:
         await self._connection.execute(
@@ -158,10 +179,8 @@ class ProviderSettings:
         return None
 
     async def catalog_status(self) -> str:
-        try:
-            return "available" if await self._context.fetch_catalog() is not None else "unavailable"
-        except OSError:
-            return "unavailable"
+        """Within the HTTP client's own limit. A reply that isn't JSON reads as unavailable."""
+        return (await check_catalog(self._context.fetch_catalog, SETTINGS_SECONDS)).status
 
     async def route_qualifications(self) -> list[RouteQualification]:
         return await read_route_qualifications(self._connection)
@@ -228,6 +247,7 @@ class ProviderSettings:
         if result is KeyCheck.UNREACHABLE:
             raise ValidationUnavailable("the key could not be checked right now")
         async with self._connection.transaction():
+            await self._rows.ensure(workspace_id)
             current, _, _ = await self._rows.read(workspace_id, lock=True)
             self._check_version(current, expected)
             await self._store.save(workspace_id, draft)
@@ -236,6 +256,7 @@ class ProviderSettings:
     async def disconnect(self, workspace_id: UUID, expected: int) -> None:
         """Removes the app credential only. An environment key is neither deleted nor overridden."""
         async with self._connection.transaction():
+            await self._rows.ensure(workspace_id)
             current, _, _ = await self._rows.read(workspace_id, lock=True)
             self._check_version(current, expected)
             await self._connection.execute(
@@ -259,7 +280,7 @@ class ProviderSettings:
             KeyCheck.REJECTED: "invalid",
             KeyCheck.UNREACHABLE: "unavailable",
         }[result]
-        await self._rows.read(workspace_id)
+        await self._rows.ensure(workspace_id)
         await self._rows.record(workspace_id, status)
 
     async def run_intent(self, workspace_id: UUID) -> str:
@@ -302,11 +323,13 @@ class ProviderSettings:
             except (CredentialMissing, CredentialStorageUnavailable):
                 return
         if current == used:
-            await self._rows.read(workspace_id)
+            await self._rows.ensure(workspace_id)
             await self._rows.record(workspace_id, "invalid")
 
     async def models(self) -> ModelList:
-        payload = await self._context.fetch_catalog()
+        """Within the HTTP client's own limit. A catalog that doesn't answer, or answers with
+        something that isn't JSON, lists every profile as unavailable."""
+        payload = (await check_catalog(self._context.fetch_catalog, SETTINGS_SECONDS)).payload
         now = datetime.now(UTC)
         snapshot = parse_catalog(payload or {}, retrieved_at=now, revision="live")
         models = []

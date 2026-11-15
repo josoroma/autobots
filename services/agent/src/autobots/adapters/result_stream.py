@@ -18,7 +18,7 @@ from uuid import UUID
 
 import psycopg
 
-from autobots.operations.logs import log_event
+from autobots.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
 CHANNEL = "autobots_result_text"

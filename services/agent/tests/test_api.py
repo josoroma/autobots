@@ -21,7 +21,7 @@ from autobots.api.app import Pool, create_app, default_pool
 from autobots.api.main import create_configured_app
 from autobots.api.pool import POOL_WAIT_SECONDS
 from autobots.api.settings import Settings, load_settings
-from autobots.operations.logs import JsonFormatter
+from autobots.logs import JsonFormatter
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"

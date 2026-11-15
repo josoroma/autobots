@@ -68,6 +68,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.operations import worker as worker_module
+from autobots.operations.composition import no_credential
 from checklib import Cases, Db, OnePool, run_check
 from goal_loop_script import ROUTE
 from pydantic import BaseModel
@@ -423,7 +424,7 @@ async def routines_wait_on_readiness(db: Db) -> None:
         logger.addHandler(said)
         worker_module.evaluate_routines = counted
         try:
-            worked = await worker_module.maintenance_step(worker_module.no_credential, store, settings, catalog=tool_registry.catalog())(connection)
+            worked = await worker_module.maintenance_step(no_credential, store, settings, catalog=tool_registry.catalog())(connection)
         finally:
             worker_module.evaluate_routines = real
             logger.removeHandler(said)

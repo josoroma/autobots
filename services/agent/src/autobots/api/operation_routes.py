@@ -2,7 +2,7 @@
 
 import os
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -12,25 +12,21 @@ from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings import Settings
 from autobots.api.settings_routes import current_workspace, require_owner
+from autobots.application.backups import backup_status
+from autobots.application.catalog_check import OPERATIONS_SECONDS, check_catalog
+from autobots.application.job_activity import delayed_occurrences, job_hours
+from autobots.application.operation_values import disk_bytes, loopback_only, stored_bytes
 from autobots.application.operations import (
     Condition,
     ProbeTimes,
     QueueCounts,
     applied_migrations,
-    backup_age_hours,
     checkpoint_adapter,
     database_conditions,
-    delayed_occurrences,
-    disk_bytes,
     is_ready,
-    job_hours,
     live_workers,
-    loopback_only,
     queue_condition,
     queue_counts,
-    restore_history,
-    stored_bytes,
-    timed_catalog,
     worker_condition,
 )
 from autobots.application.provider_settings import ProviderSettings, read_route_qualifications
@@ -59,7 +55,7 @@ from autobots.contracts.operations import (
     ServiceReadiness,
 )
 from autobots.contracts.settings import RouteQualification
-from autobots.operations.logs import remote_tracing_disabled
+from autobots.logs import remote_tracing_disabled
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Owner = Annotated[UUID, Depends(require_owner)]
@@ -97,10 +93,10 @@ async def require_ready(request: Request) -> None:
         raise ApiError(503, "not_ready", "Local services aren't ready, so nothing was started.")
 
 
-def _restore_records(directory: str) -> list[RestoreRecord]:
+def _restore_records(items: list[dict[str, Any]]) -> list[RestoreRecord]:
     """A line of the right shape with a bad value is skipped too, so the page still answers."""
     records = []
-    for item in restore_history(directory):
+    for item in items:
         try:
             records.append(RestoreRecord.model_validate(item))
         except ValueError:
@@ -152,10 +148,12 @@ async def get_local_status(
             oldest_queued_seconds=counts.oldest_queued_seconds,
         )
         retention = RetentionSettings(run_days=policy.run_days, receipt_days=policy.receipt_days)
-    openrouter, catalog_ms = await timed_catalog(
-        getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None)
+    catalog = await check_catalog(
+        getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None),
+        OPERATIONS_SECONDS,
     )
     settings = process_settings(request)
+    backups = await backup_status(settings.backup_dir, datetime.now(UTC))
     disk = disk_bytes(settings.readiness.data_root)
     probes = probe_times(request)
     return LocalStatus(
@@ -171,10 +169,10 @@ async def get_local_status(
         ],
         queue=queue,
         retention=retention,
-        backup_age_hours=backup_age_hours(settings.backup_dir, datetime.now(UTC)),
-        openrouter=openrouter,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+        backup_age_hours=backups.age_hours,
+        openrouter=catalog.status,
         delayed_schedules=delayed,
-        restores=_restore_records(settings.backup_dir),
+        restores=_restore_records(backups.restores),
         route_qualifications=qualifications,
         values=OperationValues(
             database_p95_ms=probes.p95(),
@@ -187,7 +185,7 @@ async def get_local_status(
             leased_jobs=queue.claimed if queue else None,
             queued_jobs=queue.queued if queue else None,
             checkpoint_adapter=checkpoint_adapter(),
-            catalog_fetch_ms=catalog_ms,
+            catalog_fetch_ms=catalog.milliseconds,
             loopback_only=loopback_only(),
             workers=workers,
         ),

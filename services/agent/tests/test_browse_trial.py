@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import httpx
 import pytest
@@ -11,11 +13,25 @@ from langchain_core.messages import HumanMessage
 from pydantic import SecretStr
 
 from autobots.adapters.models.factory import default_sdk_client
+from autobots.application import browsing_tool
 from autobots.application.browsing_loop import ACTION_TOOLS
+from autobots.application.tool_definitions import ToolResult
 from autobots.application.worker_inference import frozen_policy
-from autobots.domain.models import PROFILES, ModelProfileId
-from autobots.operations.browse_trial import RESULT, TrialModel, hosts, inside, refuse_repeat
-from autobots.operations.route_qualification import Refused
+from autobots.domain.models import PROFILES, ModelProfileId, ModelRoute
+from autobots.domain.tools import ToolOutcome
+from autobots.operations import browse_trial
+from autobots.operations.browse_trial import (
+    LIMIT_MICRO_USD,
+    RESULT,
+    InvocationRow,
+    ToolUseRow,
+    TrialModel,
+    build_report,
+    hosts,
+    inside,
+    refuse_repeat,
+)
+from autobots.operations.cli import Refused
 
 SOL = PROFILES[ModelProfileId.SOL]
 PAYLOAD = {
@@ -109,3 +125,92 @@ def test_the_proxy_log_gives_hosts_only_and_flags_any_outside_the_domains() -> N
         "refused": ["fonts.example.net:host_not_allowed"],
     }
     assert all(inside(host) for host in seen["connected"]) and not inside("evil.test")
+
+
+RUN = UUID("b0000000-0000-4000-8000-000000000001")
+ROUTE = ModelRoute("researcher", "openrouter_sol", SOL.wire_id, 300_000)
+
+
+def calls(*charges: tuple[str, int, int | None]) -> list[InvocationRow]:
+    return [
+        InvocationRow(
+            "researcher",
+            "openrouter_sol",
+            SOL.wire_id,
+            status,
+            reserved,
+            charged,
+            "tool_calls",
+            900,
+            40,
+            ["read_page"],
+            "openai",
+        )
+        for status, reserved, charged in charges
+    ]
+
+
+def test_the_report_is_built_from_the_stored_rows_alone() -> None:
+    """POPS-08: the report after the one paid call is a pure function, tested before any repeat."""
+    invocations = calls(("succeeded", 300_000, 12_000), ("succeeded", 300_000, 9_000))
+    uses = [ToolUseRow("succeeded", None, True, {"task": "t"}, {"summary": "s"})]
+    log = [{"event": "allowed", "host": "example.com"}, {"event": "allowed", "host": "iana.org"}]
+    result = ToolResult(ToolOutcome.SUCCEEDED, None, {"stopped": "finished"})
+    report = build_report(RUN, ROUTE, result, invocations, uses, log, "fake_transport")
+    assert report["run_id"] == str(RUN) and report["evidence_class"] == "fake_transport"
+    assert (report["charged_micro_usd"], report["open_reservations_micro_usd"]) == (21_000, 0)
+    assert report["within_limit"] and report["limit_micro_usd"] == LIMIT_MICRO_USD
+    assert (report["outcome"], report["code"], report["output"]) == (
+        "succeeded",
+        None,
+        {"stopped": "finished"},
+    )
+    assert report["invocations"][0] == {
+        "role": "researcher",
+        "profile": "openrouter_sol",
+        "wire_id": SOL.wire_id,
+        "status": "succeeded",
+        "reserved_micro_usd": 300_000,
+        "charged_micro_usd": 12_000,
+        "finish_reason": "tool_calls",
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "tool_names": ["read_page"],
+        "upstream_provider": "openai",
+    }
+    assert report["tool_uses"] == [
+        {
+            "outcome": "succeeded",
+            "code": None,
+            "metered": True,
+            "input_public": {"task": "t"},
+            "output_public": {"summary": "s"},
+        }
+    ]
+    assert report["proxy_hosts"]["connected"] == ["example.com", "iana.org"]
+    assert report["only_allowed_hosts"]
+    json.dumps(report)
+
+
+def test_an_unsettled_call_stays_held_and_can_take_the_trial_past_its_limit() -> None:
+    invocations = calls(("succeeded", 300_000, 700_000), ("uncertain", 400_000, None))
+    result = ToolResult(ToolOutcome.UNKNOWN, "model_call_uncertain")
+    log = [{"event": "allowed", "host": "evil.test"}]
+    report = build_report(RUN, ROUTE, result, invocations, [], log, "live")
+    assert (report["charged_micro_usd"], report["open_reservations_micro_usd"]) == (
+        700_000,
+        400_000,
+    )
+    assert not report["within_limit"] and not report["only_allowed_hosts"]
+    assert report["output"] is None and report["code"] == "model_call_uncertain"
+
+
+def test_the_browsing_switch_is_restored_after_the_trial(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(browsing_tool.ENABLE, raising=False)
+    with browse_trial._browsing_enabled():
+        assert os.environ[browsing_tool.ENABLE] == "enabled"
+    assert browsing_tool.ENABLE not in os.environ
+    monkeypatch.setenv(browsing_tool.ENABLE, "off")
+    with pytest.raises(RuntimeError), browse_trial._browsing_enabled():
+        raise RuntimeError("arranged")
+    assert os.environ[browsing_tool.ENABLE] == "off"

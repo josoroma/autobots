@@ -34,6 +34,7 @@ from autobots.application.runs import (
 )
 from autobots.application.tool_catalog import Catalog, ToolsUnavailable
 from autobots.application.workflows import WorkflowRefused, create_execution
+from autobots.contracts.persisted import RoutineCreatedReceipt, RoutineVersionReceipt
 from autobots.contracts.primitives import MAX_SAFE_INTEGER
 from autobots.contracts.routines import (
     OccurrenceView,
@@ -57,7 +58,7 @@ from autobots.domain.routines import (
 )
 from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
-from autobots.operations.logs import log_event
+from autobots.logs import log_event
 from autobots.persistence.records import (
     ExpertConfigRecord,
     RoutineConfigRecord,
@@ -255,9 +256,9 @@ async def create_routine(
     fingerprint = request_hash({"name": name, "config": json.loads(stored)})
     scope = (workspace_id, actor_id, "create_routine", str(workspace_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, RoutineCreatedReceipt)
         if existing is not None:
-            return await get_routine(connection, workspace_id, UUID(existing["routine_id"]))
+            return await get_routine(connection, workspace_id, existing.routine_id)
         cursor = await connection.execute(
             "select 1 from public.routines where workspace_id = %s and name = %s "
             "and removed_at is null",
@@ -276,7 +277,9 @@ async def create_routine(
             "values (%s, 1, %s, %s)",
             (routine_id, stored, actor_id),
         )
-        await store_receipt(connection, scope, fingerprint, {"routine_id": str(routine_id)})
+        await store_receipt(
+            connection, scope, fingerprint, RoutineCreatedReceipt(routine_id=routine_id)
+        )
     return await get_routine(connection, workspace_id, routine_id)
 
 
@@ -297,7 +300,7 @@ async def add_routine_version(
     fingerprint = request_hash({"expected": expected_version, "config": json.loads(stored)})
     scope = (workspace_id, actor_id, "edit_routine", str(routine_id), idempotency_key)
     async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
+        existing = await existing_receipt(connection, scope, fingerprint, RoutineVersionReceipt)
         if existing is not None:
             return await get_routine(connection, workspace_id, routine_id)
         cursor = await connection.execute(
@@ -319,7 +322,7 @@ async def add_routine_version(
         await connection.execute(
             "update public.routines set latest_version = %s where id = %s", (version, routine_id)
         )
-        await store_receipt(connection, scope, fingerprint, {"version": version})
+        await store_receipt(connection, scope, fingerprint, RoutineVersionReceipt(version=version))
     return await get_routine(connection, workspace_id, routine_id)
 
 

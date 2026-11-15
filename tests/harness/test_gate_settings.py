@@ -75,7 +75,6 @@ ANN401_BASELINE = frozenset({
     'src/autobots/application/workflows.py',
     'src/autobots/operations/browse_trial.py',
     'src/autobots/operations/concept_seed.py',
-    'src/autobots/operations/logs.py',
     'src/autobots/operations/reasoning_trial.py',
     'src/autobots/operations/route_qualification.py',
     'src/autobots/operations/worker.py',

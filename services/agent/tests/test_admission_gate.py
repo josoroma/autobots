@@ -35,6 +35,7 @@ from autobots.application.readiness import (
     installation_conditions,
 )
 from autobots.operations import worker
+from autobots.operations.composition import no_credential
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -176,25 +177,23 @@ def test_the_api_reads_the_gate_settings_and_backups_once_at_startup(tmp_path: P
         load_settings({"AUTOBOTS_MIN_FREE_BYTES": "lots"})
 
 
-def test_a_malformed_minimum_stops_the_api_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_malformed_minimum_stops_the_api_at_startup(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Exit 2, a prerequisite that isn't there, with the variable named (POPS-14)."""
     monkeypatch.setattr(api_main, "configure_logging", lambda: None)
     monkeypatch.setattr(api_main, "forbid_remote_tracing", lambda _environ: None)
     monkeypatch.setenv("AUTOBOTS_MIN_FREE_BYTES", "lots")
-    with pytest.raises(SystemExit, match="AUTOBOTS_MIN_FREE_BYTES"):
+    with pytest.raises(SystemExit) as stopped:
         api_main.create_configured_app()
+    assert stopped.value.code == 2
+    assert capsys.readouterr().err.startswith("ERROR: AUTOBOTS_MIN_FREE_BYTES must be")
 
 
-def test_a_malformed_minimum_stops_the_worker_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AUTOBOTS_MIN_FREE_BYTES", "lots")
-    with pytest.raises(SystemExit, match="AUTOBOTS_MIN_FREE_BYTES"):
-        worker.readiness_from_environment()
-    monkeypatch.setenv("AUTOBOTS_MIN_FREE_BYTES", "4096")
-    monkeypatch.setenv("AUTOBOTS_CONFIG_ROOT", "/srv/autobots")
-    assert worker.readiness_from_environment() == ReadinessSettings(Path("/srv/autobots"), 4096)
-
-
-def test_the_worker_entry_point_refuses_before_it_serves(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def never(*_args: object) -> None:
+def test_the_worker_entry_point_refuses_before_it_serves(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def never(*_args: object, **_options: object) -> None:
         raise AssertionError("a malformed minimum must stop the worker before it serves")
 
     monkeypatch.setattr(worker, "configure_logging", lambda: None)
@@ -202,8 +201,10 @@ def test_the_worker_entry_point_refuses_before_it_serves(monkeypatch: pytest.Mon
     monkeypatch.setattr(worker, "serve", never)
     monkeypatch.setenv("AUTOBOTS_DATABASE_URL", "postgresql://unused")
     monkeypatch.setenv("AUTOBOTS_MIN_FREE_BYTES", "lots")
-    with pytest.raises(SystemExit, match="AUTOBOTS_MIN_FREE_BYTES"):
+    with pytest.raises(SystemExit) as stopped:
         asyncio.run(worker.main())
+    assert stopped.value.code == 2
+    assert capsys.readouterr().err.startswith("ERROR: AUTOBOTS_MIN_FREE_BYTES must be")
 
 
 # What the gate reads
@@ -329,9 +330,7 @@ def maintenance(
         monkeypatch.setattr(worker, name, fake)
     monkeypatch.setattr(readiness, "database_conditions", database_conditions)
     settings = ReadinessSettings(tmp_path, install.min_free_bytes)
-    step = worker.maintenance_step(
-        worker.no_credential, state.storage, settings, 0, catalog=catalog()
-    )
+    step = worker.maintenance_step(no_credential, state.storage, settings, 0, catalog=catalog())
     return state, step
 
 

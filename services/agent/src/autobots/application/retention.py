@@ -9,7 +9,7 @@ from uuid import UUID
 import psycopg
 
 from autobots.domain.runs import TERMINAL
-from autobots.operations.logs import log_event
+from autobots.logs import log_event
 
 logger = logging.getLogger("autobots.retention")
 _BATCH = 100

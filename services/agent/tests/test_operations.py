@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import logging
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,24 +16,23 @@ from deepagents import graph as graph_module
 from langchain_core.language_models import FakeListChatModel
 from langchain_core.messages import ToolMessage
 
-from autobots.application import retention
+from autobots.application import backups, retention
+from autobots.application.backups import backup_age_hours
 from autobots.application.compaction import StoredSummary, summary_request, summary_text
 from autobots.application.goal_loop import SummarizationOff
 from autobots.application.operations import (
     Condition,
     QueueCounts,
-    backup_age_hours,
     disk_condition,
     is_ready,
     queue_condition,
     storage_condition,
 )
 from autobots.contracts.operations import RetentionSettings
-from autobots.operations import worker
-from autobots.operations.logs import (
+from autobots.domain.repetition import Repeated
+from autobots.logs import (
     CAUSES_KEPT,
     FRAMES_KEPT,
-    Repeated,
     configure_logging,
     error_fields,
     forbid_remote_tracing,
@@ -40,6 +40,7 @@ from autobots.operations.logs import (
     redact,
     remote_tracing_disabled,
 )
+from autobots.operations import worker
 
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 
@@ -293,6 +294,33 @@ def test_backup_age_reads_the_newest_manifest_and_ignores_damage(tmp_path: Path)
     (tmp_path / "bad").mkdir()
     (tmp_path / "bad" / "manifest.json").write_text("not json")
     assert backup_age_hours(str(tmp_path), now) == 2
+
+
+def test_the_backup_files_are_read_off_the_event_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DH-06, POPS-04: Local Operations' status route awaits `backup_status`, whose file reads run
+    in worker threads."""
+    loop_thread: list[int] = []
+    read_in: list[int] = []
+
+    def age(directory: str, now: datetime) -> int:
+        read_in.append(threading.get_ident())
+        return 2
+
+    def history(directory: str) -> list[dict[str, Any]]:
+        read_in.append(threading.get_ident())
+        return [{"at": "2026-11-05T09:30:00+00:00"}]
+
+    async def status() -> backups.BackupStatus:
+        loop_thread.append(threading.get_ident())
+        return await backups.backup_status(str(tmp_path), datetime(2026, 11, 5, 12, tzinfo=UTC))
+
+    monkeypatch.setattr(backups, "backup_age_hours", age)
+    monkeypatch.setattr(backups, "restore_history", history)
+    found = asyncio.run(status())
+    assert found == backups.BackupStatus(2, [{"at": "2026-11-05T09:30:00+00:00"}])
+    assert len(read_in) == 2 and loop_thread[0] not in read_in
 
 
 def test_low_disk_is_visible_and_stops_admission(tmp_path: Path) -> None:

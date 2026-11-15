@@ -559,7 +559,7 @@ services/agent/.venv/bin/ruff check --no-cache --isolated --exit-zero --select B
 Open each one. Decide whether it is a justified process boundary that logs, reports or re-raises, or whether it swallows a failure.
 2. Exception classes: grep -rnE "^class [A-Za-z_]+\(.*(Exception|Error)" services/agent/src. Is there a hierarchy, and do API errors map through api/errors.py consistently?
 3. Cancellation: confirm asyncio.CancelledError is never swallowed (grep -rn "CancelledError" services/agent/src).
-4. Logging: print versus the JSON logger in operations/logs.py, what is logged at which level, and that secrets and message text are never logged.
+4. Logging: print versus the JSON logger in autobots/logs.py, what is logged at which level, and that secrets and message text are never logged.
 5. Web: how BFF route handlers map upstream errors, and how components show errors (grep -rn "catch" apps/web/components | wc -l, then compare three screens). Are loading, empty, denied, unavailable and retryable states represented deliberately, as DH-06 asks?`
 
 const TOOLING_FOCUS = String.raw`Map which standards a tool enforces and where enforcement stops. Read services/agent/pyproject.toml, apps/web/eslint.config.mjs, apps/web/tsconfig.json, apps/web/package.json, packages/api-client/tsconfig.json and package.json, the root package.json, scripts/toolchain.py (which checks run, and on which paths) and scripts/verify.py.

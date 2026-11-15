@@ -13,7 +13,6 @@ import asyncio
 import json
 import logging
 import os
-import sys
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -33,19 +32,13 @@ from autobots.adapters.models.factory import (
 )
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, http_client
 from autobots.domain.models import PROFILES, ModelProfile, ModelProfileId
-from autobots.operations.logs import configure_logging, forbid_remote_tracing, log_event
-from autobots.operations.route_qualification import (
-    CALL_SECONDS,
-    CapReached,
-    Ledger,
-    LookupCode,
-    Refused,
-    Route,
-    prepare,
-    read_key,
-    reported_micro_usd,
-    trial_worst_case,
-)
+from autobots.logs import configure_logging, forbid_remote_tracing, log_event
+from autobots.operations.cli import Refused, command
+from autobots.operations.paid.attempts import CALL_SECONDS, Route, prepare
+from autobots.operations.paid.keys import read_key
+from autobots.operations.paid.ledger import CapReached, Ledger
+from autobots.operations.paid.pricing import reported_micro_usd, trial_worst_case
+from autobots.operations.route_fixtures import LookupCode
 
 logger = logging.getLogger("autobots.reasoning_trial")
 REPOSITORY = Path(__file__).resolve().parents[5]
@@ -380,8 +373,7 @@ async def _main(arguments: argparse.Namespace) -> int:
         )
         after = await key_usage(key)
     except (Refused, ModelUnavailable, UnsupportedRequestOption) as refusal:
-        print(f"REFUSED, nothing further sent: {refusal}", file=sys.stderr)
-        return 1
+        raise Refused(f"nothing further was sent: {refusal}") from None
     write_report(Path(arguments.out), results, ledger, before, after)
     log_event(logger, "reasoning_trial.finished", calls=len(ledger.entries))
     print(
@@ -422,7 +414,8 @@ def main() -> int:
     parser.add_argument("--out", default=".checks/reasoning-trial")
     parser.add_argument("--trials", type=int, default=TRIALS)
     parser.add_argument("--profile", choices=[profile.value for profile in ModelProfileId])
-    return asyncio.run(_main(parser.parse_args()))
+    arguments = parser.parse_args()
+    return command(lambda: asyncio.run(_main(arguments)))
 
 
 if __name__ == "__main__":

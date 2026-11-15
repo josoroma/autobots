@@ -7,7 +7,7 @@ through the product's own path, OpenRouter's key check included. `leaks <key fil
 how many durable rows and how many log files hold it. Only OPENROUTER_API_KEY is read from the
 file, and only numbers or counts are printed. The key check and the usage read are OpenRouter's
 free metadata calls, not inference. scripts/paid_run.py runs it for persistent_install.py,
-live_goal.py and qualify_release.py.
+live_goal.py and qualify_release.py. Exit codes: 0 done, 1 refused, 2 not configured (`cli.py`).
 """
 
 import argparse
@@ -23,9 +23,11 @@ import httpx
 import psycopg
 from pydantic import SecretStr
 
-from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
 from autobots.application.provider_settings import ProviderContext, ProviderSettings
-from autobots.operations.route_qualification import read_key
+from autobots.application.readiness import MalformedSetting
+from autobots.operations import composition
+from autobots.operations.cli import command, uuid_argument
+from autobots.operations.paid.keys import read_key
 
 USAGE_URL = "https://openrouter.ai/api/v1/key"
 USAGE_SECONDS = 30.0
@@ -41,10 +43,6 @@ DURABLE_TEXT = (
     "select content from app_private.run_files",
     "select accumulated_output from app_private.model_invocations",
 )
-
-
-class ProviderContextIncomplete(Exception):
-    """The environment doesn't say where this install keeps provider keys, so nothing is saved."""
 
 
 class Rows(Protocol):
@@ -71,22 +69,14 @@ class KeySaver(Protocol):
 
 
 def provider_context(environ: Mapping[str, str]) -> ProviderContext:
-    """The context the API builds (api.main.provider_context_from_environment), with no default
-    master key file: every paid entry point names both, and operations doesn't import api
-    (tests/test_layers.py)."""
-    missing = [name for name in (CONFIG_ROOT, MASTER_KEY_FILE) if not environ.get(name)]
-    if missing:
-        raise ProviderContextIncomplete(
-            f"{' and '.join(missing)} must be set, so the key is saved where this install keeps it"
-        )
-    return ProviderContext(
-        config_root=environ[CONFIG_ROOT],
-        mode=environ.get("NODE_ENV", "development"),
-        master_key_file=Path(environ[MASTER_KEY_FILE]),
-        process_environment=dict(environ),
-        validate_key=key_validator(),
-        fetch_catalog=catalog_fetcher(),
-    )
+    """The context the API builds (`composition.provider_context`), once both the configuration
+    root and the master key file are named, so the key is saved where this install keeps it. A
+    missing one is a setting to set, exit 2."""
+    composition.require(environ, CONFIG_ROOT, MASTER_KEY_FILE)
+    context = composition.provider_context(environ)
+    if context is None:
+        raise MalformedSetting(f"set {CONFIG_ROOT}")
+    return context
 
 
 async def key_usage(key: SecretStr, client: httpx.AsyncClient) -> float:
@@ -141,7 +131,8 @@ async def _usage(key: SecretStr) -> float:
 
 async def _save(key: SecretStr, workspace: UUID, environ: Mapping[str, str]) -> None:
     context = provider_context(environ)
-    async with runtime_connection(environ[DATABASE_URL]) as connection:
+    (url,) = composition.require(environ, DATABASE_URL)
+    async with runtime_connection(url) as connection:
         await save_key(key, workspace, ProviderSettings(connection, context))
 
 
@@ -158,19 +149,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("usage").add_argument("key_file", type=Path)
     save = commands.add_parser("save")
     save.add_argument("key_file", type=Path)
-    save.add_argument("workspace", type=UUID)
+    save.add_argument("workspace", type=uuid_argument)
     leaks = commands.add_parser("leaks")
     leaks.add_argument("key_file", type=Path)
     leaks.add_argument("logs", type=Path)
     arguments = parser.parse_args(argv)
+    return command(lambda: _run(arguments, os.environ))
+
+
+def _run(arguments: argparse.Namespace, environ: Mapping[str, str]) -> int:
     key = read_key(arguments.key_file)
     if arguments.command == "usage":
         print(asyncio.run(_usage(key)))
     elif arguments.command == "save":
-        asyncio.run(_save(key, arguments.workspace, os.environ))
+        asyncio.run(_save(key, arguments.workspace, environ))
     else:
         secret = key.get_secret_value()
-        durable = asyncio.run(_durable(secret, os.environ[DATABASE_URL]))
+        (url,) = composition.require(environ, DATABASE_URL)
+        durable = asyncio.run(_durable(secret, url))
         print(f"{durable} {log_files_holding(secret, arguments.logs)}")
     return 0
 
