@@ -62,7 +62,9 @@ def test_a_workspace_with_no_saved_policy_reads_version_0_with_no_default(
 
 
 def test_a_saved_policy_reads_as_saved(api_client: ApiClient) -> None:
-    api_client.database.answer(READ, (4, SOL, {"executor": TERRA}))
+    api_client.database.answer(
+        READ, {"version": 4, "default_profile": SOL, "role_overrides": {"executor": TERRA}}
+    )
     body = api_client.http.get("/v1/settings/model-policy", headers=api_client.headers()).json()
     assert (body["version"], body["default_profile"], body["role_overrides"]) == (
         4,

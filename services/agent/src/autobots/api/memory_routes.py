@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from autobots.api.dependencies import CurrentUser, MemberWorkspace, OwnerWorkspace
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.memory import search, store_memory
 from autobots.contracts.memory import MemoryCreate, MemoryCreated, MemorySearchView

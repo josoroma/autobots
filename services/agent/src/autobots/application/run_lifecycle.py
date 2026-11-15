@@ -10,11 +10,11 @@ children with it (PPRD-02, R-33, Decision 0029 F7).
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any
 from uuid import UUID
 
 import psycopg
@@ -31,6 +31,7 @@ from autobots.application.runs import (
     apply_worker_command,
     cascade_command,
 )
+from autobots.application.sql import SqlConnection, all_rows, one
 from autobots.application.tool_definitions import (
     Browsing,
     ToolDefinition,
@@ -65,6 +66,7 @@ from autobots.domain.stops import (
     StopCode,
     disposition_of,
 )
+from autobots.persistence.rows import OpenAssignmentRow
 
 # Writes the record `autobots.logs.log_event` writes, with its own logger:
 # `logger.log(level, event, extra={"fields": {...}})`.
@@ -102,7 +104,7 @@ class LoopResult:
 
     outcome: PassOutcome
     code: str | None
-    run_status: str | None
+    run_status: RunStatus | None
     plan_version: int | None
     completed: tuple[str, ...]
     remaining: tuple[str, ...]
@@ -133,44 +135,26 @@ def pass_registry(
 
 # How a claimed lease is driven: (connection, database URL, lease, model factory, config). The job
 # dispatch passes its own, so the workflow runner drives an agent step's child without importing it.
-Drive = Callable[[Any, str, Lease, Callable[[], Any], LoopConfig], Awaitable[LoopResult]]
+Drive = Callable[[SqlConnection, str, Lease, Callable[[], Any], LoopConfig], Awaitable[LoopResult]]
 
 
-class Rows(Protocol):
-    # Rows stay untyped until the SQL boundary is typed (R-54).
-    async def fetchone(self) -> tuple[Any, ...] | None: ...
-    async def fetchall(self) -> list[tuple[Any, ...]]: ...
+async def _status_of(connection: SqlConnection, run_id: UUID) -> RunStatus:
+    """The status of a run this worker holds, or of its child. A missing one is a named defect."""
+    (status,) = await one(connection, "select status from public.runs where id = %s", (run_id,))
+    return RunStatus(status)
 
 
-class Connection(Protocol):
-    """The worker's psycopg connection, as far as finishing a pass uses it."""
-
-    async def execute(self, query: str, params: tuple[object, ...], /) -> Rows: ...
-    def transaction(self) -> AbstractAsyncContextManager[object]: ...
-
-
-async def _row(connection: Connection, query: str, params: tuple[object, ...]) -> tuple[Any, ...]:
-    """The row a query about a run this worker holds finds. A missing one is a named defect."""
-    row = await (await connection.execute(query, params)).fetchone()
-    if row is None:
-        raise LookupError(f"no row: {query}")
-    return row
-
-
-async def run_status(connection: Connection, lease: Lease) -> str:
-    status: str = (
-        await _row(connection, "select status from public.runs where id = %s", (lease.run_id,))
-    )[0]
-    return status
+async def run_status(connection: SqlConnection, lease: Lease) -> RunStatus:
+    return await _status_of(connection, lease.run_id)
 
 
 async def result_of(
-    connection: Connection,
+    connection: SqlConnection,
     lease: Lease,
     goal: GoalSpec,
     outcome: PassOutcome,
     code: str | None,
-    status: str | None,
+    status: RunStatus | None,
 ) -> LoopResult:
     """The pass's result as it is stored: the plan's progress and the run's usage, read now."""
     view = await plan_view(connection, lease.run_id, goal)
@@ -231,7 +215,7 @@ class LeaseKeeper:
                 # An outage used up lease time with no beat, so the first look after it beats.
                 self.since_beat = self.config.heartbeat_seconds
 
-    async def look(self, connection: Connection) -> bool:
+    async def look(self, connection: SqlConnection) -> bool:
         """One look, after its wait: a sleep since the last look is noticed, the lease beats when a
         beat is due or the Mac just woke, a lease that ran out during a sleep is revived, and the
         sleep comes off the active time. False once the lease is lost for good."""
@@ -280,35 +264,38 @@ async def lease_heartbeat(
         await stop_task(task)
 
 
-async def _cancel_stray_child(connection: Connection, lease: Lease, child: UUID) -> str:
+async def _cancel_stray_child(connection: SqlConnection, lease: Lease, child: UUID) -> RunStatus:
     """The system's cancel, as no person asked for it (Decision 0029 F5)."""
-    status = (await _row(connection, "select status from public.runs where id = %s", (child,)))[0]
+    status = await _status_of(connection, child)
     try:
         result = await cascade_command(
             connection, workspace_id=lease.workspace_id, run_id=child, command=RunCommand.CANCEL
         )
     except (CommandRefused, VersionConflict):
         # It moved under us. The parent stays queued and looks again.
-        return str(status)
-    return str(result.status)
+        return status
+    return result.status
 
 
-async def settle_children(connection: Connection, lease: Lease) -> datetime | None:
+async def settle_children(connection: SqlConnection, lease: Lease) -> datetime | None:
     """A cancelled parent's children finish too, and their open assignments close.
 
     Returns when to try again, if a child still has a live owner. A parent that finished without it
     would leave nothing able to settle that child, as `claim_next` leaves children to their parent.
     """
-    cursor = await connection.execute(
+    open_assignments = await all_rows(
+        connection,
+        OpenAssignmentRow,
         "select a.id, a.child_run_id, r.status from app_private.assignments a "
         "join public.runs r on r.id = a.child_run_id "
         "where a.parent_run_id = %s and a.status = 'open'",
         (lease.run_id,),
     )
-    terminal = {RunStatus.CANCELLED.value, RunStatus.FAILED.value, RunStatus.SUCCEEDED.value}
+    terminal = {RunStatus.CANCELLED, RunStatus.FAILED, RunStatus.SUCCEEDED}
     retry_at: datetime | None = None
-    for assignment_id, child, status in await cursor.fetchall():
-        if status != RunStatus.CANCELLING.value and status not in terminal:
+    for assignment in open_assignments:
+        child, status = assignment.child_run_id, RunStatus(assignment.status)
+        if status is not RunStatus.CANCELLING and status not in terminal:
             # Admitted as the cancel landed, so the cascade missed it. Nothing else would reach it.
             status = await _cancel_stray_child(connection, lease, child)
         if status not in terminal:
@@ -323,24 +310,20 @@ async def settle_children(connection: Connection, lease: Lease) -> datetime | No
                 )
             if settled is None or settled.run_status not in terminal:
                 # Still owned, or it has children of its own to wait for.
-                moment = (
-                    await _row(
-                        connection,
-                        "select greatest(available_at, coalesce(lease_expires_at, available_at), "
-                        "clock_timestamp() + interval '5 seconds') "
-                        "from app_private.run_jobs where run_id = %s",
-                        (child,),
-                    )
-                )[0]
+                (moment,) = await one(
+                    connection,
+                    "select greatest(available_at, coalesce(lease_expires_at, available_at), "
+                    "clock_timestamp() + interval '5 seconds') "
+                    "from app_private.run_jobs where run_id = %s",
+                    (child,),
+                )
                 retry_at = moment if retry_at is None else max(retry_at, moment)
                 continue
-        outcome = (
-            await _row(connection, "select status from public.runs where id = %s", (child,))
-        )[0]
+        outcome = await _status_of(connection, child)
         await connection.execute(
             "update app_private.assignments set status = 'finished', outcome = %s, "
             "finished_at = now() where id = %s",
-            (outcome, assignment_id),
+            (outcome.value, assignment.id),
         )
     return retry_at
 
@@ -422,11 +405,11 @@ def outcome_of(code: str | None) -> PassOutcome:
     return PassOutcome.STOPPED
 
 
-async def observe(connection: Connection, lease: Lease, goal: GoalSpec) -> Observed:
+async def observe(connection: SqlConnection, lease: Lease, goal: GoalSpec) -> Observed:
     """The run as `decide` needs it. Ownership is the lease's generation on a claimed job whose
     lease is live by database time, as `apply_worker_command` checks it (SP-012)."""
     view = await plan_view(connection, lease.run_id, goal)
-    status, holds = await _row(
+    status, holds = await one(
         connection,
         "select r.status, exists (select 1 from app_private.run_jobs j where j.run_id = r.id "
         "and j.generation = %s and j.status = 'claimed' "
@@ -436,7 +419,7 @@ async def observe(connection: Connection, lease: Lease, goal: GoalSpec) -> Obser
     return Observed(RunStatus(status), bool(holds), view.version, view.finished)
 
 
-async def _settle(connection: Connection, lease: Lease) -> str | None:
+async def _settle(connection: SqlConnection, lease: Lease) -> str | None:
     """Settles a run being cancelled: its children first, then what is in flight, classified with
     this owner's own receipts before FINISH_CANCEL (SP-010). Returns the code FINISH_CANCEL
     records, or None when a child still has a live owner, and the job is requeued until then."""
@@ -452,8 +435,8 @@ async def _settle(connection: Connection, lease: Lease) -> str | None:
 
 
 async def _transition(
-    connection: Connection, lease: Lease, command: RunCommand, code: str | None
-) -> tuple[str | None, str | None]:
+    connection: SqlConnection, lease: Lease, command: RunCommand, code: str | None
+) -> tuple[str | None, RunStatus | None]:
     """Applies `command` with `code` as its stop reason, in one transaction under the lease's
     generation, so a worker that lost the run writes neither (SP-012). The code the pass ends with
     and the status reached, which is None when nothing was written."""
@@ -468,7 +451,7 @@ async def _transition(
 
 
 async def finish(
-    connection: Connection, lease: Lease, goal: GoalSpec, stop_code: str | None
+    connection: SqlConnection, lease: Lease, goal: GoalSpec, stop_code: str | None
 ) -> LoopResult:
     """Ends a pass through the canonical transitions, whatever stopped it (SP-010).
 
@@ -488,7 +471,7 @@ async def finish(
             extra={"fields": {"run": str(lease.run_id), "code": stop_code}},
         )
     code = decision.code
-    status: str | None = None
+    status: RunStatus | None = None
     if decision.ending is Ending.LET_GO:
         await let_go(connection, lease)
     elif decision.ending is Ending.SETTLE:
@@ -500,7 +483,7 @@ async def finish(
                 goal,
                 PassOutcome.WAITING,
                 StopCode.CHILDREN_SETTLING,
-                RunStatus.CANCELLING.value,
+                RunStatus.CANCELLING,
             )
     if decision.command is not None:
         code, status = await _transition(connection, lease, decision.command, code)
@@ -534,7 +517,7 @@ class PassFailure:
 
 
 async def _bound(
-    connection: Connection, lease: Lease, attempt: int, status: RunStatus
+    connection: SqlConnection, lease: Lease, attempt: int, status: RunStatus
 ) -> PassFailure:
     """The step after counting a failure, inside the transaction that counted it."""
     if status is RunStatus.PAUSED:
@@ -558,7 +541,7 @@ async def _bound(
 
 
 async def _settle_at_bound(
-    connection: Connection, lease: Lease, failure: PassFailure
+    connection: SqlConnection, lease: Lease, failure: PassFailure
 ) -> PassFailure:
     """Settles the cancellation of a run that reached the bound while being cancelled, as `finish`
     does: children first, then what is in flight, then FINISH_CANCEL (SP-010). Only a live lease
@@ -591,19 +574,19 @@ async def _settle_at_bound(
     return retry
 
 
-async def _holds_live_lease(connection: Connection, lease: Lease) -> bool:
+async def _holds_live_lease(connection: SqlConnection, lease: Lease) -> bool:
     """Whether this generation still holds a claimed job whose lease is live by database time, as
     `observe` reads ownership (SP-012)."""
-    held = await _row(
+    (held,) = await one(
         connection,
         "select exists (select 1 from app_private.run_jobs where run_id = %s and generation = %s "
         "and status = 'claimed' and lease_expires_at > clock_timestamp())",
         (lease.run_id, lease.generation),
     )
-    return bool(held[0])
+    return bool(held)
 
 
-async def record_failure(connection: Connection, lease: Lease, error: Exception) -> PassFailure:
+async def record_failure(connection: SqlConnection, lease: Lease, error: Exception) -> PassFailure:
     """Records a pass that raised an exception no handler classifies, and bounds its retries
     (Decision 0028 E4, SP-012).
 
@@ -620,7 +603,7 @@ async def record_failure(connection: Connection, lease: Lease, error: Exception)
         if counted is None:
             failure = PassFailure(FailureEnding.LOST)
         else:
-            failure = await _bound(connection, lease, counted[0], RunStatus(counted[1]))
+            failure = await _bound(connection, lease, counted[0], counted[1])
     if failure.ending is FailureEnding.CANCELLED:
         failure = await _settle_at_bound(connection, lease, failure)
     fields: dict[str, object] = {"run": str(lease.run_id), "ending": failure.ending.value}

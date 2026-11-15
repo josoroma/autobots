@@ -5,11 +5,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final, Protocol
+from typing import Final, Protocol
 from uuid import UUID
 
 from autobots.application.runs import LeaseLost, apply_claim
+from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.domain.runs import JobStatus, RunStatus
+from autobots.persistence.rows import ClaimableJobRow
 
 DEFAULT_LEASE_SECONDS = 60.0
 # Over this between the two clocks is a sleep, and not a busy Mac.
@@ -80,7 +82,7 @@ class LeaseHolder(Protocol):
     def generation(self) -> int: ...
 
 
-async def hold_lease(connection: Any, holder: LeaseHolder) -> None:
+async def hold_lease(connection: SqlConnection, holder: LeaseHolder) -> None:
     """Inside a write's transaction. The share lock serializes it against a new claim."""
     cursor = await connection.execute(
         "select 1 from app_private.run_jobs where run_id = %s and generation = %s "
@@ -91,7 +93,7 @@ async def hold_lease(connection: Any, holder: LeaseHolder) -> None:
         raise LeaseLost("this worker no longer owns the run")
 
 
-async def generation_alive(connection: Any, run_id: str, generation: int) -> bool:
+async def generation_alive(connection: SqlConnection, run_id: str, generation: int) -> bool:
     """Whether the run's job is still claimed at `generation` with an unexpired lease by database
     time, and the run is running. The browser sweeper keeps a session only while this holds, by the
     run and generation its container is labelled with (BX-04, PADP-13)."""
@@ -104,19 +106,25 @@ async def generation_alive(connection: Any, run_id: str, generation: int) -> boo
     return await cursor.fetchone() is not None
 
 
-async def is_held(connection: Any) -> bool:
+async def is_held(connection: SqlConnection) -> bool:
     """A restored instance holds all its work until a person releases it."""
     cursor = await connection.execute("select 1 from app_private.installation_holds limit 1")
     return await cursor.fetchone() is not None
 
 
 async def _claim(
-    connection: Any, condition: str, values: tuple[Any, ...], worker_id: str, lease_seconds: float
+    connection: SqlConnection,
+    condition: str,
+    values: tuple[object, ...],
+    worker_id: str,
+    lease_seconds: float,
 ) -> Lease | None:
     if await is_held(connection):
         return None
     async with connection.transaction():
-        cursor = await connection.execute(
+        row = await optional_row(
+            connection,
+            ClaimableJobRow,
             "select j.run_id, j.workspace_id, r.status, r.version "
             "from app_private.run_jobs j join public.runs r on r.id = j.run_id "
             f"where {condition} and r.status <> 'paused' "
@@ -125,11 +133,16 @@ async def _claim(
             "order by j.available_at limit 1 for update of j skip locked",
             values,
         )
-        row = await cursor.fetchone()
         if row is None:
             return None
-        run_id, workspace_id, status, version = row
-        cursor = await connection.execute(
+        run_id, workspace_id, status, version = (
+            row.run_id,
+            row.workspace_id,
+            row.status,
+            row.version,
+        )
+        generation, attempts = await one(
+            connection,
             f"update app_private.run_jobs set status = '{JobStatus.CLAIMED.value}', "
             "generation = generation + 1, "
             "attempts = attempts + 1, lease_owner = %s, "
@@ -137,7 +150,6 @@ async def _claim(
             "where run_id = %s returning generation, attempts",
             (worker_id, lease_seconds, run_id),
         )
-        generation, attempts = await cursor.fetchone()
         await connection.execute(
             "update public.runs set lease_generation = %s, checkpoint_thread_id = %s where id = %s",
             (generation, str(run_id), run_id),
@@ -147,7 +159,7 @@ async def _claim(
 
 
 async def claim_next(
-    connection: Any, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    connection: SqlConnection, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
 ) -> Lease | None:
     """Take one eligible job: queued, or held by an owner whose lease has expired.
 
@@ -157,13 +169,17 @@ async def claim_next(
 
 
 async def claim_run(
-    connection: Any, run_id: UUID, *, worker_id: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    connection: SqlConnection,
+    run_id: UUID,
+    *,
+    worker_id: str,
+    lease_seconds: float = DEFAULT_LEASE_SECONDS,
 ) -> Lease | None:
     return await _claim(connection, "j.run_id = %s", (run_id,), worker_id, lease_seconds)
 
 
 async def revive_lease(
-    connection: Any, lease: Lease, *, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    connection: SqlConnection, lease: Lease, *, lease_seconds: float = DEFAULT_LEASE_SECONDS
 ) -> None:
     """After a real sleep only: its own worker takes back a lease that ran out while nobody ran.
 
@@ -182,7 +198,7 @@ async def revive_lease(
 
 
 async def heartbeat(
-    connection: Any, lease: Lease, *, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    connection: SqlConnection, lease: Lease, *, lease_seconds: float = DEFAULT_LEASE_SECONDS
 ) -> None:
     """Extends a live lease only. An expired one can't come back, even if nobody took it yet."""
     cursor = await connection.execute(
@@ -213,7 +229,9 @@ def failure_type(error: BaseException) -> str:
     return name[:FAILURE_TYPE_LIMIT]
 
 
-async def count_failure(connection: Any, lease: Lease, kind: str) -> tuple[int, str] | None:
+async def count_failure(
+    connection: SqlConnection, lease: Lease, kind: str
+) -> tuple[int, RunStatus] | None:
     """Adds a failed pass to the job this lease claims, with its type, and returns the consecutive
     count and the run's status. None when the lease's generation no longer holds a claimed job, so
     a worker that lost the run records nothing (SP-012). The row stays locked until its caller's
@@ -226,10 +244,10 @@ async def count_failure(connection: Any, lease: Lease, kind: str) -> tuple[int, 
         (kind, lease.run_id, lease.generation),
     )
     row = await cursor.fetchone()
-    return None if row is None else (int(row[0]), str(row[1]))
+    return None if row is None else (int(row[0]), RunStatus(row[1]))
 
 
-async def release(connection: Any, lease: Lease, delay_seconds: float) -> None:
+async def release(connection: SqlConnection, lease: Lease, delay_seconds: float) -> None:
     """Requeues the job this lease claims, claimable again `delay_seconds` from now by database
     time. The lease's generation fences it."""
     await connection.execute(
@@ -240,7 +258,7 @@ async def release(connection: Any, lease: Lease, delay_seconds: float) -> None:
     )
 
 
-async def release_at(connection: Any, lease: Lease, available_at: datetime) -> None:
+async def release_at(connection: SqlConnection, lease: Lease, available_at: datetime) -> None:
     """Requeues the job this lease claims, claimable again from `available_at`. The lease's
     generation fences it."""
     await connection.execute(
@@ -251,7 +269,7 @@ async def release_at(connection: Any, lease: Lease, available_at: datetime) -> N
     )
 
 
-async def let_go(connection: Any, lease: Lease) -> None:
+async def let_go(connection: SqlConnection, lease: Lease) -> None:
     """Ends this lease's claim on a run a person paused. Their resume queues the job again."""
     await connection.execute(
         f"update app_private.run_jobs set status = '{JobStatus.DONE.value}', lease_owner = null, "
@@ -260,7 +278,7 @@ async def let_go(connection: Any, lease: Lease) -> None:
     )
 
 
-async def reset_failures(connection: Any, lease: Lease) -> None:
+async def reset_failures(connection: SqlConnection, lease: Lease) -> None:
     """A pass under this lease completed, so the job's consecutive failures start again from none
     (Decision 0028 E4). The generation fences it, so a later claim keeps a count of its own."""
     await connection.execute(

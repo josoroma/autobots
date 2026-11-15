@@ -3,7 +3,7 @@ run can reach. A plan cites the listed criterion IDs and nothing else (Decision 
 
 from uuid import UUID
 
-from autobots.application.run_lifecycle import Connection
+from autobots.application.sql import SqlConnection
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.tools import DELEGATION_TOOL
 
@@ -14,7 +14,7 @@ SYSTEM_PROMPT = (
 )
 
 
-async def scope_guidance(connection: Connection, run_id: UUID, goal: GoalSpec) -> str:
+async def scope_guidance(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -> str:
     """What this run can reach: where it may write, and which Experts it may assign."""
     lines = [f"You may read and write only under: {', '.join(goal.allowed_paths)}."]
     if DELEGATION_TOOL in goal.allowed_tools:

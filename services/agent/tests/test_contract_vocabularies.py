@@ -18,7 +18,7 @@ import pytest
 
 from autobots.api.openapi_export import openapi_document
 from autobots.application.model_admission import InvocationStatus
-from autobots.contracts.approvals import ApprovalResult, ApprovalView
+from autobots.contracts.approvals import ApprovalResult, ApprovalView, PolicyRuleName
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.improvements import CandidateStatus, KnowledgeKind
 from autobots.contracts.operations import DelayedOccurrence
@@ -91,7 +91,8 @@ def check_constraint(table: str, column: str) -> set[str]:
     """The values a text column's check constraint allows, as the migrations leave it: its table's
     definition, then any later `alter table` that adds the constraint again."""
     allowed: set[str] | None = None
-    listed = rf"check\s*\(\s*{column}\s+in\s*\(([^)]*)\)\s*\)"
+    # A nullable column's constraint reads `check (column is null or column in (...))`.
+    listed = rf"check\s*\(\s*(?:{column}\s+is\s+null\s+or\s+)?{column}\s+in\s*\(([^)]*)\)\s*\)"
     for migration in sorted(MIGRATIONS.glob("*.sql")):
         text = migration.read_text()
         created = re.search(
@@ -121,6 +122,7 @@ def check_constraint(table: str, column: str) -> set[str]:
         (values(KnowledgeKind), "improvement_candidates", "kind"),
         (values(KnowledgeKind), "knowledge_versions", "kind"),
         (values(WorkflowSource), "workflow_versions", "source"),
+        (values(PolicyRuleName), "approval_requests", "policy_rule"),
     ],
     ids=lambda item: item if isinstance(item, str) else "",
 )

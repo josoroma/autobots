@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status
 
 from autobots.api.dependencies import CurrentUser, IdempotencyKey, MemberWorkspace, OwnerWorkspace
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.routines import (
     add_routine_version,

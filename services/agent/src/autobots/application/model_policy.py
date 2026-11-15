@@ -7,25 +7,14 @@ as version 0, naming no default, so each role reads its built-in default as admi
 """
 
 from collections.abc import Mapping
-from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from typing import Any, Protocol
 from uuid import UUID
 
 from autobots.application.provider_settings import policy_overrides_json
+from autobots.application.sql import SqlConnection, optional_row
 from autobots.domain.errors import FixedRefusal
 from autobots.domain.models import ModelProfileId, require_offered, resolve_role_policy
-
-
-class Rows(Protocol):
-    # A row's columns are whatever its query selects, so they stay untyped here.
-    async def fetchone(self) -> tuple[Any, ...] | None: ...
-
-
-class Connection(Protocol):
-    async def execute(self, query: str, params: tuple[object, ...], /) -> Rows: ...
-
-    def transaction(self) -> AbstractAsyncContextManager[object]: ...
+from autobots.persistence.rows import ModelPolicyRow
 
 
 class PolicyChanged(FixedRefusal):
@@ -53,20 +42,21 @@ def validated_choice(
     return chosen_default, overrides
 
 
-async def read_model_policy(connection: Connection, workspace_id: UUID) -> StoredPolicy:
-    cursor = await connection.execute(
+async def read_model_policy(connection: SqlConnection, workspace_id: UUID) -> StoredPolicy:
+    row = await optional_row(
+        connection,
+        ModelPolicyRow,
         "select version, default_profile, role_overrides from app_private.model_policies "
         "where workspace_id = %s",
         (workspace_id,),
     )
-    row = await cursor.fetchone()
     if row is None:
         return StoredPolicy()
-    return StoredPolicy(row[0], row[1], row[2] or {})
+    return StoredPolicy(row.version, row.default_profile, row.role_overrides or {})
 
 
 async def save_model_policy(
-    connection: Connection,
+    connection: SqlConnection,
     workspace_id: UUID,
     *,
     expected_version: int,
@@ -95,7 +85,7 @@ async def save_model_policy(
 
 
 async def reset_role_overrides(
-    connection: Connection, workspace_id: UUID, *, expected_version: int
+    connection: SqlConnection, workspace_id: UUID, *, expected_version: int
 ) -> StoredPolicy:
     """Reset all, MD-03: every role override is cleared and the workspace default is kept. Raises
     PolicyChanged."""

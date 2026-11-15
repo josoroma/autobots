@@ -4,23 +4,30 @@ An Expert counts when its latest version grants the tool; an older version's gra
 A workflow counts when its published version has an agent step whose Expert grants the tool now.
 """
 
-from typing import Any
 from uuid import UUID
+
+from autobots.application.sql import SqlConnection, all_rows
+from autobots.persistence.rows import GrantedToRow
 
 
 async def tool_grants(
-    connection: Any, workspace_id: UUID, tool_id: str
+    connection: SqlConnection, workspace_id: UUID, tool_id: str
 ) -> tuple[list[tuple[UUID, str, int]], list[tuple[UUID, str, int]]]:
-    cursor = await connection.execute(
+    """Each Expert and workflow it is granted to, as (id, name, latest version), by name."""
+    granted = await all_rows(
+        connection,
+        GrantedToRow,
         "select e.id, e.name, e.latest_version from public.experts e "
         "join public.expert_versions v on v.expert_id = e.id and v.version = e.latest_version "
         "where e.workspace_id = %s and v.config -> 'tools' ? %s order by e.name",
         (workspace_id, tool_id),
     )
-    experts = [(row[0], str(row[1]), int(row[2])) for row in await cursor.fetchall()]
+    experts = [(row.id, str(row.name), int(row.latest_version)) for row in granted]
     if not experts:
         return [], []
-    cursor = await connection.execute(
+    using = await all_rows(
+        connection,
+        GrantedToRow,
         "select w.id, w.name, w.latest_version from public.workflows w "
         "join public.workflow_versions v on v.workflow_id = w.id and v.version = w.latest_version "
         "where w.workspace_id = %s and w.latest_version >= 1 and exists ("
@@ -29,5 +36,5 @@ async def tool_grants(
         "order by w.name",
         (workspace_id, [str(item[0]) for item in experts]),
     )
-    workflows = [(row[0], str(row[1]), int(row[2])) for row in await cursor.fetchall()]
+    workflows = [(row.id, str(row.name), int(row.latest_version)) for row in using]
     return experts, workflows

@@ -16,6 +16,7 @@ from autobots.adapters import tool_registry
 from autobots.application.experts import create_expert, create_session
 from autobots.application.model_admission import ledger_usage
 from autobots.application.run_projection import InvalidCursor, read_run_list, read_summary
+from autobots.application.sql import snapshot
 from autobots.application.workflow_overview import recent_executions
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from psycopg.types.json import Jsonb
@@ -215,6 +216,25 @@ async def main() -> None:
         }
         check('every view of a root shows what admission counts against it', f'{counted} = 600, as 100 charged and 500 reserved in each view',
               (counted, shown), counted == 600 and all(figures == (100, 500) for figures in shown.values()))
+
+        # Refactor plan R-54, PRUN-11: a run view reads one read-only snapshot, so a commit landing between two of its
+        # statements isn't seen, and a statement that writes inside it is refused.
+        read_goal = 'select goal_summary from public.runs where id = %s'
+        async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as other:
+            async with snapshot(db):
+                before = (await (await db.execute(read_goal, (root,))).fetchone() or (None,))[0]
+                await other.execute('update public.runs set goal_summary = %s where id = %s', (f'Changed {tag}', root))
+                during = (await (await db.execute(read_goal, (root,))).fetchone() or (None,))[0]
+            after = (await (await db.execute(read_goal, (root,))).fetchone() or (None,))[0]
+        check("a view's snapshot doesn't see a commit made while it reads", f'Ledger {tag} twice, then Changed {tag}',
+              (before, during, after), before == during == f'Ledger {tag}' and after == f'Changed {tag}')
+        try:
+            async with snapshot(db):
+                await db.execute('update public.runs set goal_summary = goal_summary where id = %s', (root,))
+            written = 'written'
+        except psycopg.errors.ReadOnlySqlTransaction:
+            written = 'refused as read-only'
+        check("a view's snapshot refuses a write", 'refused as read-only', written, written == 'refused as read-only')
     print(json.dumps({'cases': cases}))
 
 

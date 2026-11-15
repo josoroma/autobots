@@ -66,6 +66,7 @@ from autobots.application.run_usage import (
     model_calls_used,
 )
 from autobots.application.runs import ancestors_running, current_status
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolScope
 from autobots.application.tool_gateway import ownership_refusal
 from autobots.contracts.plans import GoalSpec
@@ -201,7 +202,7 @@ class LoopAdmission:
     """One run's admission for its loop. `guard` and `admission` default to the database's and the
     ledger's; tests pass in-memory ones through them (PTST-01)."""
 
-    connection: object
+    connection: SqlConnection
     scope: ToolScope
     limits: RootLimits
     route: ModelRoute
@@ -481,7 +482,8 @@ class LoopAdmission:
                     raise ProviderFailure(
                         FailureClass.UNCERTAIN_ACCEPTANCE, reason="call_time_limit"
                     )
-                if await current_status(self.connection, self.scope.run_id) in INTERRUPTING:
+                status = await current_status(self.connection, self.scope.run_id)
+                if status is not None and status in INTERRUPTING:
                     raise DispatchStopped(
                         FailureClass.UNCERTAIN_ACCEPTANCE,
                         StopCode.RUN_NOT_RUNNING,

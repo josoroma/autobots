@@ -417,7 +417,8 @@
               {
                 "enum": [
                   "consequential_external_write",
-                  "tool_marked"
+                  "tool_marked",
+                  "action_marked"
                 ],
                 "type": "string"
               },

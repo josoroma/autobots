@@ -15,12 +15,15 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Protocol
 from uuid import UUID
 
 from autobots.adapters.checkpoints import adapter_identity, adapter_qualified
 from autobots.application.schema_release import SHIPPED_MIGRATIONS
+from autobots.application.sql import SqlConnection, SqlPool, one, required_row
+from autobots.contracts.operations import ConditionState, Name
 from autobots.logs import log_event
+from autobots.persistence.rows import QueueCountRow
 
 logger = logging.getLogger("autobots.operations")
 DB_SECONDS = 3.0
@@ -77,8 +80,8 @@ BLOCKING = frozenset({"database", "schema", "storage", "disk", "hold", "adapter"
 
 @dataclass(frozen=True)
 class Condition:
-    name: str
-    state: str  # ok, degraded or unavailable
+    name: Name
+    state: ConditionState
     code: str
 
 
@@ -133,8 +136,12 @@ class QueueCounts:
     oldest_queued_seconds: int
 
 
+class StoragePing(Protocol):
+    async def ping(self) -> None: ...
+
+
 async def database_conditions(
-    pool: Any, probes: ProbeTimes | None = None
+    pool: SqlPool | None, probes: ProbeTimes | None = None
 ) -> tuple[Condition, Condition, Condition, Condition]:
     """One readiness probe. When the database answers, its answer time joins `probes`."""
     if pool is None:
@@ -147,22 +154,22 @@ async def database_conditions(
     started = time.monotonic()
     try:
         async with asyncio.timeout(DB_SECONDS), pool.connection() as connection:
-            cursor = await connection.execute(
+            (missing_relations,) = await one(
+                connection,
                 "select count(*) from unnest(%s::text[]) r where to_regclass(r) is null",
                 (list(REQUIRED_RELATIONS),),
             )
-            row = await cursor.fetchone()
-            cursor = await connection.execute(
+            (missing_columns,) = await one(
+                connection,
                 "select count(*) from unnest(%s::text[], %s::text[]) c(rel, col) where not exists "
                 "(select 1 from pg_attribute a where a.attrelid = to_regclass(c.rel) "
                 "and a.attname = c.col and not a.attisdropped)",
                 ([item[0] for item in REQUIRED_COLUMNS], [item[1] for item in REQUIRED_COLUMNS]),
             )
-            missing_columns = int((await cursor.fetchone())[0])
             applied = await _applied_if_readable(connection)
             held = False
             qualified = False
-            if int(row[0]) == 0:
+            if int(missing_relations) == 0:
                 cursor = await connection.execute(
                     "select 1 from app_private.installation_holds limit 1"
                 )
@@ -179,7 +186,7 @@ async def database_conditions(
         )
     if probes is not None:
         probes.record((time.monotonic() - started) * 1000)
-    missing = int(row[0]) + missing_columns
+    missing = int(missing_relations) + int(missing_columns)
     return (
         Condition("database", "ok", "database_ready"),
         schema_condition(missing, applied),
@@ -203,7 +210,7 @@ def schema_condition(missing: int, applied: int | None) -> Condition:
     return Condition("schema", "ok", "schema_ready")
 
 
-async def _applied_if_readable(connection: Any) -> int | None:
+async def _applied_if_readable(connection: SqlConnection) -> int | None:
     """The applied count, when the counting function exists. Its absence is not an error here."""
     cursor = await connection.execute("select to_regprocedure(%s) is not null", (COUNT_FUNCTION,))
     present = await cursor.fetchone()
@@ -214,7 +221,7 @@ async def _applied_if_readable(connection: Any) -> int | None:
     return None if row is None or row[0] is None else int(row[0])
 
 
-async def storage_condition(store: Any) -> Condition:
+async def storage_condition(store: StoragePing | None) -> Condition:
     if store is None:
         return Condition("storage", "unavailable", "storage_not_configured")
     try:
@@ -237,19 +244,33 @@ def disk_condition(path: Path, minimum_free: int) -> Condition:
     return Condition("disk", "ok", "disk_ready")
 
 
-async def queue_counts(connection: Any, workspace_id: UUID) -> QueueCounts:
+async def queue_counts(connection: SqlConnection, workspace_id: UUID) -> QueueCounts:
     """Only this workspace's jobs."""
-    cursor = await connection.execute(
-        "select count(*) filter (where status = 'queued'), "
-        "count(*) filter (where status = 'claimed' and lease_expires_at >= clock_timestamp()), "
-        "count(*) filter (where status = 'claimed' and lease_expires_at < clock_timestamp()), "
+    row = await required_row(
+        connection,
+        QueueCountRow,
+        "select count(*) filter (where status = 'queued') as queued, "
+        "count(*) filter (where status = 'claimed' and lease_expires_at >= clock_timestamp()) "
+        "as claimed, "
+        "count(*) filter (where status = 'claimed' and lease_expires_at < clock_timestamp()) "
+        "as expired_leases, "
         "coalesce(extract(epoch from clock_timestamp() - "
         "min(available_at) filter (where status = 'queued'))::bigint, 0) "
+        "as oldest_queued_seconds "
         "from app_private.run_jobs where workspace_id = %s",
         (workspace_id,),
     )
-    row = await cursor.fetchone()
-    return QueueCounts(int(row[0]), int(row[1]), int(row[2]), max(int(row[3]), 0))
+    return queue_counts_of(row)
+
+
+def queue_counts_of(row: QueueCountRow) -> QueueCounts:
+    """A queue whose oldest job is dated ahead of the clock counts as waiting no time."""
+    return QueueCounts(
+        int(row.queued),
+        int(row.claimed),
+        int(row.expired_leases),
+        max(int(row.oldest_queued_seconds), 0),
+    )
 
 
 def queue_condition(counts: QueueCounts) -> Condition:
@@ -258,15 +279,15 @@ def queue_condition(counts: QueueCounts) -> Condition:
     return Condition("queue", "ok", "queue_ready")
 
 
-async def worker_condition(connection: Any, counts: QueueCounts) -> Condition:
-    cursor = await connection.execute(
+async def worker_condition(connection: SqlConnection, counts: QueueCounts) -> Condition:
+    live_count, claiming_count = await one(
+        connection,
         "select count(*), count(*) filter (where claims_inference) "
         "from app_private.worker_heartbeats where state <> 'stopped' "
         "and beat_at >= clock_timestamp() - make_interval(secs => %s)",
         (HEARTBEAT_FRESH_SECONDS,),
     )
-    row = await cursor.fetchone()
-    live, claiming = int(row[0]), int(row[1])
+    live, claiming = int(live_count), int(claiming_count)
     if live == 0:
         return Condition("worker", "degraded", "worker_absent")
     if counts.queued and claiming == 0:
@@ -274,17 +295,18 @@ async def worker_condition(connection: Any, counts: QueueCounts) -> Condition:
     return Condition("worker", "ok", "worker_ready")
 
 
-async def live_workers(connection: Any) -> int:
+async def live_workers(connection: SqlConnection) -> int:
     """Workers with a fresh heartbeat that haven't stopped, as the worker check counts."""
-    cursor = await connection.execute(
+    (live,) = await one(
+        connection,
         "select count(*) from app_private.worker_heartbeats where state <> 'stopped' "
         "and beat_at >= clock_timestamp() - make_interval(secs => %s)",
         (HEARTBEAT_FRESH_SECONDS,),
     )
-    return int((await cursor.fetchone())[0])
+    return int(live)
 
 
-async def applied_migrations(connection: Any) -> int | None:
+async def applied_migrations(connection: SqlConnection) -> int | None:
     """The count only, through the one function that may read the migration history."""
     try:
         cursor = await connection.execute("select app_private.applied_migration_count()")

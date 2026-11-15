@@ -7,14 +7,17 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from autobots.application.sql import SqlConnection, all_rows
 from autobots.application.tool_catalog import Catalog
+from autobots.contracts.search import SearchKind
+from autobots.persistence.rows import RunHitRow
 
 PER_KIND = 5
 
 
 @dataclass(frozen=True)
 class Hit:
-    kind: str
+    kind: SearchKind
     id: str
     title: str
     detail: str | None
@@ -26,19 +29,29 @@ def _pattern(text: str) -> str:
 
 
 async def search(
-    connection: Any, workspace_id: UUID, query: str, environ: Mapping[str, str], catalog: Catalog
+    connection: SqlConnection,
+    workspace_id: UUID,
+    query: str,
+    environ: Mapping[str, str],
+    catalog: Catalog,
 ) -> list[Hit]:
     """Up to five of each kind, runs newest first and the rest by name. Tools come from `catalog`,
     the composition edge's (XMOD-01)."""
     pattern = _pattern(query)
     hits: list[Hit] = []
-    cursor = await connection.execute(
+    runs = await all_rows(
+        connection,
+        RunHitRow,
         "select id, goal_summary, status from public.runs where workspace_id = %s "
         "and goal_summary ilike %s escape '\\' order by created_at desc, id limit %s",
         (workspace_id, pattern, PER_KIND),
     )
-    hits += [Hit("run", str(row[0]), str(row[1]), str(row[2])) for row in await cursor.fetchall()]
-    for kind, table in (("expert", "public.experts"), ("workflow", "public.workflows")):
+    hits += [Hit("run", str(row.id), str(row.goal_summary), str(row.status)) for row in runs]
+    named: tuple[tuple[SearchKind, str], ...] = (
+        ("expert", "public.experts"),
+        ("workflow", "public.workflows"),
+    )
+    for kind, table in named:
         cursor = await connection.execute(
             f"select id, name from {table} where workspace_id = %s "
             "and name ilike %s escape '\\' order by lower(name), id limit %s",

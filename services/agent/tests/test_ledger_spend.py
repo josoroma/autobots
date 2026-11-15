@@ -8,7 +8,7 @@ itself (US-11.12 N-9). The database checks show the two agree on a seeded ledger
 tree; this pins the statements that make it so.
 """
 
-from autobots.application import model_admission, run_projection, workflow_overview
+from autobots.application import model_admission, workflow_overview
 from autobots.application.model_admission import (
     ACTIVE,
     LEDGER_PARAMS,
@@ -22,17 +22,19 @@ from autobots.application.model_admission import (
     unreported_column,
 )
 from autobots.application.model_attempts import FailureClass
+from autobots.application.run_projection import run_list, summary
 
-# Admission's count, byte for byte: admission is unchanged (Decision 0029 F10).
+# Admission's count, byte for byte: admission is unchanged (Decision 0029 F10). Its columns carry
+# the names its row reads them by, which change no value (refactor plan R-54).
 ADMISSION = (
     "select "
-    "count(*) filter (where status = any(%(active)s)), "
+    "count(*) filter (where status = any(%(active)s)) as active, "
     "coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
     "else coalesce(charged_micro_usd, 0) end) "
-    "filter (where spend_day = %(day)s), 0), "
+    "filter (where spend_day = %(day)s), 0) as workspace_micro_usd, "
     "coalesce(sum(case when status = any(%(outstanding)s) then reserved_micro_usd "
     "else coalesce(charged_micro_usd, 0) end) "
-    "filter (where root_run_id = %(root)s), 0) "
+    "filter (where root_run_id = %(root)s), 0) as root_micro_usd "
     "from app_private.model_invocations where workspace_id = %(workspace)s"
 )
 
@@ -69,12 +71,12 @@ def test_a_runs_figures_are_its_roots_rows_and_a_childs_own_calls() -> None:
 
 def test_each_view_builds_its_figures_from_the_shared_fragments() -> None:
     columns = spend_columns("r")
-    assert columns in run_projection._SELECT_RUN
-    assert f"{columns}, {unreported_column('r')}" in run_projection._LIST_SELECT
+    assert columns in summary.SELECT_RUN
+    assert f"{columns}, {unreported_column('r')}" in run_list.LIST_SELECT
     assert f"{columns}, {unreported_column('r')}" in workflow_overview._EXECUTIONS
     for statement in (
-        run_projection._SELECT_RUN,
-        run_projection._LIST_SELECT,
+        summary.SELECT_RUN,
+        run_list.LIST_SELECT,
         workflow_overview._EXECUTIONS,
     ):
         assert "reconciled_at is null), 0)" not in statement

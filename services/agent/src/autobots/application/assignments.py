@@ -19,6 +19,7 @@ from autobots.application.runs import (
     cascade_command,
     current_status,
 )
+from autobots.application.sql import SqlConnection, one, optional_row, required_row
 from autobots.application.tool_definitions import (
     RuntimeUnbound,
     ToolContext,
@@ -32,6 +33,7 @@ from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import GatewayCode, PassOutcome, StopCode
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import DELEGATION_TOOL, PLAN_TOOLS, OperationClass
+from autobots.persistence.rows import AssignmentRecordRow, DelegatingRunRow
 
 Driver = Callable[[Any, Lease], Awaitable[Any]]
 
@@ -77,7 +79,7 @@ def narrowed_tools(
 
 
 async def _create(
-    connection: Any,
+    connection: SqlConnection,
     context: ToolContext,
     arguments: AssignSpecialist,
     delegation: Delegation,
@@ -86,13 +88,20 @@ async def _create(
     scope = context.scope
     limits = delegation.limits
     root = scope.budget_run_id
-    cursor = await connection.execute(
+    parent = await required_row(
+        connection,
+        DelegatingRunRow,
         "select r.session_id, r.policy_snapshot, r.limit_micro_usd, "
         "coalesce((select a.depth from app_private.assignments a where a.child_run_id = r.id), 0) "
-        "from public.runs r where r.id = %s",
+        "as parent_depth from public.runs r where r.id = %s",
         (scope.run_id,),
     )
-    session_id, snapshot, limit, parent_depth = await cursor.fetchone()
+    session_id, snapshot, limit, parent_depth = (
+        parent.session_id,
+        parent.policy_snapshot,
+        parent.limit_micro_usd,
+        parent.parent_depth,
+    )
     depth = parent_depth + 1
     if depth > limits.child_levels:
         raise ToolFailed(GatewayCode.ASSIGNMENT_DEPTH_LIMIT)
@@ -111,17 +120,17 @@ async def _create(
     async with connection.transaction():
         await hold_lease(connection, scope)
         # Under the lease, so a cancel can't land between this and the child's admission unseen.
-        cursor = await connection.execute(
-            "select status from public.runs where id = %s for share", (scope.run_id,)
+        (status,) = await one(
+            connection, "select status from public.runs where id = %s for share", (scope.run_id,)
         )
-        if (await cursor.fetchone())[0] != RunStatus.RUNNING.value:
+        if status != RunStatus.RUNNING.value:
             raise ToolFailed(GatewayCode.PARENT_NOT_RUNNING)
-        cursor = await connection.execute(
+        open_count, total = await one(
+            connection,
             "select count(*) filter (where status = 'open'), count(*) "
             "from app_private.assignments where root_run_id = %s",
             (root,),
         )
-        open_count, total = await cursor.fetchone()
         if open_count >= limits.outstanding_assignments:
             raise ToolFailed(GatewayCode.OUTSTANDING_ASSIGNMENTS_LIMIT)
         try:
@@ -175,7 +184,7 @@ async def _create(
     return assignment_id, admitted.run_id
 
 
-async def _claim_child(connection: Any, child: UUID, delegation: Delegation) -> Lease:
+async def _claim_child(connection: SqlConnection, child: UUID, delegation: Delegation) -> Lease:
     """A dead parent's child may still look owned for a moment, so this waits out its lease."""
     for _ in range(int(delegation.lease_seconds * 5) + 5):
         lease = await claim_run(
@@ -195,19 +204,20 @@ def assign_tool(delegation: Delegation | None) -> ToolDefinition:  # noqa: C901 
         if delegation is None:
             raise RuntimeUnbound
         connection = context.connection
-        cursor = await connection.execute(
+        row = await optional_row(
+            connection,
+            AssignmentRecordRow,
             "select id, child_run_id, status, result from app_private.assignments "
             "where operation_id = %s",
             (context.operation_id,),
         )
-        row = await cursor.fetchone()
-        if row is not None and row[2] == "finished":
+        if row is not None and row.status == "finished":
             # A replayed request reads the existing result. No second specialist starts.
-            return AssignmentResult.model_validate(row[3])
+            return AssignmentResult.model_validate(row.result)
         if row is None:
             assignment_id, child = await _create(connection, context, arguments, delegation)
         else:
-            assignment_id, child = row[0], row[1]
+            assignment_id, child = row.id, row.child_run_id
             finished = await _finished_child(connection, child)
             if finished is not None:
                 # The parent died before writing this down. Its job is done, so nothing to claim.
@@ -233,24 +243,24 @@ def assign_tool(delegation: Delegation | None) -> ToolDefinition:  # noqa: C901 
             list(result.remaining),
         )
 
-    async def _refuse_if_waiting(connection: Any, child: UUID) -> None:
+    async def _refuse_if_waiting(connection: SqlConnection, child: UUID) -> None:
         """Its job is done until a person answers, so there's nothing to claim yet."""
-        cursor = await connection.execute("select status from public.runs where id = %s", (child,))
-        if (await cursor.fetchone())[0] in {
+        (status,) = await one(connection, "select status from public.runs where id = %s", (child,))
+        if status in {
             RunStatus.WAITING_INPUT.value,
             RunStatus.WAITING_APPROVAL.value,
         }:
             raise ToolFailed(GatewayCode.ASSIGNMENT_PAUSED)
 
     async def _finished_child(
-        connection: Any, child: UUID
+        connection: SqlConnection, child: UUID
     ) -> tuple[str, str | None, str, list[str], list[str]] | None:
-        cursor = await connection.execute(
+        status, code = await one(
+            connection,
             "select r.status, u.stop_reason from public.runs r "
             "left join app_private.run_usage u on u.run_id = r.id where r.id = %s",
             (child,),
         )
-        status, code = await cursor.fetchone()
         if status not in TERMINAL_STATUSES:
             return None
         view = await plan_view(connection, child, await load_goal(connection, child))
@@ -262,7 +272,7 @@ def assign_tool(delegation: Delegation | None) -> ToolDefinition:  # noqa: C901 
         return outcome, code, status, list(view.completed), list(view.remaining)
 
     async def _close(
-        connection: Any,
+        connection: SqlConnection,
         assignment_id: UUID,
         child: UUID,
         outcome: str,
@@ -294,7 +304,9 @@ def assign_tool(delegation: Delegation | None) -> ToolDefinition:  # noqa: C901 
         )
         return output
 
-    async def _resume_if_paused(connection: Any, context: ToolContext, child: UUID) -> None:
+    async def _resume_if_paused(
+        connection: SqlConnection, context: ToolContext, child: UUID
+    ) -> None:
         """Resuming a parent continues its child, unless the child's own wait is still open. The
         system resumes it, as no person asked for it (Decision 0029 F5)."""
         if await current_status(connection, child) is not RunStatus.PAUSED:

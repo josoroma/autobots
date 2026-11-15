@@ -5,6 +5,8 @@ gates run as production runs them (PTST-01).
 """
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -31,9 +33,12 @@ from autobots.application.provider_settings import (
     StoredSettingsRows,
     qualification_from_record,
 )
-from autobots.contracts.settings import CredentialDraft, ProviderStatus
+from autobots.application.sql import SqlParams, UnknownStoredValue
+from autobots.contracts.settings import AuthStatus, CredentialDraft, ProviderStatus
 from autobots.domain.models import PROFILES, ModelProfileId
+from autobots.persistence.rows import RouteQualificationRow
 from fake_openrouter import ARRANGED_KEY, provider_context
+from sql_fakes import Row, ScriptedConnection, ScriptedRows
 
 
 def client_for(handler: httpx.MockTransport) -> httpx.AsyncClient:
@@ -93,14 +98,25 @@ def test_a_draft_repr_does_not_matter_because_it_is_never_returned() -> None:
 
 def test_only_a_record_for_the_routes_own_model_counts() -> None:
     canonical = PROFILES[ModelProfileId.TERRA].canonical_id
-    record = (ModelProfileId.TERRA, canonical, "qualified_with_limits", date(2026, 11, 5), "c", "l")
+    record = RouteQualificationRow(
+        profile=ModelProfileId.TERRA.value,
+        canonical_id=canonical,
+        status="qualified_with_limits",
+        qualified_on=date(2026, 11, 5),
+        configuration="c",
+        limits="l",
+    )
 
-    def status(stored: tuple[Any, ...] | None) -> str:
+    def status(stored: RouteQualificationRow | None) -> str:
         return qualification_from_record(ModelProfileId.TERRA, canonical, stored).status
 
     assert status(record) == "qualified_with_limits"
     assert status(None) == "not_qualified"
-    assert status((record[0], "openai/another-model", *record[2:])) == "not_qualified"
+    assert status(replace(record, canonical_id="openai/another-model")) == "not_qualified"
+    shown = qualification_from_record(ModelProfileId.TERRA, canonical, record)
+    assert (shown.qualified_on, shown.configuration, shown.limits) == (date(2026, 11, 5), "c", "l")
+    with pytest.raises(UnknownStoredValue, match="qualified"):
+        status(replace(record, status="qualified"))
     empty = qualification_from_record(ModelProfileId.TERRA, canonical, None)
     assert (empty.qualified_on, empty.configuration, empty.limits) == (None, None, None)
 
@@ -112,7 +128,7 @@ class Keys(ProviderCredentialStore):
     def __init__(
         self, active: ResolvedCredential | Exception, *, installation_allowed: bool = False
     ) -> None:
-        super().__init__(None, Path("/nonexistent"))
+        super().__init__(ScriptedConnection(), Path("/nonexistent"))
         self.active = active
         self.installation_allowed = installation_allowed
 
@@ -129,33 +145,27 @@ class Rows:
     """The settings row in memory: version 1 at its stored status, each status recorded, and every
     call in order."""
 
-    def __init__(self, stored: str = "configured") -> None:
-        self.stored = stored
+    def __init__(self, stored: AuthStatus = "configured") -> None:
+        self.stored: AuthStatus = stored
         self.recorded: list[str] = []
         self.calls: list[str] = []
 
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
-    ) -> tuple[int, str, datetime | None]:
+    ) -> tuple[int, AuthStatus, datetime | None]:
         self.calls.append("read locked" if lock else "read")
         return 1, self.stored, None
 
     async def ensure(self, workspace_id: UUID) -> None:
         self.calls.append("ensure")
 
-    async def record(self, workspace_id: UUID, status: str) -> None:
+    async def record(self, workspace_id: UUID, status: AuthStatus) -> None:
         self.calls.append(f"record {status}")
         self.recorded.append(status)
 
 
-class NoQualifications:
+class NoQualifications(ScriptedConnection):
     """A connection with no route qualification stored, the only read left on it here."""
-
-    async def execute(self, *_: object) -> "NoQualifications":
-        return self
-
-    async def fetchall(self) -> list[tuple[object, ...]]:
-        return []
 
 
 def stored_key(version: int) -> ResolvedCredential:
@@ -219,16 +229,17 @@ def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
 class Statements:
     """A connection that answers every select with `row` and keeps each statement it was sent."""
 
-    def __init__(self, row: tuple[object, ...] | None) -> None:
+    def __init__(self, row: Row | None) -> None:
         self.row = row
         self.sent: list[str] = []
 
-    async def execute(self, query: str, _params: object = None) -> "Statements":
+    async def execute(self, query: str, _params: SqlParams | None = None, /) -> ScriptedRows:
         self.sent.append(query)
-        return self
+        return ScriptedRows([] if self.row is None else [self.row])
 
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self.row
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
 
 
 def test_reading_a_workspace_with_no_settings_row_writes_nothing_and_gives_the_defaults() -> None:
@@ -246,7 +257,9 @@ def test_reading_a_workspace_with_no_settings_row_writes_nothing_and_gives_the_d
 
 def test_a_stored_row_is_read_as_it_is() -> None:
     checked = datetime(2026, 11, 15, 9, 0, tzinfo=UTC)
-    rows = StoredSettingsRows(Statements((4, "invalid", checked)))
+    rows = StoredSettingsRows(
+        Statements({"version": 4, "auth_status": "invalid", "validated_at": checked})
+    )
     assert asyncio.run(rows.read(uuid4())) == (4, "invalid", checked)
 
 

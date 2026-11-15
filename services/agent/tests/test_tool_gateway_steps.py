@@ -10,7 +10,7 @@ import inspect
 import io
 import json
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from uuid import UUID
 
@@ -24,6 +24,7 @@ from autobots.application.approvals import (
     scope_snapshot,
 )
 from autobots.application.runs import WorkerClaim
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
@@ -39,6 +40,7 @@ from autobots.domain.runs import RunCommand
 from autobots.domain.tool_catalog import CostClass
 from autobots.domain.tools import OperationClass, ToolOutcome
 from autobots.logs import JsonFormatter
+from sql_fakes import GATE_COLUMNS, Row, ScriptedRows
 
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 RUN = UUID("b0000000-0000-4000-8000-000000000002")
@@ -51,14 +53,6 @@ TARGET = "Mail to the controlled sink"
 PLANTED = "sk-or-v1-planted0123456789 postgresql://user:hunter2@host/db"
 SCOPE = ToolScope(WORKSPACE, RUN, GENERATION, {"calculate_x": 2}, paths=("outputs",))
 STARTED_BY = UUID("c0000000-0000-4000-8000-000000000003")
-
-
-class Cursor:
-    def __init__(self, row: tuple[object, ...] | None) -> None:
-        self._row = row
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self._row
 
 
 @dataclass
@@ -82,23 +76,38 @@ class Database:
     async def transaction(self) -> AsyncIterator[None]:
         yield
 
-    async def execute(self, query: str, params: tuple[object, ...] = ()) -> Cursor:
-        self.statements.append((query, params))
-        return Cursor(self._answer(query))
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        self.statements.append((query, tuple(params) if isinstance(params, Sequence) else ()))
+        answer = self._answer(query)
+        return ScriptedRows([] if answer is None else [answer])
 
-    def _answer(self, query: str) -> tuple[object, ...] | None:
+    def _answer(self, query: str) -> Row | None:
         generation = GENERATION if self.owned else GENERATION + 1
         request = (
             None
             if self.request is None
-            else (UUID(int=7), self.request, scope_hash(SCOPE.tools, SCOPE.paths), False, False)
+            else dict(
+                zip(
+                    GATE_COLUMNS,
+                    (UUID(int=7), self.request, scope_hash(SCOPE.tools, SCOPE.paths), False, False),
+                    strict=True,
+                )
+            )
         )
-        rows: tuple[tuple[str, tuple[object, ...] | None], ...] = (
+        rows: tuple[tuple[str, Row | None], ...] = (
             ("insert into app_private.tool_uses", (1,)),
             ("event_sequence = event_sequence + 1", (1,)),
             ("update app_private.tool_uses set outcome", (5,)),
             ("from app_private.run_jobs where run_id", (1,) if self.owned else None),
-            ("join app_private.run_jobs", ("running", "claimed", generation, True)),
+            (
+                "join app_private.run_jobs",
+                {
+                    "run_status": "running",
+                    "job_status": "claimed",
+                    "generation": generation,
+                    "lease_live": True,
+                },
+            ),
             ("from public.runs where id = %s for share", ("running",)),
             ("select expert_id is not null", (self.expert,)),
             ("from public.approval_requests where operation_id = %s for update", request),
@@ -110,7 +119,10 @@ class Database:
                 (OPERATION,) if self.receipt is None else None,
             ),
             ("select status, result from app_private.tool_receipts", self.receipt),
-            ("select started_by, expert_id, expert_version", (STARTED_BY, None, None)),
+            (
+                "select started_by, expert_id, expert_version",
+                {"started_by": STARTED_BY, "expert_id": None, "expert_version": None},
+            ),
             ("select version from public.runs", (1,)),
         )
         return next((row for part, row in rows if part in query), None)

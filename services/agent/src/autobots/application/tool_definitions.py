@@ -15,6 +15,7 @@ from autobots.application import tool_keys
 from autobots.application.approvals import ApprovedRequest
 from autobots.application.approvals import return_to_review as send_back_to_review
 from autobots.application.run_usage import RootLimits
+from autobots.application.sql import SqlConnection
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import CostClass, KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import EFFECTFUL, OperationClass, ToolOutcome
@@ -89,7 +90,7 @@ class ToolContext:
     never read it, which tests/test_effect_writers.py checks (XMOD-02): they use the capabilities,
     `approval` and `return_to_review`, and `key` and `setting` for this attempt's Keys & vars."""
 
-    connection: Any
+    connection: SqlConnection
     scope: ToolScope
     operation_id: str | None
     # What a person approved for this dispatch, loaded once the approval gate released the call,

@@ -1,7 +1,6 @@
 """US-15.3: member-readable readiness, with states and codes only and no model call."""
 
 import time
-from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
@@ -12,10 +11,12 @@ from pydantic import SecretStr
 
 from autobots.api import operation_routes
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.api.settings import Settings
 from autobots.application.operations import Condition
 from autobots.application.provider_settings import ProviderSettings
 from fake_openrouter import provider_context
+from sql_fakes import LendingPool
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -49,12 +50,6 @@ class Membership:
         return "member" if user_id == MEMBER else None
 
 
-class Pool:
-    @asynccontextmanager
-    async def connection(self) -> Any:
-        yield object()
-
-
 def headers(user: UUID = MEMBER) -> dict[str, str]:
     claims = {"sub": str(user), "aud": "authenticated", "exp": time.time() + 60}
     return {
@@ -82,11 +77,10 @@ def arranged(
     monkeypatch.setattr(operation_routes, "database_conditions", conditions)
     monkeypatch.setattr(operation_routes, "worker_condition", worker_state)
     monkeypatch.setattr(ProviderSettings, "auth_status", auth_status)
-    app = create_app(SETTINGS, membership=Membership())
-    client = TestClient(app, raise_server_exceptions=False)
-    app.state.pool = Pool()
-    app.state.provider_context = provider_context()
-    return client
+    resources = AppResources(
+        SETTINGS, membership=Membership(), pool=LendingPool(), provider_context=provider_context()
+    )
+    return TestClient(create_app(resources), raise_server_exceptions=False)
 
 
 def states(reply: Any) -> dict[str, str]:

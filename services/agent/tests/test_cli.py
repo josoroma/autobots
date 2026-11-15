@@ -16,6 +16,7 @@ from autobots.application.readiness import MalformedSetting
 from autobots.operations import concept_seed
 from autobots.operations import route_qualification as rq
 from autobots.operations.cli import Refused, command, counts_argument, uuid_argument
+from sql_fakes import ScriptedConnection
 
 WORKSPACE = "a0000000-0000-4000-8000-000000000001"
 
@@ -100,14 +101,8 @@ def test_seeding_a_malformed_workspace_is_a_usage_error() -> None:
     assert stopped.value.code == 2
 
 
-class NoOwner:
+class NoOwner(ScriptedConnection):
     """A workspace with no owner row: every select answers nothing."""
-
-    async def execute(self, *_args: object) -> "NoOwner":
-        return self
-
-    async def fetchone(self) -> None:
-        return None
 
 
 def test_a_workspace_with_no_owner_is_refused_before_anything_is_written(

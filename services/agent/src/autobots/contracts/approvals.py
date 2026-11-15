@@ -1,6 +1,6 @@
 """Approval views and decisions, PRD 9.2."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,10 @@ from autobots.domain.effects import ApprovalStatus
 
 # A person's answer to a request. The decision command takes the same values (PTOL-15).
 ApprovalVerdict = Literal["approve", "reject"]
+# The rule that held a call, as approval_requests.policy_rule stores it: a consequential write, a
+# tool that always asks, or a call its tool marked (Decision 0026 C3, migration 53's CHECK).
+PolicyRuleName = Literal["consequential_external_write", "tool_marked", "action_marked"]
+POLICY_RULES: tuple[PolicyRuleName, ...] = get_args(PolicyRuleName)
 
 
 class ApprovalRequester(BaseModel):
@@ -77,7 +81,7 @@ class ApprovalView(BaseModel):
     requester: ApprovalRequester | None
     scope_snapshot: ApprovalScope | None
     policy_version: str | None
-    policy_rule: Literal["consequential_external_write", "tool_marked"] | None
+    policy_rule: PolicyRuleName | None
     # PRD-Studio AP-02 and AP-03. Empty when the run, task or decision isn't recorded.
     run_goal: str | None
     task_title: str | None

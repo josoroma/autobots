@@ -1,6 +1,6 @@
 """Improvement proposals, PRD 8.5. A proposal has no field that could change a grant or a model."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -10,10 +10,12 @@ from autobots.domain.runs import RunStatus
 # What a proposal changes. improvement_candidates.kind and knowledge_versions.kind hold to it by
 # check constraints (tests/test_contract_vocabularies.py).
 KnowledgeKind = Literal["memory", "skill"]
+KNOWLEDGE_KINDS: tuple[KnowledgeKind, ...] = get_args(KnowledgeKind)
 # improvement_candidates.status, as its check constraint allows.
 CandidateStatus = Literal[
     "proposed", "regression_failed", "regression_passed", "rejected", "promoted"
 ]
+CANDIDATE_STATUSES: tuple[CandidateStatus, ...] = get_args(CandidateStatus)
 
 
 class EvidenceRef(BaseModel):

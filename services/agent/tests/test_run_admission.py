@@ -29,9 +29,11 @@ from autobots.application.runs import (
     admit_run,
     request_hash,
 )
+from autobots.application.sql import SqlParams
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import LOOP_TOOL_GRANTS
+from sql_fakes import ScriptedRows
 
 WORKSPACE = UUID("0a000000-0000-4000-8000-000000000001")
 ACTOR = UUID("0a000000-0000-4000-8000-000000000002")
@@ -223,12 +225,8 @@ def caller_shapes() -> dict[str, dict[str, Any]]:
     }
 
 
-class Cursor:
-    def __init__(self, row: tuple[Any, ...] | None) -> None:
-        self.row = row
-
-    async def fetchone(self) -> tuple[Any, ...] | None:
-        return self.row
+def answered(row: tuple[Any, ...] | None) -> ScriptedRows:
+    return ScriptedRows([] if row is None else [row])
 
 
 class Connection:
@@ -246,17 +244,17 @@ class Connection:
         self.stored_goal = stored_goal
         self.log: list[tuple[str, Sequence[Any]]] = []
 
-    async def execute(self, statement: str, values: Sequence[Any] = ()) -> Cursor:
-        self.log.append((statement, tuple(values)))
+    async def execute(self, statement: str, values: SqlParams | None = None, /) -> ScriptedRows:
+        self.log.append((statement, tuple(values or ())))
         if "from app_private.idempotency_receipts" in statement:
-            return Cursor(self.receipt)
+            return answered(self.receipt)
         if statement.startswith("select status from public.runs"):
-            return Cursor(None if self.previous is None else (self.previous,))
+            return answered(None if self.previous is None else (self.previous,))
         if "original_request" in statement:
-            return Cursor(None if self.stored_goal is None else (self.stored_goal,))
+            return answered(None if self.stored_goal is None else (self.stored_goal,))
         if "event_sequence = event_sequence + 1" in statement:
-            return Cursor((1,))
-        return Cursor(None)
+            return answered((1,))
+        return answered(None)
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:

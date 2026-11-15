@@ -15,11 +15,12 @@ from autobots.api.dependencies import (
     MemberWorkspace,
     ModelKeyCheck,
     catalog_of,
+    membership,
     process_environment,
     require_ready,
 )
 from autobots.api.errors import ApiError, reworded
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.experts import ExpertRefused, latest_version_config
 from autobots.application.model_admission import remaining_daily_micro_usd
@@ -113,7 +114,7 @@ async def post_run(
             ),
             database=request_pool(request),
             model_ready=model_key,
-            role=partial(request.app.state.membership.role_in, user_id, workspace_id),
+            role=partial(membership(request).role_in, user_id, workspace_id),
             # Decisions 0024 K1 and 0025 V3 order the keys, and the process environment in that
             # order is the one the entry point read at start, as the OpenRouter key's is. The
             # key check's dependency has already refused a missing provider context.
@@ -126,7 +127,7 @@ async def post_run(
         schema_version=1,
         run_id=result.run_id,
         version=result.version,
-        status=result.status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+        status=result.status,
         replayed=result.replayed,
     )
 

@@ -24,8 +24,10 @@ from autobots.application.approvals import (
     scope_snapshot,
 )
 from autobots.application.runs import LeaseLost, WorkerClaim
+from autobots.application.sql import SqlParams
 from autobots.domain.effects import ApprovalStatus, ReceiptStatus
 from autobots.domain.runs import RunCommand
+from sql_fakes import GATE_COLUMNS, ScriptedRows
 
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
 BROWSE = ApprovalProposal(
@@ -86,7 +88,6 @@ class Connection:
     owned: bool = True
     statements: list[tuple[str, tuple[object, ...], int | None]] = field(default_factory=list)
     rolled_back: set[int] = field(default_factory=set)
-    answer: tuple[object, ...] | None = None
     opened: int = 0
     current: int | None = None
 
@@ -105,19 +106,14 @@ class Connection:
         finally:
             self.current = None
 
-    async def execute(self, query: str, params: tuple[object, ...] = ()) -> "Connection":
-        self.statements.append((query, params, self.current))
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        self.statements.append((query, tuple(params or ()), self.current))
         if "from public.approval_requests" in query:
-            self.answer = self.row
-        elif "from app_private.run_jobs" in query:
-            self.answer = (1,) if self.owned else None
-        else:
-            # No receipt: the call never reached an effect.
-            self.answer = None if "from app_private.tool_receipts" in query else (1,)
-        return self
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self.answer
+            return ScriptedRows([] if self.row is None else [self.row], GATE_COLUMNS)
+        if "from app_private.run_jobs" in query:
+            return ScriptedRows([(1,)] if self.owned else [])
+        # No receipt: the call never reached an effect.
+        return ScriptedRows([] if "from app_private.tool_receipts" in query else [(1,)])
 
     def with_text(self, part: str) -> list[tuple[str, tuple[object, ...], int | None]]:
         return [statement for statement in self.statements if part in statement[0]]

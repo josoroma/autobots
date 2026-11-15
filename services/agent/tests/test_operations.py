@@ -28,6 +28,7 @@ from autobots.application.operations import (
     queue_condition,
     storage_condition,
 )
+from autobots.application.sql import SqlParams
 from autobots.contracts.operations import RetentionSettings
 from autobots.domain.repetition import Repeated
 from autobots.logs import (
@@ -41,6 +42,7 @@ from autobots.logs import (
     remote_tracing_disabled,
 )
 from autobots.operations import worker
+from sql_fakes import ScriptedConnection, ScriptedRows
 
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 
@@ -175,7 +177,7 @@ def test_a_failed_worker_step_says_where_it_failed() -> None:
         return False
 
     async def step() -> bool:
-        return await worker.both(broken, working)(None)
+        return await worker.both(broken, working)(ScriptedConnection())
 
     assert asyncio.run(step()) is False
     [line] = _lines(stream)
@@ -197,9 +199,9 @@ def test_a_failed_retention_pass_names_its_workspace(monkeypatch: pytest.MonkeyP
     async def broken(_connection: object, _store: object, _workspace: UUID) -> None:
         raise KeyError("password=hunter2")
 
-    class Connection:
-        async def execute(self, _query: str, _params: object = None) -> "Rows":
-            return Rows([(WORKSPACE,)])
+    class Connection(ScriptedConnection):
+        async def execute(self, _query: str, _params: SqlParams | None = None, /) -> ScriptedRows:
+            return ScriptedRows([(WORKSPACE,)])
 
     monkeypatch.setattr(retention, "apply_retention", broken)
     asyncio.run(retention.apply_all(Connection(), None))
@@ -212,29 +214,16 @@ def test_a_failed_retention_pass_names_its_workspace(monkeypatch: pytest.MonkeyP
     assert "hunter2" not in stream.getvalue()
 
 
-class Rows:
-    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
-        self._rows = rows
-
-    async def fetchone(self) -> tuple[Any, ...] | None:
-        return None
-
-    async def fetchall(self) -> list[tuple[Any, ...]]:
-        return self._rows
-
-
 def test_bytes_storage_keeps_are_counted_with_one_warning_per_pass() -> None:
     """XERR-11: the bytes wait for the next pass, as before, and the cause is now kept once."""
     stream = io.StringIO()
     configure_logging(stream)
 
-    class Connection:
-        autocommit = True
-
-        async def execute(self, query: str, _params: object = None) -> Rows:
+    class Connection(ScriptedConnection):
+        async def execute(self, query: str, _params: SqlParams | None = None, /) -> ScriptedRows:
             if "from public.artifacts" in query:
-                return Rows([(1, "a/one"), (2, "a/two"), (3, "a/three")])
-            return Rows([])
+                return ScriptedRows([(1, "a/one"), (2, "a/two"), (3, "a/three")])
+            return ScriptedRows()
 
     class Storage:
         async def remove(self, _path: str) -> None:

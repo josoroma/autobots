@@ -59,6 +59,7 @@ from autobots.application.model_attempts import (
     classify_status,
 )
 from autobots.application.run_usage import RootLimits
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
@@ -284,7 +285,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
 
     def __init__(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
         self,
-        connection: Any,
+        connection: SqlConnection,
         scope: ToolScope,
         limits: RootLimits,
         route: ModelRoute,

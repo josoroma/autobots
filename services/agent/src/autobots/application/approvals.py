@@ -10,6 +10,7 @@ to review, each guarded by its moves in `domain/effects.py` (PTOL-03, Decision 0
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
@@ -27,6 +28,7 @@ from autobots.application.runs import (
     cascade_command,
     current_status,
 )
+from autobots.application.sql import SqlConnection, all_rows, one, optional_row, required_row
 from autobots.application.worker_leases import LeaseHolder, hold_lease
 from autobots.contracts.approvals import ApprovalVerdict
 from autobots.contracts.persisted import ApprovalDecisionReceipt
@@ -42,6 +44,14 @@ from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tools import OperationClass
+from autobots.persistence.rows import (
+    ApprovalDecisionRow,
+    ApprovalGateRow,
+    ApprovalListRow,
+    DueApprovalRow,
+    ReceiptStateRow,
+    RequesterRow,
+)
 
 DEFAULT_TTL_SECONDS = 86_400
 # The failure code of an attempt the lease refused before it wrote anything.
@@ -82,7 +92,7 @@ def receipt_may_have_sent(status: str | None) -> bool:
     return status is not None and status != ReceiptStatus.FAILED
 
 
-async def approved_request(connection: Any, operation_id: str) -> ApprovedRequest | None:
+async def approved_request(connection: SqlConnection, operation_id: str) -> ApprovedRequest | None:
     """The operation's request while it is approved, and None otherwise."""
     cursor = await connection.execute(
         "select resource_target, review_detail from public.approval_requests "
@@ -93,7 +103,7 @@ async def approved_request(connection: Any, operation_id: str) -> ApprovedReques
     return None if row is None else ApprovedRequest(row[0], row[1])
 
 
-def scope_snapshot(tools: Any, paths: Any) -> dict[str, Any]:
+def scope_snapshot(tools: Mapping[str, int], paths: Iterable[str]) -> dict[str, Any]:
     """The grants a request was made under, stored whole with it, Decision 0015."""
     return {"tools": dict(tools), "paths": list(paths)}
 
@@ -102,7 +112,7 @@ def _digest(snapshot: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
 
 
-def scope_hash(tools: Any, paths: Any) -> str:
+def scope_hash(tools: Mapping[str, int], paths: Iterable[str]) -> str:
     return _digest(scope_snapshot(tools, paths))
 
 
@@ -148,10 +158,9 @@ def requesting_agent(expert_id: UUID | None, expert_version: int | None) -> dict
     return {"kind": "expert", "id": str(expert_id), "version": expert_version}
 
 
-async def _version(connection: Any, run_id: UUID) -> int:
-    cursor = await connection.execute("select version from public.runs where id = %s", (run_id,))
-    version: int = (await cursor.fetchone())[0]
-    return version
+async def _version(connection: SqlConnection, run_id: UUID) -> int:
+    (version,) = await one(connection, "select version from public.runs where id = %s", (run_id,))
+    return int(version)
 
 
 def _requested(approval_id: UUID, tool_id: str) -> ApprovalRequested:
@@ -159,7 +168,7 @@ def _requested(approval_id: UUID, tool_id: str) -> ApprovalRequested:
 
 
 async def _reopen(
-    connection: Any,
+    connection: SqlConnection,
     run_id: UUID,
     approval_id: UUID,
     tool_id: str,
@@ -185,7 +194,7 @@ async def _reopen(
     await append_event(connection, run_id, _requested(approval_id, tool_id))
 
 
-async def _consume(connection: Any, approval_id: UUID) -> None:
+async def _consume(connection: SqlConnection, approval_id: UUID) -> None:
     """The approval released a call that leaves no receipt, so it can't release another: the same
     call again goes back to a person (Decisions 0018 B6 and 0020 L5, SP-013). The request stays
     approved, as consuming is no move of its status. The gate holds the request's row lock."""
@@ -196,24 +205,25 @@ async def _consume(connection: Any, approval_id: UUID) -> None:
     )
 
 
-async def _enter_wait(connection: Any, run: Requester, approval_id: UUID) -> None:
+async def _enter_wait(connection: SqlConnection, run: Requester, approval_id: UUID) -> None:
     await apply_worker_command(
         connection, run, RunCommand.REQUEST_APPROVAL, detail=str(approval_id)
     )
 
 
 async def _request_review(
-    connection: Any, run: Requester, proposal: ApprovalProposal, ttl_seconds: int
+    connection: SqlConnection, run: Requester, proposal: ApprovalProposal, ttl_seconds: int
 ) -> UUID:
     """Stores the request with every Decision 0015 field and announces it. Who asked is read from
     the run in this transaction, never from the call. Its status takes the column's default,
     pending, the one move a request starts with (ApprovalCommand.REQUEST)."""
     approval_id = uuid4()
-    cursor = await connection.execute(
+    requester = await required_row(
+        connection,
+        RequesterRow,
         "select started_by, expert_id, expert_version from public.runs where id = %s",
         (run.run_id,),
     )
-    started_by, expert_id, expert_version = await cursor.fetchone()
     await connection.execute(
         "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
         "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
@@ -234,8 +244,8 @@ async def _request_review(
             proposal.scope_hash,
             proposal.policy_reason,
             proposal.resource_target,
-            started_by,
-            json.dumps(requesting_agent(expert_id, expert_version)),
+            requester.started_by,
+            json.dumps(requesting_agent(requester.expert_id, requester.expert_version)),
             json.dumps(proposal.scope),
             proposal.policy_version,
             proposal.policy_rule,
@@ -305,31 +315,44 @@ def gate_decision(
     return Gate.REOPEN if row.expired or row.consumed else Gate.RELEASE
 
 
-async def _request_row(connection: Any, operation_id: str) -> RequestRow | None:
+async def _request_row(connection: SqlConnection, operation_id: str) -> RequestRow | None:
     """Locked until the gate's transaction ends, so concurrent attempts decide one at a time."""
-    cursor = await connection.execute(
-        "select id, status, scope_hash, expires_at <= clock_timestamp(), "
-        "consumed_at is not null from public.approval_requests where operation_id = %s for update",
+    row = await optional_row(
+        connection,
+        ApprovalGateRow,
+        "select id, status, scope_hash, expires_at <= clock_timestamp() as expired, "
+        "consumed_at is not null as consumed "
+        "from public.approval_requests where operation_id = %s for update",
         (operation_id,),
     )
-    row = await cursor.fetchone()
-    if row is None:
-        return None
-    return RequestRow(row[0], ApprovalStatus(row[1]), row[2], bool(row[3]), bool(row[4]))
+    return None if row is None else request_row_of(row)
 
 
-async def _receipt_state(connection: Any, operation_id: str) -> ReceiptState | None:
-    cursor = await connection.execute(
+def request_row_of(row: ApprovalGateRow) -> RequestRow:
+    """An unknown stored status raises, instead of deciding anything."""
+    return RequestRow(
+        row.id, ApprovalStatus(row.status), row.scope_hash, bool(row.expired), bool(row.consumed)
+    )
+
+
+async def _receipt_state(connection: SqlConnection, operation_id: str) -> ReceiptState | None:
+    row = await optional_row(
+        connection,
+        ReceiptStateRow,
         "select status, reconciled_at, failure_code from app_private.tool_receipts "
         "where operation_id = %s",
         (operation_id,),
     )
-    row = await cursor.fetchone()
-    return None if row is None else ReceiptState(ReceiptStatus(row[0]), row[1] is not None, row[2])
+    return None if row is None else receipt_state_of(row)
+
+
+def receipt_state_of(row: ReceiptStateRow) -> ReceiptState:
+    """A person ruled on its last attempt when its receipt was reconciled."""
+    return ReceiptState(ReceiptStatus(row.status), row.reconciled_at is not None, row.failure_code)
 
 
 async def approval_gate(
-    connection: Any,
+    connection: SqlConnection,
     run: Requester,
     proposal: ApprovalProposal,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
@@ -365,7 +388,7 @@ async def approval_gate(
 
 
 async def return_to_review(
-    connection: Any,
+    connection: SqlConnection,
     holder: LeaseHolder,
     *,
     operation_id: str,
@@ -397,7 +420,7 @@ async def return_to_review(
     return approval_id
 
 
-async def _lock_job(connection: Any, run_id: UUID) -> None:
+async def _lock_job(connection: SqlConnection, run_id: UUID) -> None:
     """The run's job row, in the caller's transaction: every path that moves a run or its requests
     takes it first, as a transition does (SP-012)."""
     await connection.execute(
@@ -405,7 +428,9 @@ async def _lock_job(connection: Any, run_id: UUID) -> None:
     )
 
 
-async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id: UUID) -> bool:
+async def expire(
+    connection: SqlConnection, approval_id: UUID, run_id: UUID, workspace_id: UUID
+) -> bool:
     """Expiry is not consent. The wait ends, the run pauses, and the operation stays unapproved.
 
     Only a pending request expires. A pass that read it pending before a person decided it or the
@@ -445,22 +470,23 @@ async def expire(connection: Any, approval_id: UUID, run_id: UUID, workspace_id:
     return True
 
 
-async def expire_due(connection: Any) -> int:
+async def expire_due(connection: SqlConnection) -> int:
     """Expires every pending request past its expiry, each in its own transaction, and returns how
     many it expired."""
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        DueApprovalRow,
         "select id, run_id, workspace_id from public.approval_requests "
-        "where status = 'pending' and expires_at <= clock_timestamp()"
+        "where status = 'pending' and expires_at <= clock_timestamp()",
     )
-    rows = await cursor.fetchall()
     expired = 0
-    for approval_id, run_id, workspace_id in rows:
+    for row in rows:
         async with connection.transaction():
-            expired += await expire(connection, approval_id, run_id, workspace_id)
+            expired += await expire(connection, row.id, row.run_id, row.workspace_id)
     return expired
 
 
-async def withdraw_pending(connection: Any, run_id: UUID) -> None:
+async def withdraw_pending(connection: SqlConnection, run_id: UUID) -> None:
     """A cancelled run's waiting requests, in the cancel's transaction (SP-010)."""
     await connection.execute(
         "update public.approval_requests set status = %s where run_id = %s and status = any(%s)",
@@ -483,7 +509,7 @@ def _decided(decision: ApprovalVerdict) -> ApprovalStatus:
 
 
 async def decide(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -517,24 +543,25 @@ async def decide(
             raise ApprovalRefused("approval_not_found")
         await _lock_job(connection, found[0])
         await connection.execute("select 1 from public.runs where id = %s for update", (found[0],))
-        cursor = await connection.execute(
-            "select run_id, status, argument_hash, expires_at <= clock_timestamp(), "
-            "arguments::text from public.approval_requests "
+        row = await optional_row(
+            connection,
+            ApprovalDecisionRow,
+            "select run_id, status, argument_hash, expires_at <= clock_timestamp() as expired, "
+            "arguments::text as arguments from public.approval_requests "
             "where id = %s and workspace_id = %s for update",
             (approval_id, workspace_id),
         )
-        row = await cursor.fetchone()
         if row is None:
             raise ApprovalRefused("approval_not_found")
-        run_id, status, stored_hash, expired, arguments = row
-        if stored_hash != argument_hash:
+        run_id, status, expired = row.run_id, ApprovalStatus(row.status), row.expired
+        if row.argument_hash != argument_hash:
             raise ApprovalRefused("approval_mismatch")
-        pending = status == ApprovalStatus.PENDING
-        if wanted is ApprovalStatus.APPROVED and pending and exceeds_review_limit(arguments):
+        pending = status is ApprovalStatus.PENDING
+        if wanted is ApprovalStatus.APPROVED and pending and exceeds_review_limit(row.arguments):
             # The hash proves what's stored, not what anyone read.
             raise ApprovalRefused("approval_too_large")
         if not pending:
-            if status == wanted:
+            if status is wanted:
                 return DecisionResult(approval_id, wanted, True)
             raise ApprovalRefused("approval_already_decided")
         if expired:
@@ -593,23 +620,25 @@ DECIDED = tuple(
 
 
 async def list_approvals(
-    connection: Any, workspace_id: UUID, statuses: str | tuple[str, ...]
-) -> list[dict[str, Any]]:
+    connection: SqlConnection, workspace_id: UUID, statuses: str | tuple[str, ...]
+) -> list[ApprovalListRow]:
     """PRD-Studio AP-01 and AP-02: requests in these statuses, with the run's goal, the plan task
     the call served (through its tool use's operation ID), who decided it and when, and the size of
     the stored arguments."""
-    cursor = await connection.execute(
+    return await all_rows(
+        connection,
+        ApprovalListRow,
         "select a.id, a.run_id, a.tool_id, a.tool_version, a.operation_class, a.argument_hash, "
-        "a.arguments::text, a.status, a.expires_at, a.policy_reason, a.resource_target, "
-        "a.requested_by, a.requested_by_agent, a.scope_snapshot, a.policy_version, "
-        "a.policy_rule, e.name, r.goal_summary, "
+        "a.arguments::text as arguments, a.status, a.expires_at, a.policy_reason, "
+        "a.resource_target, a.requested_by, a.requested_by_agent, a.scope_snapshot, "
+        "a.policy_version, a.policy_rule, e.name as expert_name, r.goal_summary as run_goal, "
         "(select t ->> 'title' from app_private.tool_uses u "
         "join app_private.plan_versions p on p.run_id = u.run_id, "
         "jsonb_array_elements(p.tasks) t "
         "where u.operation_id = a.operation_id and t ->> 'id' = u.task_id "
-        "order by p.version desc limit 1), "
-        "a.decided_at, a.decided_by, d.display_name, "
-        "octet_length(a.arguments::text), a.review_detail "
+        "order by p.version desc limit 1) as task_title, "
+        "a.decided_at, a.decided_by, d.display_name as decided_by_name, "
+        "octet_length(a.arguments::text) as arguments_bytes, a.review_detail "
         "from public.approval_requests a left join public.experts e "
         "on e.id = (a.requested_by_agent ->> 'id')::uuid and e.workspace_id = a.workspace_id "
         "left join public.runs r on r.id = a.run_id and r.workspace_id = a.workspace_id "
@@ -618,42 +647,15 @@ async def list_approvals(
         "order by coalesce(a.decided_at, a.created_at) desc limit 200",
         (workspace_id, [statuses] if isinstance(statuses, str) else list(statuses)),
     )
-    names = (
-        "id",
-        "run_id",
-        "tool_id",
-        "tool_version",
-        "operation_class",
-        "argument_hash",
-        "arguments",
-        "status",
-        "expires_at",
-        "policy_reason",
-        "resource_target",
-        "requested_by",
-        "requested_by_agent",
-        "scope_snapshot",
-        "policy_version",
-        "policy_rule",
-        "expert_name",
-        "run_goal",
-        "task_title",
-        "decided_at",
-        "decided_by",
-        "decided_by_name",
-        "arguments_bytes",
-        "review_detail",
-    )
-    return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]
 
 
-async def approval_counts(connection: Any, workspace_id: UUID) -> tuple[int, int]:
+async def approval_counts(connection: SqlConnection, workspace_id: UUID) -> tuple[int, int]:
     """Waiting and decided counts, so a tab or badge never counts a listed page."""
-    cursor = await connection.execute(
+    waiting, decided = await one(
+        connection,
         "select count(*) filter (where status = 'pending'), "
         "count(*) filter (where status = any(%s)) "
         "from public.approval_requests where workspace_id = %s",
         (list(DECIDED), workspace_id),
     )
-    row = await cursor.fetchone()
-    return int(row[0]), int(row[1])
+    return int(waiting), int(decided)

@@ -6,7 +6,7 @@ saved version is read back through its stored record (persistence/records.py) an
 """
 
 from collections.abc import Mapping
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal, Self, get_args
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -26,6 +26,7 @@ from autobots.domain.routines import DEFAULT_TIMEZONE, MAX_INTERVAL_MINUTES
 IanaTimezone = Annotated[str, Field(min_length=1, max_length=64)]
 # routine_occurrences.status, as its check constraint allows (tests/test_contract_vocabularies.py).
 OccurrenceStatus = Literal["admitted", "missed", "skipped_overlap", "blocked"]
+OCCURRENCE_STATUSES: tuple[OccurrenceStatus, ...] = get_args(OccurrenceStatus)
 
 
 # Named for the tool that introduced it: the name is the title in `cronjob` v1's input schema, which

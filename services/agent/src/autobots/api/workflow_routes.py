@@ -14,7 +14,7 @@ from autobots.api.dependencies import (
     require_ready,
 )
 from autobots.api.errors import ApiError, reworded
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.run_admission import ModelNotReady, chosen_limit, require_model_ready
 from autobots.application.workflow_overview import preview_steps, recent_executions

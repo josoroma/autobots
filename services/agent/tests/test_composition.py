@@ -10,10 +10,12 @@ import pytest
 
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.api import main as api_main
+from autobots.api.resources import resources_of
 from autobots.application.credentials.precedence import resolve_environment_key
 from autobots.application.readiness import MalformedSetting
 from autobots.application.tool_keys import DEFAULT_KEY_FILE
 from autobots.operations import composition
+from sql_fakes import ScriptedConnection
 
 ARRANGED_KEY = "sk-or-arranged-composition-0000"
 
@@ -62,7 +64,7 @@ def test_storage_needs_both_its_address_and_its_key() -> None:
 def test_with_no_provider_context_nothing_unattended_starts() -> None:
     check = composition.credential_check({})
     assert check is composition.no_credential
-    assert asyncio.run(check(object(), uuid4())) == "credentials_required"
+    assert asyncio.run(check(ScriptedConnection(), uuid4())) == "credentials_required"
 
 
 def test_missing_settings_are_named_together_and_never_their_values() -> None:
@@ -112,10 +114,11 @@ def test_the_api_builds_its_context_and_store_from_the_live_environment(
     monkeypatch.setenv("AUTOBOTS_SUPABASE_URL", "http://127.0.0.1:1")
     monkeypatch.setenv("AUTOBOTS_SERVICE_ROLE_KEY", "arranged")
     monkeypatch.setenv("AUTOBOTS_STREAM_SECONDS", "4")
-    app = api_main.create_configured_app()
-    assert app.state.provider_context.process_environment is os.environ
-    assert isinstance(app.state.object_store, SupabaseObjectStore)
-    assert app.state.stream_seconds == 4.0
+    resources = resources_of(api_main.create_configured_app())
+    assert resources.provider_context is not None
+    assert resources.provider_context.process_environment is os.environ
+    assert isinstance(resources.object_store, SupabaseObjectStore)
+    assert resources.stream_seconds == 4.0
 
 
 def test_a_malformed_stream_lifetime_stops_the_api_with_exit_2(

@@ -13,7 +13,7 @@ from autobots.api.dependencies import (
     is_owner,
 )
 from autobots.api.errors import ApiError
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.experts import (
     add_version,

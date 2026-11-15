@@ -12,7 +12,7 @@ from autobots.api.dependencies import (
     OwnerWorkspace,
 )
 from autobots.api.errors import reworded
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.improvements import (
     decide,

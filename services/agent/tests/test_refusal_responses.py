@@ -37,6 +37,7 @@ from autobots.api.dependencies import (
     require_ready,
 )
 from autobots.api.errors import STATUS, refusal_message
+from autobots.api.resources import resources_of
 from autobots.application import reconciliation
 from autobots.application.approvals import ApprovalRefused
 from autobots.application.artifacts import ArtifactUnavailable
@@ -170,6 +171,25 @@ async def no_effect(*_args: object) -> bool:
     return False
 
 
+class UnreadStore:
+    """Artifact storage that is configured, which no refusal here reaches."""
+
+    async def ping(self) -> None:
+        return None
+
+    async def put(self, path: str, content: bytes, media_type: str) -> bool:
+        raise AssertionError(path)
+
+    async def get(self, path: str) -> bytes | None:
+        raise AssertionError(path)
+
+    async def remove(self, path: str) -> None:
+        raise AssertionError(path)
+
+    async def names(self, prefix: str) -> list[str]:
+        raise AssertionError(prefix)
+
+
 @pytest.fixture
 def client(api_client: ApiClient, monkeypatch: pytest.MonkeyPatch) -> Iterator[ApiClient]:
     """Readiness passes, keys are ready, the run exists with nothing to reconcile, and artifact
@@ -178,7 +198,7 @@ def client(api_client: ApiClient, monkeypatch: pytest.MonkeyPatch) -> Iterator[A
     api_client.app.dependency_overrides[provider_settings] = lambda: Settings()
     api_client.app.dependency_overrides[model_key_check] = lambda: Settings().run_intent
     api_client.database.answer("select 1 from public.runs where id", (1,))
-    api_client.app.state.object_store = object()
+    resources_of(api_client.app).object_store = UnreadStore()
     monkeypatch.setattr(reconciliation, "outstanding", nothing_outstanding)
     monkeypatch.setattr(reconciliation, "has_unresolvable_effect", no_effect)
     monkeypatch.setattr(reconciliation, "execution_block", none)

@@ -8,8 +8,10 @@ write committed; without its row, nothing was saved.
 import hashlib
 from dataclasses import dataclass
 
+from autobots.application.sql import one, optional_row
 from autobots.application.tool_definitions import ToolContext, ToolFailed
 from autobots.application.worker_leases import hold_lease
+from autobots.persistence.rows import RunFileRow
 
 
 @dataclass(frozen=True)
@@ -25,17 +27,22 @@ class RunFile:
 _COLUMNS = "version, sha256, content, media_type"
 
 
+def run_file_of(row: RunFileRow) -> RunFile:
+    return RunFile(row.version, row.sha256, row.content, row.media_type)
+
+
 async def latest(context: ToolContext, path: str) -> RunFile:
     """The latest version of this run's file at `path`, or `file_not_found`."""
-    cursor = await context.connection.execute(
+    row = await optional_row(
+        context.connection,
+        RunFileRow,
         f"select {_COLUMNS} from app_private.run_files "
         "where run_id = %s and path = %s order by version desc limit 1",
         (context.scope.run_id, path),
     )
-    row = await cursor.fetchone()
     if row is None:
         raise ToolFailed("file_not_found")
-    return RunFile(row[0], row[1], row[2], row[3])
+    return run_file_of(row)
 
 
 async def latest_contents(context: ToolContext) -> dict[str, str]:
@@ -52,12 +59,13 @@ async def by_operation(context: ToolContext) -> RunFile | None:
     """The version this attempt's operation saved through `write`, or None. That write commits
     under a unique operation ID in one transaction, so no row means nothing was saved, and a
     readback can say so without SQL of its own (PADP-13, XMOD-02)."""
-    cursor = await context.connection.execute(
+    row = await optional_row(
+        context.connection,
+        RunFileRow,
         f"select {_COLUMNS} from app_private.run_files where operation_id = %s",
         (context.operation_id,),
     )
-    row = await cursor.fetchone()
-    return None if row is None else RunFile(row[0], row[1], row[2], row[3])
+    return None if row is None else run_file_of(row)
 
 
 async def write(context: ToolContext, path: str, content: str, media_type: str) -> tuple[int, str]:
@@ -73,12 +81,12 @@ async def write(context: ToolContext, path: str, content: str, media_type: str) 
             "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
             (f"{context.scope.run_id}|{path}",),
         )
-        cursor = await context.connection.execute(
+        (version,) = await one(
+            context.connection,
             "select coalesce(max(version), 0) + 1 from app_private.run_files "
             "where run_id = %s and path = %s",
             (context.scope.run_id, path),
         )
-        version = (await cursor.fetchone())[0]
         await context.connection.execute(
             "insert into app_private.run_files (run_id, path, version, content, sha256, "
             "media_type, operation_id) values (%s, %s, %s, %s, %s, %s, %s)",

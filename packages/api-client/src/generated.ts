@@ -418,7 +418,8 @@ export const schemas = {
           {
             "enum": [
               "consequential_external_write",
-              "tool_marked"
+              "tool_marked",
+              "action_marked"
             ],
             "type": "string"
           },
@@ -7837,7 +7838,7 @@ export interface ApprovalView {
   id: string;
   operation_class: string;
   policy_reason: string | null;
-  policy_rule: "consequential_external_write" | "tool_marked" | null;
+  policy_rule: "consequential_external_write" | "tool_marked" | "action_marked" | null;
   policy_version: string | null;
   requester: ApprovalRequester | null;
   resource_target: string | null;

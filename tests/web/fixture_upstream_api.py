@@ -16,6 +16,7 @@ import uvicorn
 from autobots.adapters.models.factory import OPENROUTER_BASE_URL
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
 from autobots.api.main import create_configured_app
+from autobots.api.resources import resources_of
 from autobots.domain.models import PROFILES, ModelProfileId
 
 LOG = Path(os.environ['AUTOBOTS_TEST_UPSTREAM_LOG'])
@@ -48,7 +49,10 @@ def make_client() -> httpx.AsyncClient:
 
 def main() -> None:
     app = create_configured_app()
-    app.state.provider_context = _with_fake(app.state.provider_context)
+    # The configured context, read and replaced, so no real key or catalog call can leave this process.
+    resources = resources_of(app)
+    assert resources.provider_context is not None, 'the configured app has no provider context'
+    resources.provider_context = _with_fake(resources.provider_context)
     uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')
 
 

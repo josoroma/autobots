@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
+from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.contracts.plans import GoalSpec
+from autobots.persistence.rows import RunSummaryRow
 
 LARGE_TOOL_CHARS = 4_000
 PREVIEW_CHARS = 300
@@ -51,7 +53,7 @@ def total_chars(messages: Sequence[Any]) -> int:
 
 
 async def offload_large(
-    connection: Any, run_id: UUID, messages: Sequence[Any], policy: CompactionPolicy
+    connection: SqlConnection, run_id: UUID, messages: Sequence[Any], policy: CompactionPolicy
 ) -> list[Any]:
     """Keeps a pointer and a short preview. The same call always maps to the same stored row."""
     view: list[Any] = []
@@ -80,11 +82,11 @@ async def offload_large(
             "sha256) values (%s, %s, %s, %s, %s, %s) on conflict (run_id, tool_call_id) do nothing",
             (uuid4(), run_id, message.tool_call_id, message.name or "", content, digest),
         )
-        cursor = await connection.execute(
+        (offload_id,) = await one(
+            connection,
             "select id from app_private.run_offloads where run_id = %s and tool_call_id = %s",
             (run_id, message.tool_call_id),
         )
-        offload_id = (await cursor.fetchone())[0]
         pointer = json.dumps(
             {
                 "offloaded": str(offload_id),
@@ -121,7 +123,7 @@ def pairing_is_valid(messages: Sequence[Any]) -> bool:
     return True
 
 
-async def state_block(connection: Any, run_id: UUID, goal: GoalSpec) -> str:
+async def state_block(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -> str:
     """Read fresh, so a summary can't lose or change any of this."""
     cursor = await connection.execute(
         "select kind, detail from app_private.run_obligations "
@@ -185,18 +187,19 @@ def summary_request(earlier: Sequence[Any], previous: StoredSummary | None) -> s
     return "\n\n".join(parts)
 
 
-async def latest_summary(connection: Any, run_id: UUID) -> StoredSummary | None:
-    cursor = await connection.execute(
+async def latest_summary(connection: SqlConnection, run_id: UUID) -> StoredSummary | None:
+    row = await optional_row(
+        connection,
+        RunSummaryRow,
         "select covers, summary, sources from app_private.run_summaries "
         "where run_id = %s order by covers desc limit 1",
         (run_id,),
     )
-    row = await cursor.fetchone()
-    return StoredSummary(row[0], row[1], tuple(row[2])) if row else None
+    return StoredSummary(row.covers, row.summary, tuple(row.sources)) if row else None
 
 
 async def store_summary(
-    connection: Any,
+    connection: SqlConnection,
     run_id: UUID,
     *,
     covers: int,

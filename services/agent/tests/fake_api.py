@@ -7,10 +7,11 @@ No database, socket or model is used.
 """
 
 import time
-from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Self
+from datetime import UTC, datetime
+from typing import Self
 from uuid import UUID
 
 import jwt
@@ -19,7 +20,10 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.api.settings import Settings
+from autobots.application.sql import SqlParams
+from sql_fakes import Row, ScriptedRows
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -27,8 +31,31 @@ OWNER = UUID("0b000000-0000-4000-8000-000000000001")
 MEMBER = UUID("0b000000-0000-4000-8000-000000000002")
 OUTSIDER = UUID("0b000000-0000-4000-8000-000000000003")
 WORKSPACE = UUID("0b000000-0000-4000-8000-0000000000aa")
-# A row as psycopg returns one. Rows stay untyped until the SQL boundary is typed (R-54).
-Row = tuple[Any, ...]
+
+
+# The statement every run view starts from (application/run_projection/summary.py).
+RUN_ROW = "from public.runs r where r.id = %(run)s"
+
+
+def run_row(run: UUID, *, status: str = "running", **columns: object) -> dict[str, object]:
+    """A run as its views read it, by column name, in this workspace."""
+    moment = datetime(2026, 11, 15, tzinfo=UTC)
+    return {
+        "id": run,
+        "workspace_id": WORKSPACE,
+        "parent_run_id": None,
+        "status": status,
+        "created_at": moment,
+        "updated_at": moment,
+        "charged_micro_usd": 0,
+        "reserved_micro_usd": 0,
+        "limit_micro_usd": 1_000_000,
+        "lease_generation": 1,
+        "checkpoint_thread_id": None,
+        "version": 1,
+        "event_sequence": 0,
+        **columns,
+    }
 
 
 def token(user: UUID = OWNER, secret: str = SECRET, **claims: object) -> str:
@@ -76,17 +103,6 @@ class PooledMembership(FakeMembership):
             return await super().role_in(user_id, workspace_id)
 
 
-class Rows:
-    def __init__(self, rows: list[Row]) -> None:
-        self.rows = rows
-
-    async def fetchone(self) -> Row | None:
-        return self.rows[0] if self.rows else None
-
-    async def fetchall(self) -> list[Row]:
-        return list(self.rows)
-
-
 @dataclass
 class FakeDatabase:
     """The app's pool. A statement is answered by the first scripted fragment it contains, and by no
@@ -123,18 +139,22 @@ class FakeDatabase:
 
 
 class FakeConnection:
+    # Retention commits only when it isn't (application/retention.py).
+    autocommit = True
+
     def __init__(self, database: FakeDatabase) -> None:
         self.database = database
 
-    async def execute(
-        self, statement: str, values: Sequence[object] | Mapping[str, object] = ()
-    ) -> Rows:
+    async def execute(self, statement: str, values: SqlParams | None = None, /) -> ScriptedRows:
         self.database.log.append(statement)
-        self.database.statements.append((statement, values))
+        self.database.statements.append((statement, () if values is None else values))
         for fragment, rows in self.database.answers:
             if fragment in statement:
-                return Rows(rows)
-        return Rows([])
+                return ScriptedRows(rows)
+        return ScriptedRows()
+
+    async def commit(self) -> None:
+        self.database.log.append("commit")
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:
@@ -170,7 +190,9 @@ class ApiClient:
             database_url=SecretStr("postgresql://fixture"),
             allowed_hosts=("testserver",),
         )
-        app = create_app(settings, membership=membership, pool_factory=lambda _url: database)
+        app = create_app(
+            AppResources(settings, membership=membership), pool_factory=lambda _url: database
+        )
         with TestClient(app) as http:
             yield cls(http, app, database, membership, log)
 

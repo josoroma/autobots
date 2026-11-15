@@ -38,6 +38,8 @@ from autobots.application import (
     tool_uses,
     workflows,
 )
+from autobots.application.run_projection import events as run_events
+from autobots.application.run_projection import workspace as run_workspace
 from autobots.application.tool_definitions import ToolResult, ToolScope
 from autobots.application.tool_gateway import Refused
 from autobots.application.worker_inference import frozen_policy
@@ -159,7 +161,10 @@ def admitting(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object
 
 def pausing(database: FakeDatabase, _monkeypatch: pytest.MonkeyPatch) -> object:
     database.answer("select version from public.runs", (7,))
-    database.answer("select status, generation, lease_expires_at", ("done", 3, None))
+    database.answer(
+        "select status, generation, lease_expires_at",
+        {"status": "done", "generation": 3, "lease_live": None},
+    )
     database.answer("select status, version from public.runs", ("running", 7))
     database.answer("select exists", (False,))
     database.answer("event_sequence = event_sequence + 1", (2,))
@@ -178,9 +183,21 @@ def pausing(database: FakeDatabase, _monkeypatch: pytest.MonkeyPatch) -> object:
 
 def deciding(database: FakeDatabase, _monkeypatch: pytest.MonkeyPatch) -> object:
     database.answer("select run_id from public.approval_requests", (RUN,))
-    database.answer("select run_id, status, argument_hash", (RUN, "pending", "hash", False, "{}"))
+    database.answer(
+        "select run_id, status, argument_hash",
+        {
+            "run_id": RUN,
+            "status": "pending",
+            "argument_hash": "hash",
+            "expired": False,
+            "arguments": "{}",
+        },
+    )
     database.answer("select version from public.runs", (7,))
-    database.answer("select status, generation, lease_expires_at", ("done", 3, None))
+    database.answer(
+        "select status, generation, lease_expires_at",
+        {"status": "done", "generation": 3, "lease_live": None},
+    )
     database.answer("select status, version from public.runs", ("waiting_approval", 7))
     database.answer("select exists", (False,))
     database.answer("event_sequence = event_sequence + 1", (3,))
@@ -206,7 +223,10 @@ def expiring(database: FakeDatabase, _monkeypatch: pytest.MonkeyPatch) -> object
 
 def requesting(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
     monkeypatch.setattr(approvals, "uuid4", lambda: APPROVAL)
-    database.answer("select started_by, expert_id, expert_version", (ACTOR, None, None))
+    database.answer(
+        "select started_by, expert_id, expert_version",
+        {"started_by": ACTOR, "expert_id": None, "expert_version": None},
+    )
     database.answer("event_sequence = event_sequence + 1", (5,))
     proposal = approvals.ApprovalProposal(
         operation_id="op-1",
@@ -277,8 +297,20 @@ class ArtifactStore:
 def reconciling_artifacts(database: FakeDatabase, _monkeypatch: pytest.MonkeyPatch) -> object:
     database.answer(
         "select id, name, object_path, sha256, status from public.artifacts",
-        (ARTIFACT, "total.md", "staged", hashlib.sha256(b"Total: 2").hexdigest(), "staged"),
-        (MISSING, "notes.md", "gone", "0" * 64, "published"),
+        {
+            "id": ARTIFACT,
+            "name": "total.md",
+            "object_path": "staged",
+            "sha256": hashlib.sha256(b"Total: 2").hexdigest(),
+            "status": "staged",
+        },
+        {
+            "id": MISSING,
+            "name": "notes.md",
+            "object_path": "gone",
+            "sha256": "0" * 64,
+            "status": "published",
+        },
     )
     database.answer("event_sequence = event_sequence + 1", (8,))
     store: Any = ArtifactStore()
@@ -371,7 +403,15 @@ def publishing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatc
 def executing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
     monkeypatch.setattr(workflows, "uuid4", lambda: EXECUTION)
     monkeypatch.setattr(runs, "uuid4", lambda: RUN)
-    database.answer("select v.graph, v.graph_hash", (PLAIN_GRAPH, "digest", {}, "Weekly digest"))
+    database.answer(
+        "select v.graph, v.graph_hash",
+        {
+            "graph": PLAIN_GRAPH,
+            "graph_hash": "digest",
+            "block_versions": {},
+            "name": "Weekly digest",
+        },
+    )
     database.answer("event_sequence = event_sequence + 1", (1,))
     binding = run(
         workflows.create_execution(
@@ -433,7 +473,14 @@ def replaying_a_candidate(database: FakeDatabase, monkeypatch: pytest.MonkeyPatc
     database.answer("event_sequence = event_sequence + 1", (1,))
     database.answer(
         "from public.improvement_candidates",
-        ("skill", "figures", "Read the table first.", "regression_passed", [], None),
+        {
+            "kind": "skill",
+            "key": "figures",
+            "content": "Read the table first.",
+            "status": "regression_passed",
+            "evidence": [],
+            "source": None,
+        },
     )
     return run(
         improvements.request_replay(
@@ -600,7 +647,7 @@ SHOWN = {
 def test_the_run_page_shows_each_stored_policy(name: str) -> None:
     database = FakeDatabase([])
     database.answer("select policy_snapshot from public.runs", (SNAPSHOTS[name],))
-    bindings = run(run_projection._role_map(FakeConnection(database), RUN))
+    bindings = run(run_workspace.role_map(FakeConnection(database), RUN))
     assert len(bindings) == len(SNAPSHOTS[name].get("bindings", {}))
     if name in SHOWN:
         (executor,) = [binding for binding in bindings if binding.role == "executor"]
@@ -617,7 +664,7 @@ UNREADABLE = [{"bindings": None}, {**SNAPSHOTS["current"], "record_version": 2}]
 def test_the_run_page_shows_a_snapshot_it_cant_read_as_nothing_bound(stored: object) -> None:
     database = FakeDatabase([])
     database.answer("select policy_snapshot from public.runs", (stored,))
-    assert run(run_projection._role_map(FakeConnection(database), RUN)) == []
+    assert run(run_workspace.role_map(FakeConnection(database), RUN)) == []
 
 
 @pytest.mark.parametrize("stored", UNREADABLE, ids=["null bindings", "a newer record version"])
@@ -627,13 +674,48 @@ def test_the_inspector_shows_a_snapshot_it_cant_read_as_nothing_frozen(stored: o
     database = FakeDatabase([])
     database.answer(
         "from public.runs r where r.id = %(run)s",
-        (RUN, WORKSPACE, None, "running", MOMENT, MOMENT, 0, 0, 1_000_000, 1, None, 1, 0),
+        {
+            "id": RUN,
+            "workspace_id": WORKSPACE,
+            "parent_run_id": None,
+            "status": "running",
+            "created_at": MOMENT,
+            "updated_at": MOMENT,
+            "charged_micro_usd": 0,
+            "reserved_micro_usd": 0,
+            "limit_micro_usd": 1_000_000,
+            "lease_generation": 1,
+            "checkpoint_thread_id": None,
+            "version": 1,
+            "event_sequence": 0,
+        },
     )
-    database.answer("select goal_summary, policy_snapshot", ("Sum the figures", stored, "thread"))
-    call = (UUID(int=9), RUN, "executor", 1, "succeeded", "openrouter_terra", "fixture/wire")
+    database.answer(
+        "select goal_summary, policy_snapshot",
+        {"goal_summary": "Sum the figures", "policy_snapshot": stored, "thread_id": "thread"},
+    )
     database.answer(
         "from app_private.model_invocations where run_id = %s or root_run_id = %s",
-        (*call, "fixture", 1, 1, 0, 10, 10, "stop", None, MOMENT, False, False),
+        {
+            "id": UUID(int=9),
+            "run_id": RUN,
+            "role": "executor",
+            "attempt": 1,
+            "status": "succeeded",
+            "profile": "openrouter_terra",
+            "wire_id": "fixture/wire",
+            "upstream_provider": "fixture",
+            "input_tokens": 1,
+            "output_tokens": 1,
+            "reasoning_tokens": 0,
+            "charged_micro_usd": 10,
+            "reserved_micro_usd": 10,
+            "finish_reason": "stop",
+            "failure_class": None,
+            "created_at": MOMENT,
+            "reconciled": False,
+            "charge_source_unknown": False,
+        },
     )
     inspector = run(run_projection.read_inspector(FakeConnection(database), WORKSPACE, RUN))
     (shown,) = inspector.model_calls
@@ -733,7 +815,7 @@ def test_a_known_type_that_fails_is_left_out_and_logged_by_type_and_sequence(
 ) -> None:
     """The first time and then every Nth, with the count, as every page that reaches the event
     reads it again (Repeated)."""
-    monkeypatch.setattr(run_projection, "_NOT_PROJECTED", Repeated(every=3))
+    monkeypatch.setattr(run_events, "_NOT_PROJECTED", Repeated(every=3))
     payload = {**EVENTS["tool_use_started"], "tool_use_id": 0, "tool_id": "PRIVATE-CONTENT"}
     with caplog.at_level(logging.DEBUG):
         for _ in range(4):

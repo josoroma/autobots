@@ -4,8 +4,6 @@ import asyncio
 import json
 import socket
 import time
-from contextlib import asynccontextmanager
-from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -16,6 +14,7 @@ from pydantic import SecretStr
 
 from autobots.api import operation_routes
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.api.settings import Settings
 from autobots.application import readiness
 from autobots.application.catalog_check import OPERATIONS_SECONDS, CatalogCheck, check_catalog
@@ -29,6 +28,8 @@ from autobots.application.operations import (
 )
 from autobots.application.retention import RetentionPolicy
 from autobots.contracts.operations import JobHour, JobsChart, OperationValues
+from fake_openrouter import provider_context
+from sql_fakes import LendingPool
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
@@ -160,12 +161,6 @@ class Membership:
         return "owner" if user_id == OWNER else None
 
 
-class Pool:
-    @asynccontextmanager
-    async def connection(self) -> Any:
-        yield object()
-
-
 def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_mac(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -231,10 +226,15 @@ def test_the_status_holds_numbers_only_and_producing_it_sends_nothing_off_this_m
         ("stored_bytes", asyncio.run(number(4096))),
     ):
         monkeypatch.setattr(operation_routes, name, stub)
-    app = create_app(SETTINGS, membership=Membership())
+    app = create_app(
+        AppResources(
+            SETTINGS,
+            membership=Membership(),
+            pool=LendingPool(),
+            provider_context=provider_context(fetch=catalog),
+        )
+    )
     client = TestClient(app, raise_server_exceptions=False)
-    app.state.pool = Pool()
-    app.state.provider_context = SimpleNamespace(fetch_catalog=catalog)
     claims = {"sub": str(OWNER), "aud": "authenticated", "exp": time.time() + 60}
     reply = client.get(
         "/v1/operations/local-status",
@@ -315,8 +315,7 @@ def test_any_member_reads_the_retention_summary_and_their_own_role(
         "Authorization": f"Bearer {jwt.encode(claims, SECRET, algorithm='HS256')}",
     }
     for membership, role in ((MemberOnly(), "member"), (Membership(), "owner")):
-        app = create_app(SETTINGS, membership=membership)
-        app.state.pool = Pool()
+        app = create_app(AppResources(SETTINGS, membership=membership, pool=LendingPool()))
         client = TestClient(app, raise_server_exceptions=False)
         reply = client.get("/v1/retention", headers=headers)
         assert reply.status_code == 200, reply.text

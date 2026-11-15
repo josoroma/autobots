@@ -2,7 +2,7 @@
 installation's readiness gate, provider and Keys & vars settings, the OpenRouter key check and what
 the process read at start (refactor plan R-55, PAPI-06, PAPI-07 and XMOD-11).
 
-Route modules import this, `api/pool.py` and application code, never each other. A workspace is
+Route modules import this, `api/resources.py` and application code, never each other. A workspace is
 resolved in three deliberate ways, all here: a feature route's (`current_workspace`), Readiness's
 (`readiness_workspace`) and Local Operations' (`operations_workspace`). `require_workspace_member`
 checks a workspace the path names.
@@ -12,15 +12,16 @@ import os
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Header, Request
-from psycopg import AsyncConnection
 
 from autobots.api.errors import ApiError
-from autobots.api.pool import ConnectionPool
-from autobots.api.security import MembershipStore, app_settings, current_user
+from autobots.api.membership import MembershipStore
+from autobots.api.pool import Pool
+from autobots.api.resources import app_resources
+from autobots.api.security import current_user
 from autobots.application.operations import Condition, ProbeTimes
 from autobots.application.provider_settings import (
     ProviderContext,
@@ -28,6 +29,7 @@ from autobots.application.provider_settings import (
     WorkspaceReadiness,
 )
 from autobots.application.readiness import first_blocking, installation_conditions
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_key_settings import ToolKeySettings
 
@@ -37,8 +39,7 @@ WORKSPACE_FORBIDDEN = "This workspace is not available."
 
 
 def membership(request: Request) -> MembershipStore:
-    store: MembershipStore = request.app.state.membership
-    return store
+    return app_resources(request).membership
 
 
 # The session's workspace
@@ -128,33 +129,26 @@ def process_environment(request: Request) -> Mapping[str, str]:
     """The process environment as the entry point read it at start, which orders keys for admission
     and availability alike (Decisions 0024 K1 and 0025 V3, PAPI-10). An app built without a provider
     context, as some tests are, has only the live one."""
-    context: ProviderContext | None = request.app.state.provider_context
+    context = app_resources(request).provider_context
     return os.environ if context is None else context.process_environment
 
 
 def catalog_of(request: Request) -> Catalog:
     """The catalog the app was built with, over the registry the worker runs (TC-01). The routes
     that read or admit tools take it from here, never build one (XMOD-01)."""
-    catalog: Catalog = request.app.state.tools
-    return catalog
+    return app_resources(request).tools
 
 
 def probe_times(request: Request) -> ProbeTimes:
-    """This process's readiness probe window, made on first use."""
-    probes: ProbeTimes | None = getattr(request.app.state, "probe_times", None)
-    if probes is None:
-        probes = ProbeTimes()
-        request.app.state.probe_times = probes
-    return probes
+    """This process's readiness probe window."""
+    return app_resources(request).probe_times
 
 
 async def installation_conditions_of(request: Request) -> list[Condition]:
     """Database, schema, hold, adapter, Storage and disk, by the settings read at start."""
+    resources = app_resources(request)
     return await installation_conditions(
-        request.app.state.pool,
-        getattr(request.app.state, "object_store", None),
-        app_settings(request).readiness,
-        probe_times(request),
+        resources.pool, resources.object_store, resources.settings.readiness, resources.probe_times
     )
 
 
@@ -168,11 +162,9 @@ async def require_ready(request: Request) -> None:
 # Provider and Keys & vars settings, and the key check
 
 
-def _provider_resources(
-    request: Request, unavailable: str
-) -> tuple[ConnectionPool, ProviderContext]:
-    pool: ConnectionPool | None = request.app.state.pool
-    context: ProviderContext | None = request.app.state.provider_context
+def _provider_resources(request: Request, unavailable: str) -> tuple[Pool, ProviderContext]:
+    resources = app_resources(request)
+    pool, context = resources.pool, resources.provider_context
     if pool is None or context is None:
         raise ApiError(503, "service_unavailable", unavailable)
     return pool, context
@@ -183,8 +175,8 @@ class SettingsSource[T]:
     """Settings a handler opens on a pooled connection of its own, once the workspace and owner
     checks, which may borrow one too, have answered. So a request holds one at a time (PAPI-11)."""
 
-    pool: ConnectionPool
-    build: Callable[[AsyncConnection[Any]], T]
+    pool: Pool
+    build: Callable[[SqlConnection], T]
 
     @asynccontextmanager
     async def opened(self) -> AsyncIterator[T]:

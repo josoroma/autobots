@@ -2,19 +2,27 @@
 test_worker_inference.py by module (PTST-04)."""
 
 import asyncio
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
+from typing import cast
 
 import psycopg
 import pytest
 
+from autobots.application.artifacts import PingableObjectStore
 from autobots.application.readiness import MalformedSetting
+from autobots.application.sql import SqlParams
 from autobots.operations import worker
+from sql_fakes import ScriptedConnection, ScriptedRows
 
 URL = "postgresql://unused"
 
 
 def test_the_switch_needs_its_configuration_rather_than_starting_half_ready() -> None:
     with pytest.raises(MalformedSetting, match="AUTOBOTS_CONFIG_ROOT"):
-        worker.inference_from_environment({}, URL, object(), None, None)
+        worker.inference_from_environment(
+            {}, URL, cast("PingableObjectStore", object()), None, None
+        )
     environ = {"AUTOBOTS_CONFIG_ROOT": "/nonexistent"}
     with pytest.raises(MalformedSetting, match="service key"):
         worker.inference_from_environment(environ, URL, None, None, None)
@@ -28,7 +36,7 @@ def test_a_failing_first_step_does_not_starve_the_second() -> None:
         return True
 
     async def go() -> bool:
-        return await worker.both(broken, working)(None)
+        return await worker.both(broken, working)(ScriptedConnection())
 
     assert asyncio.run(go()) is True
 
@@ -41,7 +49,7 @@ def test_losing_the_database_still_reaches_the_serve_loop() -> None:
         raise AssertionError("no second step on a lost connection")
 
     async def go() -> bool:
-        return await worker.both(lost, working)(None)
+        return await worker.both(lost, working)(ScriptedConnection())
 
     with pytest.raises(psycopg.OperationalError):
         asyncio.run(go())
@@ -50,7 +58,9 @@ def test_losing_the_database_still_reaches_the_serve_loop() -> None:
 def test_a_relative_configuration_root_refuses_to_start() -> None:
     environ = {"AUTOBOTS_CONFIG_ROOT": "relative/path"}
     with pytest.raises(MalformedSetting, match="absolute"):
-        worker.inference_from_environment(environ, URL, object(), None, None)
+        worker.inference_from_environment(
+            environ, URL, cast("PingableObjectStore", object()), None, None
+        )
 
 
 def test_both_steps_run_and_either_one_counts_as_work() -> None:
@@ -64,7 +74,7 @@ def test_both_steps_run_and_either_one_counts_as_work() -> None:
         return inner
 
     async def run_both(first: bool, second: bool) -> bool:
-        return await worker.both(step("first", first), step("second", second))(None)
+        return await worker.both(step("first", first), step("second", second))(ScriptedConnection())
 
     assert asyncio.run(run_both(False, True)) is True
     assert calls == ["first", "second"]
@@ -209,8 +219,17 @@ class FakeDatabase:
 
 
 class FakeConnection:
+    autocommit = True
+
     def __init__(self, database: FakeDatabase) -> None:
         self.database = database
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
+
+    async def commit(self) -> None:
+        return None
 
     async def __aenter__(self) -> "FakeConnection":
         return self
@@ -218,9 +237,10 @@ class FakeConnection:
     async def __aexit__(self, *_exc: object) -> None:
         return None
 
-    async def execute(self, query: str, params: tuple[object, ...]) -> None:
-        if "worker_heartbeats" in query:
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        if "worker_heartbeats" in query and isinstance(params, Sequence):
             self.database.beats.append(str(params[1]))
+        return ScriptedRows()
 
 
 def quick_config(drain_seconds: float = 30.0) -> worker.WorkerConfig:
@@ -267,7 +287,9 @@ def test_a_step_still_running_when_the_drain_ends_is_cut_short(
     async def go() -> bool:
         stop = asyncio.Event()
         stop.set()
-        return await worker._run_step(slow, None, stop, quick_config(drain_seconds=0.01), status)
+        return await worker._run_step(
+            slow, ScriptedConnection(), stop, quick_config(drain_seconds=0.01), status
+        )
 
     caplog.set_level("INFO", logger="autobots.worker")
     assert asyncio.run(go()) is False
@@ -286,6 +308,8 @@ def test_a_step_that_ends_within_the_drain_keeps_its_result() -> None:
     async def go() -> bool:
         stop = asyncio.Event()
         stop.set()
-        return await worker._run_step(quick, None, stop, quick_config(drain_seconds=5), status)
+        return await worker._run_step(
+            quick, ScriptedConnection(), stop, quick_config(drain_seconds=5), status
+        )
 
     assert asyncio.run(go()) is True

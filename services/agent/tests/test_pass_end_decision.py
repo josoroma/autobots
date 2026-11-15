@@ -11,7 +11,7 @@ import asyncio
 import contextlib
 import dataclasses
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -29,6 +29,7 @@ from autobots.application.runs import (
     VersionConflict,
     WorkerClaim,
 )
+from autobots.application.sql import SqlParams
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus, next_status
@@ -406,12 +407,16 @@ class Database:
     in_transaction: bool = False
     answer: tuple[object, ...] | None = None
 
-    async def execute(self, statement: str, values: tuple[object, ...] = ()) -> "Database":
+    # Each answer is a tuple, read by position.
+    description = None
+
+    async def execute(self, statement: str, values: SqlParams | None = None, /) -> "Database":
+        params = tuple(values) if isinstance(values, Sequence) else ()
         self.statements.append(statement)
         if statement.startswith("update app_private.run_jobs"):
-            self.writes.append((statement, tuple(values)))
+            self.writes.append((statement, params))
         if "stop_reason" in statement:
-            self.stop_reasons.append((values[1], self.in_transaction))
+            self.stop_reasons.append((params[1], self.in_transaction))
         self.answer = self._answer(statement)
         return self
 
@@ -493,7 +498,7 @@ def _finish(
                     "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s)",
                     (claim.run_id, stop_reason),
                 )
-        return TransitionResult(LEASE.run_id, 5, following.value, True)
+        return TransitionResult(LEASE.run_id, 5, following, True)
 
     async def settle_children(*_: object) -> datetime | None:
         effects.calls.append(("settle_children",))

@@ -13,7 +13,6 @@ import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 from autobots.application.credentials.precedence import dotenv_order, looks_usable, parse_dotenv
@@ -22,6 +21,7 @@ from autobots.application.credentials.store import (
     CredentialStorageUnavailable,
     ProviderCredentialStore,
 )
+from autobots.application.sql import SqlConnection
 from autobots.domain.tool_catalog import KeyRequirement
 
 SETTINGS = "settings"
@@ -143,7 +143,7 @@ class Saved:
 NOTHING_SAVED = Saved(frozenset(), {})
 
 
-async def saved_items(connection: Any, workspace_id: UUID) -> Saved:
+async def saved_items(connection: SqlConnection, workspace_id: UUID) -> Saved:
     cursor = await connection.execute(
         "select provider from app_private.provider_credentials "
         "where workspace_id = %s and provider = any(%s) and status = 'active'",
@@ -212,7 +212,7 @@ class KeySources(dict[str, str]):
 
 
 async def key_sources(
-    connection: Any, workspace_id: UUID, environ: Mapping[str, str]
+    connection: SqlConnection, workspace_id: UUID, environ: Mapping[str, str]
 ) -> KeySources:
     """The workspace's view of every Keys & vars item, in PK-04's order."""
     saved = await saved_items(connection, workspace_id)
@@ -228,7 +228,7 @@ async def key_sources(
 
 
 async def _saved_secret(
-    connection: Any, workspace_id: UUID, item: Item, environ: Mapping[str, str]
+    connection: SqlConnection, workspace_id: UUID, item: Item, environ: Mapping[str, str]
 ) -> str | None:
     assert item.credential is not None
     store = ProviderCredentialStore(connection, master_key_file(environ), item.credential)
@@ -242,7 +242,10 @@ async def _saved_secret(
 
 
 async def attempt_value(
-    connection: Any, workspace_id: UUID | None, item: Item, environ: Mapping[str, str]
+    connection: SqlConnection | None,
+    workspace_id: UUID | None,
+    item: Item,
+    environ: Mapping[str, str],
 ) -> str | None:
     """One attempt's value of `item` for the run's workspace, by `resolve` (PK-01). A saved secret
     is unsealed for this call only. Without a connection, as offline checks call it, nothing is
@@ -253,7 +256,8 @@ async def attempt_value(
         saved = await saved_items(connection, workspace_id)
 
     async def unseal(secret: Item) -> str | None:
-        assert workspace_id is not None
+        # Only a saved secret is unsealed, and nothing is saved without both.
+        assert connection is not None and workspace_id is not None
         return await _saved_secret(connection, workspace_id, secret, environ)
 
     return (await resolve(item, saved, environ, unseal)).value

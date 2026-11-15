@@ -4,9 +4,10 @@ checks drive it over real rows (tests/db/goal_loop_check.py, memory_check.py and
 admission_check.py)."""
 
 import asyncio
+import contextlib
 import json
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from datetime import datetime
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -40,11 +41,13 @@ from autobots.application.model_admission import (
 )
 from autobots.application.model_attempts import FailureClass, ProviderFailure, classify_status
 from autobots.application.run_usage import COUNTER_SQL, RootLimits
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 from autobots.logs import JsonFormatter, redact
 from fake_openrouter import DEEPSEEK, TERRA, invoke, model_over
+from sql_fakes import ScriptedConnection
 
 SCOPE = ToolScope(uuid4(), uuid4(), 1, {})
 ROUTE = ModelRoute("executor", TERRA.id.value, TERRA.wire_id, 1_000)
@@ -71,7 +74,11 @@ class Usage:
         self.summaries: list[str] = []
         self._row: tuple[object, ...] | None = None
 
-    async def execute(self, statement: str, values: Sequence[object] = ()) -> "Usage":
+    # Each answer is a tuple, read by position.
+    description = None
+
+    async def execute(self, statement: str, params: SqlParams | None = None, /) -> "Usage":
+        values = tuple(params) if isinstance(params, Sequence) else ()
         self._row = None
         for counter, sql in COUNTER_SQL.items():
             if statement == sql:
@@ -94,13 +101,17 @@ class Usage:
     async def fetchall(self) -> list[tuple[object, ...]]:
         return []
 
+    @contextlib.asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
+
 
 class Ledger(ModelAdmission):
     """Admission in memory. `admit` records each request, then raises the arranged refusals in
     order, as the real ledger refuses a busy slot or a spent budget, and then reserves."""
 
     def __init__(self, *refusals: AdmissionRefused) -> None:
-        super().__init__(connection=None)
+        super().__init__(connection=ScriptedConnection())
         self.refusals = list(refusals)
         self.asked: list[AdmissionRequest] = []
         self.events: list[tuple[str, object]] = []

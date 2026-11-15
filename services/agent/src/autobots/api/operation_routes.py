@@ -19,11 +19,12 @@ from autobots.api.dependencies import (
     readiness_workspace,
     require_ready,
 )
-from autobots.api.pool import ConnectionPool, request_pool
+from autobots.api.pool import Pool
+from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import app_settings, require_internal
 from autobots.application.backups import BackupStatus, backup_status
 from autobots.application.catalog_check import OPERATIONS_SECONDS, CatalogCheck, check_catalog
-from autobots.application.job_activity import delayed_occurrences, job_hours
+from autobots.application.job_activity import delayed_occurrences, delayed_view, job_hours
 from autobots.application.operation_values import disk_bytes, loopback_only, stored_bytes
 from autobots.application.operations import (
     Condition,
@@ -98,19 +99,14 @@ class _WorkspaceOperations:
     storage_used: int
 
 
-async def _workspace_operations(pool: ConnectionPool, workspace_id: UUID) -> _WorkspaceOperations:
+async def _workspace_operations(pool: Pool, workspace_id: UUID) -> _WorkspaceOperations:
     async with pool.connection() as connection:
         counts = await queue_counts(connection, workspace_id)
         queue = queue_condition(counts)
         worker = await worker_condition(connection, counts)
         policy = await read_policy(connection, workspace_id)
         delayed = [
-            DelayedOccurrence(
-                routine=public_text(row[0]),
-                occurrence_time=row[1],
-                status=row[2],
-                reason=row[3],
-            )
+            delayed_view(row, public_text(row.name))
             for row in await delayed_occurrences(connection, workspace_id)
         ]
         qualifications = await read_route_qualifications(connection)
@@ -162,8 +158,7 @@ def _local_status(
         scope="workspace" if workspace else "installation",
         remote_tracing="disabled" if process.remote_tracing_off else "enabled",
         conditions=[
-            OperationCondition(name=item.name, state=item.state, code=item.code)  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
-            for item in shown
+            OperationCondition(name=item.name, state=item.state, code=item.code) for item in shown
         ],
         queue=queue,
         retention=workspace.retention if workspace else None,
@@ -205,9 +200,9 @@ async def get_local_status(
         if workspace_id is None
         else await _workspace_operations(request_pool(request), workspace_id)
     )
+    context = app_resources(request).provider_context
     catalog = await check_catalog(
-        getattr(getattr(request.app.state, "provider_context", None), "fetch_catalog", None),
-        OPERATIONS_SECONDS,
+        None if context is None else context.fetch_catalog, OPERATIONS_SECONDS
     )
     settings = app_settings(request)
     backups = await backup_status(settings.backup_dir, datetime.now(UTC))
@@ -288,7 +283,7 @@ async def put_retention(
 async def post_retention_apply(request: Request, workspace_id: OwnerWorkspace) -> RetentionApplied:
     async with request_pool(request).connection() as connection:
         report = await apply_retention(
-            connection, getattr(request.app.state, "object_store", None), workspace_id
+            connection, app_resources(request).object_store, workspace_id
         )
     return RetentionApplied(
         schema_version=1,
@@ -313,7 +308,7 @@ async def get_readiness(
     """
     workspace_id = await readiness_workspace(request, user_id, x_autobots_workspace)
     database, schema, *_rest = await database_conditions(
-        request.app.state.pool, probe_times(request)
+        app_resources(request).pool, probe_times(request)
     )
     database_up = database.state == "ok" and schema.state == "ok"
     services = [ServiceReadiness(name="api", state="ready", code="api_ready")]
@@ -326,7 +321,7 @@ async def get_readiness(
         return MemberReadiness(schema_version=1, ready=False, services=services)
     async with request_pool(request).connection() as connection:
         worker = await worker_condition(connection, QueueCounts(0, 0, 0, 0))
-        context = request.app.state.provider_context
+        context = app_resources(request).provider_context
         auth = (
             await ProviderSettings(connection, context).auth_status(workspace_id)
             if context is not None

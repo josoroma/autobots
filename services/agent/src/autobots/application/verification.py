@@ -1,14 +1,21 @@
 """Deterministic completion, LC-12. A plausible answer can't mark a run successful."""
 
 from dataclasses import dataclass
-from typing import Any
+from uuid import UUID
 
-from autobots.application.artifacts import ArtifactUnavailable, read_artifact, reconcile_run
+from autobots.application.artifacts import (
+    ArtifactUnavailable,
+    ObjectStore,
+    read_artifact,
+    reconcile_run,
+)
 from autobots.application.plans import plan_view
 from autobots.application.recovery import outstanding
+from autobots.application.sql import SqlConnection, all_rows
 from autobots.application.tool_definitions import ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
+from autobots.persistence.rows import NamedArtifactRow
 
 
 @dataclass(frozen=True)
@@ -22,18 +29,20 @@ class VerificationReport:
         return not self.unmet
 
 
-async def _latest_by_name(connection: Any, lease: Lease) -> dict[str, tuple[Any, str]]:
+async def _latest_by_name(connection: SqlConnection, lease: Lease) -> dict[str, tuple[UUID, str]]:
     """The newest attempt per name decides, so an older good copy can't stand in for a lost one."""
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        NamedArtifactRow,
         "select distinct on (name) name, id, status from public.artifacts where run_id = %s "
         "order by name, created_at desc",
         (lease.run_id,),
     )
-    return {row[0]: (row[1], row[2]) for row in await cursor.fetchall()}
+    return {row.name: (row.id, row.status) for row in rows}
 
 
 async def verify_candidate(
-    connection: Any, store: Any, lease: Lease, goal: GoalSpec
+    connection: SqlConnection, store: ObjectStore | None, lease: Lease, goal: GoalSpec
 ) -> VerificationReport:
     """Reads back from storage. This writes no verdict: the owner records it with the transition."""
     unmet: list[str] = []

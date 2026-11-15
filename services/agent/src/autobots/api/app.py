@@ -2,13 +2,10 @@
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from typing import Protocol
 
 from fastapi import FastAPI
-from psycopg_pool import AsyncConnectionPool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from autobots.adapters.tool_registry import catalog
 from autobots.api.approval_routes import router as approval_router
 from autobots.api.artifact_routes import router as artifact_router
 from autobots.api.errors import ERROR_RESPONSES, register_error_handlers
@@ -19,63 +16,42 @@ from autobots.api.keys_and_vars_routes import router as keys_and_vars_router
 from autobots.api.memory_routes import router as memory_router
 from autobots.api.model_policy_routes import router as model_policy_router
 from autobots.api.operation_routes import router as operation_router
-from autobots.api.pool import POOL_WAIT_SECONDS
+from autobots.api.pool import Pool, default_pool
 from autobots.api.provider_routes import router as provider_router
+from autobots.api.resources import AppResources
 from autobots.api.routes import router
 from autobots.api.routine_routes import router as routine_router
 from autobots.api.run_command_routes import router as run_command_router
 from autobots.api.run_reconcile_routes import router as run_reconcile_router
 from autobots.api.run_routes import router as run_router
 from autobots.api.search_routes import router as search_router
-from autobots.api.security import DenyAllMembership, MembershipStore
-from autobots.api.settings import Settings
 from autobots.api.tool_routes import router as tool_router
 from autobots.api.workflow_routes import router as workflow_router
-from autobots.application.tool_catalog import Catalog
-
-
-class Pool(Protocol):
-    async def open(self) -> None: ...
-    async def close(self) -> None: ...
-
-
-def default_pool(url: str) -> Pool:
-    return AsyncConnectionPool(
-        url,
-        open=False,
-        min_size=1,
-        max_size=5,
-        check=AsyncConnectionPool.check_connection,
-        timeout=POOL_WAIT_SECONDS,
-    )
 
 
 def create_app(
-    settings: Settings | None = None,
+    resources: AppResources | None = None,
     *,
-    membership: MembershipStore | None = None,
     pool_factory: Callable[[str], Pool] = default_pool,
-    tools: Catalog | None = None,
 ) -> FastAPI:
-    """`tools` is the tool catalog the routes read and admit through. By default it is the one
-    over the registry the worker builds (adapters/tool_registry.py, XMOD-01); a test passes its
-    own. Building it opens nothing."""
-    resolved = Settings() if settings is None else settings
+    """`resources` are what the process holds (api/resources.py). The entry point builds them from
+    the environment, and a test builds its own. Building the app opens nothing."""
+    held = AppResources() if resources is None else resources
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         """Owns process resources: created at startup and closed at shutdown, never at import."""
-        url = resolved.database_url.get_secret_value()
+        url = held.settings.database_url.get_secret_value()
         pool = pool_factory(url) if url else None
         if pool is not None:
             await pool.open()
-        app.state.pool = pool
+        held.pool = pool
         try:
             yield
         finally:
             if pool is not None:
                 await pool.close()
-            app.state.pool = None
+            held.pool = None
 
     app = FastAPI(
         title="Autobots Agent API",
@@ -85,12 +61,8 @@ def create_app(
         docs_url=None,
         redoc_url=None,
     )
-    app.state.settings = resolved
-    app.state.membership = DenyAllMembership() if membership is None else membership
-    app.state.pool = None
-    app.state.provider_context = None
-    app.state.tools = catalog() if tools is None else tools
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(resolved.allowed_hosts))
+    app.state.resources = held
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(held.settings.allowed_hosts))
     register_error_handlers(app)
     app.include_router(router, responses=ERROR_RESPONSES)
     app.include_router(provider_router, responses=ERROR_RESPONSES)

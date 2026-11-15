@@ -17,6 +17,7 @@ import pytest
 from autobots.application import run_lifecycle
 from autobots.application.run_lifecycle import LeaseKeeper, LoopConfig, lease_heartbeat
 from autobots.application.runs import LeaseLost
+from autobots.application.sql import SqlParams
 from autobots.application.worker_leases import Lease, WakeClock
 from autobots.domain.models import ModelRoute
 
@@ -39,7 +40,9 @@ class Clocks:
 class Unused:
     """The keeper's connection. Every call the keeper makes through it is replaced."""
 
-    async def execute(self, query: str, params: tuple[object, ...], /) -> "Unused":
+    description = None
+
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> "Unused":
         raise AssertionError(query)
 
     async def fetchone(self) -> tuple[object, ...] | None:

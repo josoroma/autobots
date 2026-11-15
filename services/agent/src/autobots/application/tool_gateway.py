@@ -21,6 +21,7 @@ from autobots.application.approvals import (
     scope_snapshot,
 )
 from autobots.application.runs import LeaseLost
+from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.application.tool_definitions import (
     APPROVAL_POLICY_VERSION,
     NotDelivered,
@@ -40,6 +41,7 @@ from autobots.domain.runs import RunStatus
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tools import OperationClass, ToolOutcome, path_granted
 from autobots.logs import log_event
+from autobots.persistence.rows import OwnershipRow
 
 logger = logging.getLogger("autobots.tools")
 
@@ -86,7 +88,9 @@ class Refused:
     parsed: BaseModel | None = None
 
 
-def resolve(registry: ToolRegistry, scope: ToolScope, name: str, arguments: Any) -> Call | Refused:
+def resolve(
+    registry: ToolRegistry, scope: ToolScope, name: str, arguments: object
+) -> Call | Refused:
     """The call, or why it is refused before anything about the run is read: not granted, not
     registered, an executor no longer qualified, invalid arguments or a path outside the grants,
     in that order (SP-013)."""
@@ -115,7 +119,10 @@ def resolve(registry: ToolRegistry, scope: ToolScope, name: str, arguments: Any)
 
 
 async def _target_unchanged(
-    connection: Any, operation_id: str, approval: ApprovedRequest | None, target: str | None
+    connection: SqlConnection,
+    operation_id: str,
+    approval: ApprovedRequest | None,
+    target: str | None,
 ) -> bool:
     """Decision 0025 V7 and V8: an approved effect runs only against the target it was approved
     for, and an empty recorded target fails closed. One already sent, or possibly sent, is left to
@@ -130,7 +137,7 @@ async def _target_unchanged(
     return bool(recorded) and recorded == target
 
 
-async def _has_approval(connection: Any, operation_id: str) -> bool:
+async def _has_approval(connection: SqlConnection, operation_id: str) -> bool:
     cursor = await connection.execute(
         "select 1 from public.approval_requests where operation_id = %s", (operation_id,)
     )
@@ -164,7 +171,7 @@ def _log_failure(
     log_event(logger, event, level, **fields)
 
 
-async def _expert_behind(connection: Any, scope: ToolScope) -> bool:
+async def _expert_behind(connection: SqlConnection, scope: ToolScope) -> bool:
     """The run was admitted from an Expert's binding, the only place such a grant comes from."""
     cursor = await connection.execute(
         "select expert_id is not null from public.runs where id = %s and workspace_id = %s",
@@ -174,21 +181,22 @@ async def _expert_behind(connection: Any, scope: ToolScope) -> bool:
     return bool(row and row[0])
 
 
-async def ownership_refusal(connection: Any, scope: ToolScope) -> GatewayCode | None:
+async def ownership_refusal(connection: SqlConnection, scope: ToolScope) -> GatewayCode | None:
     """Run status and ownership, read fresh by database time."""
-    cursor = await connection.execute(
-        "select r.status, j.status, j.generation, j.lease_expires_at > clock_timestamp() "
+    row = await optional_row(
+        connection,
+        OwnershipRow,
+        "select r.status as run_status, j.status as job_status, j.generation, "
+        "j.lease_expires_at > clock_timestamp() as lease_live "
         "from public.runs r join app_private.run_jobs j on j.run_id = r.id "
         "where r.id = %s and r.workspace_id = %s",
         (scope.run_id, scope.workspace_id),
     )
-    row = await cursor.fetchone()
     if row is None:
         return GatewayCode.RUN_NOT_FOUND
-    run_status, job_status, generation, live = row
-    if job_status != "claimed" or generation != scope.generation or not live:
+    if row.job_status != "claimed" or row.generation != scope.generation or not row.lease_live:
         return GatewayCode.LEASE_LOST
-    if run_status != RunStatus.RUNNING.value:
+    if row.run_status != RunStatus.RUNNING.value:
         return GatewayCode.RUN_NOT_RUNNING
     return None
 
@@ -197,7 +205,7 @@ class NotRunning(Exception):
     """The run stopped after this worker last looked, so nothing is admitted."""
 
 
-async def hold_running(connection: Any, scope: ToolScope) -> None:
+async def hold_running(connection: SqlConnection, scope: ToolScope) -> None:
     """Inside the admission's transaction, so a cancel can't land between this and the receipt."""
     await hold_lease(connection, scope)
     cursor = await connection.execute(
@@ -208,7 +216,9 @@ async def hold_running(connection: Any, scope: ToolScope) -> None:
         raise NotRunning
 
 
-async def admission_refusal(connection: Any, scope: ToolScope, call: Call) -> GatewayCode | None:
+async def admission_refusal(
+    connection: SqlConnection, scope: ToolScope, call: Call
+) -> GatewayCode | None:
     """The run is running and this worker owns it, then an Expert-only tool has an Expert behind
     the run (AB-02). Both are read fresh, after the call resolved and before any approval."""
     refusal = await ownership_refusal(connection, scope)
@@ -248,7 +258,7 @@ class Released:
 
 
 async def hold_for_approval(
-    connection: Any, scope: ToolScope, call: Call
+    connection: SqlConnection, scope: ToolScope, call: Call
 ) -> GatewayCode | str | Released:
     """Released lets the call through: its policy doesn't hold it, or a person approved this
     operation and its target still resolves to the one they approved (Decision 0015, Decision 0025
@@ -291,7 +301,7 @@ async def hold_for_approval(
 
 
 async def admit_budget(
-    connection: Any, scope: ToolScope, call: Call, use: int | None
+    connection: SqlConnection, scope: ToolScope, call: Call, use: int | None
 ) -> GatewayCode | None:
     """Decision 0017 Q4: a metered call is counted per root run tree, before any request leaves.
     After approval, so a call waiting for a person isn't counted twice."""
@@ -309,7 +319,7 @@ class ToolGateway:
     registry: ToolRegistry
 
     async def execute(
-        self, connection: Any, scope: ToolScope, name: str, arguments: Any
+        self, connection: SqlConnection, scope: ToolScope, name: str, arguments: object
     ) -> ToolResult:
         """Every dispatch is recorded, denials included, before and after it runs (TU-01). A worker
         that lost its lease records nothing, and is refused below as before."""
@@ -325,7 +335,7 @@ class ToolGateway:
         return result
 
     async def _dispatch(
-        self, connection: Any, scope: ToolScope, resolved: Call | Refused, use: int | None
+        self, connection: SqlConnection, scope: ToolScope, resolved: Call | Refused, use: int | None
     ) -> ToolResult:
         """Refused before any effect, in the order that is the gateway's security contract (SP-013):
         the call doesn't resolve, admission refuses it, it waits for a person or is refused at
@@ -350,7 +360,11 @@ class ToolGateway:
         return await self._read(connection, scope, call, approval)
 
     async def _read(
-        self, connection: Any, scope: ToolScope, call: Call, approval: ApprovedRequest | None
+        self,
+        connection: SqlConnection,
+        scope: ToolScope,
+        call: Call,
+        approval: ApprovedRequest | None,
     ) -> ToolResult:
         """No effect, so no receipt. A repeated read must see current content. One a person
         approved has used that approval up (PTOL-06)."""
@@ -383,7 +397,7 @@ class ToolGateway:
 
     async def admit_effect(
         self,
-        connection: Any,
+        connection: SqlConnection,
         scope: ToolScope,
         call: Call,
         approval: ApprovedRequest | None = None,
@@ -473,11 +487,11 @@ async def replay_receipt(context: ToolContext, call: Call) -> ToolResult | None:
     At module level, so a database check can land a late success between two of its reads by
     swapping it with `patch.object` (TDBC-02)."""
     tool, operation_id = call.tool, call.operation_id
-    cursor = await context.connection.execute(
+    status, result = await one(
+        context.connection,
         "select status, result from app_private.tool_receipts where operation_id = %s",
         (operation_id,),
     )
-    status, result = await cursor.fetchone()
     if status == ReceiptStatus.SUCCEEDED:
         return ToolResult(
             ToolOutcome.SUCCEEDED, output=result, operation_id=operation_id, replayed=True

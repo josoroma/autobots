@@ -7,9 +7,10 @@ step's child is driven (PPRD-02).
 """
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -28,6 +29,7 @@ from autobots.application.run_lifecycle import (
 )
 from autobots.application.run_usage import ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_worker_command
+from autobots.application.sql import SqlConnection, all_rows, required_row
 from autobots.application.tool_definitions import (
     ApprovalPolicy,
     ToolContext,
@@ -52,6 +54,7 @@ from autobots.domain.workflow_execution import (
     unsettled_nodes,
 )
 from autobots.domain.workflows import validate_graph
+from autobots.persistence.rows import EmittedValueRow, RunExecutionRow
 
 
 class ApprovalInput(BaseModel):
@@ -100,26 +103,28 @@ class InstanceStopped(Exception):
 
 
 async def _load_state(
-    connection: Any, execution_id: Any
+    connection: SqlConnection, execution_id: UUID
 ) -> tuple[dict[str, str], dict[tuple[str, str, int], Any]]:
     cursor = await connection.execute(
         "select instance_key, status from public.workflow_node_instances where execution_id = %s",
         (execution_id,),
     )
     statuses = {row[0]: row[1] for row in await cursor.fetchall()}
-    cursor = await connection.execute(
+    emitted = await all_rows(
+        connection,
+        EmittedValueRow,
         "select instance_key, port, sequence, value from public.workflow_emissions "
         "where execution_id = %s",
         (execution_id,),
     )
-    emissions = {(row[0], row[1], row[2]): row[3] for row in await cursor.fetchall()}
+    emissions = {(row.instance_key, row.port, row.sequence): row.value for row in emitted}
     return statuses, emissions
 
 
 async def commit_instance(
-    connection: Any,
+    connection: SqlConnection,
     scope: ToolScope,
-    execution_id: Any,
+    execution_id: UUID,
     step: Step,
     status: str,
     outputs: list[tuple[str, int, Any]],
@@ -145,7 +150,11 @@ async def commit_instance(
 
 
 async def call_tool(
-    gateway: ToolGateway, connection: Any, scope: ToolScope, name: str, arguments: dict[str, Any]
+    gateway: ToolGateway,
+    connection: SqlConnection,
+    scope: ToolScope,
+    name: str,
+    arguments: dict[str, Any],
 ) -> dict[str, Any]:
     """A stop leaves the instance to run again, and any recorded effect comes back from its receipt.
     A code that would release or suspend the run is a stop, parent_not_running included, so a pause
@@ -161,9 +170,9 @@ async def call_tool(
 
 async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-06)
     gateway: ToolGateway,
-    connection: Any,
+    connection: SqlConnection,
     scope: ToolScope,
-    node: Any,
+    node: Mapping[str, Any],
     step: Step,
     inputs: dict[str, Any],
 ) -> list[tuple[str, int, Any]]:
@@ -232,10 +241,10 @@ async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-0
 
 async def run_pass(
     gateway: ToolGateway,
-    connection: Any,
+    connection: SqlConnection,
     scope: ToolScope,
     shape: GraphShape,
-    execution_id: Any,
+    execution_id: UUID,
     inputs: dict[str, Any],
     after_commit: Callable[[Step], None],
 ) -> bool:
@@ -265,7 +274,7 @@ async def run_pass(
 
 
 async def run_workflow(
-    connection: Any,
+    connection: SqlConnection,
     database_url: str,
     lease: Lease,
     model: Any,
@@ -279,20 +288,22 @@ async def run_workflow(
     dispatch passes its own. It is required, so no caller can leave an agent step without one and
     fail its run for good (SP-010)."""
 
-    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+    async def drive_child(child_connection: SqlConnection, child_lease: Lease) -> LoopResult:
         return await drive(child_connection, database_url, child_lease, lambda: model, config)
 
     delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
     # The process's tool set, with this workflow's approval step (APPROVAL_GATE). Built first, so a
     # process that composed no tools stops before anything is written.
     gateway = ToolGateway(pass_registry(config, delegation, workflow=True))
-    cursor = await connection.execute(
+    execution = await required_row(
+        connection,
+        RunExecutionRow,
         "select e.id, e.inputs, v.graph from public.workflow_executions e "
         "join public.workflow_versions v on v.workflow_id = e.workflow_id "
         "and v.version = e.workflow_version where e.run_id = %s",
         (lease.run_id,),
     )
-    execution_id, inputs, graph = await cursor.fetchone()
+    execution_id, inputs, graph = execution.id, execution.inputs, execution.graph
     goal = await load_goal(connection, lease.run_id)
     await ensure_usage(connection, lease.run_id)
     if validate_graph(graph):
@@ -330,7 +341,7 @@ async def run_workflow(
     return await complete_workflow(connection, lease, goal)
 
 
-async def complete_workflow(connection: Any, lease: Lease, goal: GoalSpec) -> LoopResult:
+async def complete_workflow(connection: SqlConnection, lease: Lease, goal: GoalSpec) -> LoopResult:
     """A workflow finishes when every instance is settled, through the normal transitions.
 
     A worker can die between the two, so a run already verifying only needs the second.

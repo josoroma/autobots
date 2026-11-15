@@ -14,16 +14,16 @@ argument at the call site, not a missing line.
 """
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal, Protocol, Self
+from typing import Literal, Self
 from uuid import UUID
 
 from autobots.application.experts import RunBinding, resolve_binding
 from autobots.application.experts import expert_overrides as expert_overrides
 from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.runs import AdmissionResult, Fresh, RunAdmission, admit
+from autobots.application.sql import SqlConnection, SqlPool
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.plans import InputDocument, RequiredArtifact
@@ -42,21 +42,6 @@ from autobots.domain.models import (
 # Says whether a workspace can make model calls now: "ready", or the code that refuses. It reports,
 # and never starts anything.
 CredentialCheck = Callable[[UUID], Awaitable[str]]
-
-
-class Rows(Protocol):
-    # A row's columns are whatever its query selects, so they stay untyped here.
-    async def fetchone(self) -> tuple[Any, ...] | None: ...
-
-
-class Connection(Protocol):
-    async def execute(self, query: str, params: tuple[UUID], /) -> Rows: ...
-
-
-class Connections(Protocol):
-    """The API's pool. A step that reads takes a connection of its own."""
-
-    def connection(self) -> AbstractAsyncContextManager[Connection]: ...
 
 
 class ModelNotReady(Refusal):
@@ -130,7 +115,7 @@ class WorkspacePolicy:
         return policy
 
 
-async def saved_workspace_policy(connection: Connection, workspace_id: UUID) -> WorkspacePolicy:
+async def saved_workspace_policy(connection: SqlConnection, workspace_id: UUID) -> WorkspacePolicy:
     cursor = await connection.execute(
         "select default_profile, role_overrides from app_private.model_policies "
         "where workspace_id = %s",
@@ -141,7 +126,7 @@ async def saved_workspace_policy(connection: Connection, workspace_id: UUID) -> 
 
 
 async def workspace_role_policy(
-    connection: Connection,
+    connection: SqlConnection,
     workspace_id: UUID,
     *,
     run_role_overrides: Mapping[str, str] | None = None,
@@ -158,7 +143,7 @@ async def workspace_role_policy(
 
 
 async def chosen_limit(
-    connection: Connection, workspace_id: UUID, budget: int | None, *, otherwise: int
+    connection: SqlConnection, workspace_id: UUID, budget: int | None, *, otherwise: int
 ) -> int:
     """A chosen budget becomes the run's frozen limit once Decision 0022 D11's rules and what's left
     of today's cap allow it. With none chosen, the limit is `otherwise`. Raises BudgetRefused."""
@@ -169,7 +154,7 @@ async def chosen_limit(
 
 
 async def require_tools_available(
-    connection: Connection,
+    connection: SqlConnection,
     workspace_id: UUID,
     tools: Iterable[str],
     environment: Mapping[str, str],
@@ -231,7 +216,7 @@ class AdmissionInput:
 async def admit_from_request(
     data: AdmissionInput,
     *,
-    database: Connections,
+    database: SqlPool,
     model_ready: CredentialCheck,
     role: Callable[[], Awaitable[str | None]],
     environment: Mapping[str, str],
@@ -286,7 +271,7 @@ async def admit_from_request(
         )
 
 
-async def _request_limit(database: Connections, data: AdmissionInput) -> int:
+async def _request_limit(database: SqlPool, data: AdmissionInput) -> int:
     """Step 2. A budget is read against today's cap on a connection of its own, released before the
     key check."""
     if data.budget_micro_usd is None:
@@ -300,7 +285,7 @@ async def _request_limit(database: Connections, data: AdmissionInput) -> int:
 
 
 async def _session_binding(
-    connection: Connection,
+    connection: SqlConnection,
     data: AdmissionInput,
     environment: Mapping[str, str],
     catalog: Catalog,

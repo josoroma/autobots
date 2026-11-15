@@ -23,11 +23,13 @@ from autobots.adapters.github_issues import github_issue_tool
 from autobots.adapters.github_pulls import GITHUB_PULL_REQUEST
 from autobots.adapters.github_reads import GITHUB_READ_TOOLS, github_read_tools
 from autobots.application import tool_keys
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
+from sql_fakes import ScriptedConnection
 
 REPOSITORY = "owner/configured"
 ENV = {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_TOKEN": "github_pat_fixture0001"}
-CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), "op-1")
+CONTEXT = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), "op-1")
 
 
 @pytest.mark.parametrize("status", sorted(READ_REFUSED))
@@ -83,7 +85,10 @@ def test_one_call_resolves_its_repository_and_token_once(monkeypatch: pytest.Mon
     real = tool_keys.attempt_value
 
     async def counted(
-        connection: object, workspace: UUID | None, item: tool_keys.Item, environ: Mapping[str, str]
+        connection: SqlConnection | None,
+        workspace: UUID | None,
+        item: tool_keys.Item,
+        environ: Mapping[str, str],
     ) -> str | None:
         resolved.append((workspace, item.name))
         return await real(connection, workspace, item, environ)

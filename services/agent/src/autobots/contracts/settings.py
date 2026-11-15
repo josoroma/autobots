@@ -1,7 +1,7 @@
 """Safe provider settings. Nothing here carries a stored key; only a request holds a draft."""
 
 from datetime import date
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,10 @@ AuthStatus = Literal["missing", "configured", "invalid", "unavailable"]
 CatalogStatus = Literal["available", "unavailable", "unknown"]
 RouteQualificationStatus = Literal["qualified_with_limits", "not_qualified"]
 CredentialSource = Literal["none", "app", "environment"]
+AUTH_STATUSES: tuple[AuthStatus, ...] = get_args(AuthStatus)
+ROUTE_QUALIFICATION_STATUSES: tuple[RouteQualificationStatus, ...] = get_args(
+    RouteQualificationStatus
+)
 
 
 class RouteQualification(BaseModel):

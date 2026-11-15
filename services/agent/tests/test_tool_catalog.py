@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from autobots.adapters.tool_registry import catalog, catalog_registry
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.application.tool_catalog import Catalog, all_descriptors, catalog_digest
 from autobots.application.tool_definitions import ToolRegistry, ToolScope
 from autobots.application.tool_gateway import Refused, resolve
@@ -149,7 +150,7 @@ def test_the_routes_list_the_catalog_the_app_was_built_with() -> None:
     assert calculate is not None
     only = ToolRegistry()
     only.register(calculate)
-    app = create_app(SETTINGS, membership=Membership(), tools=Catalog(lambda _: only))
+    app = create_app(AppResources(SETTINGS, membership=Membership(), tools=Catalog(lambda _: only)))
     reply = TestClient(app).get("/v1/tools", headers=headers(token()))
     assert reply.status_code == 200
     listed = [item["tool_id"] for item in reply.json()["tools"] if item["registered"]]

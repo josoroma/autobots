@@ -16,6 +16,7 @@ from autobots.application.loop_admission import active_middleware
 from autobots.application.loop_policy import LoopStopped
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
 from autobots.contracts.browsing import BrowseGoalInput
+from sql_fakes import ScriptedConnection
 
 TC_03_PROVIDERS = {"autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github"}
 CATALOG = catalog()
@@ -236,7 +237,8 @@ def call(replies: list[Any], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Exec
         try:
             with active_middleware(Middleware(replies)):
                 return await tool.handler(
-                    BrowseGoalInput.model_validate(ARGS), ToolContext(None, scope, None)
+                    BrowseGoalInput.model_validate(ARGS),
+                    ToolContext(ScriptedConnection(), scope, None),
                 )
         except ToolFailed as failed:
             return str(failed)
@@ -271,7 +273,9 @@ def test_no_runtime_or_no_loop_fails_before_any_container() -> None:
 
     async def go() -> str:
         try:
-            await tool.handler(BrowseGoalInput.model_validate(ARGS), ToolContext(None, scope, None))
+            await tool.handler(
+                BrowseGoalInput.model_validate(ARGS), ToolContext(ScriptedConnection(), scope, None)
+            )
         except ToolFailed as failed:
             return str(failed)
         return "ran"

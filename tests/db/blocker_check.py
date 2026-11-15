@@ -253,19 +253,19 @@ async def main() -> None:
             text = 'x' * size + 'CONSEQUENTIAL-TAIL'
             pending = await gateway.execute(db, scope_of(lease, {'send_note': 1}), 'send_note', {'text': text})
             check(f'a proposal {label} waits for approval', 'approval_pending', pending.code, pending.code == 'approval_pending')
-            rows = [row for row in await list_approvals(db, WORKSPACE, 'pending') if row['run_id'] == run]
+            rows = [row for row in await list_approvals(db, WORKSPACE, 'pending') if row.run_id == run]
             row = rows[0]
             if size < ARGUMENT_LIMIT:
-                check('the whole proposal reaches the reviewer, tail included', 'not over the limit', exceeds_review_limit(row['arguments']), not exceeds_review_limit(row['arguments']) and 'CONSEQUENTIAL-TAIL' in row['arguments'])
+                check('the whole proposal reaches the reviewer, tail included', 'not over the limit', exceeds_review_limit(row.arguments), not exceeds_review_limit(row.arguments) and 'CONSEQUENTIAL-TAIL' in row.arguments)
             else:
                 try:
-                    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
+                    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row.id, idempotency_key=str(uuid4()), decision='approve', argument_hash=row.argument_hash)
                     refused = 'approved'
                 except ApprovalRefused as error:
                     refused = error.code
                 check('one too long to show whole cannot be approved', 'approval_too_large', refused, refused == 'approval_too_large')
                 try:
-                    decided = await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='reject', argument_hash=row['argument_hash'])
+                    decided = await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row.id, idempotency_key=str(uuid4()), decision='reject', argument_hash=row.argument_hash)
                     outcome = decided.status
                 except ApprovalRefused as error:
                     outcome = error.code

@@ -12,11 +12,11 @@ current value, never a secret.
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 from autobots.application.credentials.store import CredentialMissing, ProviderCredentialStore
 from autobots.application.provider_settings import InvalidKey, StaleVersion
+from autobots.application.sql import SqlConnection, one
 from autobots.application.tool_keys import ITEMS, Item, resolve, saved_items
 
 
@@ -44,7 +44,9 @@ def checked(item: Item, value: str) -> str:
 class ToolKeySettings:
     """One workspace's keys and values, over one runtime-role connection."""
 
-    def __init__(self, connection: Any, key_file: Path, environ: Mapping[str, str]) -> None:
+    def __init__(
+        self, connection: SqlConnection, key_file: Path, environ: Mapping[str, str]
+    ) -> None:
         self._connection = connection
         self._key_file = key_file
         self._environ = environ
@@ -56,13 +58,13 @@ class ToolKeySettings:
             (workspace_id, name),
         )
         suffix = " for update" if lock else ""
-        cursor = await self._connection.execute(
+        (version,) = await one(
+            self._connection,
             "select version from app_private.tool_key_settings "
             f"where workspace_id = %s and provider = %s{suffix}",
             (workspace_id, name),
         )
-        row = await cursor.fetchone()
-        return int(row[0])
+        return int(version)
 
     async def _advance(self, workspace_id: UUID, name: str, value: str | None = None) -> None:
         await self._connection.execute(

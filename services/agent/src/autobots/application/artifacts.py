@@ -4,10 +4,11 @@ import hashlib
 import re
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID, uuid4
 
 from autobots.application.runs import append_event
+from autobots.application.sql import SqlConnection, all_rows, one, optional_row, stored
 from autobots.application.tool_definitions import (
     RuntimeUnbound,
     ToolContext,
@@ -16,11 +17,22 @@ from autobots.application.tool_definitions import (
     ToolScope,
 )
 from autobots.application.tool_gateway import hold_lease
-from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
+from autobots.contracts.artifacts import (
+    LISTED_ARTIFACT_STATUSES,
+    ArtifactSummary,
+    PublishArtifact,
+    PublishedArtifact,
+)
 from autobots.contracts.runs import ArtifactMissing, ArtifactPublished
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
+from autobots.persistence.rows import (
+    ArtifactObjectRow,
+    ArtifactRow,
+    PublishedArtifactRow,
+    StoredArtifactRow,
+)
 
 MEDIA_TYPES = frozenset({"text/plain", "text/markdown", "application/json"})
 MAX_ARTIFACT_BYTES = 1_000_000
@@ -32,6 +44,12 @@ class ObjectStore(Protocol):
     async def get(self, path: str) -> bytes | None: ...
     async def remove(self, path: str) -> None: ...
     async def names(self, prefix: str) -> list[str]: ...
+
+
+class PingableObjectStore(ObjectStore, Protocol):
+    """An object store readiness can ping, as Supabase Storage is (POPS-17)."""
+
+    async def ping(self) -> None: ...
 
 
 class ArtifactUnavailable(Refusal):
@@ -49,7 +67,7 @@ def _digest(content: bytes) -> str:
 
 
 async def _publish_row(
-    connection: Any, artifact_id: UUID, run_id: UUID, name: str, digest: str
+    connection: SqlConnection, artifact_id: UUID, run_id: UUID, name: str, digest: str
 ) -> None:
     await connection.execute(
         "update public.artifacts set status = 'published', published_at = now() where id = %s",
@@ -65,7 +83,7 @@ async def _publish_row(
 
 
 async def publish(
-    connection: Any,
+    connection: SqlConnection,
     store: ObjectStore,
     scope: ToolScope,
     *,
@@ -100,10 +118,11 @@ async def publish(
             digest,
         ),
     )
-    cursor = await connection.execute(
-        "select id, status from public.artifacts where operation_id = %s", (operation_id,)
+    artifact_id, status = await one(
+        connection,
+        "select id, status from public.artifacts where operation_id = %s",
+        (operation_id,),
     )
-    artifact_id, status = await cursor.fetchone()
     result = PublishedArtifact(
         artifact_id=str(artifact_id), name=name, sha256=digest, size_bytes=len(content)
     )
@@ -136,14 +155,14 @@ class ReconcileReport:
         return not self.incomplete and not self.missing
 
 
-async def _still_owner(connection: Any, owner: ToolScope | None) -> None:
+async def _still_owner(connection: SqlConnection, owner: ToolScope | None) -> None:
     """A worker's recovery stops at the moment it loses the run. An operator passes no owner."""
     if owner is not None:
         await hold_lease(connection, owner)
 
 
 async def reconcile_run(
-    connection: Any,
+    connection: SqlConnection,
     store: ObjectStore,
     workspace_id: UUID,
     run_id: UUID,
@@ -155,16 +174,24 @@ async def reconcile_run(
     listed object has a visible row, and another worker's fresh upload can't look like an orphan.
     """
     listed = await store.names(f"{workspace_id}/{run_id}")
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        ArtifactObjectRow,
         "select id, name, object_path, sha256, status from public.artifacts "
         "where run_id = %s and workspace_id = %s",
         (run_id, workspace_id),
     )
-    rows = await cursor.fetchall()
     published: list[str] = []
     incomplete: list[str] = []
     missing: list[str] = []
-    for artifact_id, name, path, digest, status in rows:
+    for row in rows:
+        artifact_id, name, path, digest, status = (
+            row.id,
+            row.name,
+            row.object_path,
+            row.sha256,
+            row.status,
+        )
         if status not in {"staged", "published"}:
             continue
         stored = await store.get(path)
@@ -193,7 +220,7 @@ async def reconcile_run(
                     ArtifactMissing(type="artifact.missing", artifact_id=artifact_id, name=name),
                 )
             missing.append(name)
-    known = {row[2] for row in rows}
+    known = {row.object_path for row in rows}
     orphans = [path for path in listed if path not in known]
     for path in orphans:
         await _still_owner(connection, owner)
@@ -201,31 +228,47 @@ async def reconcile_run(
     return ReconcileReport(tuple(published), tuple(incomplete), tuple(missing), tuple(orphans))
 
 
-async def list_artifacts(connection: Any, workspace_id: UUID, run_id: UUID) -> list[dict[str, Any]]:
-    cursor = await connection.execute(
+async def list_artifacts(
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID
+) -> list[ArtifactRow]:
+    return await all_rows(
+        connection,
+        ArtifactRow,
         "select id, run_id, name, media_type, size_bytes, sha256, status from public.artifacts "
         "where run_id = %s and workspace_id = %s and status in ('published', 'missing') "
         "order by created_at",
         (run_id, workspace_id),
     )
-    names = ("id", "run_id", "name", "media_type", "size_bytes", "sha256", "status")
-    return [dict(zip(names, row, strict=True)) for row in await cursor.fetchall()]
+
+
+def artifact_summary(row: ArtifactRow) -> ArtifactSummary:
+    """An unknown stored status raises, instead of reaching a client."""
+    return ArtifactSummary(
+        id=row.id,
+        run_id=row.run_id,
+        name=row.name,
+        media_type=row.media_type,
+        size_bytes=row.size_bytes,
+        sha256=row.sha256,
+        status=stored(LISTED_ARTIFACT_STATUSES, row.status),
+    )
 
 
 async def read_artifact(
-    connection: Any, store: ObjectStore, workspace_id: UUID, artifact_id: UUID
+    connection: SqlConnection, store: ObjectStore, workspace_id: UUID, artifact_id: UUID
 ) -> tuple[str, str, bytes]:
     """The workspace comes from the row, and bytes are checked against its hash before leaving."""
-    cursor = await connection.execute(
+    row = await optional_row(
+        connection,
+        StoredArtifactRow,
         "select name, media_type, object_path, sha256, status from public.artifacts "
         "where id = %s and workspace_id = %s",
         (artifact_id, workspace_id),
     )
-    row = await cursor.fetchone()
-    if row is None or row[4] == "staged" or row[4] == "failed":
+    if row is None or row.status == "staged" or row.status == "failed":
         raise ArtifactUnavailable("artifact_not_found")
-    name, media_type, path, digest, status = row
-    if status != "published":
+    name, media_type, path, digest = row.name, row.media_type, row.object_path, row.sha256
+    if row.status != "published":
         raise ArtifactUnavailable("artifact_missing")
     stored = await store.get(path)
     if stored is None or _digest(stored) != digest:
@@ -269,16 +312,17 @@ def publish_tool(store: ObjectStore | None) -> ToolDefinition:
         )
 
     async def found(arguments: PublishArtifact, context: ToolContext) -> PublishedArtifact | None:
-        cursor = await context.connection.execute(
+        row = await optional_row(
+            context.connection,
+            PublishedArtifactRow,
             "select id, name, sha256, size_bytes from public.artifacts "
             "where operation_id = %s and status = 'published'",
             (context.operation_id,),
         )
-        row = await cursor.fetchone()
         if row is None:
             return None
         return PublishedArtifact(
-            artifact_id=str(row[0]), name=row[1], sha256=row[2], size_bytes=row[3]
+            artifact_id=str(row.id), name=row.name, sha256=row.sha256, size_bytes=row.size_bytes
         )
 
     return ToolDefinition(

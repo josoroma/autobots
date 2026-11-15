@@ -26,6 +26,7 @@ import psycopg
 
 from autobots.adapters.tool_registry import catalog
 from autobots.application.experts import create_expert
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_catalog import Catalog
 from autobots.application.workflows import create_workflow, publish_version, save_draft
 from autobots.contracts.experts import ExpertConfig
@@ -324,7 +325,9 @@ def available_tools(environ: Mapping[str, str], tools: Catalog) -> frozenset[str
     )
 
 
-async def _named(connection: Any, table: str, workspace_id: UUID, name: str) -> UUID | None:
+async def _named(
+    connection: SqlConnection, table: str, workspace_id: UUID, name: str
+) -> UUID | None:
     cursor = await connection.execute(
         f"select id from {table} where workspace_id = %s and name = %s",
         (workspace_id, name),
@@ -337,7 +340,7 @@ class NoOwner(Refused):
     """The workspace has no owner to seed as."""
 
 
-async def _owner(connection: Any, workspace_id: UUID) -> UUID:
+async def _owner(connection: SqlConnection, workspace_id: UUID) -> UUID:
     cursor = await connection.execute(
         "select user_id from public.workspace_members where workspace_id = %s and role = 'owner' "
         "order by user_id limit 1",
@@ -350,7 +353,11 @@ async def _owner(connection: Any, workspace_id: UUID) -> UUID:
 
 
 async def _seed_experts(
-    connection: Any, workspace_id: UUID, actor: UUID, usable: frozenset[str], tools: Catalog
+    connection: SqlConnection,
+    workspace_id: UUID,
+    actor: UUID,
+    usable: frozenset[str],
+    tools: Catalog,
 ) -> tuple[dict[str, UUID], dict[str, Any]]:
     """Each concept Expert's ID by name, and what happened to each: "kept", or what was created."""
     experts: dict[str, UUID] = {}
@@ -384,7 +391,7 @@ async def _seed_experts(
 
 
 async def _seed_workflows(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     actor: UUID,
     usable: frozenset[str],
@@ -424,7 +431,9 @@ async def _seed_workflows(
     return report
 
 
-async def seed(connection: Any, workspace_id: UUID, environ: Mapping[str, str]) -> dict[str, Any]:
+async def seed(
+    connection: SqlConnection, workspace_id: UUID, environ: Mapping[str, str]
+) -> dict[str, Any]:
     """Each concept Expert and workflow once. What already exists by name is kept as it is.
 
     The owner, then the Experts, then the workflows that name them (POPS-20). Raises `NoOwner`, a

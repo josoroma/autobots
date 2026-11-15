@@ -7,6 +7,7 @@ from uuid import UUID
 
 import uvicorn
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.api.settings import load_settings
 
 
@@ -26,7 +27,7 @@ class FixtureMembership:
 
 def main() -> None:
     membership = FixtureMembership(os.environ['AUTOBOTS_TEST_USER_A'], os.environ['AUTOBOTS_TEST_WORKSPACE_A'])
-    uvicorn.run(create_app(load_settings(), membership=membership), host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')
+    uvicorn.run(create_app(AppResources(load_settings(), membership=membership)), host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')
 
 
 if __name__ == '__main__':

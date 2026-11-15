@@ -40,6 +40,7 @@ from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
 from autobots.application.run_usage import RootLimits, ensure_usage
 from autobots.application.runs import Fresh, RunAdmission, RunGrant, admit, frozen_snapshot
+from autobots.application.sql import SqlConnection, all_rows
 from autobots.application.tool_definitions import ToolRegistry, ToolResult, ToolScope
 from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_inference import frozen_policy, prepared
@@ -238,7 +239,7 @@ def _browsing_enabled() -> Iterator[None]:
             os.environ[browsing_tool.ENABLE] = before
 
 
-async def _admit(db: Any, workspace: UUID, actor: UUID) -> tuple[UUID, RolePolicy]:
+async def _admit(db: SqlConnection, workspace: UUID, actor: UUID) -> tuple[UUID, RolePolicy]:
     """An Expert granting `browse_goal`, its run at US$1, and the run's frozen policy, which has
     to bind the researcher to Sol."""
     expert = await create_expert(
@@ -272,7 +273,7 @@ async def _admit(db: Any, workspace: UUID, actor: UUID) -> tuple[UUID, RolePolic
     return run, frozen_policy(snapshot)
 
 
-async def _claim(db: Any, workspace: UUID, run: UUID) -> ToolScope:
+async def _claim(db: SqlConnection, workspace: UUID, run: UUID) -> ToolScope:
     lease = await claim_next(db, worker_id="browse-trial", lease_seconds=900)
     if lease is None or lease.run_id != run:
         raise Refused("the trial's run wasn't the one claimed")
@@ -281,7 +282,11 @@ async def _claim(db: Any, workspace: UUID, run: UUID) -> ToolScope:
 
 
 async def _execute(
-    db: Any, scope: ToolScope, executor: BrowserExecutor, model: "TrialModel", route: ModelRoute
+    db: SqlConnection,
+    scope: ToolScope,
+    executor: BrowserExecutor,
+    model: "TrialModel",
+    route: ModelRoute,
 ) -> ToolResult:
     """One `browse_goal` call through the real gateway, inside the run's loop middleware."""
     registry = ToolRegistry()
@@ -295,7 +300,7 @@ async def _execute(
         loop_middleware._MIDDLEWARE.reset(token)
 
 
-async def _approve(db: Any, workspace: UUID, actor: UUID, run: UUID) -> None:
+async def _approve(db: SqlConnection, workspace: UUID, actor: UUID, run: UUID) -> None:
     row = await (
         await db.execute(
             "select id, argument_hash from public.approval_requests where run_id = %s", (run,)
@@ -314,23 +319,23 @@ async def _approve(db: Any, workspace: UUID, actor: UUID, run: UUID) -> None:
     )
 
 
-async def _read_spend(db: Any, run: UUID) -> tuple[list[InvocationRow], list[ToolUseRow]]:
-    invocations = await (
-        await db.execute(
-            "select role, profile, wire_id, status, reserved_micro_usd, charged_micro_usd, "
-            "finish_reason, input_tokens, output_tokens, tool_names, upstream_provider "
-            "from app_private.model_invocations where run_id = %s order by attempt",
-            (run,),
-        )
-    ).fetchall()
-    uses = await (
-        await db.execute(
-            "select outcome, code, metered, input_public, output_public from "
-            "app_private.tool_uses where run_id = %s order by sequence_in_run",
-            (run,),
-        )
-    ).fetchall()
-    return [InvocationRow(*row) for row in invocations], [ToolUseRow(*row) for row in uses]
+async def _read_spend(db: SqlConnection, run: UUID) -> tuple[list[InvocationRow], list[ToolUseRow]]:
+    invocations = await all_rows(
+        db,
+        InvocationRow,
+        "select role, profile, wire_id, status, reserved_micro_usd, charged_micro_usd, "
+        "finish_reason, input_tokens, output_tokens, tool_names, upstream_provider "
+        "from app_private.model_invocations where run_id = %s order by attempt",
+        (run,),
+    )
+    uses = await all_rows(
+        db,
+        ToolUseRow,
+        "select outcome, code, metered, input_public, output_public from "
+        "app_private.tool_uses where run_id = %s order by sequence_in_run",
+        (run,),
+    )
+    return invocations, uses
 
 
 async def run_trial(

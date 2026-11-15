@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 
 from autobots.api.dependencies import MemberWorkspace, catalog_of, process_environment
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.run_projection import public_text
 from autobots.application.search import search
@@ -33,7 +33,7 @@ async def get_search(
         query=query,
         results=[
             SearchResult(
-                kind=hit.kind,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+                kind=hit.kind,
                 id=hit.id,
                 title=public_text(hit.title, limit=200) or "Untitled",
                 detail=hit.detail,

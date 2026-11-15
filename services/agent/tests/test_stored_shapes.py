@@ -244,7 +244,10 @@ def test_a_stored_daily_time_that_is_not_text_reads_and_never_runs(
         occurrences(record.trigger, record.timezone, after, after + timedelta(days=400))
     database = FakeDatabase([])
     database.answer("select id from public.routines where enabled", (ROUTINE,))
-    database.answer("select workspace_id, latest_version, evaluated_until", (WORKSPACE, 1, after))
+    database.answer(
+        "select workspace_id, latest_version, evaluated_until",
+        {"workspace_id": WORKSPACE, "latest_version": 1, "evaluated_until": after},
+    )
     database.answer("select clock_timestamp()", (datetime(2026, 11, 15, tzinfo=UTC),))
     database.answer("select config from public.routine_versions", (stored,))
 
@@ -282,7 +285,10 @@ def routine_database(stored: object) -> FakeDatabase:
     expert = {"tools": ["calculate"]}
     database.answer("from public.experts e join public.expert_versions v", (expert,))
     database.answer("from public.workflow_versions v join public.workflows w", (1,))
-    database.answer("from public.routines where id", (ROUTINE, "Fixture", True, 1))
+    database.answer(
+        "from public.routines where id",
+        {"id": ROUTINE, "name": "Fixture", "enabled": True, "latest_version": 1},
+    )
     database.answer("select latest_version from public.routines", (1,))
     database.answer("select config from public.routine_versions", (stored,))
     return database

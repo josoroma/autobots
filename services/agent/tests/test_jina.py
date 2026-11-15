@@ -13,10 +13,11 @@ from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolR
 from autobots.application.tool_gateway import Refused
 from autobots.application.tool_gateway import resolve as resolve_call
 from autobots.domain.stops import GatewayCode
+from sql_fakes import ScriptedConnection
 
 KEY = {"JINA_API_KEY": "jina_fixture0123456789"}
 MODEL_OPTIONS = ("readerlm", "x-respond-with", "x-with-generated-alt: true", "x-engine")
-CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+CONTEXT = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
 
 
 async def resolve(host: str, _: int) -> list[str]:

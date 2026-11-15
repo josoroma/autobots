@@ -19,9 +19,11 @@ import httpx
 import pytest
 
 from autobots.application.runs import LeaseLost
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.application.worker_leases import Lease
 from autobots.contracts.github_tools import GithubOpenPullRequestInput
+from sql_fakes import ScriptedRows
 
 SOURCE = Path(__file__).resolve().parents[1] / "src/autobots"
 REPOSITORY = "owner/throwaway"
@@ -41,18 +43,6 @@ PROPOSAL = GithubOpenPullRequestInput.model_validate(
         "files": [{"path": "README.md", "content": "Hello, reviewed\n"}],
     }
 )
-
-
-class Cursor:
-    def __init__(self, row: tuple[Any, ...] | None) -> None:
-        self._row = row
-
-    async def fetchone(self) -> tuple[Any, ...] | None:
-        return self._row
-
-    async def fetchall(self) -> list[tuple[Any, ...]]:
-        """The workspace's saved Keys & vars, which this ledger has none of."""
-        return []
 
 
 class Ledger:
@@ -82,9 +72,11 @@ class Ledger:
         finally:
             self._current = None
 
-    async def execute(self, query: str, params: object = None) -> Cursor:
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        """Reads it has no answer for, such as the workspace's saved Keys & vars, find nothing."""
         self.statements.append((query, params, self._current))
-        return Cursor(self._answer(query))
+        answer = self._answer(query)
+        return ScriptedRows([] if answer is None else [answer])
 
     def _answer(self, query: str) -> tuple[Any, ...] | None:
         if "from app_private.run_jobs" in query:

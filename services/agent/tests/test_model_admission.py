@@ -22,6 +22,7 @@ from autobots.application.model_admission import (
 )
 from autobots.domain.models import MAX_OUTPUT_TOKENS
 from fake_openrouter import catalog_payload
+from sql_fakes import ScriptedConnection
 
 NOW = datetime(2026, 11, 5, 12, tzinfo=UTC)
 
@@ -55,14 +56,8 @@ def test_a_variable_rate_is_not_hidden_by_a_fixed_one(pricing: dict[str, Any]) -
         worst_case_cost(parse_pricing({"pricing": pricing}), 1, 1)
 
 
-class NothingOpen:
+class NothingOpen(ScriptedConnection):
     """A ledger connection whose every guarded update finds no row in the state it needs."""
-
-    async def execute(self, *_: object) -> "NothingOpen":
-        return self
-
-    async def fetchone(self) -> None:
-        return None
 
 
 @pytest.mark.parametrize(

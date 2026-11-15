@@ -16,7 +16,6 @@ from autobots.application.goal_loop import run_goal
 from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted, execution_block
 from autobots.application.run_lifecycle import (
-    Connection,
     LoopConfig,
     LoopResult,
     finish,
@@ -24,6 +23,7 @@ from autobots.application.run_lifecycle import (
 )
 from autobots.application.runs import LeaseLost
 from autobots.application.settlement import settle_candidate
+from autobots.application.sql import SqlConnection
 from autobots.application.worker_leases import Lease, claim_next, is_held, reset_failures
 from autobots.application.workflow_runner import run_workflow
 from autobots.domain.runs import RunStatus
@@ -31,11 +31,13 @@ from autobots.domain.stops import PassOutcome, StopCode
 from autobots.logs import forbid_remote_tracing
 
 # Replaces the model and route for the job just claimed: (connection, lease, config).
-JobBinder = Callable[[Any, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any], LoopConfig]]]
+JobBinder = Callable[
+    [SqlConnection, Lease, LoopConfig], Awaitable[tuple[Callable[[], Any], LoopConfig]]
+]
 
 
 async def process_next(
-    connection: Connection,
+    connection: SqlConnection,
     database_url: str,
     worker_id: str,
     model_factory: Callable[[], Any],
@@ -73,7 +75,7 @@ async def process_next(
 
 
 async def drive_lease(
-    connection: Connection,
+    connection: SqlConnection,
     database_url: str,
     lease: Lease,
     model_factory: Callable[[], Any],

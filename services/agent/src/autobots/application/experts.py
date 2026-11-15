@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from autobots.application.improvements import active_skill_text
 from autobots.application.runs import existing_receipt, request_hash, store_receipt
+from autobots.application.sql import SqlConnection, all_rows, one, optional_row
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.experts import (
@@ -30,6 +31,7 @@ from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import UnknownModelProfile, approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
+from autobots.persistence.rows import ExpertRow
 
 
 def expert_overrides(config: ExpertConfigRecord) -> dict[str, str]:
@@ -100,7 +102,7 @@ def expand_groups(
     return config.model_copy(update={"tools": tools})
 
 
-async def _workspace_keys(connection: Any, workspace_id: UUID) -> Mapping[str, str]:
+async def _workspace_keys(connection: SqlConnection, workspace_id: UUID) -> Mapping[str, str]:
     """PK-04: a tool's key may be saved for this workspace, so availability is the workspace's."""
     return await key_sources(connection, workspace_id, os.environ)
 
@@ -121,7 +123,8 @@ def validate_config(config: ExpertConfig, catalog: Catalog, environ: Mapping[str
         raise ExpertRefused("expert_role_unknown") from None
 
 
-async def _view(connection: Any, expert_id: UUID, name: str, latest: int) -> ExpertView:
+async def _view(connection: SqlConnection, expert: ExpertRow) -> ExpertView:
+    expert_id = expert.id
     cursor = await connection.execute(
         "select version, config from public.expert_versions where expert_id = %s order by version",
         (expert_id,),
@@ -130,42 +133,46 @@ async def _view(connection: Any, expert_id: UUID, name: str, latest: int) -> Exp
         ExpertVersionView(version=row[0], config=expert_view_config(read_expert_config(row[1])))
         for row in await cursor.fetchall()
     ]
-    cursor = await connection.execute(
-        "select count(*), max(created_at) from public.runs where expert_id = %s", (expert_id,)
+    run_count, last_run_at = await one(
+        connection,
+        "select count(*), max(created_at) from public.runs where expert_id = %s",
+        (expert_id,),
     )
-    runs = await cursor.fetchone()
     return ExpertView(
         schema_version=1,
         id=expert_id,
-        name=name,
-        latest_version=latest,
+        name=expert.name,
+        latest_version=expert.latest_version,
         versions=versions,
-        run_count=int(runs[0]),
-        last_run_at=runs[1],
+        run_count=int(run_count),
+        last_run_at=last_run_at,
     )
 
 
-async def list_experts(connection: Any, workspace_id: UUID) -> list[ExpertView]:
-    cursor = await connection.execute(
+async def list_experts(connection: SqlConnection, workspace_id: UUID) -> list[ExpertView]:
+    rows = await all_rows(
+        connection,
+        ExpertRow,
         "select id, name, latest_version from public.experts where workspace_id = %s order by name",
         (workspace_id,),
     )
-    return [await _view(connection, *row) for row in await cursor.fetchall()]
+    return [await _view(connection, row) for row in rows]
 
 
-async def get_expert(connection: Any, workspace_id: UUID, expert_id: UUID) -> ExpertView:
-    cursor = await connection.execute(
+async def get_expert(connection: SqlConnection, workspace_id: UUID, expert_id: UUID) -> ExpertView:
+    row = await optional_row(
+        connection,
+        ExpertRow,
         "select id, name, latest_version from public.experts where id = %s and workspace_id = %s",
         (expert_id, workspace_id),
     )
-    row = await cursor.fetchone()
     if row is None:
         raise ExpertRefused("expert_not_found")
-    return await _view(connection, *row)
+    return await _view(connection, row)
 
 
 async def create_expert(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -206,7 +213,7 @@ async def create_expert(
 
 
 async def add_version(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -252,7 +259,7 @@ async def add_version(
 
 
 async def _option(
-    connection: Any, workspace_id: UUID, expert_id: UUID, version: int
+    connection: SqlConnection, workspace_id: UUID, expert_id: UUID, version: int
 ) -> RouteOption:
     cursor = await connection.execute(
         "select e.name, v.config from public.experts e join public.expert_versions v "
@@ -274,7 +281,7 @@ async def _option(
 
 
 async def latest_version_config(
-    connection: Any, workspace_id: UUID, expert_id: UUID
+    connection: SqlConnection, workspace_id: UUID, expert_id: UUID
 ) -> ExpertConfigRecord | None:
     """The Expert's latest saved version's configuration, if this workspace has that Expert."""
     cursor = await connection.execute(
@@ -288,7 +295,7 @@ async def latest_version_config(
 
 
 async def saved_version(
-    connection: Any, workspace_id: UUID, expert_id: UUID, version: int
+    connection: SqlConnection, workspace_id: UUID, expert_id: UUID, version: int
 ) -> ExpertConfigRecord | None:
     """One saved version's configuration, if this workspace has that Expert and version."""
     cursor = await connection.execute(
@@ -301,7 +308,7 @@ async def saved_version(
 
 
 async def create_session(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -336,7 +343,9 @@ async def create_session(
     return await get_session(connection, workspace_id, session_id)
 
 
-async def get_session(connection: Any, workspace_id: UUID, session_id: UUID) -> SessionView:
+async def get_session(
+    connection: SqlConnection, workspace_id: UUID, session_id: UUID
+) -> SessionView:
     cursor = await connection.execute(
         "select kind, experts from public.sessions where id = %s and workspace_id = %s",
         (session_id, workspace_id),
@@ -364,7 +373,7 @@ class RunBinding:
 
 
 async def resolve_binding(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     session_id: UUID,
     *,

@@ -29,8 +29,10 @@ from autobots.application.runs import (
     apply_worker_command,
     cascade_command,
 )
+from autobots.application.sql import SqlParams
 from autobots.application.worker_leases import Lease
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus, next_status
+from sql_fakes import Row, ScriptedRows
 
 SOURCE = Path(__file__).resolve().parents[1] / "src/autobots"
 WORKSPACE = UUID(int=1)
@@ -53,18 +55,21 @@ class Database:
     job: tuple[object, ...] | None = ("claimed", 3, True)
     version: int = 7
     unsettled: bool = False
-    extra: dict[str, tuple[object, ...] | None] = field(default_factory=dict)
+    extra: dict[str, Row | None] = field(default_factory=dict)
     statements: list[tuple[str, Any, int]] = field(default_factory=list)
     depth: int = 0
-    answer: tuple[object, ...] | None = None
 
-    def _answer(self, statement: str) -> tuple[object, ...] | None:
+    def _answer(self, statement: str) -> Row | None:
         for prefix, answer in self.extra.items():
             if statement.startswith(prefix):
                 return answer
-        answers: dict[str, Callable[[], tuple[object, ...] | None]] = {
+        answers: dict[str, Callable[[], Row | None]] = {
             "select version from public.runs": lambda: (self.version,),
-            JOB_LOCK: lambda: self.job,
+            JOB_LOCK: lambda: (
+                None
+                if self.job is None
+                else dict(zip(("status", "generation", "lease_live"), self.job, strict=True))
+            ),
             RUN_LOCK: lambda: (self.status.value, self.version),
             "select status from public.runs": lambda: (self.status.value,),
             "select exists": lambda: (self.unsettled,),
@@ -75,16 +80,10 @@ class Database:
                 return found()
         return None
 
-    async def execute(self, statement: str, values: object = ()) -> "Database":
-        self.statements.append((statement, values, self.depth))
-        self.answer = self._answer(statement)
-        return self
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self.answer
-
-    async def fetchall(self) -> list[tuple[object, ...]]:
-        return []
+    async def execute(self, statement: str, values: SqlParams | None = None, /) -> ScriptedRows:
+        self.statements.append((statement, () if values is None else values, self.depth))
+        answer = self._answer(statement)
+        return ScriptedRows([] if answer is None else [answer])
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:
@@ -289,7 +288,13 @@ def test_a_decision_locks_the_job_then_the_run_then_the_request(expired: bool) -
         job=("done", 3, None),
         extra={
             "select run_id from public.approval_requests": (RUN,),
-            "select run_id, status, argument_hash": (RUN, "pending", "hash", expired, "{}"),
+            "select run_id, status, argument_hash": {
+                "run_id": RUN,
+                "status": "pending",
+                "argument_hash": "hash",
+                "expired": expired,
+                "arguments": "{}",
+            },
             "update public.approval_requests": (APPROVAL,),
         },
     )
@@ -339,7 +344,12 @@ def test_a_claim_moves_a_queued_run_by_claim_in_the_table(
             RunStatus(status),
             extra={
                 "select 1 from app_private.installation_holds": None,
-                "select j.run_id": (RUN, WORKSPACE, status, 1),
+                "select j.run_id": {
+                    "run_id": RUN,
+                    "workspace_id": WORKSPACE,
+                    "status": status,
+                    "version": 1,
+                },
                 "update app_private.run_jobs set status = 'claimed'": (4, 2),
             },
         )

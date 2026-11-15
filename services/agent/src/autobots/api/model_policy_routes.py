@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Request
 
 from autobots.api.dependencies import MemberWorkspace, ModelKeyCheck, OwnerWorkspace
 from autobots.api.errors import ApiError, reworded
-from autobots.api.pool import ConnectionPool, request_pool
+from autobots.api.pool import Pool
+from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import require_internal
 from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.model_policy import (
@@ -36,9 +37,9 @@ router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 POLICY_CHANGED = "The policy changed. Reload and try again."
 
 
-def _policy_pool(request: Request) -> ConnectionPool:
+def _policy_pool(request: Request) -> Pool:
     """The pool, or 503 in the wording these routes have always used."""
-    pool: ConnectionPool | None = request.app.state.pool
+    pool = app_resources(request).pool
     if pool is None:
         raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")
     return pool

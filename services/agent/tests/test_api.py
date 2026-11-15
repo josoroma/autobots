@@ -6,7 +6,8 @@ import io
 import json
 import logging
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import Iterator
+from contextlib import AbstractAsyncContextManager
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -17,10 +18,12 @@ from fastapi.testclient import TestClient
 from psycopg_pool import PoolTimeout
 from pydantic import SecretStr
 
-from autobots.api.app import Pool, create_app, default_pool
+from autobots.api.app import create_app
 from autobots.api.main import create_configured_app
-from autobots.api.pool import POOL_WAIT_SECONDS
+from autobots.api.pool import POOL_WAIT_SECONDS, Pool, default_pool
+from autobots.api.resources import AppResources, resources_of
 from autobots.api.settings import Settings, load_settings
+from autobots.application.sql import CommittingConnection
 from autobots.logs import JsonFormatter
 
 INTERNAL = "fixture-internal"
@@ -52,7 +55,9 @@ def token(user: UUID = USER_A, secret: str = SECRET, **overrides: object) -> str
 
 
 def client() -> TestClient:
-    return TestClient(create_app(SETTINGS, membership=Membership()), raise_server_exceptions=False)
+    return TestClient(
+        create_app(AppResources(SETTINGS, membership=Membership())), raise_server_exceptions=False
+    )
 
 
 def headers(bearer: str | None = None, internal: str = INTERNAL) -> dict[str, str]:
@@ -70,7 +75,7 @@ def test_health_needs_the_internal_credential() -> None:
 
 
 def test_an_empty_configured_credential_fails_closed() -> None:
-    app = create_app(Settings(allowed_hosts=("testserver",)))
+    app = create_app(AppResources(Settings(allowed_hosts=("testserver",))))
     with TestClient(app) as test_client:
         assert test_client.get("/v1/health", headers={"X-Autobots-Internal": ""}).status_code == 401
 
@@ -125,7 +130,7 @@ def test_the_session_route_reports_verified_identity_and_membership() -> None:
 
 
 def test_default_membership_denies_everyone() -> None:
-    with TestClient(create_app(SETTINGS)) as test_client:
+    with TestClient(create_app(AppResources(SETTINGS))) as test_client:
         reply = test_client.get(f"/v1/workspaces/{WORKSPACE}", headers=headers(token()))
         assert reply.status_code == 403
 
@@ -154,7 +159,7 @@ def test_an_unexpected_error_exposes_nothing() -> None:
         async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
             return None
 
-    app = create_app(SETTINGS, membership=Broken())
+    app = create_app(AppResources(SETTINGS, membership=Broken()))
     with api_lines() as lines:
         reply = TestClient(app, raise_server_exceptions=False).get(
             f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
@@ -205,7 +210,7 @@ def test_a_database_failure_during_a_request_is_a_retryable_503() -> None:
         async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
             raise psycopg.OperationalError("connection failed: password=hunter2")
 
-    app = create_app(SETTINGS, membership=Lost())
+    app = create_app(AppResources(SETTINGS, membership=Lost()))
     with api_lines() as lines:
         reply = TestClient(app, raise_server_exceptions=False).get(
             f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
@@ -237,7 +242,7 @@ def test_a_database_error_a_retry_cant_clear_is_a_500_not_a_retry() -> None:
         async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
             raise errors.DiskFull("could not extend file")
 
-    app = create_app(SETTINGS, membership=Full())
+    app = create_app(AppResources(SETTINGS, membership=Full()))
     with api_lines() as lines:
         reply = TestClient(app, raise_server_exceptions=False).get(
             f"/v1/workspaces/{WORKSPACE}", headers=headers(token())
@@ -254,10 +259,8 @@ def test_a_pool_that_runs_out_of_time_answers_503_too() -> None:
         async def close(self) -> None:
             return None
 
-        @contextlib.asynccontextmanager
-        async def connection(self) -> AsyncIterator[None]:
+        def connection(self) -> AbstractAsyncContextManager[CommittingConnection]:
             raise PoolTimeout("couldn't get a connection after 10.00 sec")
-            yield
 
     settings = Settings(
         internal_token=SecretStr(INTERNAL),
@@ -265,7 +268,9 @@ def test_a_pool_that_runs_out_of_time_answers_503_too() -> None:
         database_url=SecretStr("postgresql://fixture"),
         allowed_hosts=("testserver",),
     )
-    app = create_app(settings, membership=Membership(), pool_factory=lambda _url: Exhausted())
+    app = create_app(
+        AppResources(settings, membership=Membership()), pool_factory=lambda _url: Exhausted()
+    )
     with TestClient(app, raise_server_exceptions=False) as test_client:
         reply = test_client.get(f"/v1/runs/{uuid4()}", headers=headers(token()))
     assert (reply.status_code, reply.json()) == (503, UNAVAILABLE)
@@ -288,6 +293,9 @@ def test_the_pool_belongs_to_the_lifespan() -> None:
         async def close(self) -> None:
             events.append("close")
 
+        def connection(self) -> AbstractAsyncContextManager[CommittingConnection]:
+            raise AssertionError("no request connects in this test")
+
     def factory(_url: str) -> Pool:
         events.append("created")
         return FakePool()
@@ -295,13 +303,13 @@ def test_the_pool_belongs_to_the_lifespan() -> None:
     settings = Settings(
         database_url=SecretStr("postgresql://fixture"), allowed_hosts=("testserver",)
     )
-    app = create_app(settings, pool_factory=factory)
+    app = create_app(AppResources(settings), pool_factory=factory)
     assert events == [], "building the app opens nothing"
     with TestClient(app):
         assert events == ["created", "open"]
-        assert app.state.pool is not None
+        assert resources_of(app).pool is not None
     assert events == ["created", "open", "close"]
-    assert app.state.pool is None
+    assert resources_of(app).pool is None
 
 
 def test_settings_hide_their_values() -> None:
@@ -318,7 +326,7 @@ def test_the_entry_point_reads_the_environment_only_when_called(
 ) -> None:
     monkeypatch.setenv("AUTOBOTS_INTERNAL_TOKEN", "from-the-environment")
     assert (
-        create_configured_app().state.settings.internal_token.get_secret_value()
+        resources_of(create_configured_app()).settings.internal_token.get_secret_value()
         == "from-the-environment"
     )
 

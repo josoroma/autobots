@@ -16,10 +16,13 @@ from autobots.adapters.github_reads import MAX_FILE_BYTES, github_read_tools
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.contracts.github_tools import GithubListPullRequestsInput, GithubListWorkflowRunsInput
 from autobots.domain.tool_catalog import ToolAvailability, key_availability
+from sql_fakes import ScriptedConnection
 
 REPOSITORY = "owner/configured"
 ENV = {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_TOKEN": "fake-token-for-tests"}
-CONTEXT = ToolContext(connection=None, scope=ToolScope(uuid4(), uuid4(), 1, {}), operation_id=None)
+CONTEXT = ToolContext(
+    connection=ScriptedConnection(), scope=ToolScope(uuid4(), uuid4(), 1, {}), operation_id=None
+)
 
 
 class FakeGithub:

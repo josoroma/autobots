@@ -12,13 +12,14 @@ import asyncio
 import contextlib
 import json
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 
 from autobots.application import approvals, receipts
+from autobots.application.sql import SqlParams
 from autobots.domain.effects import (
     ApprovalCommand,
     ApprovalStatus,
@@ -136,13 +137,19 @@ class Recorder:
     async def transaction(self) -> AsyncIterator[None]:
         yield
 
-    async def execute(self, query: str, params: tuple[object, ...] = ()) -> "Recorder":
-        self.statements.append((query, params))
+    # Each answer is a tuple, read by position.
+    description = None
+
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> "Recorder":
+        self.statements.append((query, tuple(params) if isinstance(params, Sequence) else ()))
         self._row = next((row for part, row in self.answers.items() if part in query), self.default)
         return self
 
     async def fetchone(self) -> tuple[object, ...] | None:
         return self._row
+
+    async def fetchall(self) -> list[tuple[object, ...]]:
+        return [] if self._row is None else [self._row]
 
     def only(self) -> tuple[str, tuple[object, ...]]:
         [statement] = self.statements

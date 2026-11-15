@@ -1,13 +1,13 @@
 """HTTP routes do small, bounded work. A request never owns a run or a background task."""
 
-from typing import Annotated, Literal, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
 from autobots.api.dependencies import CurrentUser, require_workspace_member
 from autobots.api.errors import ApiError
-from autobots.api.pool import request_pool
+from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import require_internal, session_email
 from autobots.application.profiles import (
     DisplayNameInvalid,
@@ -40,8 +40,9 @@ async def get_session(
     user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> SessionSummary:
-    workspaces = await request.app.state.membership.workspaces_for(user_id)
-    pool = request.app.state.pool
+    resources = app_resources(request)
+    workspaces = await resources.membership.workspaces_for(user_id)
+    pool = resources.pool
     saved = await saved_name(pool, user_id)
     detail = await workspaces_with_roles(pool, user_id)
     return SessionSummary(
@@ -55,7 +56,7 @@ async def get_session(
             SessionWorkspace(
                 id=workspace_id,
                 name=name,
-                role=cast(Literal["owner", "member"], role),
+                role=role,
                 timezone=timezone,
             )
             for workspace_id, name, role, timezone in detail
@@ -69,7 +70,7 @@ async def get_profile(
     user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> ProfileView:
-    saved = await saved_name(request.app.state.pool, user_id)
+    saved = await saved_name(app_resources(request).pool, user_id)
     return ProfileView(
         schema_version=1,
         display_name=saved if saved is not None else fallback_name(email),

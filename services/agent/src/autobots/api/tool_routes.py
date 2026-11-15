@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 
 from autobots.api.dependencies import MemberWorkspace, catalog_of, process_environment
 from autobots.api.errors import ApiError
-from autobots.api.pool import request_pool
+from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import require_internal
 from autobots.application.tool_grants import tool_grants
 from autobots.application.tool_keys import key_sources
@@ -29,7 +29,7 @@ async def _keys(request: Request, workspace_id: UUID) -> Mapping[str, str]:
     """PK-04: availability is the workspace's, since it may have saved a tool's key in Settings.
     With no database, the process environment's keys alone."""
     environment = process_environment(request)
-    if request.app.state.pool is None:
+    if app_resources(request).pool is None:
         return environment
     async with request_pool(request).connection() as connection:
         return await key_sources(connection, workspace_id, environment)

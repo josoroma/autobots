@@ -22,9 +22,11 @@ from autobots.application.approvals import (
     scope_snapshot,
 )
 from autobots.application.runs import WorkerClaim
+from autobots.application.sql import SqlParams
 from autobots.domain.effects import ApprovalStatus, ReceiptStatus
 from autobots.domain.runs import RunCommand
 from autobots.domain.stops import GatewayCode
+from sql_fakes import GATE_COLUMNS, RECEIPT_COLUMNS, ScriptedRows
 
 APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
 SNAPSHOT = scope_snapshot({"send_note": 1}, ())
@@ -112,25 +114,18 @@ class Connection:
     row: tuple[object, ...] | None
     found: tuple[object, ...] | None = None
     statements: list[str] = field(default_factory=list)
-    answer: tuple[object, ...] | None = None
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:
         yield
 
-    async def execute(self, query: str, _: tuple[object, ...] = ()) -> "Connection":
+    async def execute(self, query: str, _: SqlParams | None = None, /) -> ScriptedRows:
         self.statements.append(query)
-        self.answer = (
-            self.row
-            if "from public.approval_requests" in query
-            else self.found
-            if "from app_private.tool_receipts" in query
-            else (1,)
-        )
-        return self
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self.answer
+        if "from public.approval_requests" in query:
+            return ScriptedRows([] if self.row is None else [self.row], GATE_COLUMNS)
+        if "from app_private.tool_receipts" in query:
+            return ScriptedRows([] if self.found is None else [self.found], RECEIPT_COLUMNS)
+        return ScriptedRows([(1,)])
 
 
 @dataclass(frozen=True)

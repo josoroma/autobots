@@ -14,7 +14,7 @@ import pytest
 
 from autobots.adapters.tool_registry import catalog
 from autobots.api.errors import STATUS
-from autobots.application import experts, run_projection
+from autobots.application import experts
 from autobots.application.approvals import ApprovalRefused
 from autobots.application.credentials.store import CredentialStorageUnavailable
 from autobots.application.experts import ExpertRefused, validate_config
@@ -25,6 +25,7 @@ from autobots.application.provider_settings import StaleVersion, ValidationUnava
 from autobots.application.routines import RoutineRefused
 from autobots.application.run_admission import AdmissionRefused, ModelNotReady, PolicyNotOffered
 from autobots.application.run_projection import InvalidCursor
+from autobots.application.run_projection import workspace as run_workspace
 from autobots.application.runs import IdempotencyConflict, RunNotFound
 from autobots.application.tool_catalog import ToolsUnavailable
 from autobots.application.workflows import WorkflowRefused
@@ -34,6 +35,7 @@ from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered
 from autobots.domain.routines import TriggerInvalid
 from autobots.domain.runs import CommandRefused
+from sql_fakes import ScriptedConnection
 
 CATALOG = catalog()
 
@@ -144,17 +146,9 @@ def test_an_unknown_role_is_refused_but_a_defect_while_checking_one_is_not(
         validate_config(config, CATALOG, {})
 
 
-class NoRows:
-    async def execute(self, *_: object) -> "NoRows":
-        return self
-
-    async def fetchone(self) -> None:
-        return None
-
-
 def test_a_run_without_a_goal_is_named_as_such() -> None:
     with pytest.raises(GoalMissing) as caught:
-        asyncio.run(load_goal(NoRows(), uuid4()))
+        asyncio.run(load_goal(ScriptedConnection(), uuid4()))
     assert isinstance(caught.value, LookupError)
 
 
@@ -169,8 +163,8 @@ def test_a_defect_reading_a_goal_is_not_shown_as_a_run_without_one(
     async def defect(*_args: object) -> None:
         raise KeyError("arranged defect")
 
-    monkeypatch.setattr(run_projection, "_require_run", found)
-    monkeypatch.setattr(run_projection, "_summary", lambda _row: None)
-    monkeypatch.setattr(run_projection, "load_goal", defect)
+    monkeypatch.setattr(run_workspace, "require_run", found)
+    monkeypatch.setattr(run_workspace, "summary_of", lambda _row: None)
+    monkeypatch.setattr(run_workspace, "load_goal", defect)
     with pytest.raises(KeyError, match="arranged defect"):
-        asyncio.run(run_projection.read_workspace(NoRows(), uuid4(), uuid4()))
+        asyncio.run(run_workspace.read_workspace(ScriptedConnection(), uuid4(), uuid4()))

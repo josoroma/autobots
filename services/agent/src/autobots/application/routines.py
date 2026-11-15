@@ -9,7 +9,6 @@ import logging
 import os
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, saved_version
@@ -32,11 +31,13 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.application.sql import SqlConnection, all_rows, one, optional_row, stored
 from autobots.application.tool_catalog import Catalog, ToolsUnavailable
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.persisted import RoutineCreatedReceipt, RoutineVersionReceipt
 from autobots.contracts.primitives import MAX_SAFE_INTEGER
 from autobots.contracts.routines import (
+    OCCURRENCE_STATUSES,
     OccurrenceView,
     RoutineConfig,
     RoutineConfigView,
@@ -65,6 +66,7 @@ from autobots.persistence.records import (
     RoutineTargetRecord,
     read_routine_config,
 )
+from autobots.persistence.rows import DueRoutineRow, OccurrenceRow, RoutineRow
 
 logger = logging.getLogger("autobots.routines")
 
@@ -85,7 +87,7 @@ class RoutineRefused(Refusal):
 
 
 async def _expert_config(
-    connection: Any, workspace_id: UUID, config: RoutineConfigRecord
+    connection: SqlConnection, workspace_id: UUID, config: RoutineConfigRecord
 ) -> ExpertConfigRecord:
     target = config.target
     expert = await saved_version(connection, workspace_id, target.id, target.version)
@@ -150,7 +152,7 @@ def routine_view_config(record: RoutineConfigRecord) -> RoutineConfigView:
 
 
 async def _validate(
-    connection: Any, workspace_id: UUID, config: RoutineConfig, budget_cap: int | None
+    connection: SqlConnection, workspace_id: UUID, config: RoutineConfig, budget_cap: int | None
 ) -> RoutineConfigRecord:
     """A routine can only narrow what its pinned target has, and a capped caller's routine can't
     spend more than its cap a run (Decision 0029 F2)."""
@@ -174,70 +176,82 @@ async def _validate(
     return record
 
 
-async def _stored_config(connection: Any, routine_id: UUID, version: int) -> RoutineConfigRecord:
-    cursor = await connection.execute(
+async def _stored_config(
+    connection: SqlConnection, routine_id: UUID, version: int
+) -> RoutineConfigRecord:
+    (config,) = await one(
+        connection,
         "select config from public.routine_versions where routine_id = %s and version = %s",
         (routine_id, version),
     )
-    return read_routine_config((await cursor.fetchone())[0])
+    return read_routine_config(config)
 
 
-async def _view(connection: Any, row: Any) -> RoutineView:
-    routine_id, name, enabled, latest = row
-    config = routine_view_config(await _stored_config(connection, routine_id, latest))
-    cursor = await connection.execute(
+def occurrence_view(row: OccurrenceRow) -> OccurrenceView:
+    """An unknown stored status raises, instead of reaching a client."""
+    return OccurrenceView(
+        occurrence_time=row.occurrence_time.astimezone(UTC),
+        routine_version=row.routine_version,
+        status=stored(OCCURRENCE_STATUSES, row.status),
+        reason=row.reason,
+        run_id=row.run_id,
+    )
+
+
+async def _view(connection: SqlConnection, routine: RoutineRow) -> RoutineView:
+    config = routine_view_config(
+        await _stored_config(connection, routine.id, routine.latest_version)
+    )
+    history = await all_rows(
+        connection,
+        OccurrenceRow,
         "select occurrence_time, routine_version, status, reason, run_id "
         "from public.routine_occurrences where routine_id = %s "
         "order by occurrence_time desc limit 100",
-        (routine_id,),
+        (routine.id,),
     )
-    history = [
-        OccurrenceView(
-            occurrence_time=item[0].astimezone(UTC).isoformat(),
-            routine_version=item[1],
-            status=item[2],
-            reason=item[3],
-            run_id=item[4],
-        )
-        for item in await cursor.fetchall()
-    ]
     return RoutineView(
         schema_version=1,
-        id=routine_id,
-        name=name,
-        enabled=enabled,
-        latest_version=latest,
+        id=routine.id,
+        name=routine.name,
+        enabled=routine.enabled,
+        latest_version=routine.latest_version,
         config=config,
-        occurrences=history,
+        occurrences=[occurrence_view(item) for item in history],
     )
 
 
 _COLUMNS = "id, name, enabled, latest_version"
 
 
-async def get_routine(connection: Any, workspace_id: UUID, routine_id: UUID) -> RoutineView:
-    cursor = await connection.execute(
+async def get_routine(
+    connection: SqlConnection, workspace_id: UUID, routine_id: UUID
+) -> RoutineView:
+    row = await optional_row(
+        connection,
+        RoutineRow,
         f"select {_COLUMNS} from public.routines "
         "where id = %s and workspace_id = %s and removed_at is null",
         (routine_id, workspace_id),
     )
-    row = await cursor.fetchone()
     if row is None:
         raise RoutineRefused("routine_not_found")
     return await _view(connection, row)
 
 
-async def list_routines(connection: Any, workspace_id: UUID) -> list[RoutineView]:
-    cursor = await connection.execute(
+async def list_routines(connection: SqlConnection, workspace_id: UUID) -> list[RoutineView]:
+    rows = await all_rows(
+        connection,
+        RoutineRow,
         f"select {_COLUMNS} from public.routines where workspace_id = %s and removed_at is null "
         "order by name",
         (workspace_id,),
     )
-    return [await _view(connection, row) for row in await cursor.fetchall()]
+    return [await _view(connection, row) for row in rows]
 
 
 async def create_routine(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -284,7 +298,7 @@ async def create_routine(
 
 
 async def add_routine_version(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -327,7 +341,7 @@ async def add_routine_version(
 
 
 async def set_enabled(
-    connection: Any, workspace_id: UUID, routine_id: UUID, enabled: bool
+    connection: SqlConnection, workspace_id: UUID, routine_id: UUID, enabled: bool
 ) -> RoutineView:
     """Turning one back on doesn't catch up on the time it was off."""
     cursor = await connection.execute(
@@ -341,7 +355,7 @@ async def set_enabled(
     return await get_routine(connection, workspace_id, routine_id)
 
 
-async def remove_routine(connection: Any, workspace_id: UUID, routine_id: UUID) -> None:
+async def remove_routine(connection: SqlConnection, workspace_id: UUID, routine_id: UUID) -> None:
     """Decision 0026 C7: disabled, hidden and never evaluated again, with nothing deleted. Its
     versions, occurrences and runs stay, and its name is free for a new routine."""
     cursor = await connection.execute(
@@ -354,7 +368,7 @@ async def remove_routine(connection: Any, workspace_id: UUID, routine_id: UUID) 
 
 
 async def run_routine_now(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     routine_id: UUID,
     credential_check: CredentialCheck,
@@ -378,7 +392,7 @@ async def run_routine_now(
         version, enabled = row
         if not enabled:
             raise RoutineRefused("routine_paused")
-        moment = (await (await connection.execute("select clock_timestamp()")).fetchone())[0]
+        (moment,) = await one(connection, "select clock_timestamp()")
         config = await _stored_config(connection, routine_id, version)
         if await _has_active_run(connection, routine_id):
             await _record(connection, routine_id, moment, version, "skipped_overlap", "run_active")
@@ -401,17 +415,18 @@ async def run_routine_now(
         return "admitted", None, run_id
 
 
-async def _has_active_run(connection: Any, routine_id: UUID) -> bool:
-    cursor = await connection.execute(
+async def _has_active_run(connection: SqlConnection, routine_id: UUID) -> bool:
+    (active,) = await one(
+        connection,
         "select exists (select 1 from public.routine_occurrences o join public.runs r "
         "on r.id = o.run_id where o.routine_id = %s and r.status <> all(%s))",
         (routine_id, sorted(TERMINAL)),
     )
-    return bool((await cursor.fetchone())[0])
+    return bool(active)
 
 
 async def _record(
-    connection: Any,
+    connection: SqlConnection,
     routine_id: UUID,
     moment: datetime,
     version: int,
@@ -428,7 +443,7 @@ async def _record(
 
 
 async def admit_occurrence(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     routine_id: UUID,
     version: int,
@@ -497,38 +512,38 @@ async def admit_occurrence(
     return admitted.run_id
 
 
-async def _needs_model(config: RoutineConfigRecord, connection: Any) -> bool:
+async def _needs_model(config: RoutineConfigRecord, connection: SqlConnection) -> bool:
     if config.target.kind == "expert":
         return True
-    cursor = await connection.execute(
+    (graph,) = await one(
+        connection,
         "select graph from public.workflow_versions where workflow_id = %s and version = %s",
         (config.target.id, config.target.version),
     )
-    graph = (await cursor.fetchone())[0]
     return any(node["block"] == "agent" for node in graph["nodes"])
 
 
 async def _evaluate_one(
-    connection: Any,
+    connection: SqlConnection,
     routine_id: UUID,
     credential_check: CredentialCheck,
     now: datetime | None,
     catalog: Catalog,
 ) -> int:
     async with connection.transaction():
-        row = await (
-            await connection.execute(
-                "select workspace_id, latest_version, evaluated_until from public.routines "
-                "where id = %s and enabled and removed_at is null for update skip locked",
-                (routine_id,),
-            )
-        ).fetchone()
+        row = await optional_row(
+            connection,
+            DueRoutineRow,
+            "select workspace_id, latest_version, evaluated_until from public.routines "
+            "where id = %s and enabled and removed_at is null for update skip locked",
+            (routine_id,),
+        )
         if row is None:
             return 0
-        workspace_id, version, until = row
+        workspace_id, version, until = row.workspace_id, row.latest_version, row.evaluated_until
         # Read under the row's lock, so a slower worker can't carry an older time past a newer one.
-        cursor = await connection.execute("select clock_timestamp()")
-        moment_now = now or (await cursor.fetchone())[0]
+        (clock,) = await one(connection, "select clock_timestamp()")
+        moment_now = now or clock
         if moment_now <= until:
             return 0
         config = await _stored_config(connection, routine_id, version)
@@ -567,7 +582,7 @@ async def _evaluate_one(
 
 
 async def evaluate_routines(
-    connection: Any,
+    connection: SqlConnection,
     credential_check: CredentialCheck,
     now: datetime | None = None,
     *,

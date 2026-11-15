@@ -9,6 +9,7 @@ from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
 from autobots.application.model_admission import ACTIVE
+from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.contracts.persisted import (
     AdmissionReceipt,
     PolicySnapshot,
@@ -36,6 +37,7 @@ from autobots.domain.runs import (
     next_status,
 )
 from autobots.domain.tools import LOOP_TOOL_GRANTS, RUN_FILE_GRANTS
+from autobots.persistence.rows import LockedJobRow
 
 
 class IdempotencyConflict(FixedRefusal):
@@ -164,7 +166,7 @@ class RunAdmission:
 class AdmissionResult:
     run_id: UUID
     version: int
-    status: str
+    status: RunStatus
     replayed: bool
 
 
@@ -174,32 +176,33 @@ def request_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-async def append_event(connection: Any, run_id: UUID, payload: StoredEvent) -> int:
+async def append_event(connection: SqlConnection, run_id: UUID, payload: StoredEvent) -> int:
     """Sequences are gapless per run, and the row update serializes concurrent writers. Each
     payload is its public contract, built and validated by its writer in the write's transaction
     (refactor plan R-51), so what is stored is what `run_projection.project_event` shows."""
-    cursor = await connection.execute(
+    (sequence,) = await one(
+        connection,
         "update public.runs set event_sequence = event_sequence + 1 where id = %s "
         "returning event_sequence",
         (run_id,),
     )
-    sequence: int = (await cursor.fetchone())[0]
     await connection.execute(
         "insert into public.run_events (run_id, sequence, schema_version, payload, occurred_at) "
         "values (%s, %s, 1, %s, now())",
         (run_id, sequence, json.dumps(payload.model_dump(mode="json"))),
     )
-    return sequence
+    return int(sequence)
 
 
-def _status_changed(previous: str, current: str) -> RunStatusChanged:
-    return RunStatusChanged(
-        type="run.status_changed", previous=RunStatus(previous), current=RunStatus(current)
-    )
+def _status_changed(previous: RunStatus, current: RunStatus) -> RunStatusChanged:
+    return RunStatusChanged(type="run.status_changed", previous=previous, current=current)
 
 
 async def existing_receipt[T: StoredReceipt](
-    connection: Any, scope: tuple[UUID, UUID, str, str, str], fingerprint: str, kind: type[T]
+    connection: SqlConnection,
+    scope: tuple[UUID, UUID, str, str, str],
+    fingerprint: str,
+    kind: type[T],
 ) -> T | None:
     """Serializes this exact key, so concurrent duplicates wait and then see the first result,
     read as `kind`, its operation's receipt (contracts/persisted.py). A stored result that can't be
@@ -223,7 +226,7 @@ async def existing_receipt[T: StoredReceipt](
 
 
 async def store_receipt(
-    connection: Any,
+    connection: SqlConnection,
     scope: tuple[UUID, UUID, str, str, str],
     fingerprint: str,
     result: StoredReceipt,
@@ -261,12 +264,14 @@ class Idempotent:
         scope = (key.workspace_id, key.actor_id, operation, target, key.idempotency_key)
         return cls(scope, request_hash(payload))
 
-    async def replayed[T: StoredReceipt](self, connection: Any, kind: type[T]) -> T | None:
+    async def replayed[T: StoredReceipt](
+        self, connection: SqlConnection, kind: type[T]
+    ) -> T | None:
         """The first result under this key, as its operation's receipt `kind`, inside the
         caller's transaction, or None."""
         return await existing_receipt(connection, self.scope, self.fingerprint, kind)
 
-    async def store(self, connection: Any, result: StoredReceipt) -> None:
+    async def store(self, connection: SqlConnection, result: StoredReceipt) -> None:
         await store_receipt(connection, self.scope, self.fingerprint, result)
 
 
@@ -277,7 +282,7 @@ RUN_TREE = (
 )
 
 
-async def require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+async def require_run(connection: SqlConnection, workspace_id: UUID, run_id: UUID) -> None:
     """Raises RunNotFound unless the run is this workspace's, as for a run that doesn't exist."""
     cursor = await connection.execute(
         "select 1 from public.runs where id = %s and workspace_id = %s", (run_id, workspace_id)
@@ -286,26 +291,27 @@ async def require_run(connection: Any, workspace_id: UUID, run_id: UUID) -> None
         raise RunNotFound("that run is not available")
 
 
-async def current_status(connection: Any, run_id: UUID) -> RunStatus | None:
+async def current_status(connection: SqlConnection, run_id: UUID) -> RunStatus | None:
     """The run's status now, or None when there is no such run."""
     cursor = await connection.execute("select status from public.runs where id = %s", (run_id,))
     row = await cursor.fetchone()
     return None if row is None else RunStatus(row[0])
 
 
-async def ancestors_running(connection: Any, parent_run_id: UUID) -> bool:
+async def ancestors_running(connection: SqlConnection, parent_run_id: UUID) -> bool:
     """Whether a child's parent and every run above it are running, so the child may go on."""
-    cursor = await connection.execute(
+    (others,) = await one(
+        connection,
         "with recursive up as (select id, parent_run_id, status from public.runs "
         "where id = %s union all select r.id, r.parent_run_id, r.status "
         "from public.runs r join up u on r.id = u.parent_run_id) "
         "select count(*) from up where status <> %s",
         (parent_run_id, RunStatus.RUNNING.value),
     )
-    return not (await cursor.fetchone())[0]
+    return not others
 
 
-async def frozen_snapshot(connection: Any, run_id: UUID) -> PolicySnapshot:
+async def frozen_snapshot(connection: SqlConnection, run_id: UUID) -> PolicySnapshot:
     """The policy admission froze for this run, as stored (PolicySnapshot). A run with no row has
     nothing bound, and one whose snapshot can't be read raises UnknownModelProfile, so neither is
     routed on (refactor plan R-51, PRUN-08)."""
@@ -316,7 +322,9 @@ async def frozen_snapshot(connection: Any, run_id: UUID) -> PolicySnapshot:
     return read_policy_snapshot({} if row is None else row[0])
 
 
-async def _goal_to_repeat(connection: Any, workspace_id: UUID, run_id: UUID | None) -> str:
+async def _goal_to_repeat(
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID | None
+) -> str:
     """Whole, from what was stored, as anything shown on a page is cut and redacted."""
     cursor = await connection.execute(
         "select g.spec ->> 'original_request' from public.runs r "
@@ -354,7 +362,9 @@ def _fingerprint(admission: RunAdmission, goal: str, criteria: list[str]) -> str
     )
 
 
-async def _require_continuable(connection: Any, workspace_id: UUID, run_id: UUID | None) -> None:
+async def _require_continuable(
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID | None
+) -> None:
     if run_id is None:
         return
     cursor = await connection.execute(
@@ -377,7 +387,7 @@ def _lineage(origin: Fresh | Inherited) -> tuple[str, UUID | None, UUID | None, 
 
 
 async def _insert_run_and_job(
-    connection: Any, run_id: UUID, status: str, admission: RunAdmission, goal: str
+    connection: SqlConnection, run_id: UUID, status: str, admission: RunAdmission, goal: str
 ) -> None:
     snapshot, parent, root, started_by = _lineage(admission.origin)
     grant = admission.origin.grant
@@ -413,7 +423,7 @@ async def _insert_run_and_job(
 
 
 async def _insert_inputs(
-    connection: Any, run_id: UUID, documents: tuple[InputDocument, ...]
+    connection: SqlConnection, run_id: UUID, documents: tuple[InputDocument, ...]
 ) -> None:
     for document in documents:
         content = document.content
@@ -432,7 +442,7 @@ async def _insert_inputs(
 
 
 async def _insert_goal_spec(
-    connection: Any,
+    connection: SqlConnection,
     run_id: UUID,
     admission: RunAdmission,
     request: str,
@@ -461,7 +471,7 @@ async def _insert_goal_spec(
     )
 
 
-async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
+async def admit(connection: SqlConnection, admission: RunAdmission) -> AdmissionResult:
     """Run, job, inputs, goal, first event and receipt commit together, SP-014. A repeat of the key
     with the same content returns the original result, and with other content is refused."""
     workspace_id = admission.workspace_id
@@ -482,11 +492,11 @@ async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
     async with connection.transaction():
         existing = await existing_receipt(connection, scope, fingerprint, AdmissionReceipt)
         if existing is not None:
-            return AdmissionResult(existing.run_id, existing.version, existing.status.value, True)
+            return AdmissionResult(existing.run_id, existing.version, existing.status, True)
         await _require_continuable(connection, workspace_id, admission.continues_run_id)
         run_id = uuid4()
-        status = RunStatus.QUEUED.value
-        await _insert_run_and_job(connection, run_id, status, admission, goal)
+        status = RunStatus.QUEUED
+        await _insert_run_and_job(connection, run_id, status.value, admission, goal)
         await _insert_inputs(connection, run_id, admission.input_documents)
         await _insert_goal_spec(connection, run_id, admission, request, goal, criteria)
         await append_event(connection, run_id, _status_changed(status, status))
@@ -496,7 +506,7 @@ async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
 
 
 async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -544,38 +554,41 @@ async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06
 class TransitionResult:
     run_id: UUID
     version: int
-    status: str
+    status: RunStatus
     changed: bool
 
 
 async def record_transition(
-    connection: Any, run_id: UUID, previous: str, following: str, version: int
+    connection: SqlConnection, run_id: UUID, previous: RunStatus, following: RunStatus, version: int
 ) -> int:
     """The status, its version and its event, always together."""
     new_version = version + 1
     await connection.execute(
         "update public.runs set status = %s, version = %s, updated_at = now() where id = %s",
-        (following, new_version, run_id),
+        (following.value, new_version, run_id),
     )
     await append_event(connection, run_id, _status_changed(previous, following))
     return new_version
 
 
-async def apply_claim(connection: Any, run_id: UUID, current: RunStatus, version: int) -> RunStatus:
+async def apply_claim(
+    connection: SqlConnection, run_id: UUID, current: RunStatus, version: int
+) -> RunStatus:
     """A claim's move, inside the claim's transaction under its job row lock: a queued run starts
     running by `claim` in the command table (SP-010). A run its last owner left in another state
     keeps it, and its new owner goes on from there."""
     if current is not RunStatus.QUEUED:
         return current
     following = next_status(current, RunCommand.CLAIM, Actor.WORKER) or current
-    await record_transition(connection, run_id, current.value, following.value, version)
+    await record_transition(connection, run_id, current, following, version)
     return following
 
 
-async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
+async def _has_unsettled_work(connection: SqlConnection, run_id: UUID) -> bool:
     """SP-010: straight to cancelled only with no attempt or effect still open. A call already
     classified uncertain stays recorded, and doesn't hold the run open."""
-    cursor = await connection.execute(
+    (unsettled,) = await one(
+        connection,
         "select exists (select 1 from app_private.model_invocations where run_id = %s "
         "and status = any(%s)) or exists (select 1 from "
         "app_private.tool_receipts where run_id = %s and status = %s) "
@@ -589,10 +602,10 @@ async def _has_unsettled_work(connection: Any, run_id: UUID) -> bool:
             run_id,
         ),
     )
-    return bool((await cursor.fetchone())[0])
+    return bool(unsettled)
 
 
-async def _cancel_children(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+async def _cancel_children(connection: SqlConnection, workspace_id: UUID, run_id: UUID) -> None:
     """In the parent's transaction, so a cancel fences the whole tree at once. The system cancels
     each child, as no person asked for it (Decision 0029 F5)."""
     cursor = await connection.execute(
@@ -605,7 +618,9 @@ async def _cancel_children(connection: Any, workspace_id: UUID, run_id: UUID) ->
         )
 
 
-async def _withdraw_waits_and_cascade(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+async def _withdraw_waits_and_cascade(
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID
+) -> None:
     """A cancel's side effects, in its transaction: pending requests are withdrawn, open waits are
     met, and the run's children are cancelled."""
     # Imported here: approvals imports this module for its run commands, so importing it at module
@@ -623,7 +638,7 @@ async def _withdraw_waits_and_cascade(connection: Any, workspace_id: UUID, run_i
 
 
 async def _record_obligation(
-    connection: Any, run_id: UUID, command: RunCommand, detail: str, response: str | None
+    connection: SqlConnection, run_id: UUID, command: RunCommand, detail: str, response: str | None
 ) -> None:
     """A wait outlives a pause, so a resume can't skip what it was waiting for."""
     kinds = {RunCommand.REQUEST_INPUT: "input", RunCommand.REQUEST_APPROVAL: "approval"}
@@ -643,21 +658,24 @@ async def _record_obligation(
         )
 
 
-async def _lock_job(connection: Any, workspace_id: UUID, run_id: UUID) -> LockedJob:
+async def _lock_job(connection: SqlConnection, workspace_id: UUID, run_id: UUID) -> LockedJob:
     """The job's row lock, always before the run's, the same order a claim uses, so the two can't
     deadlock."""
-    cursor = await connection.execute(
-        "select status, generation, lease_expires_at > clock_timestamp() "
+    row = await optional_row(
+        connection,
+        LockedJobRow,
+        "select status, generation, lease_expires_at > clock_timestamp() as lease_live "
         "from app_private.run_jobs where run_id = %s and workspace_id = %s for update",
         (run_id, workspace_id),
     )
-    row = await cursor.fetchone()
     if row is None:
         return LockedJob(None, None, False)
-    return LockedJob(JobStatus(row[0]), row[1], bool(row[2]))
+    return LockedJob(JobStatus(row.status), row.generation, bool(row.lease_live))
 
 
-async def _lock_run(connection: Any, workspace_id: UUID, run_id: UUID) -> tuple[RunStatus, int]:
+async def _lock_run(
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID
+) -> tuple[RunStatus, int]:
     cursor = await connection.execute(
         "select status, version from public.runs where id = %s and workspace_id = %s for update",
         (run_id, workspace_id),
@@ -669,7 +687,7 @@ async def _lock_run(connection: Any, workspace_id: UUID, run_id: UUID) -> tuple[
 
 
 async def _write_job(
-    connection: Any, run_id: UUID, status: JobStatus | None, *, resumed: bool
+    connection: SqlConnection, run_id: UUID, status: JobStatus | None, *, resumed: bool
 ) -> None:
     """Under the job's row lock, in the transaction that moved the run."""
     if status is not None:
@@ -685,7 +703,7 @@ async def _write_job(
         )
 
 
-async def _record_stop_reason(connection: Any, run_id: UUID, code: str | None) -> None:
+async def _record_stop_reason(connection: SqlConnection, run_id: UUID, code: str | None) -> None:
     # A run can stop before its first segment, so the row may not exist yet.
     await connection.execute(
         "insert into app_private.run_usage (run_id, stop_reason) values (%s, %s) "
@@ -738,7 +756,7 @@ class _Move:
     stop_reason: str | Literal[Unset.UNSET] | None = Unset.UNSET
 
 
-async def _apply(connection: Any, move: _Move) -> TransitionResult:
+async def _apply(connection: SqlConnection, move: _Move) -> TransitionResult:
     """Ownership, version, actor and SP-010 are checked where the change is written, and the
     change, its event, its job and its receipt commit together. Always the job's row, then the
     run's."""
@@ -746,7 +764,7 @@ async def _apply(connection: Any, move: _Move) -> TransitionResult:
         if move.receipt is not None:
             existing = await move.receipt.replayed(connection, TransitionReceipt)
             if existing is not None:
-                return TransitionResult(move.run_id, existing.version, existing.status.value, False)
+                return TransitionResult(move.run_id, existing.version, existing.status, False)
         job = await _lock_job(connection, move.workspace_id, move.run_id)
         if move.actor is Actor.WORKER and (
             move.generation is None or not job.held_by(move.generation)
@@ -757,12 +775,10 @@ async def _apply(connection: Any, move: _Move) -> TransitionResult:
         following = next_status(current, move.command, move.actor, has_active_work=has_active_work)
         if following is None:
             # Repeating a cancellation changes nothing, and is not a conflict.
-            return TransitionResult(move.run_id, version, current.value, False)
+            return TransitionResult(move.run_id, version, current, False)
         if version != move.expected_version:
             raise VersionConflict("the run changed; reload it")
-        new_version = await record_transition(
-            connection, move.run_id, current.value, following.value, version
-        )
+        new_version = await record_transition(connection, move.run_id, current, following, version)
         await _record_obligation(connection, move.run_id, move.command, move.detail, move.response)
         if move.command is RunCommand.CANCEL:
             await _withdraw_waits_and_cascade(connection, move.workspace_id, move.run_id)
@@ -778,10 +794,10 @@ async def _apply(connection: Any, move: _Move) -> TransitionResult:
             await move.receipt.store(
                 connection, TransitionReceipt(version=new_version, status=following)
             )
-    return TransitionResult(move.run_id, new_version, following.value, True)
+    return TransitionResult(move.run_id, new_version, following, True)
 
 
-async def _version_of(connection: Any, run_id: UUID) -> int:
+async def _version_of(connection: SqlConnection, run_id: UUID) -> int:
     """Read before the row locks, so a person's command that lands between this read and the locks
     is a version conflict."""
     cursor = await connection.execute("select version from public.runs where id = %s", (run_id,))
@@ -792,7 +808,7 @@ async def _version_of(connection: Any, run_id: UUID) -> int:
 
 
 async def apply_command(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     run_id: UUID,
@@ -826,7 +842,7 @@ async def apply_command(
 
 
 async def apply_worker_command(
-    connection: Any,
+    connection: SqlConnection,
     claim: WorkerClaim,
     command: RunCommand,
     *,
@@ -853,7 +869,7 @@ async def apply_worker_command(
 
 
 async def cascade_command(
-    connection: Any, *, workspace_id: UUID, run_id: UUID, command: RunCommand
+    connection: SqlConnection, *, workspace_id: UUID, run_id: UUID, command: RunCommand
 ) -> TransitionResult:
     """A command neither a person nor the run's leased worker applies: a parent's cancel or resume
     reaching its child, a stray child's cancel, or an approval's expiry pausing its run. The system

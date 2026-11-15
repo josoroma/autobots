@@ -28,6 +28,7 @@ from autobots.application.worker_leases import Lease, claim_next, claim_run
 from autobots.contracts.approvals import ApprovalReviewDetail
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import PLAN_TOOLS
+from autobots.persistence.rows import ApprovalListRow
 from checklib import Cases, run_check
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -143,16 +144,16 @@ async def main(cases: Cases) -> None:
             assert lease is not None and lease.run_id == run, lease
             return ToolScope(WORKSPACE, run, lease.generation, granted)
 
-        async def shown(run: UUID) -> dict[str, Any]:
-            items = [item for item in await list_approvals(db, WORKSPACE, ('pending', 'approved')) if item['run_id'] == run]
+        async def shown(run: UUID) -> ApprovalListRow:
+            items = [item for item in await list_approvals(db, WORKSPACE, ('pending', 'approved')) if item.run_id == run]
             return items[0]
 
         # The approval shows each file's diff, and nothing has written.
         run, scope = await start()
         pending = await gateway.execute(db, scope, TOOL_ID, proposal('Tidy the readme'))
         item = await shown(run)
-        detail = ApprovalReviewDetail.model_validate(item['review_detail'])
-        arguments = json.loads(item['arguments'])
+        detail = ApprovalReviewDetail.model_validate(item.review_detail)
+        arguments = json.loads(item.arguments)
         files = {f.path: f for f in detail.files}
         check('a proposal waits for approval', 'approval_pending', pending.code, pending.code == 'approval_pending')
         check('the request shows the title, the base branch and each file\'s diff against the base', 'title, main at base-1, a modified and an added diff',
@@ -216,14 +217,14 @@ async def main(cases: Cases) -> None:
             writes_before, pulls_before = len(git.writes()), len(git.pulls)
             moved = await gateway.execute(db, scope, TOOL_ID, proposal('Moved base'))
             again = await shown(run)
-            renewed = ApprovalReviewDetail.model_validate(again['review_detail'])
+            renewed = ApprovalReviewDetail.model_validate(again.review_detail)
             readme = next(f for f in renewed.files if f.path == 'README.md')
             check('a moved base stops with base_moved and opens nothing', 'failed base_moved, no writes, no pull',
                   (moved.outcome.value, moved.code, len(git.writes()) - writes_before, len(git.pulls) - pulls_before),
                   moved.code == 'base_moved' and len(git.writes()) == writes_before and len(git.pulls) == pulls_before)
             check('the new approval shows the diff against the new head', 'pending, base-2, a diff from the upstream text',
-                  (again['status'], renewed.base_sha, readme.diff[:120]),
-                  again['status'] == 'pending' and renewed.base_sha == 'base-2' and '-Hello, changed upstream' in readme.diff)
+                  (again.status, renewed.base_sha, readme.diff[:120]),
+                  again.status == 'pending' and renewed.base_sha == 'base-2' and '-Hello, changed upstream' in readme.diff)
             # The run keeps running, and enters the decision wait when the call is tried again (Decision 0028 E1).
             check('after a moved base the run keeps running with its request pending, and waits only on a retry',
                   'running, pending',

@@ -12,30 +12,21 @@ import socket
 import stat
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 from uuid import UUID
 
-
-class Rows(Protocol):
-    # A row's columns are whatever its query selects, so they stay untyped here.
-    async def fetchone(self) -> tuple[Any, ...] | None: ...
+from autobots.application.sql import SqlConnection, one
 
 
-class Connection(Protocol):
-    """The API's pooled psycopg connection, as far as this read uses it."""
-
-    async def execute(self, query: str, params: tuple[UUID], /) -> Rows: ...
-
-
-async def stored_bytes(connection: Connection, workspace_id: UUID) -> int:
+async def stored_bytes(connection: SqlConnection, workspace_id: UUID) -> int:
     """This workspace's published artifact bytes in Storage, from their recorded sizes."""
-    cursor = await connection.execute(
+    (stored,) = await one(
+        connection,
         "select coalesce(sum(size_bytes), 0)::bigint from public.artifacts "
         "where workspace_id = %s and status = 'published'",
         (workspace_id,),
     )
-    row = await cursor.fetchone()
-    return 0 if row is None else int(row[0])
+    return int(stored)
 
 
 def disk_bytes(path: Path) -> tuple[int, int] | None:

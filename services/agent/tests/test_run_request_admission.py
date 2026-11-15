@@ -25,6 +25,7 @@ import pytest
 
 from autobots.api.dependencies import model_key_check, require_ready
 from autobots.api.errors import ApiError
+from autobots.api.resources import resources_of
 from fake_api import MEMBER, OWNER, WORKSPACE, ApiClient
 from fake_openrouter import provider_context
 
@@ -107,7 +108,7 @@ def post(client: ApiClient, arranged: Arranged, idempotency_key: str = "key-1") 
         database.answer("select status from public.runs", (arranged.earlier_status,))
     if arranged.stored_goal is not None:
         database.answer("original_request", (arranged.stored_goal,))
-    client.app.state.provider_context = provider_context(environment=arranged.startup)
+    resources_of(client.app).provider_context = provider_context(environment=arranged.startup)
     client.app.dependency_overrides[require_ready] = lambda: None
     client.app.dependency_overrides[model_key_check] = lambda: (
         KeyCheck(arranged.key, client.log).run_intent

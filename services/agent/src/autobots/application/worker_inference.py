@@ -48,6 +48,7 @@ from autobots.application.provider_settings import (
     ProviderSettings,
 )
 from autobots.application.runs import frozen_snapshot
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import Browsing
 from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import Lease
@@ -276,7 +277,7 @@ class InferenceSource:
             _log_refusal("reject_key", error)
 
     async def _refusal(
-        self, connection: Any, workspace_id: UUID, policy: RolePolicy
+        self, connection: SqlConnection, workspace_id: UUID, policy: RolePolicy
     ) -> tuple[str | None, int]:
         """Why this job shouldn't start, and otherwise the most one call could cost.
 
@@ -308,7 +309,7 @@ class InferenceSource:
         return entry.pricing.input_per_million, entry.pricing.tier_from_tokens
 
     async def bind(
-        self, connection: Any, lease: Lease, config: LoopConfig
+        self, connection: SqlConnection, lease: Lease, config: LoopConfig
     ) -> tuple[Callable[[], Any], LoopConfig]:
         """The route comes from this run's frozen policy, never from the worker or the workspace."""
         try:
@@ -323,7 +324,7 @@ class InferenceSource:
         browsing = await self._browsing(connection, lease)
         return lambda: model, replace(config, route=route, refusal=refusal, browsing=browsing)
 
-    async def _browsing(self, connection: Any, lease: Lease) -> Browsing | None:
+    async def _browsing(self, connection: SqlConnection, lease: Lease) -> Browsing | None:
         """`browse_goal` for this job, bound to the run's researcher route, while browsing is
         switched on and its executor qualified. The pass's tool set registers it from this
         (adapters/tool_registry.py)."""
@@ -344,7 +345,7 @@ class InferenceSource:
         )
 
     async def role_route(
-        self, connection: Any, lease: Lease, role: ModelRole
+        self, connection: SqlConnection, lease: Lease, role: ModelRole
     ) -> tuple[AttemptModel, ModelRoute] | str:
         """Another role of the same run, as its frozen policy binds it, or why it can't be used.
 

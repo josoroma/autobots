@@ -28,6 +28,7 @@ from autobots.application.tool_definitions import (
     ToolScope,
 )
 from autobots.contracts.github_tools import GithubOpenPullRequestInput, GithubOpenPullRequestOutput
+from sql_fakes import ScriptedConnection
 
 REPOSITORY = "owner/configured"
 ENV = {"GITHUB_REPOSITORY": REPOSITORY, "GITHUB_TOKEN": "github_pat_fixture0001"}
@@ -158,7 +159,7 @@ class Reviewing(ToolContext):
 def approved(base_sha: str = "base-1") -> Reviewing:
     detail: dict[str, object] = {"base_branch": "main", "base_sha": base_sha, "files": []}
     approval = ApprovedRequest(f"GitHub repository {REPOSITORY}", detail)
-    return Reviewing(None, SCOPE, OPERATION, approval)
+    return Reviewing(ScriptedConnection(), SCOPE, OPERATION, approval)
 
 
 def settled[T](awaitable: Awaitable[T]) -> T:
@@ -374,7 +375,7 @@ def test_a_missing_base_branch_is_refused_in_review() -> None:
 
 def test_an_attempt_without_its_approved_detail_writes_nothing() -> None:
     git = FakeGit()
-    context = Reviewing(None, SCOPE, OPERATION, ApprovedRequest("x", None))
+    context = Reviewing(ScriptedConnection(), SCOPE, OPERATION, ApprovedRequest("x", None))
     with pytest.raises(ToolFailed, match=r"^review_detail_missing$"):
         open_pull(git, context)
     assert git.writes() == []

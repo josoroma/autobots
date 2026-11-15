@@ -14,6 +14,7 @@ from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
 
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolResult, ToolScope
 from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import ToolOutcome
@@ -48,7 +49,7 @@ class GatewayMiddleware(AgentMiddleware[Any, Any]):
     """Answers every tool call from the gateway. List it after `LoopMiddleware`, which reads the
     code this tags each reply with."""
 
-    def __init__(self, gateway: ToolGateway, connection: object, scope: ToolScope) -> None:
+    def __init__(self, gateway: ToolGateway, connection: SqlConnection, scope: ToolScope) -> None:
         super().__init__()
         self._gateway = gateway
         self._connection = connection

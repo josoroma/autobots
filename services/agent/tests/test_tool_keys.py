@@ -3,7 +3,9 @@ over every item keeps Decisions 0024 and 0025's order, and a nonblank, unusable 
 falls through to a lower one (PTOL-12, model-gateway rule)."""
 
 import asyncio
+import contextlib
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -16,6 +18,7 @@ from autobots.adapters.tavily import tavily_tools
 from autobots.adapters.tool_registry import catalog
 from autobots.application import tool_keys
 from autobots.application.provider_settings import InvalidKey
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
 from autobots.application.tool_key_settings import ToolKeySettings
 from autobots.application.tool_keys import (
@@ -32,6 +35,7 @@ from autobots.application.tool_keys import (
     resolve,
 )
 from autobots.contracts.web_tools import TavilySearchInput
+from sql_fakes import ScriptedConnection, ScriptedRows
 
 CATALOG = catalog()
 
@@ -85,28 +89,20 @@ def test_a_relative_configuration_root_is_never_read(tmp_path: Path) -> None:
 
 
 def test_without_a_database_or_any_value_the_key_is_missing() -> None:
-    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
     with pytest.raises(ToolFailed, match=r"^tavily_key_missing$"):
         asyncio.run(context.key("tavily", {}))
     assert asyncio.run(attempt_value(None, uuid4(), ITEMS["tavily"], {})) is None
 
 
-class Cursor:
-    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
-        self.rows = rows
-
-    async def fetchall(self) -> list[tuple[Any, ...]]:
-        return self.rows
-
-
-class Saved:
+class Saved(ScriptedConnection):
     """A connection whose workspace saved a Tavily key, and nothing else."""
 
-    async def execute(self, query: str, params: Any = None) -> Cursor:
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
         if "tool_key_settings" in query:
-            return Cursor([])
+            return ScriptedRows([])
         assert "provider_credentials" in query
-        return Cursor([("tavily",)])
+        return ScriptedRows([("tavily",)])
 
 
 def test_the_availability_view_names_sources_and_never_holds_a_value(tmp_path: Path) -> None:
@@ -150,7 +146,9 @@ def call(environ: dict[str, str]) -> tuple[list[str], str | None]:
 
     async def go() -> str | None:
         try:
-            await search.handler(TavilySearchInput(query="colones"), ToolContext(None, scope, None))
+            await search.handler(
+                TavilySearchInput(query="colones"), ToolContext(ScriptedConnection(), scope, None)
+            )
         except ToolFailed as failed:
             return str(failed)
         return None
@@ -168,8 +166,8 @@ def test_the_adapter_resolves_inside_the_attempt_and_sends_the_key_only_as_its_h
     assert call({}) == ([], "tavily_key_missing")
 
 
-class Untouched:
-    async def execute(self, *_: Any) -> None:
+class Untouched(ScriptedConnection):
+    async def execute(self, query: str, _params: SqlParams | None = None, /) -> ScriptedRows:
         raise AssertionError("a malformed key must be refused before the database")
 
 
@@ -238,18 +236,17 @@ class Approvals:
     def __init__(self, receipt: str | None, recorded: str | None) -> None:
         self.receipt, self.recorded = receipt, recorded
 
-    async def execute(self, query: str, params: Any = None) -> Any:
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
         row = (
             (self.receipt,)
             if "tool_receipts" in query and self.receipt
             else ((self.recorded, None) if "approval_requests" in query else None)
         )
+        return ScriptedRows([] if row is None else [row])
 
-        class One:
-            async def fetchone(self) -> Any:
-                return row
-
-        return One()
+    @contextlib.asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
 
 
 @pytest.mark.parametrize(
@@ -282,17 +279,9 @@ def test_a_write_uses_the_repository_its_approval_recorded() -> None:
     from autobots.application.approvals import ApprovedRequest
 
     class Recorded(Approvals):
-        async def execute(self, query: str, params: Any = None) -> Any:
+        async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query or "provider_credentials" in query:
-
-                class Nothing:
-                    async def fetchone(self) -> None:
-                        return None
-
-                    async def fetchall(self) -> list[Any]:
-                        return []
-
-                return Nothing()
+                return ScriptedRows()
             return await super().execute(query, params)
 
     scope = ToolScope(uuid4(), uuid4(), 1, {"create_github_issue": 1})
@@ -333,13 +322,13 @@ def test_each_item_has_its_own_check(name: str, value: str, accepted: bool) -> N
 
 
 def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Path) -> None:
-    class Both:
-        async def execute(self, query: str, params: Any = None) -> Cursor:
+    class Both(ScriptedConnection):
+        async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query:
-                return Cursor(
+                return ScriptedRows(
                     [("browser_executor", "disabled"), ("github_repository", "owner/saved")]
                 )
-            return Cursor([("github",)])
+            return ScriptedRows([("github",)])
 
     environ = {"AUTOBOTS_BROWSER_EXECUTOR": "enabled", "GITHUB_REPOSITORY": "owner/env"}
     view = asyncio.run(key_sources(Both(), uuid4(), environ))
@@ -430,7 +419,7 @@ def test_a_nonblank_unusable_process_value_stops_resolution(tmp_path: Path, name
 def test_an_attempt_treats_an_unusable_value_as_not_configured(tmp_path: Path, name: str) -> None:
     item = ITEMS[name]
     environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
-    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
     resolved = asyncio.run(context.setting(name, environ))
     assert resolved == UNUSABLE[name] and item.usable(resolved) is None
 
@@ -442,7 +431,7 @@ def test_an_attempt_sends_the_unusable_process_key_never_the_env_files(
     """A secret goes to the client as it resolved, and its provider refuses it: the `.env` file's
     usable key is never sent in its place."""
     environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
-    context = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+    context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
     assert asyncio.run(context.key(name, environ)) == UNUSABLE[name]
 
 
@@ -487,11 +476,11 @@ def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(tool_keys, "_saved_secret", forbidden)
 
-    class Everything:
-        async def execute(self, query: str, params: Any = None) -> Cursor:
+    class Everything(ScriptedConnection):
+        async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query:
-                return Cursor([("github_repository", "owner/saved")])
-            return Cursor([("tavily",), ("jina",), ("github",)])
+                return ScriptedRows([("github_repository", "owner/saved")])
+            return ScriptedRows([("tavily",), ("jina",), ("github",)])
 
     view = asyncio.run(key_sources(Everything(), uuid4(), {}))
     secrets = [item.variable for item in ITEMS.values() if item.secret]
@@ -510,11 +499,11 @@ def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_environment(
 
     monkeypatch.setattr(tool_keys, "_saved_secret", unavailable)
 
-    class SavedKey:
-        async def execute(self, query: str, params: Any = None) -> Cursor:
+    class SavedKey(ScriptedConnection):
+        async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query:
-                return Cursor([])
-            return Cursor([(item.credential,)])
+                return ScriptedRows()
+            return ScriptedRows([(item.credential,)])
 
     context = ToolContext(SavedKey(), ToolScope(uuid4(), uuid4(), 1, {}), "op")
     environ = {item.variable: USABLE[name]}

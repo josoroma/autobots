@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import (
-    Connection,
     LoopConfig,
     LoopResult,
     finish,
@@ -14,6 +13,7 @@ from autobots.application.run_lifecycle import (
     result_of,
 )
 from autobots.application.runs import LeaseLost, VersionConflict, apply_worker_command
+from autobots.application.sql import SqlConnection
 from autobots.application.verification import verify_candidate
 from autobots.application.worker_leases import Lease
 from autobots.domain.runs import CommandRefused, RunCommand
@@ -21,7 +21,7 @@ from autobots.domain.stops import PassOutcome, StopCode
 
 
 async def settle_candidate(
-    connection: Connection, database_url: str, lease: Lease, config: LoopConfig
+    connection: SqlConnection, database_url: str, lease: Lease, config: LoopConfig
 ) -> LoopResult:
     """Only recorded checks finish a run. Also picks up a candidate whose worker died."""
     goal = await load_goal(connection, lease.run_id)

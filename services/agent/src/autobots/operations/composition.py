@@ -24,6 +24,7 @@ from autobots.application.provider_settings import (
     ProviderSettings,
 )
 from autobots.application.readiness import MalformedSetting
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_keys import master_key_file
 
 EXIT_UNCONFIGURED = 2
@@ -88,7 +89,7 @@ def object_store(environ: Mapping[str, str]) -> SupabaseObjectStore | None:
     return SupabaseObjectStore(url, SecretStr(key)) if url and key else None
 
 
-async def no_credential(_connection: object, _workspace_id: UUID) -> str:
+async def no_credential(_connection: SqlConnection, _workspace_id: UUID) -> str:
     """With no provider context, nothing unattended starts. The code matches a missing key."""
     return "credentials_required"
 
@@ -99,7 +100,7 @@ def credential_check(environ: Mapping[str, str]) -> ConnectionReadiness:
     if context is None:
         return no_credential
 
-    async def check(connection: object, workspace_id: UUID) -> str:
+    async def check(connection: SqlConnection, workspace_id: UUID) -> str:
         return await ProviderSettings(connection, context).run_intent(workspace_id)
 
     return check

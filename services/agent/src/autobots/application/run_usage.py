@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
+from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.application.worker_leases import LeaseHolder
 from autobots.domain.stops import StopCode
+from autobots.persistence.rows import UsageCountRow
 
 Counter = Literal["model_calls", "tool_dispatches", "repairs", "plan_revisions", "children"]
 COUNTER_SQL: dict[Counter, str] = {
@@ -52,14 +54,14 @@ class LimitReached(Exception):
         self.code = LIMIT_CODES[counter]
 
 
-async def ensure_usage(connection: Any, run_id: UUID) -> None:
+async def ensure_usage(connection: SqlConnection, run_id: UUID) -> None:
     await connection.execute(
         "insert into app_private.run_usage (run_id) values (%s) on conflict (run_id) do nothing",
         (run_id,),
     )
 
 
-async def consume(connection: Any, run_id: UUID, counter: Counter, limit: int) -> int:
+async def consume(connection: SqlConnection, run_id: UUID, counter: Counter, limit: int) -> int:
     """Atomic, so concurrent callers can't pass the limit together."""
     cursor = await connection.execute(COUNTER_SQL[counter], (run_id, limit))
     row = await cursor.fetchone()
@@ -74,7 +76,7 @@ async def consume(connection: Any, run_id: UUID, counter: Counter, limit: int) -
 _HELD = "exists (select 1 from app_private.run_jobs j where j.run_id = %s and j.generation = %s)"
 
 
-async def begin_segment(connection: Any, lease: LeaseHolder) -> None:
+async def begin_segment(connection: SqlConnection, lease: LeaseHolder) -> None:
     """A segment a dead worker left open is closed at its start, since its end is unknown."""
     await connection.execute(
         "update app_private.run_usage set segment_started_at = clock_timestamp() "
@@ -83,7 +85,7 @@ async def begin_segment(connection: Any, lease: LeaseHolder) -> None:
     )
 
 
-async def end_segment(connection: Any, lease: LeaseHolder) -> None:
+async def end_segment(connection: SqlConnection, lease: LeaseHolder) -> None:
     """A worker that lost the run reaches its own end after the new owner began, so without the
     fence it would count the new owner's time and close their segment."""
     await connection.execute(
@@ -95,7 +97,7 @@ async def end_segment(connection: Any, lease: LeaseHolder) -> None:
     )
 
 
-async def discount_sleep(connection: Any, lease: LeaseHolder, seconds: float) -> None:
+async def discount_sleep(connection: SqlConnection, lease: LeaseHolder, seconds: float) -> None:
     """A Mac asleep isn't a run working, so an open segment doesn't count that time.
 
     This isn't capped at the database's now. Docker's clock can lag a wake by half a minute, then
@@ -112,16 +114,15 @@ async def discount_sleep(connection: Any, lease: LeaseHolder, seconds: float) ->
     )
 
 
-async def model_calls_used(connection: Any, run_id: UUID) -> int:
+async def model_calls_used(connection: SqlConnection, run_id: UUID) -> int:
     """The model calls the run tree whose root is `run_id` has counted so far."""
-    cursor = await connection.execute(
-        "select model_calls from app_private.run_usage where run_id = %s", (run_id,)
+    (used,) = await one(
+        connection, "select model_calls from app_private.run_usage where run_id = %s", (run_id,)
     )
-    used: int = (await cursor.fetchone())[0]
-    return used
+    return int(used)
 
 
-async def active_seconds_used(connection: Any, run_id: UUID) -> float:
+async def active_seconds_used(connection: SqlConnection, run_id: UUID) -> float:
     cursor = await connection.execute(
         "select active_seconds + greatest(coalesce(extract(epoch from clock_timestamp() - "
         "segment_started_at), 0), 0) from app_private.run_usage where run_id = %s",
@@ -131,12 +132,33 @@ async def active_seconds_used(connection: Any, run_id: UUID) -> float:
     return float(row[0]) if row else 0.0
 
 
-async def usage_view(connection: Any, run_id: UUID) -> dict[str, Any]:
-    cursor = await connection.execute(
+async def usage_view(connection: SqlConnection, run_id: UUID) -> dict[str, Any]:
+    """The run's counters as a pass reports them, all zero before its first segment."""
+    row = await optional_row(
+        connection,
+        UsageCountRow,
         "select model_calls, tool_dispatches, repairs, plan_revisions, children, stop_reason "
         "from app_private.run_usage where run_id = %s",
         (run_id,),
     )
-    row = await cursor.fetchone()
-    names = ("model_calls", "tool_dispatches", "repairs", "plan_revisions", "children", "stop")
-    return dict(zip(names, row or (0, 0, 0, 0, 0, None), strict=True))
+    return usage_counts(row)
+
+
+def usage_counts(row: UsageCountRow | None) -> dict[str, Any]:
+    if row is None:
+        row = UsageCountRow(
+            model_calls=0,
+            tool_dispatches=0,
+            repairs=0,
+            plan_revisions=0,
+            children=0,
+            stop_reason=None,
+        )
+    return {
+        "model_calls": row.model_calls,
+        "tool_dispatches": row.tool_dispatches,
+        "repairs": row.repairs,
+        "plan_revisions": row.plan_revisions,
+        "children": row.children,
+        "stop": row.stop_reason,
+    }

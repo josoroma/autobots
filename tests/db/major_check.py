@@ -165,16 +165,16 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
         lease = await claim_next(db, worker_id='m2')
         asked = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': text})
         assert asked.code == 'approval_pending', asked.code
-        row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run)
-        await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
+        row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item.run_id == run)
+        await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row.id, idempotency_key=str(uuid4()), decision='approve', argument_hash=row.argument_hash)
         await db.execute("update app_private.run_jobs set status = 'queued', available_at = clock_timestamp() where run_id = %s", (run,))
         lease = await claim_run(db, run, worker_id='m2-after')
         return run, lease, row
 
     run, lease, row = await approved_run('lapses')
-    await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row['id'],))
+    await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row.id,))
     late = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': 'lapses'})
-    asked_again = await value('select status from public.approval_requests where id = %s', row['id'])
+    asked_again = await value('select status from public.approval_requests where id = %s', row.id)
     check('an unused approval past its time asks a person again', 'approval_pending, nothing attempted', (late.code, asked_again, attempts), late.code == 'approval_pending' and asked_again == 'pending' and not attempts)
 
     # The blocker from the second review: what already happened is read back, whatever the date.
@@ -190,12 +190,12 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     run = await admit()
     lease = await claim_next(db, worker_id='replay')
     await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
-    row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item['run_id'] == run)
-    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row['id'], idempotency_key=str(uuid4()), decision='approve', argument_hash=row['argument_hash'])
+    row = next(item for item in await list_approvals(db, WORKSPACE, 'pending') if item.run_id == run)
+    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=row.id, idempotency_key=str(uuid4()), decision='approve', argument_hash=row.argument_hash)
     await db.execute("update app_private.run_jobs set status = 'queued', available_at = clock_timestamp() where run_id = %s", (run,))
     lease = await claim_run(db, run, worker_id='replay-2')
     sent = await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
-    await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row['id'],))
+    await db.execute("update public.approval_requests set expires_at = clock_timestamp() - interval '1 second' where id = %s", (row.id,))
     replayed = await gateway.execute(db, scope_of(lease, {'gated_ok': 1}), 'gated_ok', {'text': 'sent once'})
     check('a replay past the approval time returns the delivered result', 'succeeded, replayed, one delivery', (sent.outcome.value, replayed.outcome.value, replayed.replayed, len(delivered)), replayed.outcome.value == 'succeeded' and replayed.replayed and len(delivered) == 1)
 

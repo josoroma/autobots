@@ -1,6 +1,6 @@
 """Artifact tool and API contracts."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -26,6 +26,11 @@ class PublishedArtifact(BaseModel):
     size_bytes: int
 
 
+# A listed artifact is published, or published once and since found missing from Storage.
+ListedArtifactStatus = Literal["published", "missing"]
+LISTED_ARTIFACT_STATUSES: tuple[ListedArtifactStatus, ...] = get_args(ListedArtifactStatus)
+
+
 class ArtifactSummary(BaseModel):
     """It never holds a storage path."""
 
@@ -39,7 +44,7 @@ class ArtifactSummary(BaseModel):
     media_type: str
     size_bytes: int
     sha256: str
-    status: Literal["published", "missing"]
+    status: ListedArtifactStatus
 
 
 class ArtifactList(BaseModel):

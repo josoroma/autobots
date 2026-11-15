@@ -1,6 +1,8 @@
 """Decision 0023 E2: the schema check reads the applied count against what this release ships."""
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,8 @@ from autobots.application.operations import (
     schema_condition,
 )
 from autobots.application.schema_release import NEWEST_MIGRATION, SHIPPED_MIGRATIONS
+from autobots.application.sql import SqlParams
+from sql_fakes import ScriptedRows
 
 MIGRATIONS = Path(__file__).resolve().parents[3] / "supabase/migrations"
 
@@ -59,12 +63,8 @@ def test_the_newer_objects_are_required() -> None:
         assert column in REQUIRED_COLUMNS
 
 
-class Cursor:
-    def __init__(self, row: tuple[Any, ...] | None) -> None:
-        self.row = row
-
-    async def fetchone(self) -> tuple[Any, ...] | None:
-        return self.row
+def answered(row: tuple[Any, ...] | None) -> ScriptedRows:
+    return ScriptedRows([] if row is None else [row])
 
 
 class Connection:
@@ -75,15 +75,19 @@ class Connection:
         self.applied = applied
         self.statements: list[str] = []
 
-    async def execute(self, statement: str, *_: Any) -> Cursor:
+    async def execute(self, statement: str, _params: SqlParams | None = None, /) -> ScriptedRows:
         self.statements.append(statement)
         if "to_regprocedure" in statement:
-            return Cursor((self.has_function,))
+            return answered((self.has_function,))
         if "applied_migration_count" in statement:
-            return Cursor((self.applied,))
+            return answered((self.applied,))
         if "installation_holds" in statement:
-            return Cursor(None)
-        return Cursor((0,))
+            return answered(None)
+        return answered((0,))
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
 
     async def __aenter__(self) -> "Connection":
         return self

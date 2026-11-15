@@ -7,6 +7,7 @@ from uuid import UUID
 
 from autobots.application.model_admission import LEDGER_PARAMS, spend_columns, unreported_column
 from autobots.application.run_admission import saved_workspace_policy
+from autobots.application.sql import SqlConnection, all_rows
 from autobots.contracts.workflows import (
     WorkflowExecutionSummary,
     WorkflowStepView,
@@ -15,12 +16,15 @@ from autobots.domain.models import PROFILES, ModelRole
 from autobots.domain.runs import TERMINAL, RunStatus
 from autobots.domain.workflows import AgentConfig, block_config, step_order
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
+from autobots.persistence.rows import ExecutionSummaryRow, ExpertConfigRow
 
 # One execution per row, with the root run's ledger, as the run list and admission count it (RN-01,
 # Decision 0029 F10).
 _EXECUTIONS = (
-    "select x.id, x.run_id, x.workflow_version, r.status, x.created_at, r.updated_at, "
-    f"r.created_at, {spend_columns('r')}, {unreported_column('r')} "
+    "select x.id, x.run_id, x.workflow_version, r.status, x.created_at as started_at, "
+    "r.updated_at as run_updated_at, "
+    f"r.created_at as run_created_at, {spend_columns('r')}, {unreported_column('r')} "
+    "as unreported "
     "from public.workflow_executions x join public.runs r on r.id = x.run_id "
     "and r.workspace_id = x.workspace_id "
     "where x.workflow_id = %(workflow)s and x.workspace_id = %(workspace)s "
@@ -28,33 +32,37 @@ _EXECUTIONS = (
 )
 
 
-def _summary(row: Any) -> WorkflowExecutionSummary:
-    finished = RunStatus(row[3]) in TERMINAL
+def execution_summary(row: ExecutionSummaryRow) -> WorkflowExecutionSummary:
+    """An unknown stored status raises, instead of reaching a client."""
+    status = RunStatus(row.status)
+    elapsed = (row.run_updated_at - row.run_created_at).total_seconds()
     return WorkflowExecutionSummary(
-        id=row[0],
-        run_id=row[1],
-        version=row[2],
-        status=row[3],
-        charged_micro_usd=int(row[7]),
-        reserved_micro_usd=int(row[8]),
-        unreported=bool(row[9]),
-        started_at=row[4].astimezone(UTC).isoformat(),
+        id=row.id,
+        run_id=row.run_id,
+        version=row.workflow_version,
+        status=status,
+        charged_micro_usd=int(row.charged_micro_usd),
+        reserved_micro_usd=int(row.reserved_micro_usd),
+        unreported=bool(row.unreported),
+        started_at=row.started_at.astimezone(UTC),
         # The run's own time, from admission to its last change, to the nearest second.
-        duration_seconds=max(round((row[5] - row[6]).total_seconds()), 0) if finished else None,
+        duration_seconds=max(round(elapsed), 0) if status in TERMINAL else None,
     )
 
 
 async def recent_executions(
-    connection: Any, workspace_id: UUID, workflow_id: UUID, limit: int = 10
+    connection: SqlConnection, workspace_id: UUID, workflow_id: UUID, limit: int = 10
 ) -> list[WorkflowExecutionSummary]:
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        ExecutionSummaryRow,
         _EXECUTIONS,
         {"workflow": workflow_id, "workspace": workspace_id, "limit": limit, **LEDGER_PARAMS},
     )
-    return [_summary(row) for row in await cursor.fetchall()]
+    return [execution_summary(row) for row in rows]
 
 
-async def run_count(connection: Any, workspace_id: UUID, workflow_id: UUID) -> int:
+async def run_count(connection: SqlConnection, workspace_id: UUID, workflow_id: UUID) -> int:
     cursor = await connection.execute(
         "select count(*) from public.workflow_executions where workflow_id = %s "
         "and workspace_id = %s",
@@ -65,18 +73,20 @@ async def run_count(connection: Any, workspace_id: UUID, workflow_id: UUID) -> i
 
 
 async def _experts(
-    connection: Any, workspace_id: UUID, expert_ids: list[str]
+    connection: SqlConnection, workspace_id: UUID, expert_ids: list[str]
 ) -> dict[str, tuple[str, ExpertConfigRecord]]:
     """Each named Expert's name and latest configuration, in this workspace only."""
     if not expert_ids:
         return {}
-    cursor = await connection.execute(
-        "select e.id::text, e.name, v.config from public.experts e "
+    rows = await all_rows(
+        connection,
+        ExpertConfigRow,
+        "select e.id::text as id, e.name, v.config from public.experts e "
         "join public.expert_versions v on v.expert_id = e.id and v.version = e.latest_version "
         "where e.workspace_id = %s and e.id::text = any(%s)",
         (workspace_id, expert_ids),
     )
-    return {row[0]: (str(row[1]), read_expert_config(row[2])) for row in await cursor.fetchall()}
+    return {row.id: (str(row.name), read_expert_config(row.config)) for row in rows}
 
 
 def _agent_expert(node: Mapping[str, Any]) -> str | None:
@@ -95,7 +105,7 @@ def _agent_experts(graph: Mapping[str, Any]) -> list[str]:
 
 
 async def expert_chain(
-    connection: Any, workspace_id: UUID, graph: Mapping[str, Any] | None
+    connection: SqlConnection, workspace_id: UUID, graph: Mapping[str, Any] | None
 ) -> list[str]:
     """WF-01: the Experts its agent steps use, in step order, such as Research analyst then
     Brief writer. An Expert used twice in a row is named once."""
@@ -112,7 +122,7 @@ async def expert_chain(
 
 
 async def preview_steps(
-    connection: Any, workspace_id: UUID, graph: Mapping[str, Any]
+    connection: SqlConnection, workspace_id: UUID, graph: Mapping[str, Any]
 ) -> list[WorkflowStepView]:
     """WF-03: each step in order. An agent step shows its Expert, the model its child run would
     use if the workflow started now, and the Expert's tools. An approval step is marked as the

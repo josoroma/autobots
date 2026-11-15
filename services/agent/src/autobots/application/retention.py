@@ -3,11 +3,12 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Protocol
 from uuid import UUID
 
 import psycopg
 
+from autobots.application.sql import CommittingConnection, SqlConnection, one
 from autobots.domain.runs import TERMINAL
 from autobots.logs import log_event
 
@@ -33,7 +34,13 @@ class RetentionReport:
     objects_pending: int = 0
 
 
-async def read_policy(connection: Any, workspace_id: UUID) -> RetentionPolicy:
+class ObjectRemover(Protocol):
+    """The object store, as far as retention removes expired bytes from it."""
+
+    async def remove(self, path: str) -> None: ...
+
+
+async def read_policy(connection: SqlConnection, workspace_id: UUID) -> RetentionPolicy:
     cursor = await connection.execute(
         "select run_days, receipt_days from app_private.workspace_retention "
         "where workspace_id = %s",
@@ -44,7 +51,7 @@ async def read_policy(connection: Any, workspace_id: UUID) -> RetentionPolicy:
 
 
 async def write_policy(
-    connection: Any, workspace_id: UUID, actor_id: UUID, policy: RetentionPolicy
+    connection: SqlConnection, workspace_id: UUID, actor_id: UUID, policy: RetentionPolicy
 ) -> None:
     await connection.execute(
         "insert into app_private.workspace_retention "
@@ -56,14 +63,17 @@ async def write_policy(
     )
 
 
-async def _commit(connection: Any) -> None:
+async def _commit(connection: CommittingConnection) -> None:
     """The API's pooled connections aren't autocommit, and these steps have to be durable each."""
     if not connection.autocommit:
         await connection.commit()
 
 
 async def _remove_expired_objects(
-    connection: Any, store: Any, workspace_id: UUID, report: RetentionReport
+    connection: CommittingConnection,
+    store: ObjectRemover | None,
+    workspace_id: UUID,
+    report: RetentionReport,
 ) -> None:
     """After the rows commit, so a crash leaves bytes to retry, never a row pointing at nothing."""
     cursor = await connection.execute(
@@ -103,12 +113,15 @@ async def _remove_expired_objects(
 
 
 async def apply_retention(
-    connection: Any, store: Any, workspace_id: UUID, now: datetime | None = None
+    connection: CommittingConnection,
+    store: ObjectRemover | None,
+    workspace_id: UUID,
+    now: datetime | None = None,
 ) -> RetentionReport:
     """One workspace's declared windows. The database refuses anything else, and says why."""
     policy = await read_policy(connection, workspace_id)
     report = RetentionReport()
-    moment = now or (await (await connection.execute("select now()")).fetchone())[0]
+    moment = now if now is not None else (await one(connection, "select now()"))[0]
     if policy.run_days is not None:
         cutoff = moment - timedelta(days=policy.run_days)
         # By position, not by repeating the query, so runs refused today can't crowd out the rest.
@@ -135,14 +148,12 @@ async def apply_retention(
                 break
             for run_id, updated_at in rows:
                 position = (updated_at, run_id)
-                result = await (
-                    await connection.execute(
-                        "select app_private.purge_run_content(%s, %s, %s)",
-                        (workspace_id, run_id, cutoff),
-                    )
-                ).fetchone()
+                (outcome,) = await one(
+                    connection,
+                    "select app_private.purge_run_content(%s, %s, %s)",
+                    (workspace_id, run_id, cutoff),
+                )
                 await _commit(connection)
-                outcome = result[0]
                 if outcome.get("purged"):
                     report.purged_runs += 1
                 else:
@@ -151,12 +162,12 @@ async def apply_retention(
     await _remove_expired_objects(connection, store, workspace_id, report)
     if policy.receipt_days is not None:
         cutoff = moment - timedelta(days=policy.receipt_days)
-        row = await (
-            await connection.execute(
-                "select app_private.expire_idempotency_receipts(%s, %s)", (workspace_id, cutoff)
-            )
-        ).fetchone()
-        report.keys_expired = int(row[0])
+        (expired,) = await one(
+            connection,
+            "select app_private.expire_idempotency_receipts(%s, %s)",
+            (workspace_id, cutoff),
+        )
+        report.keys_expired = int(expired)
         await _commit(connection)
     log_event(
         logger,
@@ -171,7 +182,7 @@ async def apply_retention(
     return report
 
 
-async def apply_all(connection: Any, store: Any) -> None:
+async def apply_all(connection: CommittingConnection, store: ObjectRemover | None) -> None:
     """Only workspaces that declared a window, each on its own, so one failure stays its own."""
     cursor = await connection.execute(
         "select workspace_id from app_private.workspace_retention "

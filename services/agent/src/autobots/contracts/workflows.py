@@ -1,6 +1,6 @@
 """Workflow IR and API contracts, PRD 7.3 and 11.2."""
 
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ from autobots.domain.runs import RunStatus
 
 # workflow_versions.source, as its check constraint allows (tests/test_contract_vocabularies.py).
 WorkflowSource = Literal["user", "model_proposal"]
+WORKFLOW_SOURCES: tuple[WorkflowSource, ...] = get_args(WorkflowSource)
 
 
 class WorkflowNode(BaseModel):

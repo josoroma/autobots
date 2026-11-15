@@ -36,6 +36,7 @@ from autobots.application.credentials.store import (
     ProviderCredentialStore,
     ResolvedCredential,
 )
+from sql_fakes import Row, ScriptedConnection
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 CASES = json.loads((REPOSITORY / "contracts/fixtures/credential-precedence.json").read_text())
@@ -121,17 +122,11 @@ def test_master_key_creation_is_exclusive_and_private(tmp_path: Path) -> None:
     assert load_master_key(path) == original
 
 
-class OneRow:
+class OneRow(ScriptedConnection):
     """A connection whose every query answers `row`, as one stored credential."""
 
-    def __init__(self, row: tuple[object, ...]) -> None:
-        self.row = row
-
-    async def execute(self, *_: object) -> "OneRow":
-        return self
-
-    async def fetchone(self) -> tuple[object, ...]:
-        return self.row
+    def __init__(self, row: Row) -> None:
+        super().__init__([row])
 
 
 def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -> None:
@@ -142,7 +137,13 @@ def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -
     path = tmp_path / "secrets/master.key"
     create_master_key(path)
     sealed = seal(bytes(32), PLAINTEXT, associated_data(workspace, "openrouter", credential, 1))
-    row = (credential, 1, sealed.ciphertext, sealed.nonce, sealed.tag)
+    row = {
+        "credential_id": credential,
+        "version": 1,
+        "ciphertext": sealed.ciphertext,
+        "nonce": sealed.nonce,
+        "tag": sealed.tag,
+    }
     with pytest.raises(CredentialUnreadable) as caught:
         asyncio.run(ProviderCredentialStore(OneRow(row), path).load_active(workspace))
     assert isinstance(caught.value, CredentialStorageUnavailable)

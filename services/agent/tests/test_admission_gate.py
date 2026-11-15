@@ -22,6 +22,7 @@ from pydantic import SecretStr
 from autobots.adapters.tool_registry import catalog
 from autobots.api import main as api_main
 from autobots.api.app import create_app
+from autobots.api.resources import AppResources
 from autobots.api.settings import Settings, load_settings
 from autobots.application import readiness
 from autobots.application.operations import Condition, ProbeTimes, is_ready
@@ -36,12 +37,13 @@ from autobots.application.readiness import (
 )
 from autobots.operations import worker
 from autobots.operations.composition import no_credential
+from sql_fakes import LendingPool, ScriptedConnection
 
 INTERNAL = "fixture-internal"
 SECRET = "fixture-jwt-secret-with-enough-length"
 MEMBER = UUID("c1111111-1111-4111-8111-111111111111")
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
-CONNECTION = object()
+CONNECTION = ScriptedConnection()
 DatabaseAnswer = tuple[Condition, Condition, Condition, Condition]
 DATABASE_READY: DatabaseAnswer = (
     Condition("database", "ok", "database_ready"),
@@ -90,12 +92,26 @@ SCHEMA_AHEAD = Install(database=answer(Condition("schema", "degraded", "schema_a
 
 
 class Storage:
+    """Storage that answers a ping, and stores nothing these tests read."""
+
     def __init__(self, up: bool) -> None:
         self.up = up
 
     async def ping(self) -> None:
         if not self.up:
             raise RuntimeError("arranged: Storage is down")
+
+    async def put(self, path: str, content: bytes, media_type: str) -> bool:
+        raise AssertionError(path)
+
+    async def get(self, path: str) -> bytes | None:
+        raise AssertionError(path)
+
+    async def remove(self, path: str) -> None:
+        raise AssertionError(path)
+
+    async def names(self, prefix: str) -> list[str]:
+        raise AssertionError(prefix)
 
 
 # The gate's rule
@@ -429,9 +445,14 @@ def gated_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, install: Insta
         allowed_hosts=("testserver",),
         readiness=ReadinessSettings(tmp_path, install.min_free_bytes),
     )
-    app = create_app(settings, membership=Membership())
-    app.state.pool = object()
-    app.state.object_store = Storage(install.storage_up)
+    app = create_app(
+        AppResources(
+            settings,
+            membership=Membership(),
+            pool=LendingPool(),
+            object_store=Storage(install.storage_up),
+        )
+    )
     return TestClient(app, raise_server_exceptions=False)
 
 

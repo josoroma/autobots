@@ -1,6 +1,6 @@
 """Local Operations, SP-018: conditions and counts only. No address, path, identifier or secret."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -8,13 +8,15 @@ from autobots.contracts.primitives import LAX_CONTRACT, Count, UtcTimestamp
 from autobots.contracts.settings import RouteQualification
 
 Name = Literal["database", "schema", "hold", "adapter", "storage", "disk", "queue", "worker"]
+# A condition is fine, shown but not stopping work, or failing (Decision 0022 D5).
+ConditionState = Literal["ok", "degraded", "unavailable"]
 
 
 class OperationCondition(BaseModel):
     model_config = LAX_CONTRACT
 
     name: Name
-    state: Literal["ok", "degraded", "unavailable"]
+    state: ConditionState
     code: str
 
 
@@ -60,6 +62,11 @@ class RetentionSummary(BaseModel):
     viewer_role: Literal["owner", "member"]
 
 
+# The occurrence statuses Operations lists as not having run at their time.
+DelayedStatus = Literal["missed", "skipped_overlap", "blocked"]
+DELAYED_STATUSES: tuple[DelayedStatus, ...] = get_args(DelayedStatus)
+
+
 class DelayedOccurrence(BaseModel):
     """A routine occurrence that didn't run at its time, and the code for why."""
 
@@ -67,7 +74,7 @@ class DelayedOccurrence(BaseModel):
 
     routine: str
     occurrence_time: UtcTimestamp
-    status: Literal["missed", "skipped_overlap", "blocked"]
+    status: DelayedStatus
     reason: str | None
 
 

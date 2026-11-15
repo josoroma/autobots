@@ -11,7 +11,7 @@ import gc
 import io
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from uuid import UUID
 
 import pytest
@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from autobots.adapters import github_connector, github_issues, github_pulls
 from autobots.adapters.provider_http import UnclearReply
 from autobots.application.bounded import stop_task
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import (
     ApprovalPolicy,
     OutcomeUnknown,
@@ -33,6 +34,7 @@ from autobots.application.tool_definitions import (
 from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import OperationClass, ToolOutcome
 from autobots.logs import JsonFormatter
+from sql_fakes import Row, ScriptedRows
 
 WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
 RUN = UUID("b0000000-0000-4000-8000-000000000002")
@@ -48,21 +50,21 @@ class Saved(BaseModel):
     saved: bool
 
 
-class Cursor:
-    def __init__(self, row: tuple[object, ...] | None) -> None:
-        self._row = row
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self._row
-
-
 # The rows the gateway's other statements read, for a run this worker owns and that is running.
-OWNED_AND_RUNNING: tuple[tuple[str, tuple[object, ...]], ...] = (
+OWNED_AND_RUNNING: tuple[tuple[str, Row], ...] = (
     ("insert into app_private.tool_uses", (1,)),
     ("event_sequence = event_sequence + 1", (1,)),
     ("update app_private.tool_uses", (5,)),
     ("from app_private.run_jobs where run_id", (1,)),
-    ("join app_private.run_jobs", ("running", "claimed", GENERATION, True)),
+    (
+        "join app_private.run_jobs",
+        {
+            "run_status": "running",
+            "job_status": "claimed",
+            "generation": GENERATION,
+            "lease_live": True,
+        },
+    ),
     ("from public.runs where id = %s for share", ("running",)),
 )
 
@@ -78,12 +80,13 @@ class Database:
     async def transaction(self) -> AsyncIterator[None]:
         yield
 
-    async def execute(self, query: str, params: tuple[object, ...] = ()) -> Cursor:
+    async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
         if query.startswith("update app_private.tool_receipts set status = %s"):
-            self.receipts.append(params)
-        return Cursor(self._answer(query))
+            self.receipts.append(tuple(params) if isinstance(params, Sequence) else ())
+        answer = self._answer(query)
+        return ScriptedRows([] if answer is None else [answer])
 
-    def _answer(self, query: str) -> tuple[object, ...] | None:
+    def _answer(self, query: str) -> Row | None:
         if query.startswith("insert into app_private.tool_receipts"):
             return ("created",) if self.receipt is None else None
         if query.startswith("select status, result from app_private.tool_receipts"):

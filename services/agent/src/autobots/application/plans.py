@@ -4,10 +4,10 @@ import json
 import re
 from dataclasses import dataclass
 from functools import partial
-from typing import Any
 from uuid import UUID
 
 from autobots.application.run_usage import LimitReached, RootLimits, consume
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import (
     ToolContext,
     ToolDefinition,
@@ -138,7 +138,7 @@ class GoalMissing(LookupError):
     (refactor plan R-41, PRUN-13)."""
 
 
-async def load_goal(connection: Any, run_id: UUID) -> GoalSpec:
+async def load_goal(connection: SqlConnection, run_id: UUID) -> GoalSpec:
     cursor = await connection.execute(
         "select spec from app_private.goal_specs where run_id = %s", (run_id,)
     )
@@ -148,7 +148,7 @@ async def load_goal(connection: Any, run_id: UUID) -> GoalSpec:
     return goal_spec(read_goal_spec(row[0]))
 
 
-async def latest_plan(connection: Any, run_id: UUID) -> tuple[int, list[PlanTask]] | None:
+async def latest_plan(connection: SqlConnection, run_id: UUID) -> tuple[int, list[PlanTask]] | None:
     cursor = await connection.execute(
         "select version, tasks from app_private.plan_versions where run_id = %s "
         "order by version desc limit 1",
@@ -160,7 +160,7 @@ async def latest_plan(connection: Any, run_id: UUID) -> tuple[int, list[PlanTask
     return row[0], [plan_task(task) for task in read_plan_tasks(row[1])]
 
 
-async def completed_tasks(connection: Any, run_id: UUID) -> frozenset[str]:
+async def completed_tasks(connection: SqlConnection, run_id: UUID) -> frozenset[str]:
     cursor = await connection.execute(
         "select task_id from app_private.plan_evidence where run_id = %s", (run_id,)
     )
@@ -179,7 +179,7 @@ class PlanView:
         return self.version is not None and not self.remaining and not self.uncovered_criteria
 
 
-async def plan_view(connection: Any, run_id: UUID, goal: GoalSpec) -> PlanView:
+async def plan_view(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -> PlanView:
     """Decided from recorded evidence. A model saying it finished changes nothing here."""
     done = await completed_tasks(connection, run_id)
     plan = await latest_plan(connection, run_id)
@@ -206,7 +206,9 @@ def reference_shape(reference: str) -> str:
     return "other_path" if "/" in reference else "bare_name"
 
 
-async def evidence_exists(connection: Any, run_id: UUID, kind: str, reference: str) -> bool:
+async def evidence_exists(
+    connection: SqlConnection, run_id: UUID, kind: str, reference: str
+) -> bool:
     """Whether a task's evidence is on record for this run: an artifact as a file saved at that
     path, anything else as a succeeded receipt with that operation id."""
     if kind == "artifact":

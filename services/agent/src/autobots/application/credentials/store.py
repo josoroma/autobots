@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn
 from uuid import UUID, uuid4
 
 from pydantic import SecretStr
@@ -23,7 +23,9 @@ from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
 )
+from autobots.application.sql import SqlConnection, optional_row
 from autobots.domain.errors import FixedRefusal, RefusalKind
+from autobots.persistence.rows import SealedCredentialRow
 
 PROVIDER = "openrouter"
 KEY_VERSION = 1
@@ -82,7 +84,7 @@ class ResolvedCredential:
     def __repr__(self) -> str:
         return f"ResolvedCredential(reference={self.reference!r}, value=<hidden>)"
 
-    def __reduce_ex__(self, protocol: Any) -> NoReturn:
+    def __reduce_ex__(self, protocol: object) -> NoReturn:
         raise TypeError("a resolved credential cannot be serialized")
 
     def __getstate__(self) -> NoReturn:
@@ -97,7 +99,7 @@ def resolve_for_attempt_blocked_check(candidate: EnvironmentCandidate) -> None:
 class ProviderCredentialStore:
     """Takes an open async connection with the restricted runtime role."""
 
-    def __init__(self, connection: Any, key_path: Path, provider: str = PROVIDER) -> None:
+    def __init__(self, connection: SqlConnection, key_path: Path, provider: str = PROVIDER) -> None:
         self._connection = connection
         self._key_path = key_path
         self._provider = provider
@@ -160,25 +162,29 @@ class ProviderCredentialStore:
         return CredentialReference("app", credential_id, version)
 
     async def load_active(self, workspace_id: UUID) -> ResolvedCredential:
-        cursor = await self._connection.execute(
+        row = await optional_row(
+            self._connection,
+            SealedCredentialRow,
             "select credential_id, version, ciphertext, nonce, tag "
             "from app_private.provider_credentials "
             "where workspace_id = %s and provider = %s and status = 'active'",
             (workspace_id, self._provider),
         )
-        row = await cursor.fetchone()
         if row is None:
             raise CredentialMissing("no credential is configured")
         try:
             key = load_master_key(self._key_path)
         except MasterKeyUnavailable as error:
             raise CredentialStorageUnavailable("the master key is unavailable") from error
-        aad = associated_data(workspace_id, self._provider, row[0], row[1])
+        aad = associated_data(workspace_id, self._provider, row.credential_id, row.version)
+        sealed = Sealed(bytes(row.ciphertext), bytes(row.nonce), bytes(row.tag))
         try:
-            plaintext = unseal(key, Sealed(bytes(row[2]), bytes(row[3]), bytes(row[4])), aad)
+            plaintext = unseal(key, sealed, aad)
         except CredentialDecryptionError as error:
             raise CredentialUnreadable("the stored key cannot be read") from error
-        return ResolvedCredential(CredentialReference("app", row[0], row[1]), plaintext)
+        return ResolvedCredential(
+            CredentialReference("app", row.credential_id, row.version), plaintext
+        )
 
     async def installation_key_allowed(self, workspace_id: UUID) -> bool:
         cursor = await self._connection.execute(

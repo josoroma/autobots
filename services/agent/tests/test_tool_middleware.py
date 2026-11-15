@@ -5,7 +5,6 @@ the SDK's own tool bodies never run. tests/db/tool_gateway_check.py runs it insi
 
 import asyncio
 import json
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import cast
 from uuid import uuid4
@@ -28,9 +27,10 @@ from autobots.application.tool_definitions import (
 )
 from autobots.application.tool_gateway import ToolGateway
 from autobots.domain.tools import OperationClass, ToolOutcome
+from sql_fakes import ScriptedConnection
 
 SCOPE = ToolScope(uuid4(), uuid4(), 1, {"granted": 1})
-CONNECTION = object()
+CONNECTION = ScriptedConnection()
 
 
 class Note(BaseModel):
@@ -62,11 +62,11 @@ class Gateway(ToolGateway):
     """Answers each call with `result` and records it, so the middleware is all that runs."""
 
     result: ToolResult
-    calls: list[tuple[object, ToolScope, str, Mapping[str, object]]] = field(default_factory=list)
+    calls: list[tuple[object, ToolScope, str, object]] = field(default_factory=list)
     active: list[int] = field(default_factory=list)
 
     async def execute(
-        self, connection: object, scope: ToolScope, name: str, arguments: Mapping[str, object]
+        self, connection: object, scope: ToolScope, name: str, arguments: object
     ) -> ToolResult:
         self.active.append(1)
         assert len(self.active) == 1, "two calls shared the connection at once"

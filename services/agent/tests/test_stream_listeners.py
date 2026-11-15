@@ -19,10 +19,19 @@ from pydantic import SecretStr
 
 from autobots.api import event_routes
 from autobots.api.app import create_app
-from autobots.api.event_routes import END_FRAME, MAX_LISTENERS, ListenerSlots, listener_slots
-from autobots.api.pool import ConnectionPool
+from autobots.api.event_routes import END_FRAME
+from autobots.api.resources import MAX_LISTENERS, AppResources, ListenerSlots
 from autobots.api.settings import Settings
-from fake_api import INTERNAL, SECRET, WORKSPACE, FakeDatabase, FakeMembership, token
+from fake_api import (
+    INTERNAL,
+    RUN_ROW,
+    SECRET,
+    WORKSPACE,
+    FakeDatabase,
+    FakeMembership,
+    run_row,
+    token,
+)
 
 RUN = UUID("0b000000-0000-4000-8000-0000000000c1")
 CONNECTED = ": connected\n\n"
@@ -60,7 +69,8 @@ class Arranged:
 
     def request(self) -> Request:
         settings = Settings(database_url=SecretStr("postgresql://fixture"))
-        state = SimpleNamespace(settings=settings, listener_slots=self.slots, stream_seconds=5.0)
+        resources = AppResources(settings, listener_slots=self.slots, stream_seconds=5.0)
+        state = SimpleNamespace(resources=resources)
 
         async def connected() -> bool:
             return False
@@ -70,9 +80,7 @@ class Arranged:
         )
 
     def stream(self) -> AsyncGenerator[str]:
-        frames = event_routes._frames(
-            self.request(), cast(ConnectionPool, self.database), WORKSPACE, RUN, 0
-        )
+        frames = event_routes._frames(self.request(), self.database, WORKSPACE, RUN, 0)
         # An async generator, so a test can close it as a client's disconnect does.
         return cast(AsyncGenerator[str], frames)
 
@@ -88,17 +96,17 @@ def arranged(monkeypatch: pytest.MonkeyPatch) -> Arranged:
 
     monkeypatch.setattr(psycopg.AsyncConnection, "connect", connect)
     # The run has finished, so a stream ends once it has read its stored events.
-    found.database.answer("from public.runs r where r.id = %(run)s", (RUN,))
+    found.database.answer(RUN_ROW, run_row(RUN))
     found.database.answer("select status from public.runs where id = %s", ("succeeded",))
     return found
 
 
-def test_the_cap_is_ten_listeners_made_on_first_use() -> None:
-    state = SimpleNamespace()
-    request = cast(Request, SimpleNamespace(app=SimpleNamespace(state=state)))
-    slots = listener_slots(request)
+def test_the_cap_is_ten_listeners_held_once_per_process() -> None:
+    resources = AppResources()
+    slots = resources.listener_slots
     assert (MAX_LISTENERS, slots.limit, slots.held) == (10, 10, 0)
-    assert listener_slots(request) is slots
+    assert resources.listener_slots is slots
+    assert AppResources().listener_slots is not slots
 
 
 @pytest.mark.asyncio
@@ -178,9 +186,14 @@ async def test_a_client_that_goes_away_gives_its_slot_back(arranged: Arranged) -
         database_url=SecretStr("postgresql://fixture"),
         allowed_hosts=("testserver",),
     )
-    app = create_app(settings, membership=FakeMembership([]))
-    app.state.pool = arranged.database
-    app.state.listener_slots = arranged.slots
+    app = create_app(
+        AppResources(
+            settings,
+            membership=FakeMembership([]),
+            listener_slots=arranged.slots,
+            pool=arranged.database,
+        )
+    )
     # A run still going, so only the client's going away ends the stream.
     arranged.database.answer("select status from public.runs where id = %s", ("running",))
     path = f"/v1/runs/{RUN}/events/stream"

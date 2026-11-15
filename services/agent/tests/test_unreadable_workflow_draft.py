@@ -8,6 +8,8 @@ it by key or saves over it (R-56, SQLI-13, Decision 0029 F3).
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,6 +17,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from autobots.application import workflows
+from autobots.application.sql import SqlParams
 from autobots.application.workflows import (
     WorkflowRefused,
     discard_draft,
@@ -22,22 +25,12 @@ from autobots.application.workflows import (
     list_workflows,
     publish_draft,
 )
+from sql_fakes import ScriptedRows
 
 WORKSPACE = uuid4()
 # Passes the CHECK, fails WorkflowGraph: a node has no block or version.
 UNREADABLE: dict[str, Any] = {"nodes": [{"id": "x"}], "links": []}
 READABLE: dict[str, Any] = {"nodes": [], "links": []}
-
-
-class Cursor:
-    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
-        self._rows = rows
-
-    async def fetchone(self) -> tuple[Any, ...] | None:
-        return self._rows[0] if self._rows else None
-
-    async def fetchall(self) -> list[tuple[Any, ...]]:
-        return self._rows
 
 
 SAVED_AT = datetime(2026, 11, 15, tzinfo=UTC)
@@ -52,23 +45,31 @@ class Workflows:
         self.drafts = {workflow: draft for workflow, draft in drafts.items() if draft is not None}
         self.sent: list[str] = []
 
-    async def execute(self, sql: str, values: tuple[Any, ...] = ()) -> Cursor:
+    async def execute(self, sql: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        values: tuple[Any, ...] = tuple(params) if isinstance(params, Sequence) else ()
         self.sent.append(sql)
         if sql.startswith("select id, name, latest_version, description from public.workflows"):
             wanted = self.names if "order by name" in sql else {values[0]}
             found = [(item, name) for item, name in self.names.items() if item in wanted]
-            return Cursor([(item, name, 0, None) for item, name in found])
+            return ScriptedRows(
+                [(item, name, 0, None) for item, name in found],
+                ("id", "name", "latest_version", "description"),
+            )
         if sql.startswith("select version, graph_hash"):
-            return Cursor([])
+            return ScriptedRows()
         if sql.startswith("select graph, saved_at from public.workflow_drafts"):
             draft = self.drafts.get(values[0])
-            return Cursor([] if draft is None else [(draft, SAVED_AT)])
+            return ScriptedRows([] if draft is None else [(draft, SAVED_AT)])
         if sql.startswith("select workspace_id from public.workflows"):
-            return Cursor([(WORKSPACE,)])
+            return ScriptedRows([(WORKSPACE,)])
         if sql.startswith(DISCARD):
             gone = self.drafts.pop(values[0], None) if values[1] == WORKSPACE else None
-            return Cursor([] if gone is None else [(values[0],)])
+            return ScriptedRows([] if gone is None else [(values[0],)])
         raise AssertionError(f"unexpected SQL: {sql}")
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
 
 
 @pytest.fixture(autouse=True)

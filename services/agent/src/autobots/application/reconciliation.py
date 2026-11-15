@@ -6,18 +6,20 @@ the destination's own records show. Nothing here treats an outcome as known with
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, assert_never
+from typing import assert_never
 from uuid import UUID
 
 from autobots.application import receipts
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.recovery import execution_block, outstanding
 from autobots.application.runs import RUN_TREE, CommandKey, Idempotent, append_event, require_run
+from autobots.application.sql import SqlConnection, all_rows, one
 from autobots.contracts.persisted import EffectRulingReceipt, ModelCallReconciliationReceipt
 from autobots.contracts.run_commands import EffectOutcome
 from autobots.contracts.runs import EffectReconciled
 from autobots.domain.effects import ReceiptStatus
 from autobots.domain.errors import Refusal, RefusalKind
+from autobots.persistence.rows import UnknownOperationRow
 
 
 class ReconciliationRefused(Refusal):
@@ -38,23 +40,29 @@ class UnknownOperation:
     generation: int
 
 
-async def unknown_operations(connection: Any, run_id: UUID) -> list[UnknownOperation]:
-    cursor = await connection.execute(
+async def unknown_operations(connection: SqlConnection, run_id: UUID) -> list[UnknownOperation]:
+    rows = await all_rows(
+        connection,
+        UnknownOperationRow,
         RUN_TREE
         + "select operation_id, tool_id, tool_version, generation from app_private.tool_receipts "
         "where run_id in (select id from tree) and status = 'unknown' order by created_at",
         (run_id,),
     )
-    return [UnknownOperation(row[0], row[1], row[2], row[3]) for row in await cursor.fetchall()]
+    return [
+        UnknownOperation(row.operation_id, row.tool_id, row.tool_version, row.generation)
+        for row in rows
+    ]
 
 
-async def has_unresolvable_effect(connection: Any, run_id: UUID) -> bool:
-    cursor = await connection.execute(
+async def has_unresolvable_effect(connection: SqlConnection, run_id: UUID) -> bool:
+    (unresolvable,) = await one(
+        connection,
         RUN_TREE + "select exists (select 1 from app_private.tool_receipts "
         "where run_id in (select id from tree) and status = 'unknown' and not can_readback)",
         (run_id,),
     )
-    return bool((await cursor.fetchone())[0])
+    return bool(unresolvable)
 
 
 def _ruled(outcome: EffectOutcome) -> ReceiptStatus:
@@ -68,7 +76,7 @@ def _ruled(outcome: EffectOutcome) -> ReceiptStatus:
 
 
 async def record_evidence(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     run_id: UUID,
@@ -115,7 +123,7 @@ async def record_evidence(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (
     return status.value
 
 
-async def require_resumable(connection: Any, workspace_id: UUID, run_id: UUID) -> None:
+async def require_resumable(connection: SqlConnection, workspace_id: UUID, run_id: UUID) -> None:
     """A resume's preconditions, read in one place and refused in this order: the run is this
     workspace's, this release can continue it, no model call's outcome is open, and no effect
     waits on a person. A tool with a readback resolves itself on replay, so only an effect without
@@ -133,7 +141,7 @@ async def require_resumable(connection: Any, workspace_id: UUID, run_id: UUID) -
 
 
 async def reconcile_oldest_uncertain_call(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,

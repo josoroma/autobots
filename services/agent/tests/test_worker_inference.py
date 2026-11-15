@@ -69,6 +69,7 @@ from fake_openrouter import (
     snapshot,
     source_with,
 )
+from sql_fakes import ScriptedConnection
 
 NOW = datetime.now(UTC)
 
@@ -280,15 +281,11 @@ def lease() -> Lease:
     return Lease(uuid4(), uuid4(), 1, "worker", 1, "running")
 
 
-class Rows:
+class Rows(ScriptedConnection):
+    """Every statement answers `value`, as the run's frozen snapshot."""
+
     def __init__(self, value: Any) -> None:
-        self.value = value
-
-    async def execute(self, *_: Any) -> "Rows":
-        return self
-
-    async def fetchone(self) -> tuple[Any]:
-        return (self.value,)
+        super().__init__([(value,)])
 
 
 def real_source(pricing: object = PRICE) -> InferenceSource:

@@ -19,7 +19,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import httpx
@@ -31,6 +31,11 @@ from autobots.adapters.browser_qualification import (
     PROXY,
     executor_qualified,
 )
+from autobots.application.sql import SqlConnection
+
+if TYPE_CHECKING:
+    # Imported for its type only: application/browsing_tool imports this module.
+    from autobots.application.tool_definitions import ToolScope
 
 # Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool, browser_page
 # and tests/db/browser_executor_check.py import them from this module.
@@ -323,14 +328,14 @@ class BrowserExecutor:
         return reason
 
 
-async def attempt_alive(connection: Any, scope: Any) -> bool:
+async def attempt_alive(connection: SqlConnection, scope: "ToolScope") -> bool:
     """The attempt still owns a running run, by database time, as the gateway decides it."""
     from autobots.application.tool_gateway import ownership_refusal
 
     return await ownership_refusal(connection, scope) is None
 
 
-def lease_alive(connection: Any) -> Callable[[str, int], Awaitable[bool]]:
+def lease_alive(connection: SqlConnection) -> Callable[[str, int], Awaitable[bool]]:
     """For the sweeper: a session lives only while its run's job is claimed at its generation
     (worker_leases.generation_alive, which owns the query)."""
     from autobots.application.worker_leases import generation_alive

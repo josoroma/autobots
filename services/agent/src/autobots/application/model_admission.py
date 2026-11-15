@@ -3,8 +3,10 @@
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Any
 from uuid import UUID, uuid4
+
+from autobots.application.sql import SqlConnection, required_row
+from autobots.persistence.rows import LedgerUsageRow, SpendLimitsRow
 
 
 class InvocationStatus(StrEnum):
@@ -178,14 +180,14 @@ def shown_for(run: str, alias: str = "i") -> str:
 
 
 def spend_columns(run: str) -> str:
-    """A run's charged and reserved figures, two select-list columns that add up to what admission
-    counts for the same rows."""
+    """A run's charged and reserved figures, two select-list columns named `charged_micro_usd` and
+    `reserved_micro_usd` that add up to what admission counts for the same rows."""
     rows = f"from app_private.model_invocations i where {shown_for(run)}"
     return (
         f"(select coalesce(sum({charge('i')}) filter (where not ({cost_open('i')})), 0)::bigint "
-        f"{rows}), "
+        f"{rows}) as charged_micro_usd, "
         f"(select coalesce(sum({reservation('i')}) filter (where {cost_open('i')}), 0)::bigint "
-        f"{rows})"
+        f"{rows}) as reserved_micro_usd"
     )
 
 
@@ -211,18 +213,20 @@ class LedgerUsage:
 # Admission's count: slots in use, the workspace's spend on the day and the root's spend.
 _USAGE = (
     "select "
-    "count(*) filter (where status = any(%(active)s)), "
-    f"coalesce(sum({spend()}) filter (where spend_day = %(day)s), 0), "
-    f"coalesce(sum({spend()}) filter (where {under_root('%(root)s')}), 0) "
+    "count(*) filter (where status = any(%(active)s)) as active, "
+    f"coalesce(sum({spend()}) filter (where spend_day = %(day)s), 0) as workspace_micro_usd, "
+    f"coalesce(sum({spend()}) filter (where {under_root('%(root)s')}), 0) as root_micro_usd "
     "from app_private.model_invocations where workspace_id = %(workspace)s"
 )
 
 
 async def ledger_usage(
-    connection: Any, workspace_id: UUID, root_run_id: UUID, day: date
+    connection: SqlConnection, workspace_id: UUID, root_run_id: UUID, day: date
 ) -> LedgerUsage:
     """Read in admission's transaction, under its workspace lock, or on its own by a check."""
-    cursor = await connection.execute(
+    row = await required_row(
+        connection,
+        LedgerUsageRow,
         _USAGE,
         {
             "active": _values(ACTIVE),
@@ -232,14 +236,13 @@ async def ledger_usage(
             "workspace": workspace_id,
         },
     )
-    active, workspace_used, root_used = await cursor.fetchone()
-    return LedgerUsage(int(active), int(workspace_used), int(root_used))
+    return LedgerUsage(int(row.active), int(row.workspace_micro_usd), int(row.root_micro_usd))
 
 
 class ModelAdmission:
     """Takes an open async connection with the restricted runtime role, in autocommit."""
 
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: SqlConnection) -> None:
         self._connection = connection
 
     async def admit(self, request: AdmissionRequest, *, at: datetime | None = None) -> Ticket:
@@ -256,13 +259,13 @@ class ModelAdmission:
                 "on conflict (workspace_id) do nothing",
                 (request.workspace_id,),
             )
-            limits = await (
-                await self._connection.execute(
-                    "select run_limit_micro_usd, daily_limit_micro_usd, slots "
-                    "from app_private.model_spend_limits where workspace_id = %s",
-                    (request.workspace_id,),
-                )
-            ).fetchone()
+            limits = await required_row(
+                self._connection,
+                SpendLimitsRow,
+                "select run_limit_micro_usd, daily_limit_micro_usd, slots "
+                "from app_private.model_spend_limits where workspace_id = %s",
+                (request.workspace_id,),
+            )
             usage = await ledger_usage(
                 self._connection, request.workspace_id, request.root_run_id, day
             )
@@ -275,12 +278,16 @@ class ModelAdmission:
                 "select limit_micro_usd from public.runs where id = %s", (request.root_run_id,)
             )
             run_row = await cursor.fetchone()
-            run_limit = min(limits[0], run_row[0]) if run_row else limits[0]
-            if active >= limits[2]:
+            run_limit = (
+                min(limits.run_limit_micro_usd, run_row[0])
+                if run_row
+                else limits.run_limit_micro_usd
+            )
+            if active >= limits.slots:
                 raise NoInferenceSlot("both inference slots are in use")
             cost = request.worst_case_micro_usd
             run_after, workspace_after = run_used + cost, workspace_used + cost
-            if run_after > run_limit or workspace_after > limits[1]:
+            if run_after > run_limit or workspace_after > limits.daily_limit_micro_usd:
                 raise BudgetExceeded("this would exceed the spending limit")
             invocation_id = uuid4()
             await self._connection.execute(
@@ -304,7 +311,7 @@ class ModelAdmission:
                 ),
             )
         run_percent = _percent(run_after, run_limit)
-        workspace_percent = _percent(workspace_after, limits[1])
+        workspace_percent = _percent(workspace_after, limits.daily_limit_micro_usd)
         return Ticket(
             invocation_id,
             cost,
@@ -313,7 +320,7 @@ class ModelAdmission:
             workspace_percent,
         )
 
-    async def _transition(self, invocation_id: UUID, sets: str, *values: Any) -> None:
+    async def _transition(self, invocation_id: UUID, sets: str, *values: object) -> None:
         """Settles an active attempt. `sets` is one of this class's own assignments, never input."""
         cursor = await self._connection.execute(
             f"update app_private.model_invocations set {sets}, finished_at = now() "
@@ -447,7 +454,7 @@ class ModelAdmission:
 
 
 async def remaining_daily_micro_usd(
-    connection: Any, workspace_id: UUID, *, at: datetime | None = None
+    connection: SqlConnection, workspace_id: UUID, *, at: datetime | None = None
 ) -> int:
     """What's left of the workspace's UTC-day cap, counted as `admit` counts it: outstanding
     reservations plus reported charges. Reading it reserves nothing."""

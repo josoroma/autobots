@@ -42,6 +42,7 @@ from autobots.application.run_lifecycle import (
 from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
 from autobots.application.runs import LeaseLost, apply_worker_command, frozen_snapshot
+from autobots.application.sql import SqlConnection, one
 from autobots.application.tool_definitions import ToolRegistry, ToolScope
 from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import Lease
@@ -63,7 +64,7 @@ class SummarizationOff(AgentMiddleware[Any, Any]):
 
 
 def build_stage(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
-    connection: Any,
+    connection: SqlConnection,
     model: Any,
     saver: Any,
     scope: ToolScope,
@@ -103,7 +104,7 @@ def build_stage(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
 
 
 async def run_goal(
-    connection: Any,
+    connection: SqlConnection,
     database_url: str,
     lease: Lease,
     model: Any,
@@ -120,13 +121,13 @@ async def run_goal(
     `finish` settles the run from the stop code.
     """
     goal = await load_goal(connection, lease.run_id)
-    cursor = await connection.execute(
+    parent, root = await one(
+        connection,
         "select parent_run_id, coalesce(root_run_id, id) from public.runs where id = %s",
         (lease.run_id,),
     )
-    parent, root = await cursor.fetchone()
 
-    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+    async def drive_child(child_connection: SqlConnection, child_lease: Lease) -> LoopResult:
         return await drive(child_connection, database_url, child_lease, lambda: model, config)
 
     delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
@@ -155,7 +156,7 @@ async def run_goal(
                 connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None
             )
     status = await run_status(connection, lease)
-    if status == RunStatus.CANCELLING.value:
+    if status is RunStatus.CANCELLING:
         return await finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
     if await _obligation_holds(connection, lease):
         return await result_of(
@@ -217,12 +218,12 @@ async def run_goal(
     return await finish(connection, lease, goal, code)
 
 
-async def _obligation_holds(connection: Any, lease: Lease) -> bool:
+async def _obligation_holds(connection: SqlConnection, lease: Lease) -> bool:
     """Re-enters a wait that a pause and resume left open. Nothing else runs until it's answered."""
     obligation = await open_obligation(connection, lease.run_id)
     if obligation is None:
         return False
-    kind, detail = obligation
+    kind, detail = obligation.kind, obligation.detail
     await apply_worker_command(
         connection,
         lease,
@@ -232,7 +233,7 @@ async def _obligation_holds(connection: Any, lease: Lease) -> bool:
     return True
 
 
-async def _bound_profile(connection: Any, lease: Lease, role: str) -> str | None:
+async def _bound_profile(connection: SqlConnection, lease: Lease, role: str) -> str | None:
     """The profile the run's frozen policy binds to `role`, or None when it binds none or its
     snapshot can't be read (PolicySnapshot)."""
     try:
@@ -241,7 +242,9 @@ async def _bound_profile(connection: Any, lease: Lease, role: str) -> str | None
         return None
 
 
-async def _summary_route(connection: Any, lease: Lease, config: LoopConfig) -> ModelRoute | None:
+async def _summary_route(
+    connection: SqlConnection, lease: Lease, config: LoopConfig
+) -> ModelRoute | None:
     """Compaction uses the run's frozen summarizer binding. A different one has no route here."""
     bound = await _bound_profile(connection, lease, "summarizer")
     if bound is None or bound != config.route.profile:
@@ -249,7 +252,7 @@ async def _summary_route(connection: Any, lease: Lease, config: LoopConfig) -> M
     return replace(config.route, role="summarizer", profile=bound)
 
 
-async def _route_is_bound(connection: Any, lease: Lease, config: LoopConfig) -> bool:
+async def _route_is_bound(connection: SqlConnection, lease: Lease, config: LoopConfig) -> bool:
     """A resumed run keeps its frozen policy. A changed workspace default doesn't reach it."""
     bound = await _bound_profile(connection, lease, config.route.role)
     return bound is not None and bound == config.route.profile

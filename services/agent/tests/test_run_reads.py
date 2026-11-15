@@ -12,7 +12,7 @@ import psycopg
 import pytest
 
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
-from fake_api import ApiClient
+from fake_api import RUN_ROW, ApiClient, run_row
 
 RUN = UUID("0b000000-0000-4000-8000-0000000000c1")
 EXPERT = UUID("0b000000-0000-4000-8000-0000000000e1")
@@ -21,7 +21,6 @@ LATEST_CONFIG = (
     "on v.expert_id = e.id and v.version = e.latest_version "
     "where e.id = %s and e.workspace_id = %s"
 )
-RUN_ROW = "from public.runs r where r.id = %(run)s"
 RUN_STATUS = "select status from public.runs where id = %s"
 
 
@@ -70,7 +69,7 @@ def test_a_finished_runs_stream_ends_once_every_event_is_sent(
         raise psycopg.OperationalError("no listener in this test")
 
     monkeypatch.setattr(psycopg.AsyncConnection, "connect", unreachable)
-    api_client.database.answer(RUN_ROW, (RUN,))
+    api_client.database.answer(RUN_ROW, run_row(RUN))
     api_client.database.answer(RUN_STATUS, ("succeeded",))
     with api_client.http.stream(
         "GET", f"/v1/runs/{RUN}/events/stream", headers=api_client.headers()

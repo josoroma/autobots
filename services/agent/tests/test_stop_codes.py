@@ -28,11 +28,12 @@ from autobots.application.model_attempts import FailureClass
 from autobots.application.plans import PlanView
 from autobots.application.run_usage import Counter, LimitReached
 from autobots.application.runs import TransitionResult
+from autobots.application.sql import SqlParams
 from autobots.application.worker_inference import INTENT_FAILURES
 from autobots.application.worker_leases import Lease
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import INCOMPATIBLE
-from autobots.domain.runs import RunCommand
+from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import (
     DISPOSITION,
     NOT_OURS,
@@ -477,7 +478,11 @@ class Connection:
         self.stop_reasons: list[object] = []
         self.answer: tuple[object, ...] = (4,)
 
-    async def execute(self, statement: str, values: Sequence[object] = ()) -> "Connection":
+    # Each answer is a tuple, read by position.
+    description = None
+
+    async def execute(self, statement: str, params: SqlParams | None = None, /) -> "Connection":
+        values = tuple(params) if isinstance(params, Sequence) else ()
         if "stop_reason" in statement:
             self.stop_reasons.append(values[1])
         self.answer = ("running", True) if statement.startswith("select r.status") else (4,)
@@ -498,7 +503,7 @@ def _finish(
 ) -> tuple[list[object], Connection, run_lifecycle.LoopResult]:
     """`finish` on a running run whose plan is done, with its plan and transition replaced."""
     applied: list[object] = []
-    reached = {RunCommand.SUSPEND: "paused", RunCommand.FAIL: "failed"}
+    reached = {RunCommand.SUSPEND: RunStatus.PAUSED, RunCommand.FAIL: RunStatus.FAILED}
 
     async def plan_view(*_: object) -> PlanView:
         return PlanView(1, ("t1",), (), ())

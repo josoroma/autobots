@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from autobots.api.app import create_app
 from autobots.api.membership import PostgresMembership
+from autobots.api.resources import DEFAULT_STREAM_SECONDS, AppResources
 from autobots.api.settings import load_settings
 from autobots.application.readiness import MalformedSetting
 from autobots.logs import configure_logging, forbid_remote_tracing
@@ -34,11 +35,13 @@ def create_configured_app() -> FastAPI:
         stream_seconds = seconds(os.environ, STREAM_SECONDS)
     except MalformedSetting as error:
         stop_unconfigured(error)
-    app = create_app(settings)
-    app.state.membership = PostgresMembership(app.state)
-    if stream_seconds is not None:
-        app.state.stream_seconds = stream_seconds
-    app.state.object_store = object_store(os.environ)
-    # The live mapping, so a key is resolved again for each attempt (model-gateway rule).
-    app.state.provider_context = provider_context(os.environ)
-    return app
+    resources = AppResources(
+        settings,
+        stream_seconds=DEFAULT_STREAM_SECONDS if stream_seconds is None else stream_seconds,
+        object_store=object_store(os.environ),
+        # The live mapping, so a key is resolved again for each attempt (model-gateway rule).
+        provider_context=provider_context(os.environ),
+    )
+    # Membership reads the pool the lifespan sets on these same resources.
+    resources.membership = PostgresMembership(resources)
+    return create_app(resources)

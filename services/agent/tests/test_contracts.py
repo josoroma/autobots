@@ -1,6 +1,7 @@
 """Boundary validation from the shared fixtures, and the conversion boundaries around it."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -73,22 +74,22 @@ NOW = datetime(2026, 11, 5, tzinfo=UTC)
 
 
 def row(**overrides: Any) -> RunRow:
-    data: RunRow = {
-        "id": RUN_ID,
-        "workspace_id": WORKSPACE_ID,
-        "parent_run_id": None,
-        "status": "running",
-        "created_at": NOW,
-        "updated_at": NOW,
-        "spent_micro_usd": 5,
-        "reserved_micro_usd": 6,
-        "limit_micro_usd": 7,
-        "lease_generation": 3,
-        "checkpoint_thread_id": "private-thread",
-        "version": 1,
-    }
-    data.update(overrides)  # type: ignore[typeddict-item]
-    return data
+    data = RunRow(
+        id=RUN_ID,
+        workspace_id=WORKSPACE_ID,
+        parent_run_id=None,
+        status="running",
+        created_at=NOW,
+        updated_at=NOW,
+        charged_micro_usd=5,
+        reserved_micro_usd=6,
+        limit_micro_usd=7,
+        lease_generation=3,
+        checkpoint_thread_id="private-thread",
+        version=1,
+        event_sequence=4,
+    )
+    return replace(data, **overrides)
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case["name"] for case in CASES])

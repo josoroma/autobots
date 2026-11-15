@@ -13,6 +13,7 @@ from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolR
 from autobots.application.tool_gateway import Refused
 from autobots.application.tool_gateway import resolve as resolve_call
 from autobots.domain.stops import GatewayCode
+from sql_fakes import ScriptedConnection
 
 KEY = {"TAVILY_API_KEY": "tvly-fixture0123456789"}
 FORBIDDEN = {"include_answer", "auto_parameters", "instructions", "include_raw_content"}
@@ -55,7 +56,7 @@ def tools(fake: Fake, environ: dict[str, str] = KEY) -> dict[str, Any]:
     }
 
 
-CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+CONTEXT = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
 CALLS = {
     "tavily_search": {"query": "colones"},
     "tavily_extract": {"urls": ["https://example.com/a"]},

@@ -19,8 +19,11 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.application.sql import SqlConnection, all_rows, one, optional_row, stored
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.improvements import (
+    CANDIDATE_STATUSES,
+    KNOWLEDGE_KINDS,
     CandidateView,
     ImprovementProposal,
     KnowledgeHead,
@@ -35,6 +38,12 @@ from autobots.domain.models import RolePolicy
 from autobots.domain.runs import TERMINAL, RunStatus
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
+from autobots.persistence.rows import (
+    CandidateCheckRow,
+    CandidateDecisionRow,
+    CandidateRow,
+    ReplayRunRow,
+)
 
 # Text that tries to act as policy. It can still be stored as a note about what someone wrote, but
 # not through this path, which is for content later runs will read as guidance.
@@ -62,7 +71,10 @@ class ImprovementRefused(Refusal):
 
 
 async def propose(
-    connection: Any, workspace_id: UUID, proposal: ImprovementProposal, source: dict[str, Any]
+    connection: SqlConnection,
+    workspace_id: UUID,
+    proposal: ImprovementProposal,
+    source: dict[str, Any],
 ) -> UUID:
     """Only stores a proposal. Nothing reads it until it's promoted."""
     candidate_id = uuid4()
@@ -83,7 +95,9 @@ async def propose(
     return candidate_id
 
 
-async def _evidence_problems(connection: Any, workspace_id: UUID, evidence: list[Any]) -> list[str]:
+async def _evidence_problems(
+    connection: SqlConnection, workspace_id: UUID, evidence: list[Any]
+) -> list[str]:
     """Each reference must be real, in this workspace. An invented recollection has none."""
     if not evidence:
         return ["evidence_required"]
@@ -100,7 +114,7 @@ async def _evidence_problems(connection: Any, workspace_id: UUID, evidence: list
 
 
 async def run_regression(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     candidate_id: UUID,
     cases: list[dict[str, Any]] | None = None,
@@ -111,31 +125,37 @@ async def run_regression(
     The cases come from the person reviewing. A proposer writing its own would certify itself.
     """
     async with connection.transaction():
-        cursor = await connection.execute(
+        checked = await optional_row(
+            connection,
+            CandidateCheckRow,
             "select content, evidence, regression_cases, status from "
             "public.improvement_candidates where id = %s and workspace_id = %s for update",
             (candidate_id, workspace_id),
         )
-        row = await cursor.fetchone()
-        if row is None:
+        if checked is None:
             raise ImprovementRefused("candidate_not_found")
-        content, evidence, regression_cases, status = row
+        content, evidence, regression_cases, status = (
+            checked.content,
+            checked.evidence,
+            checked.regression_cases,
+            checked.status,
+        )
         if status not in {"proposed", "regression_failed"}:
             raise ImprovementRefused("candidate_not_open")
         failures = await _evidence_problems(connection, workspace_id, evidence)
-        cursor = await connection.execute(
+        (proposed_by,) = await one(
+            connection,
             "select source ->> 'run_id' from public.improvement_candidates where id = %s",
             (candidate_id,),
         )
-        proposed_by = (await cursor.fetchone())[0]
         if proposed_by:
             cited = [str(item["id"]).lower() for item in evidence]
-            cursor = await connection.execute(
+            (own_artifacts,) = await one(
+                connection,
                 "select count(*) from public.artifacts where id::text = any(%s) "
                 "and run_id::text = %s",
                 (cited, proposed_by.lower()),
             )
-            own_artifacts = (await cursor.fetchone())[0]
             if proposed_by.lower() in cited or own_artifacts:
                 failures.append("evidence_is_its_own_run")
         if AUTHORITY_CLAIMS.search(content):
@@ -165,7 +185,7 @@ async def run_regression(
 
 
 async def _activate(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     kind: str,
     key: str,
@@ -211,20 +231,36 @@ async def _activate(
         )
 
 
+async def _candidate_for_decision(
+    connection: SqlConnection, workspace_id: UUID, candidate_id: UUID
+) -> CandidateDecisionRow:
+    """The candidate a decision or a replay acts on, under its row lock."""
+    row = await optional_row(
+        connection,
+        CandidateDecisionRow,
+        "select kind, key, content, status, evidence, source from "
+        "public.improvement_candidates where id = %s and workspace_id = %s for update",
+        (candidate_id, workspace_id),
+    )
+    if row is None:
+        raise ImprovementRefused("candidate_not_found")
+    return row
+
+
 async def decide(
-    connection: Any, workspace_id: UUID, candidate_id: UUID, actor_id: UUID, decision: str
+    connection: SqlConnection, workspace_id: UUID, candidate_id: UUID, actor_id: UUID, decision: str
 ) -> str:
     """A person's decision, and only after checks passed. Promotion adds a version."""
     async with connection.transaction():
-        cursor = await connection.execute(
-            "select kind, key, content, status, evidence, source from "
-            "public.improvement_candidates where id = %s and workspace_id = %s for update",
-            (candidate_id, workspace_id),
+        row = await _candidate_for_decision(connection, workspace_id, candidate_id)
+        kind, key, content, status, evidence, source = (
+            row.kind,
+            row.key,
+            row.content,
+            row.status,
+            row.evidence,
+            row.source,
         )
-        row = await cursor.fetchone()
-        if row is None:
-            raise ImprovementRefused("candidate_not_found")
-        kind, key, content, status, evidence, source = row
         if status in {"promoted", "rejected"}:
             raise ImprovementRefused("candidate_already_decided")
         if decision == "reject":
@@ -237,12 +273,12 @@ async def decide(
                 raise ImprovementRefused("replay_required")
             if replay.state != "passed":
                 raise ImprovementRefused(f"replay_{replay.state}")
-            cursor = await connection.execute(
+            (version,) = await one(
+                connection,
                 "select coalesce(max(version), 0) + 1 from public.knowledge_versions "
                 "where workspace_id = %s and kind = %s and key = %s",
                 (workspace_id, kind, key),
             )
-            version = (await cursor.fetchone())[0]
             await connection.execute(
                 "insert into public.knowledge_versions (workspace_id, kind, key, version, content, "
                 "candidate_id, provenance) values (%s, %s, %s, %s, %s, %s, %s)",
@@ -276,7 +312,7 @@ async def decide(
 
 
 async def rollback(
-    connection: Any, workspace_id: UUID, kind: KnowledgeKind, key: str, to_version: int
+    connection: SqlConnection, workspace_id: UUID, kind: KnowledgeKind, key: str, to_version: int
 ) -> KnowledgeHead:
     """Points back at an earlier version, or at none with 0, since a first promotion has nothing
     before it. Every version stays. Admitted work keeps its pinned skill, and reads memory live."""
@@ -308,28 +344,33 @@ async def rollback(
     return KnowledgeHead(schema_version=1, kind=kind, key=key, active_version=to_version)
 
 
-async def list_candidates(connection: Any, workspace_id: UUID) -> list[CandidateView]:
-    cursor = await connection.execute(
+def candidate_view(row: CandidateRow, replay: ReplayView | None) -> CandidateView:
+    """An unknown stored kind or status raises, instead of reaching a client."""
+    return CandidateView(
+        id=row.id,
+        kind=stored(KNOWLEDGE_KINDS, row.kind),
+        key=row.key,
+        content=row.content,
+        status=stored(CANDIDATE_STATUSES, row.status),
+        regression_results=row.regression_results,
+        replay=replay,
+    )
+
+
+async def list_candidates(connection: SqlConnection, workspace_id: UUID) -> list[CandidateView]:
+    rows = await all_rows(
+        connection,
+        CandidateRow,
         "select id, kind, key, content, status, regression_results from "
         "public.improvement_candidates where workspace_id = %s order by created_at desc limit 100",
         (workspace_id,),
     )
-    rows = await cursor.fetchall()
-    return [
-        CandidateView(
-            id=row[0],
-            kind=row[1],
-            key=row[2],
-            content=row[3],
-            status=row[4],
-            regression_results=row[5],
-            replay=await replay_state(connection, row[0]),
-        )
-        for row in rows
-    ]
+    return [candidate_view(row, await replay_state(connection, row.id)) for row in rows]
 
 
-async def active_skill_text(connection: Any, workspace_id: UUID, skills: list[str]) -> str:
+async def active_skill_text(
+    connection: SqlConnection, workspace_id: UUID, skills: list[str]
+) -> str:
     """Read at admission, so a run keeps what it started with. It informs, and grants nothing."""
     if not skills:
         return ""
@@ -351,7 +392,7 @@ def _normalized(text: str) -> str:
 
 
 async def request_replay(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     candidate_id: UUID,
@@ -372,15 +413,15 @@ async def request_replay(
         existing = await existing_receipt(connection, scope, fingerprint, ReplayReceipt)
         if existing is not None:
             return existing.replay_id
-        cursor = await connection.execute(
-            "select kind, key, content, status, evidence, source from "
-            "public.improvement_candidates where id = %s and workspace_id = %s for update",
-            (candidate_id, workspace_id),
+        row = await _candidate_for_decision(connection, workspace_id, candidate_id)
+        kind, key, content, status, evidence, source = (
+            row.kind,
+            row.key,
+            row.content,
+            row.status,
+            row.evidence,
+            row.source,
         )
-        row = await cursor.fetchone()
-        if row is None:
-            raise ImprovementRefused("candidate_not_found")
-        kind, key, content, status, evidence, source = row
         if status in {"promoted", "rejected"}:
             raise ImprovementRefused("candidate_already_decided")
         if status != "regression_passed":
@@ -433,10 +474,12 @@ async def request_replay(
     return replay_id
 
 
-async def replay_state(connection: Any, candidate_id: UUID) -> ReplayView | None:
+async def replay_state(connection: SqlConnection, candidate_id: UUID) -> ReplayView | None:
     """The latest replay only. Passed when every run succeeded, failed when any ended otherwise."""
-    cursor = await connection.execute(
-        "select r.id, rr.run_id, rr.task ->> 'goal_text', u.status "
+    rows = await all_rows(
+        connection,
+        ReplayRunRow,
+        "select r.id as replay_id, rr.run_id, rr.task ->> 'goal_text' as goal_text, u.status "
         "from app_private.improvement_replays r "
         "join app_private.improvement_replay_runs rr on rr.replay_id = r.id "
         "join public.runs u on u.id = rr.run_id "
@@ -444,10 +487,9 @@ async def replay_state(connection: Any, candidate_id: UUID) -> ReplayView | None
         "order by created_at desc, id limit 1) order by rr.position",
         (candidate_id,),
     )
-    rows = await cursor.fetchall()
     if not rows:
         return None
-    statuses = [RunStatus(row[3]) for row in rows]
+    statuses = [RunStatus(row.status) for row in rows]
     state: Literal["running", "passed", "failed"]
     if all(item is RunStatus.SUCCEEDED for item in statuses):
         state = "passed"
@@ -456,9 +498,12 @@ async def replay_state(connection: Any, candidate_id: UUID) -> ReplayView | None
     else:
         state = "running"
     return ReplayView(
-        id=rows[0][0],
+        id=rows[0].replay_id,
         state=state,
-        runs=[ReplayRunView(run_id=row[1], goal_text=row[2], status=row[3]) for row in rows],
+        runs=[
+            ReplayRunView(run_id=row.run_id, goal_text=row.goal_text, status=status)
+            for row, status in zip(rows, statuses, strict=True)
+        ],
     )
 
 

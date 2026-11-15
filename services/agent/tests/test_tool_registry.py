@@ -9,6 +9,7 @@ import asyncio
 import subprocess
 import sys
 from collections.abc import Mapping
+from contextlib import AbstractAsyncContextManager
 from dataclasses import replace
 from pathlib import Path
 from typing import cast
@@ -21,11 +22,12 @@ from autobots.adapters import tool_registry
 from autobots.adapters.tool_middleware import visible_tools
 from autobots.adapters.tool_registry import build_registry, catalog_registry
 from autobots.application import browsing_tool, worker_inference
-from autobots.application.artifacts import ObjectStore
+from autobots.application.artifacts import PingableObjectStore
 from autobots.application.assignments import Delegation
 from autobots.application.provider_settings import ProviderContext
 from autobots.application.run_lifecycle import LoopConfig, LoopResult, NoToolSet, pass_registry
 from autobots.application.run_usage import RootLimits
+from autobots.application.sql import SqlParams
 from autobots.application.tool_catalog import describe
 from autobots.application.tool_definitions import (
     Browsing,
@@ -39,6 +41,7 @@ from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import Lease
 from autobots.domain.models import ModelRoute
 from autobots.operations import worker
+from sql_fakes import ScriptedConnection, ScriptedRows
 
 SWITCHED_ON = {"AUTOBOTS_BROWSER_EXECUTOR": "enabled"}
 ROUTE = ModelRoute("researcher", "openrouter_terra", "fixture/model", 1)
@@ -50,7 +53,7 @@ async def never_drive(*_: object) -> LoopResult:
 
 DELEGATION = Delegation(never_drive, RootLimits(), lease_seconds=1.0)
 # Never used: these tests compare and describe tools, and run none.
-STORE = cast("ObjectStore", object())
+STORE = cast("PingableObjectStore", object())
 
 
 def ids(registry: ToolRegistry) -> set[tuple[str, int]]:
@@ -82,7 +85,7 @@ def worker_browsing(
         browser=object(),
     )
     job = Lease(uuid4(), uuid4(), 1, "worker", 1, "running")
-    return asyncio.run(source._browsing(object(), job))
+    return asyncio.run(source._browsing(ScriptedConnection(), job))
 
 
 def worker_registry(browsing: Browsing | None, *, workflow: bool) -> ToolRegistry:
@@ -168,8 +171,11 @@ def test_the_config_adds_its_own_definitions_after_the_tool_set() -> None:
 class Untouchable:
     """A connection that fails the test on any use, so a refusal is proved to come first."""
 
-    def __getattr__(self, name: str) -> object:
-        raise AssertionError(f"a definition with no runtime touched the connection: {name}")
+    async def execute(self, query: str, _params: SqlParams | None = None, /) -> ScriptedRows:
+        raise AssertionError(f"a definition with no runtime touched the connection: {query}")
+
+    def transaction(self) -> AbstractAsyncContextManager[None]:
+        raise AssertionError("a definition with no runtime touched the connection: transaction")
 
 
 ARGUMENTS: dict[str, dict[str, object]] = {

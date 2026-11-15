@@ -1,15 +1,12 @@
-"""The connection pool the routes read from app state, once the lifespan in app.py opens it."""
+"""The connection pool the lifespan in app.py opens and closes, typed as the routes use it."""
 
-from typing import Any
+from contextlib import AbstractAsyncContextManager
+from typing import Protocol
 
-from fastapi import Request
-from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 
-from autobots.api.errors import ApiError
+from autobots.application.sql import CommittingConnection
 
-# Rows stay untyped until the SQL boundary is typed (R-54).
-ConnectionPool = AsyncConnectionPool[AsyncConnection[Any]]
 # How long a request waits for a pooled connection. psycopg_pool's default is 30 s, the same as the
 # BFF's own abort in apps/web/lib/bff.ts, so the BFF's timer could fire first and a stopped
 # database would read as its timeout. Shorter, so it reaches the person as this service's
@@ -17,9 +14,23 @@ ConnectionPool = AsyncConnectionPool[AsyncConnection[Any]]
 POOL_WAIT_SECONDS = 10.0
 
 
-def request_pool(request: Request) -> ConnectionPool:
-    """The open pool, or 503 when the service has no database."""
-    pool: ConnectionPool | None = request.app.state.pool
-    if pool is None:
-        raise ApiError(503, "service_unavailable", "The database is unavailable.")
-    return pool
+class Pool(Protocol):
+    """psycopg_pool's `AsyncConnectionPool`, or a test's fake. Its connections aren't autocommit,
+    so retention commits between its steps (application/retention.py)."""
+
+    async def open(self) -> None: ...
+
+    async def close(self) -> None: ...
+
+    def connection(self) -> AbstractAsyncContextManager[CommittingConnection]: ...
+
+
+def default_pool(url: str) -> Pool:
+    return AsyncConnectionPool(
+        url,
+        open=False,
+        min_size=1,
+        max_size=5,
+        check=AsyncConnectionPool.check_connection,
+        timeout=POOL_WAIT_SECONDS,
+    )

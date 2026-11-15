@@ -1,6 +1,6 @@
 """What the run workspace may see. Built by code from typed records, never from graph state."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, Field, RootModel
 
@@ -70,6 +70,12 @@ ModelCallStatus = Literal[
 ]
 # app_private.tool_receipts.status, as its check constraint and ReceiptStatus allow.
 ReceiptStatusName = Literal["started", "succeeded", "failed", "unknown"]
+# app_private.assignments.status, as its check constraint allows.
+AssignmentStatusName = Literal["open", "finished"]
+ASSIGNMENT_STATUSES: tuple[AssignmentStatusName, ...] = get_args(AssignmentStatusName)
+# What labels a run in the list (PRD-Studio RN-01).
+RunLabelKind = Literal["goal", "expert", "session", "workflow"]
+RUN_LABEL_KINDS: tuple[RunLabelKind, ...] = get_args(RunLabelKind)
 
 
 class CriterionView(BaseModel):
@@ -154,7 +160,7 @@ class AssignmentView(BaseModel):
     id: Identifier
     child_run_id: Identifier
     expert: str
-    status: Literal["open", "finished"]
+    status: AssignmentStatusName
     outcome: str | None
 
 
@@ -236,7 +242,7 @@ class RunListItem(BaseModel):
     goal_summary: str
     created_at: UtcTimestamp
     updated_at: UtcTimestamp
-    label_kind: Literal["goal", "expert", "session", "workflow"]
+    label_kind: RunLabelKind
     label: str | None
     stop_reason: StopReason | None
     tasks_complete: int

@@ -1,38 +1,19 @@
 """Who may call the Python API. Loopback does not authorize anything."""
 
 import hmac
-from typing import Annotated, Protocol
+from typing import Annotated
 from uuid import UUID
 
 import jwt
 from fastapi import Depends, Header, Request
 
 from autobots.api.errors import ApiError
+from autobots.api.resources import app_resources
 from autobots.api.settings import Settings
 
 
-class MembershipStore(Protocol):
-    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool: ...
-    async def workspaces_for(self, user_id: UUID) -> list[UUID]: ...
-    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None: ...
-
-
-class DenyAllMembership:
-    """The default until real membership is connected: no identity reaches any workspace."""
-
-    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
-        return False
-
-    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
-        return []
-
-    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
-        return None
-
-
 def app_settings(request: Request) -> Settings:
-    settings: Settings = request.app.state.settings
-    return settings
+    return app_resources(request).settings
 
 
 def require_internal(

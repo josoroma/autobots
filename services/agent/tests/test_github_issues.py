@@ -19,6 +19,7 @@ from autobots.adapters.provider_http import UnclearReply
 from autobots.application.tool_definitions import NotDelivered, ToolContext, ToolFailed, ToolScope
 from autobots.contracts.github_tools import CreateGithubIssueInput
 from autobots.domain.tools import EXPERT_TOOLS, LOOP_TOOL_GRANTS, OperationClass
+from sql_fakes import ScriptedConnection
 
 REPOSITORY = "owner/throwaway"
 TOKEN = "arranged-connector-token"
@@ -51,7 +52,7 @@ class FakeGithub:
 
 
 def context(operation: str = OPERATION) -> ToolContext:
-    return ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), operation)
+    return ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), operation)
 
 
 def tool(

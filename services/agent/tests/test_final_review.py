@@ -5,6 +5,8 @@ import io
 import json
 import logging
 import logging.config
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -23,6 +25,7 @@ from autobots.application.backups import restore_history
 from autobots.application.loop_policy import past_known_price, reservation_for
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
+from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import ToolFailed
 from autobots.application.worker_inference import AttemptModel, CatalogCache, InferenceSource
 from autobots.contracts.run_commands import RunRequest
@@ -31,6 +34,7 @@ from autobots.domain.tools import DELEGATION_TOOL
 from autobots.logs import JsonFormatter, configure_logging
 from autobots.operations.worker import inference_step
 from fake_openrouter import catalog_payload, provider_context
+from sql_fakes import ScriptedRows
 
 ROUTE = ModelRoute("executor", "openrouter_terra", "fixture/model", 34_560, 1_000_000)
 
@@ -118,24 +122,20 @@ def test_a_bad_restore_line_is_skipped_and_the_rest_read(tmp_path: Path) -> None
     assert restore_history(str(tmp_path)) == [good]
 
 
-class FakeCursor:
-    def __init__(self, row: tuple[Any, ...]) -> None:
-        self.row = row
-
-    async def fetchone(self) -> tuple[Any, ...]:
-        return self.row
-
-
 class FakeConnection:
     def __init__(self, missing_columns: int) -> None:
         self.missing_columns = missing_columns
 
-    async def execute(self, statement: str, *_: Any) -> FakeCursor:
+    async def execute(self, statement: str, _params: SqlParams | None = None, /) -> ScriptedRows:
         if "pg_attribute" in statement:
-            return FakeCursor((self.missing_columns,))
+            return ScriptedRows([(self.missing_columns,)])
         if "installation_holds" in statement:
-            return FakeCursor(())
-        return FakeCursor((0,))
+            return ScriptedRows([()])
+        return ScriptedRows([(0,)])
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[None]:
+        yield
 
     async def __aenter__(self) -> "FakeConnection":
         return self

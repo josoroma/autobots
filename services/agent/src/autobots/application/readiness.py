@@ -6,19 +6,21 @@ Its settings are read from the environment once per process by the entry point (
 """
 
 from collections.abc import AsyncIterator, Iterable, Mapping
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Self
+from typing import Self
 
 from autobots.application.operations import (
     Condition,
     ProbeTimes,
+    StoragePing,
     database_conditions,
     disk_condition,
     stops_admission,
     storage_condition,
 )
+from autobots.application.sql import SqlConnection, SqlPool
 
 DATA_ROOT = "AUTOBOTS_CONFIG_ROOT"
 MIN_FREE_BYTES = "AUTOBOTS_MIN_FREE_BYTES"
@@ -55,25 +57,19 @@ class ReadinessSettings:
         return cls(data_root, minimum)
 
 
-class ConnectionSource(Protocol):
-    """The API's pool, or `LentConnection` around the worker's own connection."""
-
-    def connection(self) -> AbstractAsyncContextManager[object]: ...
-
-
-class StoragePing(Protocol):
-    async def ping(self) -> None: ...
+# The API's pool, or `LentConnection` around the worker's own connection.
+ConnectionSource = SqlPool
 
 
 class LentConnection:
     """A connection its holder lends as a pool lends one, so the worker's own connection answers
     the probe the API makes through its pool."""
 
-    def __init__(self, connection: object) -> None:
+    def __init__(self, connection: SqlConnection) -> None:
         self._connection = connection
 
     @asynccontextmanager
-    async def connection(self) -> AsyncIterator[object]:
+    async def connection(self) -> AsyncIterator[SqlConnection]:
         yield self._connection
 
 

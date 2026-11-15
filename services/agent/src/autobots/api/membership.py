@@ -1,19 +1,40 @@
-"""Workspace membership from the database, through the restricted runtime role."""
+"""Workspace membership: what the routes ask of it, the deny-all default, and the database's answer
+through the restricted runtime role."""
 
 from typing import Protocol
 from uuid import UUID
 
-from autobots.api.pool import ConnectionPool
+from autobots.api.pool import Pool
+
+
+class MembershipStore(Protocol):
+    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool: ...
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]: ...
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None: ...
+
+
+class DenyAllMembership:
+    """The default until real membership is connected: no identity reaches any workspace."""
+
+    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
+        return False
+
+    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
+        return []
+
+    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
+        return None
 
 
 class PoolHolder(Protocol):
-    """Application state, or anything else that holds the pool once the lifespan opens it."""
+    """The app's resources (api/resources.py), which hold the pool once the lifespan opens it."""
 
-    pool: ConnectionPool | None
+    @property
+    def pool(self) -> Pool | None: ...
 
 
 class PostgresMembership:
-    """Reads the pool from application state, so nothing connects before the lifespan starts it."""
+    """Reads the pool from the app's resources, so nothing connects before the lifespan opens it."""
 
     def __init__(self, state: PoolHolder) -> None:
         self._state = state
@@ -40,7 +61,7 @@ class PostgresMembership:
                 (user_id, workspace_id),
             )
             row = await cursor.fetchone()
-            return row[0] if row else None
+            return str(row[0]) if row else None
 
     async def workspaces_for(self, user_id: UUID) -> list[UUID]:
         pool = self._state.pool
@@ -52,4 +73,5 @@ class PostgresMembership:
                 "where user_id = %s order by workspace_id",
                 (user_id,),
             )
-            return [row[0] for row in await cursor.fetchall()]
+            found: list[UUID] = [row[0] for row in await cursor.fetchall()]
+            return found

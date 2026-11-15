@@ -14,17 +14,20 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from autobots.application.runs import LeaseLost, append_event
+from autobots.application.sql import SqlConnection, all_rows, one
 from autobots.application.tool_definitions import ToolDefinition, ToolResult, ToolScope
 from autobots.application.tool_gateway import Call, Refused, hold_lease
 from autobots.contracts.runs import ToolUseCompleted, ToolUseList, ToolUseStarted, ToolUseView
 from autobots.domain.tool_catalog import CostClass
+from autobots.domain.tools import ToolOutcome
+from autobots.persistence.rows import ToolUseRow
 
 # Decision 0017 Q4: a root run tree may make this many metered tool calls.
 METERED_TOOL_CALLS = 20
 COMPLETE_TASK = "complete_task"
 
 
-def input_digest(arguments: Any) -> str:
+def input_digest(arguments: object) -> str:
     """A digest of the arguments as the model sent them, before parsing. The gateway hashes the
     parsed arguments, so the two agree only when parsing changes nothing."""
     try:
@@ -34,7 +37,7 @@ def input_digest(arguments: Any) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-def _scrub(value: Any) -> Any:
+def _scrub(value: object) -> object:
     """URLs lose their query string and fragment, which can carry tokens (TU-04)."""
     if isinstance(value, str) and value.startswith(("http://", "https://")):
         parts = urlsplit(value)
@@ -52,7 +55,7 @@ def public_projection(values: Mapping[str, Any] | None, fields: Iterable[str]) -
 
 
 async def served_task(
-    connection: Any, run_id: UUID, name: str, arguments: Any
+    connection: SqlConnection, run_id: UUID, name: str, arguments: object
 ) -> tuple[int | None, str | None]:
     """The plan task a call served: `complete_task`'s own task, or else the first open task whose
     dependencies are done and that lists this tool. None when no task claims it, such as a plan's
@@ -95,7 +98,11 @@ def _public_arguments(resolved: Call | Refused) -> Mapping[str, Any] | None:
 
 
 async def begin_use(
-    connection: Any, scope: ToolScope, name: str, arguments: Any, resolved: Call | Refused
+    connection: SqlConnection,
+    scope: ToolScope,
+    name: str,
+    arguments: object,
+    resolved: Call | Refused,
 ) -> int | None:
     """Recorded before anything else happens, with a started event in the same transaction.
 
@@ -113,7 +120,8 @@ async def begin_use(
                 "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 (f"tool_uses|{scope.run_id}",),
             )
-            cursor = await connection.execute(
+            (use_id,) = await one(
+                connection,
                 "insert into app_private.tool_uses (run_id, root_run_id, workspace_id, "
                 "sequence_in_run, tool_id, tool_version, tool_group, provider, cost_class, "
                 "plan_version, task_id, input_digest, input_public, generation, instance_key) "
@@ -138,7 +146,6 @@ async def begin_use(
                     scope.run_id,
                 ),
             )
-            use_id: int = (await cursor.fetchone())[0]
             if task_id is not None:
                 # RN-05: a task starts with the first use that serves it, in database time, fenced
                 # by this transaction's lease. A later use keeps the first start.
@@ -161,11 +168,11 @@ async def begin_use(
             )
     except LeaseLost:
         return None
-    return use_id
+    return int(use_id)
 
 
 async def admit_metered(
-    connection: Any, scope: ToolScope, use_id: int, limit: int = METERED_TOOL_CALLS
+    connection: SqlConnection, scope: ToolScope, use_id: int, limit: int = METERED_TOOL_CALLS
 ) -> bool:
     """Counted per root run tree, under a lock, so concurrent children can't both take the last."""
     async with connection.transaction():
@@ -174,11 +181,12 @@ async def admit_metered(
             "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
             (f"metered|{scope.budget_run_id}",),
         )
-        cursor = await connection.execute(
+        (metered,) = await one(
+            connection,
             "select count(*) from app_private.tool_uses where root_run_id = %s and metered",
             (scope.budget_run_id,),
         )
-        if (await cursor.fetchone())[0] >= limit:
+        if metered >= limit:
             return False
         await connection.execute(
             "update app_private.tool_uses set metered = true where id = %s", (use_id,)
@@ -191,7 +199,7 @@ def is_metered(tool: ToolDefinition | None) -> bool:
 
 
 async def complete_use(
-    connection: Any,
+    connection: SqlConnection,
     scope: ToolScope,
     use_id: int,
     name: str,
@@ -256,8 +264,36 @@ def _utc(value: datetime | None) -> datetime | None:
     return value.astimezone(UTC) if value is not None else None
 
 
+def tool_use_view(row: ToolUseRow) -> ToolUseView:
+    """An unknown stored outcome raises, instead of reaching a client."""
+    return ToolUseView(
+        id=row.id,
+        run_id=row.run_id,
+        sequence_in_run=row.sequence_in_run,
+        tool_id=row.tool_id,
+        tool_version=row.tool_version,
+        group=row.tool_group,
+        provider=row.provider,
+        plan_version=row.plan_version,
+        task_id=row.task_id,
+        task_title=row.task_title,
+        requested_at=row.requested_at.astimezone(UTC),
+        finished_at=_utc(row.finished_at),
+        duration_ms=max(int(row.duration_ms), 0) if row.duration_ms is not None else None,
+        outcome=None if row.outcome is None else ToolOutcome(row.outcome).value,
+        code=row.code,
+        input_public=row.input_public or {},
+        output_public=row.output_public,
+        input_digest=row.input_digest,
+        output_bytes=row.output_bytes,
+        operation_id=row.operation_id,
+        provider_units=float(row.provider_units) if row.provider_units is not None else None,
+        instance_key=row.instance_key,
+    )
+
+
 async def list_tool_uses(
-    connection: Any, workspace_id: UUID, run_id: UUID, after: int = 0, limit: int = 100
+    connection: SqlConnection, workspace_id: UUID, run_id: UUID, after: int = 0, limit: int = 100
 ) -> ToolUseList | None:
     """A run's uses, or a root run's whole tree, in order, with the plan task's title (TU-07)."""
     cursor = await connection.execute(
@@ -268,48 +304,23 @@ async def list_tool_uses(
     if row is None:
         return None
     column = "u.root_run_id" if row[0] is None else "u.run_id"
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        ToolUseRow,
         "select u.id, u.run_id, u.sequence_in_run, u.tool_id, u.tool_version, u.tool_group, "
         "u.provider, u.plan_version, u.task_id, "
         "(select t ->> 'title' from app_private.plan_versions p "
         " cross join lateral jsonb_array_elements(p.tasks) t where p.run_id = u.run_id "
-        " and p.version = u.plan_version and t ->> 'id' = u.task_id limit 1), "
+        " and p.version = u.plan_version and t ->> 'id' = u.task_id limit 1) as task_title, "
         "u.requested_at, u.finished_at, "
-        "(extract(epoch from u.finished_at - u.requested_at) * 1000)::bigint, "
+        "(extract(epoch from u.finished_at - u.requested_at) * 1000)::bigint as duration_ms, "
         "u.outcome, u.code, u.input_public, u.output_public, u.input_digest, u.output_bytes, "
         "u.operation_id, u.provider_units, u.instance_key "
         f"from app_private.tool_uses u where u.workspace_id = %s and u.id > %s and {column} = %s "
         "order by u.id limit %s",
         (workspace_id, after, run_id, limit + 1),
     )
-    rows = await cursor.fetchall()
-    uses = [
-        ToolUseView(
-            id=item[0],
-            run_id=item[1],
-            sequence_in_run=item[2],
-            tool_id=item[3],
-            tool_version=item[4],
-            group=item[5],
-            provider=item[6],
-            plan_version=item[7],
-            task_id=item[8],
-            task_title=item[9],
-            requested_at=item[10].astimezone(UTC),
-            finished_at=_utc(item[11]),
-            duration_ms=max(int(item[12]), 0) if item[12] is not None else None,
-            outcome=item[13],
-            code=item[14],
-            input_public=item[15] or {},
-            output_public=item[16],
-            input_digest=item[17],
-            output_bytes=item[18],
-            operation_id=item[19],
-            provider_units=float(item[20]) if item[20] is not None else None,
-            instance_key=item[21],
-        )
-        for item in rows[:limit]
-    ]
+    uses = [tool_use_view(item) for item in rows[:limit]]
     return ToolUseList(
         schema_version=1,
         run_id=run_id,

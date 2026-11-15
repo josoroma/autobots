@@ -15,7 +15,8 @@ from psycopg import AsyncConnection
 from autobots.adapters.result_stream import CHANNEL as RESULT_CHANNEL
 from autobots.api.dependencies import MemberWorkspace
 from autobots.api.errors import ApiError
-from autobots.api.pool import ConnectionPool, request_pool
+from autobots.api.pool import Pool
+from autobots.api.resources import ListenerSlots, app_resources, request_pool
 from autobots.api.security import require_internal
 from autobots.application.run_projection import (
     RUN_LIST_SIZE,
@@ -43,39 +44,7 @@ from autobots.domain.runs import TERMINAL
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Cursor = Annotated[int, Query(ge=0)]
 POLL_SECONDS = 0.5
-# A stream ends after a while, and the client reconnects from its cursor.
-DEFAULT_STREAM_SECONDS = 60.0
 KEEPALIVE_SECONDS = 15.0
-# Each live stream listens on a direct connection outside the pool. Past this many at once, a
-# stream polls stored events only, as one does when LISTEN can't connect (PAPI-11).
-MAX_LISTENERS = 10
-
-
-class ListenerSlots:
-    """How many streams hold a LISTEN connection now, in this process. One event loop serves every
-    stream, and nothing awaits between reading the count and changing it."""
-
-    def __init__(self, limit: int = MAX_LISTENERS) -> None:
-        self.limit = limit
-        self.held = 0
-
-    def take(self) -> bool:
-        if self.held >= self.limit:
-            return False
-        self.held += 1
-        return True
-
-    def give_back(self) -> None:
-        self.held -= 1
-
-
-def listener_slots(request: Request) -> ListenerSlots:
-    """This process's slots, made on first use."""
-    slots: ListenerSlots | None = getattr(request.app.state, "listener_slots", None)
-    if slots is None:
-        slots = ListenerSlots()
-        request.app.state.listener_slots = slots
-    return slots
 
 
 def _not_found() -> ApiError:
@@ -148,8 +117,7 @@ async def get_tool_uses(
 async def _listener(request: Request) -> AsyncConnection[Any] | None:
     """US-15.24: this stream's own connection, listening for live result text. None when the API
     has no database address, as under a test client; then only durable events flow."""
-    settings = getattr(request.app.state, "settings", None)
-    url = settings.database_url.get_secret_value() if settings is not None else ""
+    url = app_resources(request).settings.database_url.get_secret_value()
     if not url:
         return None
     try:
@@ -231,9 +199,9 @@ def live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
 
 
 async def _frames(
-    request: Request, pool: ConnectionPool, workspace_id: UUID, run_id: UUID, after: int
+    request: Request, pool: Pool, workspace_id: UUID, run_id: UUID, after: int
 ) -> AsyncIterator[str]:
-    slots = listener_slots(request)
+    slots = app_resources(request).listener_slots
     listener = await _held_listener(request, slots)
     try:
         async for frame in _durable_and_live(request, pool, workspace_id, run_id, after, listener):
@@ -248,7 +216,7 @@ async def _frames(
 
 async def _durable_and_live(
     request: Request,
-    pool: ConnectionPool,
+    pool: Pool,
     workspace_id: UUID,
     run_id: UUID,
     after: int,
@@ -259,7 +227,7 @@ async def _durable_and_live(
     started = last_sent = loop.time()
     # Sends the headers now, or a quiet run would look like a connection that never opened.
     yield ": connected\n\n"
-    lifetime = getattr(request.app.state, "stream_seconds", DEFAULT_STREAM_SECONDS)
+    lifetime = app_resources(request).stream_seconds
     while loop.time() - started < lifetime and not await request.is_disconnected():
         async with pool.connection() as connection:
             page = await read_events(connection, workspace_id, run_id, after=cursor)

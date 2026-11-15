@@ -1,7 +1,7 @@
 """MP-04 and MP-05. Validation uses key metadata and the public catalog, and never a completion."""
 
 import json
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -12,7 +12,7 @@ from uuid import UUID
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
-from autobots.application.catalog_check import SETTINGS_SECONDS, check_catalog
+from autobots.application.catalog_check import SETTINGS_SECONDS, CatalogStatus, check_catalog
 from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
@@ -26,7 +26,12 @@ from autobots.application.credentials.store import (
     ResolvedCredential,
     resolve_for_attempt,
 )
+from autobots.application.sql import SqlConnection, all_rows, optional_row, stored
 from autobots.contracts.settings import (
+    AUTH_STATUSES,
+    ROUTE_QUALIFICATION_STATUSES,
+    AuthStatus,
+    CredentialSource,
     ModelAvailability,
     ModelList,
     ProviderStatus,
@@ -34,6 +39,7 @@ from autobots.contracts.settings import (
 )
 from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.models import PROFILES, ModelProfileId, is_offered
+from autobots.persistence.rows import ProviderSettingsRow, RouteQualificationRow
 
 
 class KeyCheck(StrEnum):
@@ -73,7 +79,7 @@ CatalogFetcher = Callable[[], Awaitable[dict[str, Any] | None]]
 # `run_intent`'s answer, "ready" or the refusing code, for a workspace (XMOD-17). One takes the
 # workspace only; the other also takes the connection to read it over, as the worker holds one.
 WorkspaceReadiness = Callable[[UUID], Awaitable[str]]
-ConnectionReadiness = Callable[[Any, UUID], Awaitable[str]]
+ConnectionReadiness = Callable[[SqlConnection, UUID], Awaitable[str]]
 
 
 @dataclass(frozen=True)
@@ -98,35 +104,37 @@ class SettingsRows(Protocol):
 
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
-    ) -> tuple[int, str, datetime | None]: ...
+    ) -> tuple[int, AuthStatus, datetime | None]: ...
 
     async def ensure(self, workspace_id: UUID) -> None: ...
 
-    async def record(self, workspace_id: UUID, status: str) -> None: ...
+    async def record(self, workspace_id: UUID, status: AuthStatus) -> None: ...
 
 
 class StoredSettingsRows:
     """`app_private.provider_settings`, over one runtime-role connection."""
 
-    def __init__(self, connection: Any) -> None:
+    def __init__(self, connection: SqlConnection) -> None:
         self._connection = connection
 
     async def read(
         self, workspace_id: UUID, *, lock: bool = False
-    ) -> tuple[int, str, datetime | None]:
+    ) -> tuple[int, AuthStatus, datetime | None]:
         """Writes nothing. A workspace with no row reads as the table's defaults: version 0,
         missing and never checked (supabase/migrations/20261105000005_provider_settings.sql). A
         writer calls `ensure` first, so `lock` has a row to hold (SP-014, POPS-12)."""
         suffix = " for update" if lock else ""
-        cursor = await self._connection.execute(
+        row = await optional_row(
+            self._connection,
+            ProviderSettingsRow,
             "select version, auth_status, validated_at from app_private.provider_settings "
             f"where workspace_id = %s{suffix}",
             (workspace_id,),
         )
-        row = await cursor.fetchone()
         if row is None:
             return 0, "missing", None
-        return row[0], row[1], row[2]
+        # The column's check constraint allows these four (POPS-11), so another raises here.
+        return row.version, stored(AUTH_STATUSES, row.auth_status), row.validated_at
 
     async def ensure(self, workspace_id: UUID) -> None:
         """Creates the row at its defaults if it isn't there yet, for a writer."""
@@ -136,7 +144,7 @@ class StoredSettingsRows:
             (workspace_id,),
         )
 
-    async def record(self, workspace_id: UUID, status: str) -> None:
+    async def record(self, workspace_id: UUID, status: AuthStatus) -> None:
         await self._connection.execute(
             "update app_private.provider_settings set version = version + 1, auth_status = %s, "
             "validated_at = case when %s = 'configured' then now() else validated_at end "
@@ -150,7 +158,7 @@ class ProviderSettings:
 
     def __init__(
         self,
-        connection: Any,
+        connection: SqlConnection,
         context: ProviderContext,
         *,
         store: ProviderCredentialStore | None = None,
@@ -178,14 +186,14 @@ class ProviderSettings:
             return candidate
         return None
 
-    async def catalog_status(self) -> str:
+    async def catalog_status(self) -> CatalogStatus:
         """Within the HTTP client's own limit. A reply that isn't JSON reads as unavailable."""
         return (await check_catalog(self._context.fetch_catalog, SETTINGS_SECONDS)).status
 
     async def route_qualifications(self) -> list[RouteQualification]:
         return await read_route_qualifications(self._connection)
 
-    async def auth_status(self, workspace_id: UUID) -> str:
+    async def auth_status(self, workspace_id: UUID) -> AuthStatus:
         """The stored authentication state only, as `status` reports it, with no catalog fetch."""
         _version, auth_status, _validated_at = await self._rows.read(workspace_id)
         if await self._effective_environment(workspace_id) is not None:
@@ -200,7 +208,7 @@ class ProviderSettings:
 
     async def status(self, workspace_id: UUID) -> ProviderStatus:
         version, auth_status, validated_at = await self._rows.read(workspace_id)
-        source = "none"
+        source: CredentialSource = "none"
         credential_id = None
         credential_version = None
         environment = await self._effective_environment(workspace_id)
@@ -220,9 +228,9 @@ class ProviderSettings:
             schema_version=1,
             provider="openrouter",
             settings_version=version,
-            source=source,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
-            auth_status=auth_status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
-            catalog_status=await self.catalog_status(),  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+            source=source,
+            auth_status=auth_status,
+            catalog_status=await self.catalog_status(),
             qualification=await self.route_qualifications(),
             credential_id=credential_id,
             credential_version=credential_version,
@@ -275,11 +283,12 @@ class ProviderSettings:
             # A row this key can't open raises the store's CredentialUnreadable, a storage error.
             secret = (await self._store.load_active(workspace_id)).client_secret()
         result = await self._context.validate_key(secret)
-        status = {
+        statuses: dict[KeyCheck, AuthStatus] = {
             KeyCheck.VALID: "configured",
             KeyCheck.REJECTED: "invalid",
             KeyCheck.UNREACHABLE: "unavailable",
-        }[result]
+        }
+        status = statuses[result]
         await self._rows.ensure(workspace_id)
         await self._rows.record(workspace_id, status)
 
@@ -352,33 +361,36 @@ class ProviderSettings:
                     capabilities=sorted(entry.supported_parameters) if entry else [],
                 )
             )
-        status = "available" if payload is not None else "unavailable"
+        status: CatalogStatus = "available" if payload is not None else "unavailable"
         return ModelList(
             schema_version=1,
-            catalog_status=status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+            catalog_status=status,
             fetched_at=now if payload is not None else None,
             models=models,
         )
 
 
-async def read_route_qualifications(connection: Any) -> list[RouteQualification]:
+async def read_route_qualifications(connection: SqlConnection) -> list[RouteQualification]:
     """Only a stored record for the route's own canonical model counts, MP-04. Neither a key nor
     the catalog changes this."""
-    cursor = await connection.execute(
+    rows = await all_rows(
+        connection,
+        RouteQualificationRow,
         "select profile, canonical_id, status, qualified_on, configuration, limits "
-        "from agent_runtime.route_qualifications"
+        "from agent_runtime.route_qualifications",
     )
-    stored = {row[0]: row for row in await cursor.fetchall()}
+    recorded = {row.profile: row for row in rows}
     return [
-        qualification_from_record(profile.id, profile.canonical_id, stored.get(profile.id))
+        qualification_from_record(profile.id, profile.canonical_id, recorded.get(profile.id))
         for profile in PROFILES.values()
     ]
 
 
 def qualification_from_record(
-    profile: ModelProfileId, canonical_id: str, record: Sequence[Any] | None
+    profile: ModelProfileId, canonical_id: str, record: RouteQualificationRow | None
 ) -> RouteQualification:
-    if record is None or record[1] != canonical_id:
+    """An unknown stored status raises, instead of reaching a client."""
+    if record is None or record.canonical_id != canonical_id:
         return RouteQualification(
             profile=profile,
             canonical_id=canonical_id,
@@ -390,10 +402,10 @@ def qualification_from_record(
     return RouteQualification(
         profile=profile,
         canonical_id=canonical_id,
-        status=record[2],
-        qualified_on=record[3],
-        configuration=record[4],
-        limits=record[5],
+        status=stored(ROUTE_QUALIFICATION_STATUSES, record.status),
+        qualified_on=record.qualified_on,
+        configuration=record.configuration,
+        limits=record.limits,
     )
 
 

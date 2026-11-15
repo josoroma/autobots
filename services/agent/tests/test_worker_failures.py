@@ -13,7 +13,7 @@ import contextlib
 import json
 import logging
 import re
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -29,6 +29,7 @@ from autobots.application.run_lifecycle import (
     record_failure,
 )
 from autobots.application.runs import LeaseLost, TransitionResult, WorkerClaim
+from autobots.application.sql import SqlParams
 from autobots.application.worker_leases import (
     FAILURE_BOUND,
     FAILURE_TYPE_LIMIT,
@@ -42,6 +43,7 @@ from autobots.domain.runs import CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import PassOutcome, StopCode
 from autobots.logs import JsonFormatter
 from autobots.operations import job_dispatch
+from sql_fakes import ScriptedRows
 
 MIGRATION = (
     Path(__file__).resolve().parents[3] / "supabase/migrations/20261114000055_run_job_failures.sql"
@@ -84,8 +86,12 @@ class Database:
             and values[-1] == self.job.generation
         )
 
-    async def execute(self, statement: str, values: tuple[object, ...] = ()) -> "Database":
-        self.statements.append((statement, tuple(values), self.depth > 0))
+    # Each answer is a tuple, read by position.
+    description = None
+
+    async def execute(self, statement: str, params: SqlParams | None = None, /) -> "Database":
+        values = tuple(params) if isinstance(params, Sequence) else ()
+        self.statements.append((statement, values, self.depth > 0))
         self.answer = None
         if statement.startswith("update app_private.run_jobs j set failed_attempts"):
             if self._fenced(values):
@@ -150,7 +156,7 @@ def _record(
             raise transitions.refusal
         database.stop_reasons.append(fields["stop_reason"])
         database.run_status, database.job.status = RunStatus.PAUSED, "done"
-        return TransitionResult(LEASE.run_id, 5, RunStatus.PAUSED.value, True)
+        return TransitionResult(LEASE.run_id, 5, RunStatus.PAUSED, True)
 
     monkeypatch.setattr(run_lifecycle, "apply_worker_command", apply_worker_command)
     return asyncio.run(record_failure(database, LEASE, error))
@@ -369,7 +375,7 @@ def test_the_log_names_the_run_and_the_error_type_and_never_its_message(
     assert "retry_seconds" not in third
 
 
-RESULT = LoopResult(PassOutcome.STOPPED, "plan_missing", "failed", None, (), (), (), {})
+RESULT = LoopResult(PassOutcome.STOPPED, "plan_missing", RunStatus.FAILED, None, (), (), (), {})
 
 
 @dataclass
@@ -500,21 +506,18 @@ class Commands:
     statements: list[str] = field(default_factory=list)
     answer: tuple[object, ...] | None = None
 
-    async def execute(self, statement: str, values: tuple[object, ...] = ()) -> "Commands":
+    async def execute(self, statement: str, _values: SqlParams | None = None, /) -> ScriptedRows:
         self.statements.append(statement)
         self.answer = None
         if statement.startswith("select status, generation"):
-            self.answer = ("done", 3, None)
+            return ScriptedRows([{"status": "done", "generation": 3, "lease_live": None}])
         elif statement.startswith("select status, version"):
             self.answer = (self.status.value, 7)
         elif statement.startswith("select exists"):
             self.answer = (False,)
         elif statement.startswith("update public.runs set event_sequence"):
             self.answer = (2,)
-        return self
-
-    async def fetchone(self) -> tuple[object, ...] | None:
-        return self.answer
+        return ScriptedRows([] if self.answer is None else [self.answer])
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncIterator[None]:

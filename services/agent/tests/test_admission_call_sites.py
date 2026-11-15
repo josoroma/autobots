@@ -157,7 +157,15 @@ def test_a_workflow_execution_admits_with_the_golden_fingerprint() -> None:
     options = caller_shapes()["workflow"]
     database = scripted()
     # The shape's goal is "Workflow Weekly digest, version 4", from this name and version.
-    database.answer("select v.graph, v.graph_hash", (PLAIN_GRAPH, "digest", {}, "Weekly digest"))
+    database.answer(
+        "select v.graph, v.graph_hash",
+        {
+            "graph": PLAIN_GRAPH,
+            "graph_hash": "digest",
+            "block_versions": {},
+            "name": "Weekly digest",
+        },
+    )
     digest = admitted_through(
         database,
         lambda connection: create_execution(
@@ -184,7 +192,14 @@ def test_a_held_out_replay_admits_its_task_with_the_golden_fingerprint() -> None
     database = scripted()
     database.answer(
         "from public.improvement_candidates",
-        ("skill", "figures", "Read the table first.", "regression_passed", [], None),
+        {
+            "kind": "skill",
+            "key": "figures",
+            "content": "Read the table first.",
+            "status": "regression_passed",
+            "evidence": [],
+            "source": None,
+        },
     )
     task = HeldOutTask(
         goal_text=options["goal_text"], criteria=list(options["acceptance_criteria"])
@@ -236,7 +251,12 @@ def test_a_specialists_child_admits_with_the_golden_fingerprint() -> None:
     database = scripted()
     database.answer(
         "select r.session_id, r.policy_snapshot, r.limit_micro_usd",
-        (inherited.session_id, inherited.snapshot, options["limit_micro_usd"], 0),
+        {
+            "session_id": inherited.session_id,
+            "policy_snapshot": inherited.snapshot,
+            "limit_micro_usd": options["limit_micro_usd"],
+            "parent_depth": 0,
+        },
     )
     database.answer(
         "select kind, experts from public.sessions",
@@ -251,7 +271,8 @@ def test_a_specialists_child_admits_with_the_golden_fingerprint() -> None:
     database.answer("count(*) filter (where status = 'open')", (0, 0))
     database.answer("set children = children + 1", (1,))
     database.answer(
-        "from app_private.run_jobs j join public.runs r", (CLAIMED, WORKSPACE, "running", 1)
+        "from app_private.run_jobs j join public.runs r",
+        {"run_id": CLAIMED, "workspace_id": WORKSPACE, "status": "running", "version": 1},
     )
     database.answer("returning generation, attempts", (1, 1))
     scope = ToolScope(

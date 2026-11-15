@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 
 from autobots.adapters.checkpoints import QUALIFIED_STACK, adapter_identity
-from autobots.application.artifacts import ObjectStore
+from autobots.application.artifacts import PingableObjectStore
 from autobots.application.assignments import Delegation
 from autobots.application.run_lifecycle import pass_registry
 from autobots.application.run_usage import RootLimits
@@ -29,7 +29,7 @@ def test_the_version_table_is_what_the_worker_registers() -> None:
         return None
 
     delegation = Delegation(drive=drive, limits=RootLimits(), lease_seconds=1)
-    store = cast("ObjectStore", object())
+    store = cast("PingableObjectStore", object())
     registry = pass_registry(worker.loop_config(store), delegation)
     assert registry.versions() == dict(TOOL_VERSIONS)
 

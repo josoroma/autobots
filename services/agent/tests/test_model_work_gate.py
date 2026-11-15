@@ -17,6 +17,7 @@ import pytest
 
 from autobots.adapters.tool_registry import catalog
 from autobots.api.dependencies import model_key_check, require_ready
+from autobots.api.resources import resources_of
 from autobots.application.experts import expert_record
 from autobots.application.routines import run_routine_now
 from autobots.application.run_admission import (
@@ -244,7 +245,7 @@ class KeyCheck:
 
 
 def overridden(client: ApiClient, key: str) -> None:
-    client.app.state.provider_context = provider_context()
+    resources_of(client.app).provider_context = provider_context()
     client.app.dependency_overrides[require_ready] = lambda: None
     client.app.dependency_overrides[model_key_check] = lambda: KeyCheck(key, client.log).run_intent
 
@@ -419,8 +420,12 @@ def test_every_agent_step_shows_the_workflow_runs_executor_from_one_policy_read(
     }
     database.answer(
         "from public.experts e",
-        (str(EXPERT), "Researcher", {"tools": [], "role_bindings": {"executor": DEEPSEEK.value}}),
-        (str(SECOND_EXPERT), "Writer", {"tools": ["calculate"]}),
+        {
+            "id": str(EXPERT),
+            "name": "Researcher",
+            "config": {"tools": [], "role_bindings": {"executor": DEEPSEEK.value}},
+        },
+        {"id": str(SECOND_EXPERT), "name": "Writer", "config": {"tools": ["calculate"]}},
     )
     database.answer("app_private.model_policies", ("openrouter_sol", {}))
     steps = {step.id: step for step in run(preview_steps(connection, WORKSPACE, graph))}
@@ -437,8 +442,8 @@ def test_a_draft_preview_reads_only_its_agent_steps_configuration() -> None:
     type, and its preview still shows every step (refactor plan R-52)."""
     database, connection = fresh()
     database.answer(
-        "select e.id::text, e.name, v.config from public.experts e",
-        (str(EXPERT), "Researcher", {"tools": ["calculate"]}),
+        "select e.id::text as id, e.name, v.config from public.experts e",
+        {"id": str(EXPERT), "name": "Researcher", "config": {"tools": ["calculate"]}},
     )
     draft = {
         "nodes": [
@@ -464,16 +469,25 @@ def test_the_workflow_preview_names_the_model_its_agent_steps_child_will_use() -
     database, connection = fresh()
     expert = {"tools": ["calculate"], "role_bindings": {"executor": "openrouter_sol"}}
     database.answer(
-        "select e.id::text, e.name, v.config from public.experts e",
-        (str(EXPERT), "Researcher", expert),
+        "select e.id::text as id, e.name, v.config from public.experts e",
+        {"id": str(EXPERT), "name": "Researcher", "config": expert},
     )
     (step,) = [s for s in run(preview_steps(connection, WORKSPACE, AGENT_GRAPH)) if s.id == "ask"]
     # The workflow run, as creating an execution freezes it.
     database.answer("event_sequence = event_sequence + 1", (1,))
-    database.answer("select v.graph, v.graph_hash", (AGENT_GRAPH, "digest", {}, "Weekly digest"))
+    database.answer(
+        "select v.graph, v.graph_hash",
+        {
+            "graph": AGENT_GRAPH,
+            "graph_hash": "digest",
+            "block_versions": {},
+            "name": "Weekly digest",
+        },
+    )
     database.answer("select v.graph from public.workflow_versions", (AGENT_GRAPH,))
     database.answer(
-        "select id, name, latest_version from public.experts", (EXPERT, "Researcher", 1)
+        "select id, name, latest_version from public.experts",
+        {"id": EXPERT, "name": "Researcher", "latest_version": 1},
     )
     database.answer("from public.expert_versions where expert_id", (1, expert))
     database.answer("count(*), max(created_at) from public.runs", (0, None))

@@ -8,7 +8,7 @@ is granted only through an Expert, and each action stays in the run's workspace.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Any, assert_never
+from typing import assert_never
 from uuid import UUID
 
 from autobots.application.routines import (
@@ -20,6 +20,7 @@ from autobots.application.routines import (
     run_routine_now,
     set_enabled,
 )
+from autobots.application.sql import SqlConnection
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_definitions import (
     ApprovalPolicy,
@@ -39,10 +40,10 @@ from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
-CredentialCheck = Callable[[Any, UUID], Awaitable[str]]
+CredentialCheck = Callable[[SqlConnection, UUID], Awaitable[str]]
 
 
-async def _environment_check(connection: Any, workspace_id: UUID) -> str:
+async def _environment_check(connection: SqlConnection, workspace_id: UUID) -> str:
     """The worker's own readiness answer, so a scheduled and an asked-for occurrence agree."""
     from os import environ
 
@@ -64,7 +65,7 @@ def routine_config(task: CronjobTask) -> RoutineConfig:
     )
 
 
-async def _creator(connection: Any, context: ToolContext) -> UUID:
+async def _creator(connection: SqlConnection, context: ToolContext) -> UUID:
     """C5: the person who started the run, else the workspace's owner for unattended runs."""
     cursor = await connection.execute(
         "select coalesce(r.started_by, (select m.user_id from public.workspace_members m "

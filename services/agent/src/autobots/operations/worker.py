@@ -22,13 +22,14 @@ from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID
 
 import psycopg
 
 from autobots.adapters.tool_registry import build_registry, catalog
 from autobots.application.approvals import expire_due
+from autobots.application.artifacts import PingableObjectStore
 from autobots.application.bounded import stop_task
 from autobots.application.goal_loop import UNBOUND
 from autobots.application.provider_settings import CatalogFetcher, ConnectionReadiness
@@ -42,6 +43,7 @@ from autobots.application.readiness import (
 from autobots.application.retention import apply_all
 from autobots.application.routines import evaluate_routines
 from autobots.application.run_lifecycle import LoopConfig
+from autobots.application.sql import CommittingConnection, SqlConnection
 from autobots.application.tool_catalog import Catalog
 from autobots.application.worker_inference import CatalogCache, InferenceSource
 from autobots.application.worker_leases import is_held
@@ -61,9 +63,9 @@ from autobots.operations.composition import (
 from autobots.operations.job_dispatch import process_next
 
 logger = logging.getLogger("autobots.worker")
-Step = Callable[[Any], Awaitable[bool]]
+Step = Callable[[CommittingConnection], Awaitable[bool]]
 # Opens one autocommit connection; the serve loop, its heartbeat and its last beat each use one.
-Connect = Callable[[str], Awaitable[AbstractAsyncContextManager[Any]]]
+Connect = Callable[[str], Awaitable[AbstractAsyncContextManager[CommittingConnection]]]
 INFERENCE_SWITCH = "AUTOBOTS_WORKER_INFERENCE"
 DRAIN_SECONDS = "AUTOBOTS_WORKER_DRAIN_SECONDS"
 DEFAULT_DRAIN_SECONDS = 30.0
@@ -85,7 +87,7 @@ class _Status:
     changed: asyncio.Event = field(default_factory=asyncio.Event)
 
 
-async def _write_beat(connection: Any, config: WorkerConfig, state: str) -> None:
+async def _write_beat(connection: SqlConnection, config: WorkerConfig, state: str) -> None:
     await connection.execute(
         "insert into app_private.worker_heartbeats (worker_id, state, claims_inference) "
         "values (%s, %s, %s) on conflict (worker_id) do update set state = excluded.state, "
@@ -135,7 +137,11 @@ async def _pause(stop: asyncio.Event, seconds: float) -> None:
 
 
 async def _run_step(
-    step: Step, connection: Any, stop: asyncio.Event, config: WorkerConfig, status: _Status
+    step: Step,
+    connection: CommittingConnection,
+    stop: asyncio.Event,
+    config: WorkerConfig,
+    status: _Status,
 ) -> bool:
     """One step, given until drain ends once a stop arrives. Cut short, its lease just expires."""
     task: asyncio.Future[Any] = asyncio.ensure_future(step(connection))
@@ -213,7 +219,7 @@ class _Maintenance:
 
 def maintenance_step(
     credential_check: ConnectionReadiness,
-    store: Any,
+    store: PingableObjectStore | None,
     readiness: ReadinessSettings,
     retention_seconds: float = 3600,
     *,
@@ -228,7 +234,7 @@ def maintenance_step(
     """
     state = _Maintenance()
 
-    async def step(connection: Any) -> bool:
+    async def step(connection: CommittingConnection) -> bool:
         if await is_held(connection):
             return False
         await expire_due(connection)
@@ -255,14 +261,17 @@ def maintenance_step(
     return step
 
 
-def loop_config(store: Any) -> LoopConfig:
+def loop_config(store: PingableObjectStore | None) -> LoopConfig:
     """What every job's binder starts from: no route until the job's own policy binds one, and the
     tool set from the composition edge, so a pass runs what the catalog lists (XMOD-01, TC-01)."""
     return LoopConfig(route=UNBOUND, object_store=store, tool_set=build_registry)
 
 
 def inference_step(
-    config: WorkerConfig, source: InferenceSource, store: Any, stop: asyncio.Event | None = None
+    config: WorkerConfig,
+    source: InferenceSource,
+    store: PingableObjectStore | None,
+    stop: asyncio.Event | None = None,
 ) -> Step:
     """Claims through `process_next`, and each job's own policy picks its route.
 
@@ -271,7 +280,7 @@ def inference_step(
     """
     base = loop_config(store)
 
-    async def step(connection: Any) -> bool:
+    async def step(connection: CommittingConnection) -> bool:
         # A stop can land during the maintenance before this, and a paid job shouldn't start then.
         if stop is not None and stop.is_set():
             return False
@@ -283,7 +292,7 @@ def inference_step(
     return step
 
 
-def _unbound() -> Any:
+def _unbound() -> NoReturn:
     raise RuntimeError("the job's binder chooses its model")
 
 
@@ -294,7 +303,7 @@ def both(first: Step, second: Step) -> Step:
     Losing the database still reaches `serve`, which reconnects.
     """
 
-    async def step(connection: Any) -> bool:
+    async def step(connection: CommittingConnection) -> bool:
         try:
             worked = await first(connection)
         except psycopg.OperationalError:
@@ -310,7 +319,7 @@ def both(first: Step, second: Step) -> Step:
 def inference_from_environment(
     environ: Mapping[str, str],
     database_url: str,
-    store: Any,
+    store: PingableObjectStore | None,
     client_factory: Callable[[str], Any] | None,
     fetch_catalog: CatalogFetcher | None,
 ) -> InferenceSource:

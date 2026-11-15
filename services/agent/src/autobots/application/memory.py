@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.run_projection import public_text
+from autobots.application.sql import SqlConnection, all_rows, optional_row
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.memory import (
     OffloadContent,
@@ -21,6 +22,7 @@ from autobots.contracts.memory import (
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
+from autobots.persistence.rows import FileHitRow, MemoryHitRow, OffloadRow, ReplayProposalRow
 
 MAX_HITS = 10
 _HEADLINE = 'MaxFragments=2, MaxWords=25, MinWords=5, StartSel="", StopSel=""'
@@ -31,7 +33,7 @@ class MemoryRefused(Refusal):
 
 
 async def store_memory(
-    connection: Any,
+    connection: SqlConnection,
     *,
     workspace_id: UUID,
     actor_id: UUID,
@@ -57,7 +59,7 @@ async def store_memory(
 
 
 async def search(
-    connection: Any,
+    connection: SqlConnection,
     workspace_id: UUID,
     query: str,
     *,
@@ -89,8 +91,10 @@ async def search(
                     source={"kind": "proposal", "key": replay[1], "candidate_id": str(replay[0])},
                 )
             )
-    cursor = await connection.execute(
-        "select id, title, ts_headline('english', content, q, %s), source, created_at "
+    memories = await all_rows(
+        connection,
+        MemoryHitRow,
+        "select id, title, ts_headline('english', content, q, %s) as headline, source, created_at "
         "from public.memory_items, websearch_to_tsquery('english', %s) q "
         "where workspace_id = %s and search @@ q and retired_at is null "
         "and (not %s or expert_id is null or expert_id = %s) "
@@ -98,41 +102,47 @@ async def search(
         "order by ts_rank(search, q) desc limit %s",
         (_HEADLINE, query, workspace_id, for_run, expert_id, replaced, replaced, MAX_HITS),
     )
-    for row in await cursor.fetchall():
-        hits.append(
-            SearchHit(
-                kind="memory",
-                title=public_text(row[1]),
-                snippet=public_text(row[2]),
-                source={**row[3], "memory_id": str(row[0]), "stored_at": row[4].isoformat()},
-            )
-        )
+    hits += [memory_hit(row) for row in memories]
     # The workspace comes through the run, so a file in another workspace can't match.
-    cursor = await connection.execute(
+    files = await all_rows(
+        connection,
+        FileHitRow,
         "select f.run_id, f.path, f.version, f.sha256, "
-        "ts_headline('english', f.content, q, %s), f.created_at "
+        "ts_headline('english', f.content, q, %s) as headline, f.created_at "
         "from app_private.run_files f join public.runs r on r.id = f.run_id, "
         "websearch_to_tsquery('english', %s) q "
         "where r.workspace_id = %s and f.search @@ q and (%s::uuid is null or f.run_id = %s) "
         "order by ts_rank(f.search, q) desc limit %s",
         (_HEADLINE, query, workspace_id, run_id, run_id, MAX_HITS),
     )
-    for row in await cursor.fetchall():
-        hits.append(
-            SearchHit(
-                kind="evidence",
-                title=public_text(row[1]),
-                snippet=public_text(row[4]),
-                source={
-                    "run_id": str(row[0]),
-                    "path": row[1],
-                    "version": row[2],
-                    "sha256": row[3],
-                    "stored_at": row[5].isoformat(),
-                },
-            )
-        )
+    hits += [file_hit(row) for row in files]
     return hits
+
+
+def memory_hit(row: MemoryHitRow) -> SearchHit:
+    """A memory's title and matching passage, redacted, and where it came from."""
+    return SearchHit(
+        kind="memory",
+        title=public_text(row.title),
+        snippet=public_text(row.headline),
+        source={**row.source, "memory_id": str(row.id), "stored_at": row.created_at.isoformat()},
+    )
+
+
+def file_hit(row: FileHitRow) -> SearchHit:
+    """A run file's path and matching passage, redacted, and the version that matched."""
+    return SearchHit(
+        kind="evidence",
+        title=public_text(row.path),
+        snippet=public_text(row.headline),
+        source={
+            "run_id": str(row.run_id),
+            "path": row.path,
+            "version": row.version,
+            "sha256": row.sha256,
+            "stored_at": row.created_at.isoformat(),
+        },
+    )
 
 
 async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchResults:
@@ -142,14 +152,15 @@ async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchR
     )
     expert = await cursor.fetchone()
     # A run of a memory proposal's held-out replay finds the proposal in place of the active key.
-    cursor = await context.connection.execute(
+    replay = await optional_row(
+        context.connection,
+        ReplayProposalRow,
         "select c.id, c.key, c.content from app_private.improvement_replay_runs rr "
         "join app_private.improvement_replays r on r.id = rr.replay_id "
         "join public.improvement_candidates c on c.id = r.candidate_id "
         "where rr.run_id = %s and c.kind = 'memory'",
         (context.scope.run_id,),
     )
-    replay = await cursor.fetchone()
     hits = await search(
         context.connection,
         context.scope.workspace_id,
@@ -157,7 +168,7 @@ async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchR
         run_id=context.scope.run_id,
         expert_id=expert[0] if expert else None,
         for_run=True,
-        replay=(replay[0], replay[1], replay[2]) if replay else None,
+        replay=(replay.id, replay.key, replay.content) if replay else None,
     )
     return SearchResults(hits=hits)
 
@@ -167,20 +178,21 @@ async def _read_offload(arguments: ReadOffload, context: ToolContext) -> Offload
         offload_id = UUID(arguments.offload_id)
     except ValueError:
         raise ToolFailed("offload_not_found") from None
-    cursor = await context.connection.execute(
+    row = await optional_row(
+        context.connection,
+        OffloadRow,
         "select tool_name, content, sha256 from app_private.run_offloads "
         "where id = %s and run_id = %s",
         (offload_id, context.scope.run_id),
     )
-    row = await cursor.fetchone()
     if row is None:
         raise ToolFailed("offload_not_found")
-    content: str = row[1]
+    content = row.content
     end = arguments.offset + arguments.limit
     return OffloadContent(
-        tool_name=row[0],
+        tool_name=row.tool_name,
         content=content[arguments.offset : end],
-        sha256=row[2],
+        sha256=row.sha256,
         total_chars=len(content),
         next_offset=end if end < len(content) else None,
     )

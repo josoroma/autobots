@@ -25,6 +25,7 @@ from pydantic import SecretStr
 
 from autobots.application.provider_settings import ProviderContext, ProviderSettings
 from autobots.application.readiness import MalformedSetting
+from autobots.application.sql import SqlConnection
 from autobots.operations import composition
 from autobots.operations.cli import command, uuid_argument
 from autobots.operations.paid.keys import read_key
@@ -119,7 +120,7 @@ def http_client() -> httpx.AsyncClient:
 
 
 @asynccontextmanager
-async def runtime_connection(url: str) -> AsyncIterator[Database]:
+async def runtime_connection(url: str) -> AsyncIterator[SqlConnection]:
     async with await psycopg.AsyncConnection.connect(url, autocommit=True) as connection:
         yield connection
 

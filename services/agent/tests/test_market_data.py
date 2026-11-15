@@ -10,8 +10,9 @@ from autobots.adapters.market_data import market_tools
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
 from autobots.application.tool_gateway import Refused, resolve
 from autobots.domain.stops import GatewayCode
+from sql_fakes import ScriptedConnection
 
-CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
+CONTEXT = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
 DAY = 86_400
 START = 1_761_955_200  # 2025-11-01T00:00:00Z
 

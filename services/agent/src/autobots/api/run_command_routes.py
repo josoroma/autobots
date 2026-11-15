@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 
 from autobots.api.dependencies import CurrentUser, IdempotencyKey, MemberWorkspace, ModelKeyCheck
-from autobots.api.pool import request_pool
+from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.reconciliation import require_resumable
 from autobots.application.run_admission import require_model_ready
@@ -41,7 +41,7 @@ async def _command(
         schema_version=1,
         run_id=result.run_id,
         version=result.version,
-        status=result.status,  # type: ignore[arg-type]  # a str that pydantic validates against the field's Literal
+        status=result.status,
         changed=result.changed,
     )
 

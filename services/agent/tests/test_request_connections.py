@@ -14,6 +14,7 @@ from uuid import UUID
 import pytest
 
 from autobots.api.dependencies import require_ready
+from autobots.api.resources import resources_of
 from fake_api import OWNER, ApiClient, PooledMembership
 from fake_openrouter import provider_context
 
@@ -56,9 +57,10 @@ def most_held(log: list[str]) -> int:
 def client(api_client: ApiClient) -> Iterator[ApiClient]:
     """Readiness passes, membership borrows from the pool, and the workspace may use the
     installation's usable key."""
-    api_client.app.state.membership = PooledMembership(api_client.log, api_client.database)
+    resources = resources_of(api_client.app)
+    resources.membership = PooledMembership(api_client.log, api_client.database)
     api_client.app.dependency_overrides[require_ready] = lambda: None
-    api_client.app.state.provider_context = provider_context(
+    resources.provider_context = provider_context(
         environment={"OPENROUTER_API_KEY": "sk-or-fixture-installation-key"}
     )
     api_client.database.answer(GRANT, (1,))

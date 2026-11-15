@@ -11,6 +11,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.postgres.base import BasePostgresSaver
 from psycopg.rows import dict_row
 
+from autobots.application.sql import SqlConnection
 from autobots.application.worker_leases import Lease
 
 # Checkpoint before the next step begins, so a step never relies on progress that isn't saved.
@@ -47,7 +48,7 @@ def adapter_identity() -> tuple[str, str]:
     return version, identity_of(stack, BasePostgresSaver.MIGRATIONS, ADAPTER_STATEMENTS)
 
 
-async def adapter_qualified(connection: Any) -> bool:
+async def adapter_qualified(connection: SqlConnection) -> bool:
     """A framework release continues saved work only after a migration records its qualification."""
     _, fingerprint = adapter_identity()
     cursor = await connection.execute(
