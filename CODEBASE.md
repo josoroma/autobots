@@ -25,12 +25,12 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `services/agent/src/autobots/`: the Python service (`domain/`, `contracts/`, `application/`, `adapters/`, `api/`, `operations/`, `persistence/`).
   - `apps/web/`: Next.js (`app/`, `components/`, `lib/`).
   - `packages/api-client/src/runtime.ts`: the client runtime.
-  - SQL: `supabase/migrations/` (56 files), `supabase/seeds/`, `supabase/bootstrap/`.
+  - SQL: `supabase/migrations/` (62 files), `supabase/seeds/`, `supabase/bootstrap/`.
   - `infra/`: Compose files, the vendored Supabase release in `infra/supabase/upstream/`, and the browser executor images in `infra/browser/`.
 - **Generated:**
   - `contracts/generated/openapi.json`;
   - `packages/api-client/src/generated.ts`;
-  - `packages/db-types/src/generated.ts`;
+  - `packages/db-types/src/generated.ts` (the columns a member can select) and `supabase/schema.snapshot.sql` (a schema-only dump of the three app schemas, for reading, never applied), both written by `python3.12 scripts/app_db.py types` and drift-checked;
   - the backlog navigation in `SPECS.md`.
 - **Tests:**
   - `services/agent/tests/`: 40 `test_*.py` modules, plus `conftest.py` and `fake_openrouter.py`.
@@ -89,10 +89,10 @@ Layers under `services/agent/src/autobots/`:
   - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_overview.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`, `search.py`.
   - Local operations: `operations.py`, `retention.py`, `worker_leases.py`, `provider_settings.py`, `credentials/`.
 - **`adapters/`:**
-  - Dispatch: `loop_middleware.py`, `tool_middleware.py`, `model_replies.py` (a reply's charge, finish and retry facts).
+  - Dispatch: `loop_middleware.py` (the thin `AgentMiddleware`, `AdmittedModel` and streaming), `tool_middleware.py`, `model_replies.py` (a reply's charge, finish and retry facts). Since R-62, after the analyzed revision, the loop's policy is in `application/loop_policy.py` and `application/loop_admission.py` (`LoopAdmission`: the guard, slot wait, admitted call, late charge, compaction and tool-dispatch stops).
   - Storage and checkpoints: `checkpoints.py`, `object_storage.py`.
   - Live text: `result_stream.py`.
-  - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`.
+  - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_connector.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`. Since R-62, after the analyzed revision, every client comes from `provider_http.http_client` (no redirects, no proxy or certificate variables, a required named timeout), provider replies are read through lenient adapter-private models, refused statuses are one table per write class, and each provider is a frozen connector with module-level handlers.
   - Browser: `browser_executor.py`, `browser_cdp.py`, `browser_qualification.py` (the images' source fingerprint), `browser_page.py`, `egress_proxy.py`.
   - Models: `models/` (`catalog.py`, `factory.py`, `openrouter_metadata.py`).
 - **`api/`:** `app.py` (factory), `main.py` (configured entry), 14 route modules, `security.py`, `membership.py` and `errors.py`.
@@ -100,7 +100,7 @@ Layers under `services/agent/src/autobots/`:
   - Outside the schema (`include_in_schema=False`): artifact download and `/v1/runs/{id}/events/stream`.
 - **`operations/`:** `worker.py`, `logs.py`, `bootstrap_owner.py`, `route_qualification.py`, `reasoning_trial.py`, `browse_trial.py`, `concept_seed.py`, `fake_stream.py`, `live_key.py` (moved from `tests/db` after the analyzed revision).
 
-**The model path.** `goal_loop.py` builds the graph with `create_deep_agent` around `AdmittedModel`, which refuses any call outside an admitted dispatch. For each dispatch, `LoopMiddleware` (`adapters/loop_middleware.py`):
+**The model path.** `goal_loop.py` builds the graph with `create_deep_agent` around `AdmittedModel`, which refuses any call outside an admitted dispatch. For each dispatch, `LoopMiddleware` (`adapters/loop_middleware.py`, calling `application/loop_admission.py`):
 - rechecks ownership, parent status and active time;
 - consumes the root's `model_calls` limit;
 - bounds a call at 120 s and interrupts it on cancel;
@@ -117,6 +117,8 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - `builtin_default` gives `researcher` Sol while Sol is offered, and Terra otherwise.
 - A run dispatches through its `executor` binding.
 - A `summarizer` binding that differs pauses a run needing compaction with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)).
+
+**Transitions.** Since R-60, after the analyzed revision, `domain/runs.py` lists which actors may apply each run command (`ACTORS`), with a `system` actor for cascades and expiries (Decision 0029 F5), mirrored by the SP-010 table in the Option B contract. `application/runs.py` is the one surface: `apply_command` for people, `apply_worker_command` for a lease (its stop reason in the same transaction), `cascade_command` for the system and `apply_claim`, always locking the job row before the run row; `job_status_after` and `JobStatus` decide the job. `ModelAdmission` is the only writer of the invocation ledger, and admission, the run projection, the run list and the workflow overview share one spend fragment, admission's, with a child's own calls added to its view (F10).
 
 **Ownership.** `worker_leases.py` claims jobs by database time with a rising generation. Triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` and the lease keeper in `run_lifecycle.py` handle sleep and wake ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
 
@@ -153,7 +155,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 56 ordered files, from `20261105000001_workspaces.sql` to `20261115000056_approval_consumed.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, R-35's private `failed_attempts` and `last_failure_type` on `app_private.run_jobs`, and R-50's `approval_requests.consumed_at`, which makes an approval that releases a call leaving no receipt single-use, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 62 ordered files, from `20261105000001_workspaces.sql` to `20261115000062_sol_concurrent_admission_limit.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, R-35's private `failed_attempts` and `last_failure_type` on `app_private.run_jobs`, R-50's `approval_requests.consumed_at`, which makes an approval that releases a call leaving no receipt single-use, and R-56's run-lookup indexes, `app_private.run_is_terminal`, the draft graph's shape CHECK and four composite version foreign keys, validated by migration 61, and migration 62's caveat on Sol's qualified limits that concurrent admission was never tested (SQLI-12), after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|
@@ -172,7 +174,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 | 48 | `app_private.plan_task_times` |
 | 49 | `app_private.applied_migration_count()`, a security-definer function returning a count only, from `autobots_install.migrations` or `autobots_disposable.migrations` |
 
-- **Seeds and bootstrap:** `supabase/seeds/reference.sql` is the repeatable model reference, and `supabase/bootstrap/` holds roles and Storage policies. The concept Experts and workflows are not in any seed or migration.
+- **Seeds and bootstrap:** `supabase/seeds/reference.sql` is the repeatable model reference, and `supabase/bootstrap/` holds roles and Storage policies. Since R-56, after the analyzed revision, `storage.sql` and then the numbered bootstrap files are applied as superuser after the migrations and the seed, by `persistent_install.guarded_apply` and `app_db.apply_bootstrap` through one `app_db.bootstrap_plan`; each file gets a `bootstrap/<file>` row with its sha256 in the migration history, and an edited, missing or misnamed file is refused (`tests/harness/test_bootstrap_history.py`). `20261115000001_storage_members_read_only.sql` leaves members only the read policy on Storage objects and revokes anon's EXECUTE on `can_access_artifact` (Decision 0029 F3). The concept Experts and workflows are not in any seed or migration.
 - **Public tables:**
   - workspaces (with `timezone`), members, `user_profiles`;
   - runs, `run_events`, `artifacts`, `approval_requests`;
@@ -216,7 +218,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **Tavily** (`adapters/tavily.py`): `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl`. Read-only, metered, with Tavily's inference options off.
 - **Jina** (`adapters/jina.py`): `search_web`, `extract_website_content` (reader mode).
 - **Market data** (`adapters/market_data.py`): `market_history` (Yahoo chart endpoint over `httpx`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG`), both keyless.
-- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, revalidates up to 3 redirects, and caps size and time. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys, the GitHub pair and an exact `enabled` browsing switch from the repository's `.env` through `scripts/tool_keys_env.py`. Since US-14.18 the GitHub adapters resolve their repository and token the same way, per attempt (`adapters/github_issues.py` `attempt_target`). The gateway refuses an approved write whose target now resolves differently, `approval_target_changed`. The worker binds `browse_goal` only when the run's workspace resolves the switch to `enabled`.
+- **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, requests the address it checked (R-62), revalidates up to 3 redirects, and caps size and time; a test keeps its public-address rule equal to the egress proxy's. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys, the GitHub pair and an exact `enabled` browsing switch from the repository's `.env` through `scripts/tool_keys_env.py`. Since US-14.18 the GitHub adapters resolve their repository and token the same way, per attempt (`adapters/github_issues.py` `attempt_target`). The gateway refuses an approved write whose target now resolves differently, `approval_target_changed`. The worker binds `browse_goal` only when the run's workspace resolves the switch to `enabled`.
 - **Browser:** `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts and gates DevTools with a token. `browser_page.py` reads pages over CDP.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
@@ -262,9 +264,9 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - **Runs:**
   - `POST /v1/runs` admits atomically with idempotency receipts. It refuses with `503 not_ready`, when no key is usable, or for a budget outside `domain/budgets.py` or above the remaining daily cap.
   - `/v1/runs` returns the label, stop reason, plan progress, frozen profiles and ledger spend, with `group`, `q`, `profile` and keyset `cursor` filters and per-group counts.
-  - `run-panel.tsx` opens under the list at `?run=<id>`. Its commands send the version it loaded.
+  - `runs/panel/` opens under the list at `?run=<id>`. Its commands send the version it loaded.
   - `RunWorkspace` adds task markers, times from `plan_task_times`, wall seconds, used tools, `current_task_id`, and the metered-call count.
-  - The controls are pause, resume, cancel, owner reconciliation of a call's charge, and Continue (a linked new run). Terminal runs don't resume.
+  - The controls are pause, resume, cancel, owner reconciliation of a call's charge, and Continue (a linked new run). Terminal runs don't resume. Since R-49, after the analyzed revision, `RunWorkspace.allowed_commands` lists the commands `domain.next_status` lets a person send from the run's status, and the page offers only those; the run views are folders under `components/runs/` with their pure rules in `lib/runs/`, and the stream's frames are declared in `contracts/run_workspace.py` (`StreamFrame`, `StreamCursor`, `StreamGap`) and parsed in one module, `lib/runs/stream.ts`.
 - **Live result text:** while a run writes a result, the run view shows its text under Result until the published artifact replaces it. "Stream text as it's written" (`autobots.stream`) turns this off.
 - **Model choice:**
   - New work can choose Terra or Sol.
@@ -293,7 +295,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - A typed subset with immutable versions. A run binds to a version and hash, and emissions are insert-only.
   - IR v2 adds an optional node `label`, and `ir_normalized` keeps v1 hashes.
   - Optional description.
-  - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`.
+  - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`. Since R-56, after the analyzed revision, a draft that fails validation reads as absent with `draft_unreadable`, the list still loads, publishing it is refused, discard deletes it by key, and the editor says saving replaces it.
   - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
   - Executions accept a D11 budget.
 - **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `loop_prompts.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
@@ -426,9 +428,9 @@ Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering
 ## Evidence Paths
 
 - `services/agent/src/autobots/domain/models.py`: profiles, offered set, binding sources, output cap.
-- `services/agent/src/autobots/adapters/loop_middleware.py`, `application/goal_loop.py`, `application/model_attempts.py`: admitted, streamed calls.
+- `services/agent/src/autobots/adapters/loop_middleware.py`, `application/loop_admission.py`, `application/goal_loop.py`, `application/model_attempts.py`: admitted, streamed calls.
 - `services/agent/src/autobots/adapters/result_stream.py`, `api/event_routes.py`: NOTIFY tap and live SSE frames.
-- `services/agent/src/autobots/adapters/github_reads.py`, `github_issues.py`, `github_pulls.py`: GitHub tools.
+- `services/agent/src/autobots/adapters/github_connector.py`, `github_reads.py`, `github_issues.py`, `github_pulls.py`: GitHub tools.
 - `services/agent/src/autobots/adapters/tavily.py`, `jina.py`, `market_data.py`, `url_guard.py`, `browser_executor.py`, `egress_proxy.py`: other integrations.
 - `services/agent/src/autobots/application/operations.py`, `api/operation_routes.py`: readiness, values, jobs chart.
 - `services/agent/src/autobots/api/settings_routes.py:46–70`, `api/membership.py`, `apps/web/lib/bff.ts`: workspace and owner resolution.
@@ -436,7 +438,7 @@ Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering
 - `services/agent/src/autobots/application/search.py`, `domain/budgets.py`, `domain/workflows.py`: search, budgets, workflow IR.
 - `supabase/migrations/20261107000036_…` to `20261108000049_applied_migration_count.sql`: schema since the last refresh.
 - `contracts/generated/openapi.json`: 66 `/v1` paths.
-- `apps/web/components/` (`search/`, `new-run.tsx`, `waiting-notifier.tsx`, `operations/jobs-chart.tsx`, `run-panel.tsx`, `settings-nav.tsx`, `sidebar-nav.tsx`, `appearance-control.tsx`), `apps/web/app/layout.tsx`, `apps/web/app/globals.css`: Studio surfaces.
+- `apps/web/components/` (`search/`, `new-run.tsx`, `waiting-notifier.tsx`, `operations/jobs-chart.tsx`, `runs/`, `settings-nav.tsx`, `sidebar-nav.tsx`, `appearance-control.tsx`), `apps/web/app/layout.tsx`, `apps/web/app/globals.css`: Studio surfaces.
 - `scripts/verify.py`, `scripts/qualify_identity.py:276–335`, `scripts/qualify_web.py:169`, `scripts/harness_lib.py`: verifier and browser-spec mapping.
 - `openspec/changes/archive/2026-11-07-us-14-*/`, `2026-11-08-us-15-*/verification.md`: per-story records (pointers only).
 - `docs/engineering/decisions/0019-sol-profile-and-browser-use.md`, `0022-studio-product-surfaces.md`: paid authority, Studio scope.
