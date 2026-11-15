@@ -273,13 +273,13 @@ async def run_workflow(
     model: Any,
     config: LoopConfig,
     *,
-    drive: Drive | None = None,
+    drive: Drive,
     after_commit: Callable[[Step], None] = lambda _: None,
 ) -> LoopResult:
     """Runs what can move until nothing can, then finishes the run through `finish` or
-    `complete_workflow`. `drive` is how an agent step's child is driven: the goal loop passes its
-    own. Without one no assignment tool is registered, so an agent step fails with
-    `tool_not_registered`."""
+    `complete_workflow`. `drive` is how an agent step's child is driven, and the goal loop passes
+    its own. It is required, so no caller can leave an agent step without one and fail its run for
+    good (SP-010)."""
     cursor = await connection.execute(
         "select e.id, e.inputs, v.graph from public.workflow_executions e "
         "join public.workflow_versions v on v.workflow_id = e.workflow_id "
@@ -301,14 +301,10 @@ async def run_workflow(
         tuple(goal.allowed_paths),
     )
 
-    delegation: Delegation | None = None
-    if drive is not None:
-        driver = drive
+    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+        return await drive(child_connection, database_url, child_lease, lambda: model, config)
 
-        async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
-            return await driver(child_connection, database_url, child_lease, lambda: model, config)
-
-        delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
+    delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
     registry = loop_registry(
         config.limits, config.object_store, delegation, (*config.tools, APPROVAL_GATE)
     )

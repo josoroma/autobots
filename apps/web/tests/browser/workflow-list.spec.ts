@@ -102,8 +102,10 @@ test("the preview's version switch shows each version's steps in order", async (
   await expect(research.locator('[data-field="step-expert"]')).toHaveText(
     "Research analyst",
   );
+  // The step's child run inherits the workflow run's policy, so the preview shows that model, not
+  // the step Expert's own binding (Decision 0028 E6).
   await expect(research.locator('[data-field="step-model"]')).toHaveText(
-    "openai/gpt-6.1-sol-20260929",
+    "openai/gpt-6.1-terra-20261026",
   );
   await expect(research.locator('[data-field="step-tools"]')).toHaveText(
     "calculate, read_csv",

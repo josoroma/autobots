@@ -25,7 +25,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `services/agent/src/autobots/`: the Python service (`domain/`, `contracts/`, `application/`, `adapters/`, `api/`, `operations/`, `persistence/`).
   - `apps/web/`: Next.js (`app/`, `components/`, `lib/`).
   - `packages/api-client/src/runtime.ts`: the client runtime.
-  - SQL: `supabase/migrations/` (49 files), `supabase/seeds/`, `supabase/bootstrap/`.
+  - SQL: `supabase/migrations/` (55 files), `supabase/seeds/`, `supabase/bootstrap/`.
   - `infra/`: Compose files, the vendored Supabase release in `infra/supabase/upstream/`, and the browser executor images in `infra/browser/`.
 - **Generated:**
   - `contracts/generated/openapi.json`;
@@ -36,7 +36,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `services/agent/tests/`: 40 `test_*.py` modules, plus `conftest.py` and `fake_openrouter.py`.
   - `apps/web/tests/`: 38 browser specs and 2 unit tests.
   - `tests/db/`: disposable-stack checks and their workers.
-  - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`.
+  - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `tests/db/checklib.py` holds the database checks' shared case protocol, and `scripts/qualification/` the qualifiers' one child-check runner and typed records; `scripts/paid_run.py` is the one paid-run session (after the analyzed revision).
   - `contracts/fixtures/`: shared cases.
 - **Tooling:** `scripts/` (27 tracked files), `Makefile` (wraps the persistent install), and `.claude/` (7 agents, 13 skills, 9 rules, `hooks/dispatch.py`, `settings.json`, `ohmyorch/`).
 - **Operator guides:** `README-SETUP-RUN.md` (set up, start, stop) and `README-QA.md` (runtime Q&A, which describes revision `ecb34900e46c`).
@@ -79,16 +79,17 @@ Layers under `services/agent/src/autobots/`:
   - `budgets.py`: US$0.25–US$5.00 in US$0.25 steps.
   - Also `runs.py`, `tools.py`, `tool_catalog.py`, `workflows.py` (`ir_normalized`), `workflow_execution.py`, `routines.py`, `execution.py`.
   - `secret_patterns.py`, added after the analyzed revision: the secret shapes that both log redaction and shown text (`public_text`) mask.
+  - Added by the R-21 to R-40 refactors, after the analyzed revision: `stops.py` (the stop-code vocabulary and each code's disposition), `repetition.py` (rate-limited logging), and `ModelRoute` in `models.py`.
 - **`contracts/`:** the public Pydantic DTOs, which are the source of OpenAPI. Row helpers are in `persistence/rows.py`.
 - **`application/`:**
-  - Admission: `runs.py`.
-  - Goal loop: `goal_loop.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`.
+  - Admission: `runs.py` (typed `RunAdmission`), `run_admission.py` (the request's use case and the gate for model-backed work), `readiness.py` (one installation gate for people and routines).
+  - Goal loop: `goal_loop.py`, `run_lifecycle.py` (how a pass ends, the lease keeper and bounded worker failures), `loop_tools.py`, `plans.py`, `run_usage.py`, `verification.py`, `recovery.py`, `compaction.py`, `bounded.py` (a child interpreter a timeout can stop, and `stop_task`).
   - Model spend: `model_admission.py`, `model_attempts.py`, `worker_inference.py`, `profiles.py`.
   - Tools: `tool_gateway.py`, `tools.py`, `tool_catalog.py`, `tool_grants.py`, `tool_uses.py`, `code_tools.py`, `browsing_loop.py`, `browsing_tool.py`, `reconciliation.py`, `approvals.py`.
   - Product surfaces: `experts.py`, `assignments.py`, `workflows.py`, `workflow_overview.py`, `workflow_runner.py`, `routines.py`, `memory.py`, `improvements.py`, `artifacts.py`, `run_projection.py`, `search.py`.
   - Local operations: `operations.py`, `retention.py`, `worker_leases.py`, `provider_settings.py`, `credentials/`.
 - **`adapters/`:**
-  - Dispatch: `loop_middleware.py`, `tool_middleware.py`.
+  - Dispatch: `loop_middleware.py`, `tool_middleware.py`, `model_replies.py` (a reply's charge, finish and retry facts).
   - Storage and checkpoints: `checkpoints.py`, `object_storage.py`.
   - Live text: `result_stream.py`.
   - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`.
@@ -97,7 +98,7 @@ Layers under `services/agent/src/autobots/`:
 - **`api/`:** `app.py` (factory), `main.py` (configured entry), 14 route modules, `security.py`, `membership.py` and `errors.py`.
   - `contracts/generated/openapi.json` lists 66 paths under `/v1`.
   - Outside the schema (`include_in_schema=False`): artifact download and `/v1/runs/{id}/events/stream`.
-- **`operations/`:** `worker.py`, `logs.py`, `bootstrap_owner.py`, `route_qualification.py`, `reasoning_trial.py`, `browse_trial.py`, `concept_seed.py`, `fake_stream.py`.
+- **`operations/`:** `worker.py`, `logs.py`, `bootstrap_owner.py`, `route_qualification.py`, `reasoning_trial.py`, `browse_trial.py`, `concept_seed.py`, `fake_stream.py`, `live_key.py` (moved from `tests/db` after the analyzed revision).
 
 **The model path.** `goal_loop.py` builds the graph with `create_deep_agent` around `AdmittedModel`, which refuses any call outside an admitted dispatch. For each dispatch, `LoopMiddleware` (`adapters/loop_middleware.py`):
 - rechecks ownership, parent status and active time;
@@ -117,7 +118,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - A run dispatches through its `executor` binding.
 - A `summarizer` binding that differs pauses a run needing compaction with `route_not_bound` ([Decision 0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md)).
 
-**Ownership.** `worker_leases.py` claims jobs by database time with a rising generation. Triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` and `goal_loop._keep_lease` handle sleep and wake ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
+**Ownership.** `worker_leases.py` claims jobs by database time with a rising generation. Triggers from `20261105000008_worker_ownership.sql` refuse checkpoint writes from any other generation. `WakeClock` and the lease keeper in `run_lifecycle.py` handle sleep and wake ([US-12.5](docs/engineering/evidence/US-12.5/summary.md)).
 
 **Live result text.** `goal_loop.py:350` creates a per-run `ResultTap` (`adapters/result_stream.py`).
 - It reads only the growing `content` of `save_artifact` calls whose path is under `outputs/`.
@@ -185,7 +186,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - credentials, policies, spend limits, idempotency receipts;
   - heartbeats, retention, `installation_holds`.
 - **`agent_runtime`:** LangGraph checkpoints, `adapter_qualifications`, `route_qualifications`.
-- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 53), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
+- **Schema readiness:** `application/operations.py` checks `REQUIRED_RELATIONS` and `REQUIRED_COLUMNS` (through migration 55), and compares `app_private.applied_migration_count()` with `SHIPPED_MIGRATIONS` in `application/schema_release.py`: fewer is `schema_behind` and blocks, more is `schema_ahead`, degraded and not blocking. A harness test (`tests/harness/test_app_db.py`) and `services/agent/tests/test_schema_release.py` fail unless that record matches `supabase/migrations`. Operations shows "N of M migrations applied" (`lib/schema-value.ts`). Changed by US-16.2, after the analyzed revision.
 - **Install-only schema:** `autobots_install` holds the install's identity and applied-migration digests (`scripts/persistent_install.py`).
 - **Ephemeral channel:** Postgres `NOTIFY autobots_result_text`. Nothing is stored.
 - **Objects and files:**

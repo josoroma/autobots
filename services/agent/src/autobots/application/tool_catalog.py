@@ -10,7 +10,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Literal, cast
 
 from autobots.application.assignments import Delegation
-from autobots.application.goal_loop import loop_registry
+from autobots.application.loop_tools import loop_registry
 from autobots.application.run_usage import RootLimits
 from autobots.application.tool_gateway import ToolDefinition, ToolRegistry
 from autobots.application.workflow_runner import APPROVAL_GATE

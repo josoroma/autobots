@@ -290,6 +290,10 @@ def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
         commands.append((command, code))
         return code, RunStatus.CANCELLED.value
 
+    async def holds(connection: object, lease: object) -> bool:
+        return True
+
+    monkeypatch.setattr(run_lifecycle, "_holds_live_lease", holds)
     monkeypatch.setattr(run_lifecycle, "_settle", settle)
     monkeypatch.setattr(run_lifecycle, "_transition", transition)
     failure = asyncio.run(record_failure(database, LEASE, ArrangedDefect()))
@@ -299,6 +303,30 @@ def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
         assert commands == []
     else:
         assert commands == [(RunCommand.FINISH_CANCEL, StopCode.CANCELLED)]
+
+
+@pytest.mark.parametrize("arranged", ["lapsed_lease", "settlement_fails"])
+def test_a_cancelling_run_that_cant_settle_at_the_bound_retries_after_the_longest_backoff(
+    monkeypatch: pytest.MonkeyPatch, arranged: str
+) -> None:
+    """Only a live lease settles, as finish requires; a settlement that itself fails is logged and
+    the job released after 60 s instead of staying claimed (SP-010, SP-012)."""
+    database = Database(job=Job(failed_attempts=2), run_status=RunStatus.CANCELLING)
+    settles: list[object] = []
+
+    async def holds(connection: object, lease: object) -> bool:
+        return arranged != "lapsed_lease"
+
+    async def settle(connection: object, lease: object) -> str | None:
+        settles.append(lease)
+        raise ArrangedDefect()
+
+    monkeypatch.setattr(run_lifecycle, "_holds_live_lease", holds)
+    monkeypatch.setattr(run_lifecycle, "_settle", settle)
+    failure = asyncio.run(record_failure(database, LEASE, ArrangedDefect()))
+    assert failure == PassFailure(FailureEnding.RETRY, 3, RETRY_DELAYS_SECONDS[-1])
+    assert (database.job.status, database.job.delay) == ("queued", 60.0)
+    assert settles == ([] if arranged == "lapsed_lease" else [LEASE])
 
 
 def test_every_job_write_keeps_the_generation_fence_in_one_transaction(

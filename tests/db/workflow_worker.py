@@ -9,7 +9,7 @@ import sys
 import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig
+from autobots.application.goal_loop import LoopConfig, drive_lease
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_runner import run_workflow
 from pydantic import SecretStr
@@ -29,7 +29,7 @@ async def main() -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         lease = await claim_next(db, worker_id='dying', lease_seconds=60)
         assert lease is not None
-        await run_workflow(db, URL, lease, None, config, after_commit=die_after)
+        await run_workflow(db, URL, lease, None, config, drive=drive_lease, after_commit=die_after)
 
 
 asyncio.run(main())

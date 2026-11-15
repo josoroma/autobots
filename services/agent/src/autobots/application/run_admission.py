@@ -3,7 +3,8 @@ passes first (refactor plan R-31, PAPI-02, PAPI-04, PPRD-09 and XDUP-08).
 
 `admit_from_request` runs a request's nine steps in a fixed order, and the first refusal is the
 answer. Only the last step writes anything, so a refused request leaves nothing behind. Admission
-records intent, and a worker executes it (PRD-Development-Harness DH-06).
+records intent, the run, its job and first event in one transaction, and a worker that claims the
+job executes it (option-b-contract SP-012).
 
 The gate is `require_model_ready`, `workspace_role_policy` with its offered check, `chosen_limit`
 and `require_tools_available`, and `expert_overrides` turns an Expert's bindings into run
@@ -41,7 +42,7 @@ CredentialCheck = Callable[[UUID], Awaitable[str]]
 
 
 class Rows(Protocol):
-    # Rows stay untyped until the SQL boundary is typed (R-54).
+    # A row's columns are whatever its query selects, so they stay untyped here.
     async def fetchone(self) -> tuple[Any, ...] | None: ...
 
 

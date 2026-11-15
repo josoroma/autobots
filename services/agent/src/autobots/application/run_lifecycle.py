@@ -554,17 +554,46 @@ async def _settle_at_bound(
     connection: Connection, lease: Lease, failure: PassFailure
 ) -> PassFailure:
     """Settles the cancellation of a run that reached the bound while being cancelled, as `finish`
-    does: children first, then what is in flight, then FINISH_CANCEL (SP-010). A child still owned
-    elsewhere requeues the job until it settles; a refused or lost transition retries later."""
-    code = await _settle(connection, lease)
-    if code is None:
-        return PassFailure(FailureEnding.RETRY, failure.attempt)
-    _, reached = await _transition(connection, lease, RunCommand.FINISH_CANCEL, code)
+    does: children first, then what is in flight, then FINISH_CANCEL (SP-010). Only a live lease
+    settles, as `finish` requires, since classifying moves this run's in-flight calls whatever their
+    generation. A child still owned elsewhere requeues the job until it settles.
+
+    A lapsed lease, a refused or lost transition, or a settlement that itself fails releases the
+    job after the longest backoff. A run whose settlement keeps failing stays cancelling, retried at
+    that backoff and logged each time, since SP-010 forbids FINISH_CANCEL without classification."""
+    retry = PassFailure(FailureEnding.RETRY, failure.attempt, RETRY_DELAYS_SECONDS[-1])
+    if not await _holds_live_lease(connection, lease):
+        await release(connection, lease, RETRY_DELAYS_SECONDS[-1])
+        return retry
+    try:
+        code = await _settle(connection, lease)
+        if code is None:
+            return PassFailure(FailureEnding.RETRY, failure.attempt)
+        _, reached = await _transition(connection, lease, RunCommand.FINISH_CANCEL, code)
+    except Exception as error:  # noqa: BLE001 - a failed settlement is logged and retried after the longest backoff instead of holding the job claimed
+        logger.log(
+            logging.ERROR,
+            "run.settle_failed",
+            extra={"fields": {"run": str(lease.run_id), "error": error}},
+        )
+        await release(connection, lease, RETRY_DELAYS_SECONDS[-1])
+        return retry
     if reached is not None:
         return failure
-    delay = RETRY_DELAYS_SECONDS[-1]
-    await release(connection, lease, delay)
-    return PassFailure(FailureEnding.RETRY, failure.attempt, delay)
+    await release(connection, lease, RETRY_DELAYS_SECONDS[-1])
+    return retry
+
+
+async def _holds_live_lease(connection: Connection, lease: Lease) -> bool:
+    """Whether this generation still holds a claimed job whose lease is live by database time, as
+    `observe` reads ownership (SP-012)."""
+    held = await _row(
+        connection,
+        "select exists (select 1 from app_private.run_jobs where run_id = %s and generation = %s "
+        "and status = 'claimed' and lease_expires_at > clock_timestamp())",
+        (lease.run_id, lease.generation),
+    )
+    return bool(held[0])
 
 
 async def record_failure(connection: Connection, lease: Lease, error: Exception) -> PassFailure:

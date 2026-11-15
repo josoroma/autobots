@@ -15,7 +15,7 @@ from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application import workflow_runner
 from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import process_next
+from autobots.application.goal_loop import drive_lease, process_next
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import apply_command
@@ -159,7 +159,7 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='stale', lease_seconds=60)
         await db.execute("update app_private.run_jobs set generation = generation + 1 where run_id = %s", (execution.run_id,))
         from autobots.application.workflow_runner import run_workflow
-        result = await run_workflow(db, URL, lease, None, config)
+        result = await run_workflow(db, URL, lease, None, config, drive=drive_lease)
         rows = await value('select count(*) from public.workflow_node_instances where execution_id = %s', execution.id)
         check('a stale worker commits nothing', 'lost, 0 instances', (result.outcome, rows), result.outcome == 'lost' and rows == 0)
 
@@ -230,17 +230,22 @@ async def main() -> None:
         run = execution.run_id
         real_command = workflow_runner.apply_command
 
+        # A process that dies runs no handler, so the death is a BaseException the worker's failure
+        # record (Decision 0028 E4) doesn't catch: the job stays claimed until its lease lapses.
+        class WorkerDied(BaseException):
+            pass
+
         async def dies_after_verify(*arguments: Any, **options: Any) -> Any:
             result = await real_command(*arguments, **options)
             if options.get('command') is RunCommand.VERIFY:
-                raise RuntimeError('the worker died here')
+                raise WorkerDied('the worker died here')
             return result
 
         workflow_runner.apply_command = dies_after_verify
         try:
             await advance()
             died = False
-        except RuntimeError:
+        except WorkerDied:
             died = True
         finally:
             workflow_runner.apply_command = real_command
