@@ -28,14 +28,17 @@ from disposable_db import (
     Unavailable,
     free_port,
     other_resources,
+    record_cleanup,
     remove_stack,
     require_identity,
     run,
     tool_env,
 )
 from harness_lib import fingerprint, project_root
-from qualify_identity import PYTHON, bootstrap_owner, password_token
-from qualify_operations import Checks, Ops, api_call, conditions, exited, wait
+from qualification.children import CHECK_PYTHON as PYTHON
+from qualification.ops import Ops, api_call, conditions, exited, wait
+from qualification.owners import bootstrap_owner, password_token
+from qualification.records import Cases
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/worker-inference/qualification.json')
@@ -86,7 +89,7 @@ def qualify(root: Path) -> int:
         raise Unavailable('the Docker engine is not reachable')
     (root / REPORT).unlink(missing_ok=True)
     require_images(require_rendered(stack))
-    cases = Checks()
+    cases = Cases()
     input_fingerprint = fingerprint(root)
     before = other_resources(project)
     started_at = time.monotonic()
@@ -461,10 +464,8 @@ def qualify(root: Path) -> int:
         ops.stop_all()
         remove_stack(stack)
         subprocess.run(['rm', '-rf', str(config_root)], check=False)
-    label = f'label=com.docker.compose.project={project}'
-    left = (run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout
-            + run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
+    # A listing that fails raises Unavailable, rather than reading as nothing left (SCRP-07).
+    record_cleanup(cases, project)
     after = other_resources(project)
     changed = sorted(set(before) ^ set(after))
     cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after, changed {changed[:8]}', before == after)

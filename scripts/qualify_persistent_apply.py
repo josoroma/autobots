@@ -9,31 +9,30 @@ from __future__ import annotations
 
 import hashlib
 import json
-import secrets
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
-from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import BOOTSTRAP_ROW, MIGRATIONS, STORAGE_POLICIES, AppStack, bootstrap_files
+from app_db import (
+    BOOTSTRAP_ROW,
+    MIGRATIONS,
+    STORAGE_POLICIES,
+    AppStack,
+    app_project,
+    bootstrap_files,
+)
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
     Refused,
-    Target,
     Unavailable,
     free_port,
-    other_resources,
-    remove_stack,
-    require_identity,
     rows,
-    run,
     tool_env,
 )
-from harness_lib import fingerprint, project_root
+from harness_lib import project_root
 from persistent_install import (
     STORAGE_SQL,
     Record,
@@ -42,7 +41,7 @@ from persistent_install import (
     read_record,
     write_install,
 )
-from supabase_stack import generated_values, require_images, require_rendered
+from qualification.report import finish
 
 REPORT = Path('.checks/persistent-apply/qualification.json')
 PYTHON = Path('services/agent/.venv/bin/python')
@@ -101,112 +100,93 @@ def cli_cases(root: Path, cases: Cases, work: Path, used: list[int]) -> None:
 
 
 def qualify(root: Path) -> int:
-    project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
-    gateway_port = free_port()
-    db_port = free_port([gateway_port])
-    target = Target(project, db_port, gateway_port)
-    stack = AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', values=generated_values(gateway_port, db_port))
-    stack.migrator_password, stack.runtime_password = secrets.token_hex(24), secrets.token_hex(24)
-    require_identity(target, tool_env())
-    if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
-        raise Unavailable('the Docker engine is not reachable')
-    require_images(require_rendered(stack))
-    (root / REPORT).unlink(missing_ok=True)
     cases = Cases()
-    before_resources = other_resources(project)
-    started_at = time.monotonic()
-    work = Path(tempfile.mkdtemp(prefix='autobots-apply-'))
-    record = Record(project, 'arranged-install-id', gateway_port, db_port, 1, 2, work)
-    try:
-        up = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300)
-        if up.returncode:
-            raise Unavailable(f'the stack did not start: {up.stderr[-300:]}')
-
-        def attempt(requested: str = project, stored: Record = record, expected: str = 'disposable', folder: Path | None = None) -> dict:
-            return guarded_apply(stack, root, stored, requested, expected, directory=folder)
-
+    with app_project(root, cases, report=root / REPORT) as app:
+        work = Path(tempfile.mkdtemp(prefix='autobots-apply-'))
         try:
-            attempt()
-            cases.check('a database with no identity row is refused', 'refused', 'not refused', False)
-        except Refused as refusal:
-            cases.check('a database with no identity row is refused', 'refused', str(refusal)[:160], 'no identity row' in str(refusal))
-        first_setup(stack, root, record, project, 'disposable')
-        written = rows(stack, 'select install_id from autobots_install.identity;')
-        cases.check('setup writes the identity row', record.install_id, written, written == record.install_id)
-        try:
-            first_setup(stack, root, record, project, 'disposable')
-            cases.check('setup never runs twice', 'refused', 'not refused', False)
-        except Refused as refusal:
-            cases.check('setup never runs twice', 'refused', str(refusal)[:160], 'already holds' in str(refusal))
-
-        applied = attempt()
-        names = sorted(path.name for path in (root / MIGRATIONS).glob('*.sql'))
-        cases.check('the normal path applies every migration in order, each with a history row', f'{len(names)} applied', str(len(applied['applied'])), applied['applied'] == names)
-        # R-56 (SQLI-07): then every bootstrap file as the superuser, storage.sql first, on this target's real Storage.
-        bootstrapped = [BOOTSTRAP_ROW + path.name for path in bootstrap_files(root)]
-        cases.check('the normal path then applies every bootstrap file, storage.sql first', ', '.join(bootstrapped), str(applied['bootstrap_applied']),
-                    applied['bootstrap_applied'] == bootstrapped)
-        again = attempt()
-        cases.check('a second apply has nothing pending', '0 applied, 0 bootstrap files', f"{len(again['applied'])} applied, {again['bootstrap_applied']}",
-                    again['applied'] == [] and again['bootstrap_applied'] == [] and again['already_applied'] == len(names))
-        policies = rows(stack, STORAGE_POLICIES)
-        cases.check('afterwards members hold only the read policy on Storage objects (Decision 0029 F3)', 'artifact_read:SELECT', policies,
-                    policies == 'artifact_read:SELECT')
-        reading = stack.runtime('select count(*) from autobots_install.identity;')
-        cases.check('the runtime role cannot read the install schema', 'refused', str(reading.returncode), reading.returncode != 0)
-        writing = stack.migrator("insert into autobots_install.identity values ('x', 'x');")
-        cases.check('the migration role cannot change the identity', 'refused', str(writing.returncode), writing.returncode != 0)
-
-        refused(cases, 'another project is refused', lambda: attempt('supabase_db_finance'), stack, 'is not the recorded install')
-        refused(cases, 'another install id is refused', lambda: attempt(stored=Record(project, 'another-id', gateway_port, db_port, 1, 2, work)), stack, 'no identity row')
-        refused(cases, 'a record naming another port is refused', lambda: attempt(stored=Record(project, record.install_id, gateway_port, 1, 1, 2, work)), stack, 'publishes its database')
-        refused(cases, 'a disposable target is refused on the real path', lambda: attempt(expected='persistent'), stack, 'labelled disposable')
-        refused(cases, 'a target with no hold is refused as a restored copy', lambda: guarded_apply(stack, root, record, project, restored_copy=True), stack, 'restore hold')
-        refused(cases, 'a real project is refused as a restored copy', lambda: guarded_apply(stack, root, record, 'autobots-install', restored_copy=True), stack, f'always {PROJECT_PREFIX}')
-        refused(cases, 'first setup refuses a record naming another port', lambda: first_setup(stack, root, Record(project, record.install_id, gateway_port, 1, 1, 2, work), project, 'disposable'), stack, 'publishes its database')
-        # The install's own schema refuses the migrator, so this uses the owner's connection, as setup does.
-        changed = stack.sql("update autobots_install.migrations set sha256 = 'arranged' where name = 'bootstrap/storage.sql' returning sha256;")
-        if changed.returncode or 'arranged' not in changed.stdout:
-            raise Unavailable('could not arrange a changed storage record')
-        real_digest = hashlib.sha256((root / STORAGE_SQL).read_bytes()).hexdigest()
-        try:
-            refused(cases, 'a changed storage file is refused', lambda: attempt(), stack, 'changed after it was applied')
+            apply_cases(root, cases, app.stack, app.gateway_port, app.db_port, work)
         finally:
-            stack.sql(f"update autobots_install.migrations set sha256 = '{real_digest}' where name = 'bootstrap/storage.sql';")
-        edited = migration_copy(root, work / 'edited')
-        first = sorted(edited.glob('*.sql'))[0]
-        first.write_text(first.read_text() + '\n-- edited\n')
-        refused(cases, 'an edited applied migration is refused', lambda: attempt(folder=edited), stack, 'never edit an applied migration')
-        older = migration_copy(root, work / 'older')
-        sorted(older.glob('*.sql'))[-1].unlink()
-        refused(cases, 'an older checkout missing an applied migration is refused', lambda: attempt(folder=older), stack, 'not in this checkout')
-        pending = migration_copy(root, work / 'pending')
-        (pending / 'bad-name.sql').write_text('select 1;\n')
-        refused(cases, 'a badly named file is refused before anything applies', lambda: attempt(folder=pending), stack, 'is not named')
-        (pending / 'bad-name.sql').unlink()
-        (pending / '20991231000001_breaks.sql').write_text('create table public.half_done (id int);\nselect no_such_function();\n')
-        before = rows(stack, STATE)
-        try:
-            attempt(folder=pending)
-            cases.check('a failing migration rolls back whole', 'reported', 'not reported', False)
-        except Unavailable as problem:
-            cases.check('a failing migration rolls back whole', 'reported, nothing changed', f'{str(problem)[:120]}, {before} then {rows(stack, STATE)}', rows(stack, STATE) == before and '20991231000001' in str(problem))
-        cli_cases(root, cases, work, [gateway_port, db_port])
+            shutil.rmtree(work, ignore_errors=True)
+    return finish(root, root / REPORT, 'autobots.persistent-apply/v1', cases, app.started_at, ['the real install', 'H1', 'product acceptance'])
+
+
+def apply_cases(root: Path, cases: Cases, stack: AppStack, gateway_port: int, db_port: int, work: Path) -> None:
+    project = stack.target.project
+    record = Record(project, 'arranged-install-id', gateway_port, db_port, 1, 2, work)
+    up = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300)
+    if up.returncode:
+        raise Unavailable(f'the stack did not start: {up.stderr[-300:]}')
+
+    def attempt(requested: str = project, stored: Record = record, expected: str = 'disposable', folder: Path | None = None) -> dict:
+        return guarded_apply(stack, root, stored, requested, expected, directory=folder)
+
+    try:
+        attempt()
+        cases.check('a database with no identity row is refused', 'refused', 'not refused', False)
+    except Refused as refusal:
+        cases.check('a database with no identity row is refused', 'refused', str(refusal)[:160], 'no identity row' in str(refusal))
+    first_setup(stack, root, record, project, 'disposable')
+    written = rows(stack, 'select install_id from autobots_install.identity;')
+    cases.check('setup writes the identity row', record.install_id, written, written == record.install_id)
+    try:
+        first_setup(stack, root, record, project, 'disposable')
+        cases.check('setup never runs twice', 'refused', 'not refused', False)
+    except Refused as refusal:
+        cases.check('setup never runs twice', 'refused', str(refusal)[:160], 'already holds' in str(refusal))
+
+    applied = attempt()
+    names = sorted(path.name for path in (root / MIGRATIONS).glob('*.sql'))
+    cases.check('the normal path applies every migration in order, each with a history row', f'{len(names)} applied', str(len(applied['applied'])), applied['applied'] == names)
+    # R-56 (SQLI-07): then every bootstrap file as the superuser, storage.sql first, on this target's real Storage.
+    bootstrapped = [BOOTSTRAP_ROW + path.name for path in bootstrap_files(root)]
+    cases.check('the normal path then applies every bootstrap file, storage.sql first', ', '.join(bootstrapped), str(applied['bootstrap_applied']),
+                applied['bootstrap_applied'] == bootstrapped)
+    again = attempt()
+    cases.check('a second apply has nothing pending', '0 applied, 0 bootstrap files', f"{len(again['applied'])} applied, {again['bootstrap_applied']}",
+                again['applied'] == [] and again['bootstrap_applied'] == [] and again['already_applied'] == len(names))
+    policies = rows(stack, STORAGE_POLICIES)
+    cases.check('afterwards members hold only the read policy on Storage objects (Decision 0029 F3)', 'artifact_read:SELECT', policies,
+                policies == 'artifact_read:SELECT')
+    reading = stack.runtime('select count(*) from autobots_install.identity;')
+    cases.check('the runtime role cannot read the install schema', 'refused', str(reading.returncode), reading.returncode != 0)
+    writing = stack.migrator("insert into autobots_install.identity values ('x', 'x');")
+    cases.check('the migration role cannot change the identity', 'refused', str(writing.returncode), writing.returncode != 0)
+
+    refused(cases, 'another project is refused', lambda: attempt('supabase_db_finance'), stack, 'is not the recorded install')
+    refused(cases, 'another install id is refused', lambda: attempt(stored=Record(project, 'another-id', gateway_port, db_port, 1, 2, work)), stack, 'no identity row')
+    refused(cases, 'a record naming another port is refused', lambda: attempt(stored=Record(project, record.install_id, gateway_port, 1, 1, 2, work)), stack, 'publishes its database')
+    refused(cases, 'a disposable target is refused on the real path', lambda: attempt(expected='persistent'), stack, 'labelled disposable')
+    refused(cases, 'a target with no hold is refused as a restored copy', lambda: guarded_apply(stack, root, record, project, restored_copy=True), stack, 'restore hold')
+    refused(cases, 'a real project is refused as a restored copy', lambda: guarded_apply(stack, root, record, 'autobots-install', restored_copy=True), stack, f'always {PROJECT_PREFIX}')
+    refused(cases, 'first setup refuses a record naming another port', lambda: first_setup(stack, root, Record(project, record.install_id, gateway_port, 1, 1, 2, work), project, 'disposable'), stack, 'publishes its database')
+    # The install's own schema refuses the migrator, so this uses the owner's connection, as setup does.
+    changed = stack.sql("update autobots_install.migrations set sha256 = 'arranged' where name = 'bootstrap/storage.sql' returning sha256;")
+    if changed.returncode or 'arranged' not in changed.stdout:
+        raise Unavailable('could not arrange a changed storage record')
+    real_digest = hashlib.sha256((root / STORAGE_SQL).read_bytes()).hexdigest()
+    try:
+        refused(cases, 'a changed storage file is refused', lambda: attempt(), stack, 'changed after it was applied')
     finally:
-        remove_stack(stack)
-        shutil.rmtree(work, ignore_errors=True)
-    label = f'label=com.docker.compose.project={project}'
-    left = (run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout + run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
-    after_resources = other_resources(project)
-    cases.check('other Docker resources are untouched', 'same', f'{len(before_resources)} before, {len(after_resources)} after', before_resources == after_resources)
-    passed = all(case['status'] == 'passed' for case in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.persistent-apply/v1', 'completed_at_utc': datetime.now(UTC).isoformat(), 'duration_seconds': round(time.monotonic() - started_at, 1),
-                                'input_fingerprint': fingerprint(root), 'status': 'passed' if passed else 'failed', 'target_class': 'disposable', 'cases': cases.records,
-                                'not_established': ['the real install', 'H1', 'product acceptance']}, indent=2) + '\n')
-    return 0 if passed else 1
+        stack.sql(f"update autobots_install.migrations set sha256 = '{real_digest}' where name = 'bootstrap/storage.sql';")
+    edited = migration_copy(root, work / 'edited')
+    first = sorted(edited.glob('*.sql'))[0]
+    first.write_text(first.read_text() + '\n-- edited\n')
+    refused(cases, 'an edited applied migration is refused', lambda: attempt(folder=edited), stack, 'never edit an applied migration')
+    older = migration_copy(root, work / 'older')
+    sorted(older.glob('*.sql'))[-1].unlink()
+    refused(cases, 'an older checkout missing an applied migration is refused', lambda: attempt(folder=older), stack, 'not in this checkout')
+    pending = migration_copy(root, work / 'pending')
+    (pending / 'bad-name.sql').write_text('select 1;\n')
+    refused(cases, 'a badly named file is refused before anything applies', lambda: attempt(folder=pending), stack, 'is not named')
+    (pending / 'bad-name.sql').unlink()
+    (pending / '20991231000001_breaks.sql').write_text('create table public.half_done (id int);\nselect no_such_function();\n')
+    before = rows(stack, STATE)
+    try:
+        attempt(folder=pending)
+        cases.check('a failing migration rolls back whole', 'reported', 'not reported', False)
+    except Unavailable as problem:
+        cases.check('a failing migration rolls back whole', 'reported, nothing changed', f'{str(problem)[:120]}, {before} then {rows(stack, STATE)}', rows(stack, STATE) == before and '20991231000001' in str(problem))
+    cli_cases(root, cases, work, [gateway_port, db_port])
 
 
 def main() -> int:

@@ -11,41 +11,45 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from harness_lib import (
-    FULL_CHECKS,
-    PYTHON_STEPS,
-    REPO_PYTHON_STEPS,
-    WEB_STEPS,
+    EXIT_FAILED,
+    EXIT_PASSED,
+    EXIT_UNAVAILABLE,
     adapter_status,
     check_domains,
     config_errors,
+    derived_domains,
     fingerprint,
     input_manifest,
     project_root,
     reduced_env,
+    run_bounded,
     scope_paths,
+    utc,
 )
 from qualification.errors import Unavailable
-from qualification.records import ModelTransport, StepClass, VerificationClass
-from suites import (
-    API_CLIENT_TESTS,
-    DB_QUALIFIERS,
-    HARNESS_PATTERN,
-    OPERATIONS_QUALIFIERS,
-    TOOLCHAIN_OFFLINE,
-    WEB_UNIT_TESTS,
+from qualification.profiles import (
+    HARNESS_SECONDS,
+    HARNESS_STEPS,
+    PROFILES,
+    PYTHON_STEPS,
+    REPO_PYTHON_STEPS,
+    SPREAD,
+    STEPS,
+    WEB_STEPS,
+    CheckStep,
+    declared,
 )
+from qualification.records import StepClass
+from suites import API_CLIENT_TESTS, HARNESS_PATTERN, TOOLCHAIN_OFFLINE, WEB_UNIT_TESTS
 from toolchain import (
-    LONG,
     Step,
     check_steps,
     child_env,
@@ -56,55 +60,51 @@ from toolchain import (
     snapshot_differences,
 )
 
-EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
-IMPLEMENTED_PROFILES = ('harness', 'fast', 'full', 'db', 'operations')
-# These report exit 2 for a missing prerequisite, which is not a failed check.
-SELF_REPORTING_STEPS = frozenset({'contract_drift', 'browser_qualification', 'fault_qualification', 'disposable_qualification', 'supabase_stack_qualification',
-                                  'app_db_qualification', 'identity_qualification', 'persistent_apply_qualification', 'operations_qualification',
-                                  'backup_qualification', 'upgrade_qualification'})
-# DH-09.2 class and model transport by step, in the vocabulary of qualification/records.py. Evidence reads
-# these, and a plan cannot override them.
-STEP_CLASSES: dict[str, tuple[VerificationClass, ModelTransport]] = {'harness_behavior_tests': ('mock', 'none'), 'pytest': ('mock', 'mock'), 'api_client_tests': ('mock', 'none'),
-                'web_unit_tests': ('mock', 'none'), 'browser_qualification': ('local_runtime', 'none'),
-                'fault_qualification': ('mock', 'mock'), 'disposable_qualification': ('disposable', 'none'),
-                'supabase_stack_qualification': ('disposable', 'none'), 'app_db_qualification': ('disposable', 'mock'),
-                'identity_qualification': ('disposable', 'mock'), 'persistent_apply_qualification': ('disposable', 'none'),
-                'operations_qualification': ('disposable', 'mock'),
-                'backup_qualification': ('disposable', 'mock'), 'upgrade_qualification': ('disposable', 'mock')}
+# The profiles, in the order .claude/autobots.json lists them as implemented.
+IMPLEMENTED_PROFILES = tuple(PROFILES)
+# These report exit 2 for a missing prerequisite, which is not a failed check (qualification/profiles.py).
+SELF_REPORTING_STEPS = frozenset(step.id for step in STEPS.values() if step.self_reporting)
+# DH-09.2 class and model transport by step, from qualification/profiles.py. Evidence holds a cited check to
+# them, and a plan cannot override them.
+STEP_CLASSES = {step.id: (step.klass, step.transport) for step in STEPS.values() if (step.klass, step.transport) != ('static', 'none')}
 OUTSIDE_SCOPE = 'outside the changed scope of this fast run'
 NODE_TEST_STEPS = frozenset({'web_unit_tests', 'api_client_tests'})
-NOT_TESTED = ['Claude event delivery', 'Supabase', 'Docker', 'OpenRouter inference', 'complete H0/H1']
-APPLICATION_NOT_TESTED: list[str] = []
-DB_NOT_TESTED = ['the persistent database',
-                 'Claude event delivery', 'OpenRouter inference', 'complete H0/H1']
-# What the three qualifiers each record as not established, plus what this runner adds.
-OPERATIONS_NOT_TESTED = ['H1', 'product acceptance', 'the persistent stack', 'a real model call', 'a real credential',
-                         'a real image or framework version change', 'Mac sleep', 'resource use under load',
-                         'protection from losing this Mac', 'Claude event delivery', 'OpenRouter inference']
+# The test selections a step's arguments name, from scripts/suites.py.
+SELECTIONS: dict[str, str | tuple[str, ...]] = {'harness_pattern': HARNESS_PATTERN, 'web_unit_tests': WEB_UNIT_TESTS,
+                                                'api_client_tests': API_CLIENT_TESTS, SPREAD.strip('{}'): TOOLCHAIN_OFFLINE}
+OUTPUT_LIMIT = 16000
 
 
 def classify(step_id: str) -> StepClass:
-    klass, transport = STEP_CLASSES.get(step_id, ('static', 'none'))
+    klass, transport = declared(step_id)
     return {'class': klass, 'model_transport': transport}
 
 
-def utc() -> str:
-    return datetime.now(UTC).isoformat()
+def arguments(step: CheckStep, values: Mapping[str, str | tuple[str, ...]]) -> tuple[str, ...]:
+    """A registered step's arguments, each `{name}` filled in from `values`. A tuple value spreads into arguments."""
+    resolved: list[str] = []
+    for part in step.argv or ():
+        spread = values.get(part.strip('{}')) if part.startswith('{') and part.endswith('}') else None
+        if isinstance(spread, tuple):
+            resolved.extend(spread)
+        else:
+            resolved.append(part.format_map({name: value for name, value in values.items() if isinstance(value, str)}))
+    return tuple(resolved)
 
 
 def run_check(root: Path, name: str, argv: list[str]) -> dict[str, Any]:
+    """One harness check, with the record fields its readers parse (DH-09.2). A timeout ends what it started too."""
     start = utc()
     began = time.monotonic()
     # Tests receive no inherited API keys, credentials or assistant configuration.
     env = reduced_env()
     env.update(PYTHONDONTWRITEBYTECODE='1', PYTHONIOENCODING='utf-8')
-    try:
-        result = subprocess.run(argv, cwd=root, env=env, capture_output=True,
-                                text=True, timeout=60, check=False)
-        status, code = ('passed' if result.returncode == 0 else 'failed'), result.returncode
-        output = (result.stdout + result.stderr)[-16000:]
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        status, code, output = 'error', None, type(exc).__name__
+    result = run_bounded(argv, cwd=root, env=env, timeout=STEPS[name].timeout if name in STEPS else HARNESS_SECONDS)
+    if result.exit_code is None:
+        status, code, output = 'error', None, 'TimeoutExpired' if result.failure == 'timeout' else str(result.failure)
+    else:
+        status, code = ('passed' if result.exit_code == 0 else 'failed'), result.exit_code
+        output = (result.stdout + result.stderr)[-OUTPUT_LIMIT:]
     return {'id': name, **classify(name), 'command_argv': argv, 'cwd': str(root), 'started_at_utc': start,
             'finished_at_utc': utc(), 'duration_seconds': round(time.monotonic()-began, 3),
             'exit_code': code, 'status': status, 'output': output}
@@ -112,13 +112,13 @@ def run_check(root: Path, name: str, argv: list[str]) -> dict[str, Any]:
 
 def harness_checks(root: Path) -> list[dict[str, Any]]:
     problems = config_errors(root)
-    checks = [{'id': 'project_configuration', **classify('project_configuration'),
-               'status': 'passed' if not problems else 'failed', 'errors': problems},
-              run_check(root, 'backlog_validation', [sys.executable, 'scripts/specs.py', 'validate']),
-              run_check(root, 'harness_behavior_tests',
-                        [sys.executable, '-m', 'unittest', 'discover', '-s',
-                         'tests/harness', '-p', HARNESS_PATTERN, '-v'])]
-    checks[-1].update(judge_unittest(checks[-1]))
+    checks: list[dict[str, Any]] = [{'id': 'project_configuration', **classify('project_configuration'),
+                                     'status': 'passed' if not problems else 'failed', 'errors': problems}]
+    values = {'python': sys.executable, **SELECTIONS}
+    checks.extend(run_check(root, step.id, list(arguments(step, values))) for step in HARNESS_STEPS if step.commanded)
+    for check in checks:
+        if check['id'] == 'harness_behavior_tests':
+            check.update(judge_unittest(check))
     return checks
 
 
@@ -155,11 +155,14 @@ def judge_pytest(record: Mapping[str, Any]) -> dict[str, Any]:
     return {'tests_skipped': skipped, **({'status': 'failed'} if skipped and record['status'] == 'passed' else {})}
 
 
-def selected_steps(profile: str, step_ids: Sequence[str], changed: Sequence[str] | None) -> set[str]:
-    """Which toolchain steps a profile runs. An unknown change set runs both application domains."""
-    if profile == 'full':
+def selected_steps(profile: str, step_ids: Sequence[str], changed: Sequence[str] | None, root: Path | None = None) -> set[str]:
+    """Which toolchain steps a profile runs. An unknown change set runs both application domains. Given the checkout's
+    root, a changed script also brings the domains of the profiles whose scripts import it (SCRP-06)."""
+    if not PROFILES[profile].selects_by_change:
         return set(step_ids)
-    domains = {'python', 'web', 'repo_python'} if changed is None else {d for path in changed for d in check_domains(path)}
+    derived = derived_domains(root) if root is not None else {}
+    domains = ({'python', 'web', 'repo_python'} if changed is None
+               else {d for path in changed for d in check_domains(path, derived=derived)})
     return set(step_ids) & ((PYTHON_STEPS if 'python' in domains else frozenset())
                             | (WEB_STEPS if 'web' in domains else frozenset())
                             | (REPO_PYTHON_STEPS if 'repo_python' in domains else frozenset()))
@@ -171,19 +174,22 @@ class ToolPlan:
     env: Mapping[str, str] = field(default_factory=dict)
 
 
+def registered(root: Path, step: CheckStep, values: Mapping[str, str | tuple[str, ...]]) -> Step:
+    return Step(step.id, arguments(step, values), root / step.cwd, step.timeout)
+
+
 def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[ToolPlan, list[dict[str, Any]]]:
-    """The toolchain steps to run and the ones left out. Needs tools only when a step needs them."""
-    docker_env = reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})
-    if profile in ('db', 'operations'):
+    """The profile's steps to run and the ones left out, from qualification/profiles.py. Needs tools only when a
+    step needs them."""
+    definition = PROFILES[profile]
+    if definition.docker:
         missing = missing_prepared_paths(root, find_tools(root))
         if missing:
             raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
-    if profile in ('db', 'operations'):
-        qualifiers = DB_QUALIFIERS if profile == 'db' else OPERATIONS_QUALIFIERS
-        steps = [Step(step_id, (sys.executable, *argv), root, LONG) for step_id, *argv in qualifiers]
-        return ToolPlan(steps, docker_env), []
-    known = set(FULL_CHECKS)
-    chosen = selected_steps(profile, sorted(known), changed)
+        docker_env = reduced_env() | ({'HOME': os.environ['HOME']} if 'HOME' in os.environ else {})
+        return ToolPlan([registered(root, step, {'python': sys.executable}) for step in definition.steps], docker_env), []
+    known = definition.step_ids
+    chosen = selected_steps(profile, sorted(known), changed, root)
     left_out = [{'id': name, 'status': 'not_run', 'reason': OUTSIDE_SCOPE} for name in sorted(known - chosen)]
     if not chosen:
         return ToolPlan(), left_out
@@ -191,19 +197,10 @@ def tool_plan(root: Path, profile: str, changed: Sequence[str] | None) -> tuple[
     missing = missing_prepared_paths(root, tools)
     if missing:
         raise Unavailable('not prepared, run scripts/toolchain.py bootstrap explicitly; missing: ' + ', '.join(missing))
-    qualification = Step('fault_qualification', (sys.executable, 'scripts/qualify_faults.py'), root, LONG)
-    # The offline part of `tests/toolchain`: scope, manifest pins and launchers. `suites.MANUAL` says why the rest
-    # stays manual.
-    scope_tests = Step('toolchain_scope_tests', (sys.executable, '-m', 'unittest', *TOOLCHAIN_OFFLINE),
-                       root / 'tests/toolchain')
-    web_bin = root / 'apps/web/node_modules/.bin'
-    contracts = (Step('contract_drift', (sys.executable, 'scripts/generate_contracts.py', 'check'), root),
-                 Step('api_client_typecheck', (str(web_bin / 'tsc'), '-p', 'packages/api-client'), root),
-                 # Globs, which Node expands itself, so a new test file can't be left out (R-01).
-                 Step('api_client_tests', (str(Path(tools.node_dir) / 'node'), '--test', API_CLIENT_TESTS), root),
-                 Step('web_unit_tests', (str(Path(tools.node_dir) / 'node'), '--test', WEB_UNIT_TESTS), root),
-                 Step('browser_qualification', (sys.executable, 'scripts/qualify_web.py'), root, LONG))
-    steps = [step for step in (*check_steps(root, tools), *contracts, qualification, scope_tests) if step.id in chosen]
+    values = {'python': sys.executable, 'node': str(Path(tools.node_dir) / 'node'),
+              'web_bin': str(root / 'apps/web/node_modules/.bin'), **SELECTIONS}
+    built = {step.id: step for step in check_steps(root, tools)}
+    steps = [built[step.id] if step.argv is None else registered(root, step, values) for step in definition.steps if step.id in chosen]
     return ToolPlan(steps, child_env(root, tools, verifying=True)), left_out
 
 
@@ -264,13 +261,7 @@ def run_profile(root: Path, profile: str, *, base_checks: Callable[[Path], list[
         stable = final == initial
         code = exit_code_for(checks, stable)
         status = {EXIT_PASSED: 'passed', EXIT_FAILED: 'failed', EXIT_UNAVAILABLE: 'error'}[code]
-        scope = {'harness': 'Project configuration, backlog structure and deterministic harness fixtures only',
-                 'db': 'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets',
-                 'operations': 'Harness checks plus the operations, backup and upgrade runbooks, on disposable Compose projects with a '
-                               'scripted model. Disposable evidence only, not H1 or product acceptance'
-                 }.get(profile, 'Harness checks plus local static checks, focused tests and, for full, the production build and the shell and appearance browser specs')
-        not_tested = {'harness': ['application', *NOT_TESTED], 'db': DB_NOT_TESTED, 'operations': OPERATIONS_NOT_TESTED
-                      }.get(profile, [*APPLICATION_NOT_TESTED, *NOT_TESTED])
+        scope, not_tested = PROFILES[profile].scope, list(PROFILES[profile].not_tested)
         report = {'schema_version': 'autobots.harness-result/v1', 'template': False,
                   'profile': profile, 'status': status,
                   'completed_at_utc': utc(), 'python_version': sys.version.split()[0],

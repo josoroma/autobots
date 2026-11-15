@@ -149,7 +149,8 @@ def post_edit_diagnostic(root: Path, raw: object) -> str:
     path = resolve_path(root, raw)
     if path is None or not path.is_relative_to(root.resolve()):
         return diagnostic
-    domains = check_domains(path.relative_to(root.resolve()).as_posix())
+    # A script also has the domains of every profile whose scripts import it, read from this checkout (SCRP-06).
+    domains = check_domains(path.relative_to(root.resolve()).as_posix(), root.resolve())
     # Each profile the edit needs: fast for code and repository Python, db for the database checks.
     needed = domains - {'harness'}
     profiles = (['fast'] if needed - {'db'} else []) + (['db'] if 'db' in needed else []) or ['harness']

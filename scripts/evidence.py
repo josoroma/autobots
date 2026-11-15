@@ -23,6 +23,9 @@ from typing import Any
 
 from harness_lib import input_manifest, project_root, read_report
 
+# What each registered step's class and model transport is (qualification/profiles.py, SCRP-12).
+from qualification.profiles import STEPS, declared
+
 # The verification classes and model transports (DH-09.2), which the verifier's step classes and the
 # qualifiers' case records use too (SCRP-10).
 from qualification.records import CLASSES, TRANSPORTS
@@ -256,6 +259,9 @@ def provenance_errors(root: Path, checks: Sequence[Mapping[str, Any]], availabil
                   or found.get('model_transport') != check.get('model_transport')
                   or (('exit_code' in found) and found.get('exit_code') != check.get('exit_code'))):
                 errors.append(f'{label}: differs from the {profile} report that it cites.')
+            elif 'class' in found and found.get('id') in STEPS and (found.get('class'), found.get('model_transport')) != declared(str(found['id'])):
+                # A report records what the verifier ran, so an edited one can't claim a class its step never has.
+                errors.append(f'{label}: the {profile} report gives it another class or model transport than its registered step.')
         else:
             errors.append(f'{label}: names no run; a hand-written result is not evidence.')
     return errors

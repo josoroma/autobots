@@ -29,7 +29,7 @@ COPY_BASE = REPO_ROOT / '.checks/US-1.3/copies'
 COPY_FILES = {'.gitignore', '.node-version', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
               'docs/engineering/runbooks/toolchains.md', 'scripts/harness_lib.py',
               'scripts/toolchain.py'}
-COPY_PREFIXES = ('apps/', 'contracts/', 'packages/', 'services/', 'tests/toolchain/')
+COPY_PREFIXES = ('apps/', 'contracts/', 'packages/', 'services/', 'tests/toolchain/', 'scripts/qualification/')
 # Applied to a copy only when its `.gitignore` lacks them, so a copy is clean however the real file stands.
 CANDIDATE_IGNORES = ('.corepack/', '.uv/', '.cache/', 'next-env.d.ts')
 TOOL_TIMEOUT = 900.0

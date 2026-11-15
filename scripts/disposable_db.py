@@ -22,20 +22,21 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urlsplit
 
-from harness_lib import fingerprint, project_root
+from harness_lib import project_root
 
 # Shared by every qualifier (refactor plan R-39); a script that imports these from here gets the same objects.
 from qualification.children import tool_env
 from qualification.errors import Refused, Unavailable
-from qualification.records import Cases, write_report
+from qualification.records import Cases
+from qualification.report import finish
 
 PROJECT_PREFIX = 'autobots-disposable-'
 PROJECT = re.compile(r'autobots-disposable-[a-z0-9]{1,24}')
@@ -89,11 +90,11 @@ class Stack:
         return self.compose('exec', '-T', 'db', 'psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-A',
                             '-t', '-v', 'ON_ERROR_STOP=1', stdin=statements)
 
-    def as_role(self, role: str, user: str | None, statement: str) -> subprocess.CompletedProcess[str]:
-        """Run one statement as an actual nonprivileged role, then roll back."""
-        # This image's `auth.uid()` reads the older per-claim setting until GoTrue's migrations replace it.
+    def as_role(self, role: str, user: str | None, statement: str, *, setup: str = '') -> subprocess.CompletedProcess[str]:
+        """Run one statement as an actual nonprivileged role, after `setup` as the superuser, then roll back both."""
+        # Both claim settings, since `auth.uid()` reads the older per-claim one until GoTrue's migrations replace it.
         claims = json.dumps({'role': role, **({'sub': user} if user else {})})
-        return self.sql(f"begin;\nset local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
+        return self.sql(f"begin;\n{setup}set local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
                         f"set_config('request.jwt.claim.sub', '{user or ''}', true);\n{statement};\nrollback;\n")
 
 
@@ -265,6 +266,80 @@ def remove_stack(stack: Stack) -> None:
     for name in left.stdout.split():
         if run(['docker', 'volume', 'rm', name], tool_env()).returncode:
             raise Unavailable(f'the volume {name} could not be removed')
+
+
+def require_engine() -> None:
+    """The Docker engine answers, so a stopped engine is reported as itself and not as a missing image (SCRP-07)."""
+    if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
+        raise Unavailable('the Docker engine is not reachable')
+
+
+def record_cleanup(cases: Cases, project: str) -> None:
+    """The case that nothing of `project` is left. A listing that fails raises Unavailable, rather than reading as
+    nothing left (SCRP-07)."""
+    label = f'label=com.docker.compose.project={project}'
+    volumes = run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env())
+    containers = run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env())
+    if volumes.returncode or containers.returncode:
+        raise Unavailable('docker could not list what cleanup left')
+    left = (volumes.stdout + containers.stdout).strip()
+    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
+
+
+def remove_owned(stacks: Sequence[Stack]) -> None:
+    """Remove each stack, the last owned first, trying every one though an earlier removal failed, then raise the first
+    failure. remove_stack proves each project's ownership before removing anything."""
+    failure: Refused | Unavailable | None = None
+    for stack in reversed(stacks):
+        try:
+            remove_stack(stack)
+        except (Refused, Unavailable) as error:
+            failure = failure or error
+    if failure is not None:
+        raise failure
+
+
+@dataclass
+class DisposableRun:
+    """The projects one qualification owns, the first one it started with, and what the rest of Docker held before."""
+
+    stack: Stack
+    before: list[str]
+    started_at: float
+    owned: list[Stack] = field(default_factory=list)
+
+    def own(self, other: Stack) -> Stack:
+        """Remove `other` too when the run ends, such as the copy a restore creates. Only a disposable target can be
+        owned, and it is refused before anything is created for it."""
+        require_identity(other.target, tool_env())
+        self.owned.append(other)
+        return other
+
+
+@contextmanager
+def disposable_project(stack: Stack, cases: Cases, *, report: Path, prepare: Callable[[], object] = lambda: None) -> Iterator[DisposableRun]:
+    """One disposable project's lifecycle, for every qualifier (SCRP-07, XDUP-13).
+
+    Before anything starts: the target's identity, the Docker engine, no earlier report left behind, then `prepare`,
+    which checks the rendered configuration and its images, and a listing of every other container and volume. When
+    the body ends, by any path, each owned project is removed. Only when it ended normally are the cases recorded that
+    nothing of each owned project is left and that every other container and volume is as it was.
+    """
+    require_identity(stack.target, tool_env())
+    require_engine()
+    report.unlink(missing_ok=True)  # A run that cannot finish leaves no earlier result behind.
+    prepare()
+    project = stack.target.project
+    owned = DisposableRun(stack, other_resources(project), time.monotonic(), [stack])
+    try:
+        yield owned
+    finally:
+        remove_owned(owned.owned)
+    for each in owned.owned:
+        record_cleanup(cases, each.target.project)
+    after = other_resources(project)
+    cases.check('other Docker resources are untouched', 'same containers and volumes', f'{len(owned.before)} before, {len(after)} after',
+                owned.before == after)
 
 
 def free_port(excluded: Sequence[int] = ()) -> int:
@@ -547,15 +622,12 @@ def qualify(root: Path) -> int:
         'AUTOBOTS_DISPOSABLE_SERVICE_KEY': jwt(secret, {'role': 'service_role'})})
     cases = Cases()
     identity_cases(cases)
-    require_identity(target, tool_env())
-    if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
-        raise Unavailable('the Docker engine is not reachable')
-    (root / REPORT).unlink(missing_ok=True)  # A run that cannot finish leaves no earlier result behind.
-    require_rendered(stack)
-    cases.check('the real Compose file renders safely', 'no refusal', 'loopback, pinned, labeled and owned', True)
-    before = other_resources(project)
-    started_at = time.monotonic()
-    try:
+
+    def prepare() -> None:
+        require_rendered(stack)
+        cases.check('the real Compose file renders safely', 'no refusal', 'loopback, pinned, labeled and owned', True)
+
+    with disposable_project(stack, cases, report=root / REPORT, prepare=prepare) as owned:
         started = stack.compose('up', '-d', '--wait', 'db')
         if started.returncode:
             raise Unavailable(f'the disposable database did not start: {started.stderr[-300:]}')
@@ -566,26 +638,9 @@ def qualify(root: Path) -> int:
         storage_cases(stack, cases, root)
         worker_cases(stack, cases, root)
         guard_cases_on_real_target(stack, cases)
-    finally:
-        remove_stack(stack)
-    label = f'label=com.docker.compose.project={project}'
-    left_volumes = run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env())
-    left_containers = run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env())
-    if left_volumes.returncode or left_containers.returncode:
-        raise Unavailable('docker could not list what cleanup left')
-    left = (left_volumes.stdout + left_containers.stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
-    after = other_resources(project)
-    cases.check('other Docker resources are untouched', 'same containers and volumes', f'{len(before)} before, {len(after)} after', before == after)
-    write_report(root / REPORT, {'schema_version': 'autobots.disposable-qualification/v1',
-                                 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                 'duration_seconds': round(time.monotonic() - started_at, 1),
-                                 'input_fingerprint': fingerprint(root),
-                                 'status': cases.status, 'target_class': 'disposable',
-                                 'project': project, 'cases': cases.records,
-                                 'not_established': ['H1', 'product acceptance', 'the persistent stack',
-                                                     'the pinned self-hosted release']})
-    return 0 if cases.status == 'passed' else 1
+    # Its database and Storage images are the install overlay's (SQLI-15), but its configuration is not the release's.
+    return finish(root, root / REPORT, 'autobots.disposable-qualification/v1', cases, owned.started_at,
+                  ['H1', 'product acceptance', 'the persistent stack', 'the pinned self-hosted release'], project=project)
 
 
 def guarded_stack(args: argparse.Namespace, root: Path) -> Stack:

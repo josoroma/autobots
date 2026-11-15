@@ -2,7 +2,9 @@
 
 tests/harness/test_suite_claims.py reads this module, so a test file that no step runs, and that
 isn't listed below as manual with a reason, fails the harness. Profiles and qualifiers import their
-selections from here rather than keeping their own copies.
+selections from here rather than keeping their own copies. Which scripts each profile runs is
+qualification/profiles.py's, and the claim test follows them and their imports, and nothing else, to see
+which tests/db checks run (R-65).
 """
 
 # unittest discovery pattern for tests/harness.
@@ -32,24 +34,6 @@ RELEASE_PROJECT = 'release'
 INSTALL_CURRENT_PROJECT = 'install-current'
 INSTALL_PROJECT = 'install'
 MANUAL_PROJECTS = (RELEASE_PROJECT, INSTALL_CURRENT_PROJECT, INSTALL_PROJECT)
-
-# The qualifiers the db and operations profiles run, as (step id, script, arguments...). verify.py
-# builds those steps from these, and the claim test follows them and their imports, and nothing
-# else, to see which tests/db checks run.
-DB_QUALIFIERS = (
-    ('disposable_qualification', 'scripts/disposable_db.py', 'qualify'),
-    ('supabase_stack_qualification', 'scripts/supabase_stack.py', 'qualify'),
-    ('app_db_qualification', 'scripts/app_db.py', 'qualify'),
-    ('identity_qualification', 'scripts/qualify_identity.py'),
-    ('persistent_apply_qualification', 'scripts/qualify_persistent_apply.py'),
-)
-OPERATIONS_QUALIFIERS = (
-    ('operations_qualification', 'scripts/qualify_operations.py'),
-    ('backup_qualification', 'scripts/qualify_backup.py'),
-    ('upgrade_qualification', 'scripts/qualify_upgrade.py'),
-)
-# full's qualifiers, which verify.py names in tool_plan.
-FULL_QUALIFIERS = ('scripts/qualify_faults.py', 'scripts/qualify_web.py')
 
 MANUAL = {
     'tests/db/browser_executor_check.py': 'Run by `qualify_browser_executor.py`, live: it needs the browser images and '

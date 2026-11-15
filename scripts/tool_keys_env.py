@@ -2,37 +2,42 @@
 """Decisions 0024 (K2, K7) and 0025 (V5), PRD-Tool-Catalog PK-06 and PK-07: values from a `.env`
 file, for `make start`.
 
-By default, prints one `export NAME='value'` line for each of the Tavily and Jina keys and the
-GitHub repository and token that has a non-blank value, quoted so the shell reads it as data. With
-`--browser-switch`, it prints only `export AUTOBOTS_BROWSER_EXECUTOR=enabled`, and only when the
-file sets exactly that. Browsing still needs a passing executor qualification at the current code
-(AB-02).
+`tool_values` gives the Tavily and Jina keys and the GitHub repository and token that have a non-blank
+value, and `switch_values` gives `AUTOBOTS_BROWSER_EXECUTOR=enabled`, and only when the file sets exactly
+that. scripts/local_app.py passes them to the API and the worker. Browsing still needs a passing executor
+qualification at the current code (AB-02).
 
-The file is parsed with the app's own `.env` parser and never sourced, and no other variable is
-printed. A missing file prints nothing. Nothing that could carry a value goes to stderr.
+The file is parsed as data and never sourced, as the app parses `.env` (harness_lib.parse_dotenv), and
+no other variable is passed. As a command, it prints each value as one `export NAME='value'` line, quoted
+so a shell reads it as data. A missing file prints nothing. Nothing that could carry a value goes to stderr.
 """
 
 import shlex
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'services/agent/src'))
-
-from autobots.application.credentials.precedence import parse_dotenv  # noqa: E402
+from harness_lib import parse_dotenv
 
 # Decision 0025 V5 adds the GitHub pair, under the same rules.
 NAMES = ('TAVILY_API_KEY', 'JINA_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN')
 SWITCH = 'AUTOBOTS_BROWSER_EXECUTOR'
 
 
+def tool_values(text: str) -> dict[str, str]:
+    values = parse_dotenv(text, 'app')
+    return {name: values[name].strip() for name in NAMES if values.get(name, '').strip()}
+
+
+def switch_values(text: str) -> dict[str, str]:
+    return {SWITCH: 'enabled'} if parse_dotenv(text, 'app').get(SWITCH, '').strip() == 'enabled' else {}
+
+
 def exports(text: str) -> list[str]:
-    values = parse_dotenv(text)
-    return [f'export {name}={shlex.quote(values[name].strip())}' for name in NAMES if values.get(name, '').strip()]
+    return [f'export {name}={shlex.quote(value)}' for name, value in tool_values(text).items()]
 
 
 def switch(text: str) -> list[str]:
-    return [f'export {SWITCH}=enabled'] if parse_dotenv(text).get(SWITCH, '').strip() == 'enabled' else []
+    return [f'export {name}={value}' for name, value in switch_values(text).items()]
 
 
 def main(argv: list[str]) -> int:

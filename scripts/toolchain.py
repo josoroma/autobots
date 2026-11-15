@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Explicit lock, prepare, version and check verbs for the pinned Node and Python toolchains.
 
-`versions` and `check` never install. `lock` writes the two locks and `bootstrap` writes
+`versions`, `check` and `node-bin` never install. `lock` writes the two locks and `bootstrap` writes
 Git-ignored environments, and only when asked. Runtimes are found among existing installs and
 selected for child processes only; nothing here changes the machine's shell, PATH or global tools.
 
@@ -16,21 +16,26 @@ import hashlib
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import tomllib
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from harness_lib import project_root, reduced_env
+from harness_lib import EXIT_FAILED as EXIT_FAILED
+from harness_lib import EXIT_PASSED as EXIT_PASSED
+from harness_lib import EXIT_UNAVAILABLE as EXIT_UNAVAILABLE
+from harness_lib import project_root, reduced_env, run_bounded
+from harness_lib import utc as utc
 
 # A pinned tool, manifest or prepared environment is missing: exit code 2. One class for every script
 # (SCRP-08), so a script that imports it from here catches what disposable_db.py raises too.
 from qualification.errors import Unavailable as Unavailable
+from qualification.profiles import LONG as LONG
+from qualification.profiles import SHORT as SHORT
+from qualification.profiles import STEPS
 
 
 def git_paths(root: Path, *arguments: str) -> list[str]:
@@ -49,8 +54,6 @@ def digest(path: Path) -> str:
         raise ValueError(f'cannot hash directory entry {path.name}; its contents would go unchecked')
     return hashlib.sha256(path.read_bytes()).hexdigest() + (':executable' if os.access(path, os.X_OK) else '')
 
-
-EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 
 AGENT = Path('services/agent')
 PYPROJECT = AGENT / 'pyproject.toml'
@@ -74,8 +77,6 @@ XDG_LOCATIONS = {'XDG_STATE_HOME': 'state', 'XDG_CACHE_HOME': 'cache',
                  'XDG_DATA_HOME': 'data', 'XDG_CONFIG_HOME': 'config'}
 
 PROBE_TIMEOUT = 10.0
-SHORT = 120.0
-LONG = 600.0
 SEMVER = re.compile(r'\d+\.\d+\.\d+')
 OUTPUT_LIMIT = 16000
 
@@ -158,10 +159,13 @@ def find_pinned(name: str, wanted: str, extra: Iterable[Path] = ()) -> str:
     raise Unavailable(f'{name} {wanted} is required and was not found; nothing was downloaded or installed')
 
 
+def nvm_bin(pins: Pins) -> Path:
+    return Path.home() / '.nvm/versions/node' / f'v{pins.node}/bin'
+
+
 def find_tools(root: Path) -> Tools:
     pins = read_pins(root)
-    nvm = Path.home() / '.nvm/versions/node' / f'v{pins.node}/bin'
-    node = find_pinned('node', pins.node, [nvm])
+    node = find_pinned('node', pins.node, [nvm_bin(pins)])
     node_dir = str(Path(node).parent)
     corepack = Path(node_dir) / 'corepack'
     if not os.access(corepack, os.X_OK):
@@ -201,62 +205,47 @@ def bootstrap_steps(root: Path, tools: Tools) -> list[Step]:
 
 
 def check_steps(root: Path, tools: Tools) -> list[Step]:
-    """Everything `check` runs after its prerequisites. Tests scan this list for install launchers."""
+    """Everything `check` runs after its prerequisites, each with its registered deadline (qualification/profiles.py).
+    Tests scan this list for install launchers."""
     agent = root / AGENT
     venv_bin = root / VENV / 'bin'
     web_script = (tools.corepack, 'pnpm', '--filter', '@autobots/web', 'run')
+
+    def step(step_id: str, argv: tuple[str, ...], cwd: Path, expect_output: str | None = None) -> Step:
+        return Step(step_id, argv, cwd, STEPS[step_id].timeout, expect_output)
+
     return [
-        Step('python_lock', (tools.uv, 'lock', '--check', '--offline'), agent),
-        Step('python_env', (tools.uv, 'sync', '--check', '--locked', '--offline'), agent),
-        Step('ruff_check', (str(venv_bin / 'ruff'), 'check'), agent),
-        Step('ruff_format', (str(venv_bin / 'ruff'), 'format', '--check'), agent),
-        Step('mypy', (str(venv_bin / 'mypy'),), agent, LONG),
-        Step('pytest', (str(venv_bin / 'pytest'),), agent, LONG),
+        step('python_lock', (tools.uv, 'lock', '--check', '--offline'), agent),
+        step('python_env', (tools.uv, 'sync', '--check', '--locked', '--offline'), agent),
+        step('ruff_check', (str(venv_bin / 'ruff'), 'check'), agent),
+        step('ruff_format', (str(venv_bin / 'ruff'), 'format', '--check'), agent),
+        step('mypy', (str(venv_bin / 'mypy'),), agent),
+        step('pytest', (str(venv_bin / 'pytest'),), agent),
         # R-07: repository Python, from the root, under ruff.toml and mypy.ini.
-        Step('repo_ruff_check', (str(venv_bin / 'ruff'), 'check', 'scripts', 'tests', '.claude/hooks'), root),
-        Step('repo_mypy', (str(venv_bin / 'mypy'),), root, LONG),
-        Step('node_lock', (tools.corepack, 'pnpm', 'install', '--frozen-lockfile', '--lockfile-only', '--offline'), root),
-        Step('node_version', (tools.corepack, 'pnpm', 'run', '--silent', 'node:version'), root,
-             expect_output=f'v{tools.pins.node}'),
-        Step('lint', (*web_script, 'lint'), root, LONG),
-        Step('format_check', (*web_script, 'format:check'), root),
-        Step('typegen', (*web_script, 'typegen'), root),
-        Step('typecheck', (*web_script, 'typecheck'), root, LONG),
-        Step('build', (*web_script, 'build'), root, LONG),
+        step('repo_ruff_check', (str(venv_bin / 'ruff'), 'check', 'scripts', 'tests', '.claude/hooks'), root),
+        step('repo_mypy', (str(venv_bin / 'mypy'),), root),
+        step('node_lock', (tools.corepack, 'pnpm', 'install', '--frozen-lockfile', '--lockfile-only', '--offline'), root),
+        step('node_version', (tools.corepack, 'pnpm', 'run', '--silent', 'node:version'), root, expect_output=f'v{tools.pins.node}'),
+        step('lint', (*web_script, 'lint'), root),
+        step('format_check', (*web_script, 'format:check'), root),
+        step('typegen', (*web_script, 'typegen'), root),
+        step('typecheck', (*web_script, 'typecheck'), root),
+        step('build', (*web_script, 'build'), root),
     ]
 
 
-def utc() -> str:
-    return datetime.now(UTC).isoformat()
-
-
 def run_step(step: Step, env: Mapping[str, str]) -> dict[str, Any]:
-    """Run one step in its own process group, so a timeout also ends what it started."""
+    """Run one step in its own process group, so a timeout also ends what it started (harness_lib.run_bounded)."""
     record: dict[str, Any] = {'id': step.id, 'argv': [Path(step.argv[0]).name, *step.argv[1:]],
-                    'started_at_utc': utc(), 'exit_code': None, 'status': 'error', 'output': ''}
-    try:
-        process = subprocess.Popen(step.argv, cwd=step.cwd, env=dict(env), stdin=subprocess.DEVNULL,
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                   errors='replace', start_new_session=True)
-    except OSError as error:
-        record.update(output=type(error).__name__, finished_at_utc=utc())
+                              'started_at_utc': utc(), 'exit_code': None, 'status': 'error', 'output': ''}
+    result = run_bounded(step.argv, cwd=step.cwd, env=env, timeout=step.timeout, stderr=subprocess.STDOUT)
+    if result.exit_code is None:
+        shown = f'timed out after {step.timeout} seconds' if result.failure == 'timeout' else str(result.failure)
+        record.update(output=shown, finished_at_utc=utc())
         return record
-    try:
-        output, _ = process.communicate(timeout=step.timeout)
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            process.kill()
-        try:
-            process.communicate(timeout=1)
-        except subprocess.TimeoutExpired:
-            pass  # A descendant left the group and holds the pipe; the step already failed.
-        record.update(output=f'timed out after {step.timeout} seconds', finished_at_utc=utc())
-        return record
-    passed = process.returncode == 0 and (step.expect_output is None or step.expect_output in output)
-    record.update(exit_code=process.returncode, status='passed' if passed else 'failed',
-                  output=output[-OUTPUT_LIMIT:], finished_at_utc=utc())
+    passed = result.exit_code == 0 and (step.expect_output is None or step.expect_output in result.stdout)
+    record.update(exit_code=result.exit_code, status='passed' if passed else 'failed',
+                  output=result.stdout[-OUTPUT_LIMIT:], finished_at_utc=utc())
     return record
 
 
@@ -446,12 +435,20 @@ def versions(root: Path) -> int:
     return EXIT_PASSED
 
 
+def node_bin(root: Path) -> int:
+    """Print the directory of the pinned Node, found as `find_tools` finds it, on the search path and then under nvm,
+    so the Makefile never runs another Node that happens to come first (SQLI-11). Absent, it prints nothing."""
+    pins = read_pins(root)
+    print(Path(find_pinned('node', pins.node, [nvm_bin(pins)])).parent)
+    return EXIT_PASSED
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     if sys.version_info < (3, 12):  # noqa: UP036 - a guard for an older interpreter running this script
         print('ERROR: Python 3.12+ is required; use the qualified python3.12 interpreter.', file=sys.stderr)
         return EXIT_UNAVAILABLE
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('verb', choices=('versions', 'lock', 'bootstrap', 'check'))
+    parser.add_argument('verb', choices=('versions', 'lock', 'bootstrap', 'check', 'node-bin'))
     parser.add_argument('--project-root', type=Path, default=project_root())
     args = parser.parse_args(argv)
     try:
@@ -460,6 +457,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return check(root)
         if args.verb == 'versions':
             return versions(root)
+        if args.verb == 'node-bin':
+            return node_bin(root)
         tools = find_tools(root)
         steps = lock_steps(root, tools) if args.verb == 'lock' else bootstrap_steps(root, tools)
         return run_explicit(root, steps, child_env(root, tools, verifying=False))

@@ -1,6 +1,7 @@
 # Disposable H1 fixtures only, never the persistent workbench. Run it through scripts/disposable_db.py,
 # which checks the target first. Images are already local and pinned by digest, so nothing is pulled.
-# These are not the coordinated self-hosted release that US-2.1 pins.
+# The database and Storage images are infra/supabase/compose.overlay.yaml's, the ones `make images` pulls and the
+# install runs (DH-07, SQLI-15), though this configuration is not the coordinated self-hosted release US-2.1 pins.
 name: ${AUTOBOTS_DISPOSABLE_PROJECT:?required}
 
 x-labels: &labels
@@ -9,7 +10,7 @@ x-labels: &labels
 
 services:
   db:
-    image: public.ecr.aws/supabase/postgres:17.6.1.106@sha256:21ab971149317ea9cd12a8126fe4ebb34def08c8972956b0958cba0924409dab
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
     pull_policy: never
     labels: *labels
     environment:
@@ -28,7 +29,7 @@ services:
       retries: 60
 
   storage:
-    image: public.ecr.aws/supabase/storage-api:v1.35.3@sha256:5a3ecdc67dbe9e88a56810b5b2f432f2d93708dcb4dc9de34e78e342b390eb4d
+    image: supabase/storage-api:v1.81.0@sha256:98ffec5d0678803783c30e404c27f4ec65e97efbe014088f2a86b4b8b54b9f54
     pull_policy: never
     labels: *labels
     profiles: [storage]

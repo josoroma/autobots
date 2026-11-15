@@ -47,7 +47,7 @@ from disposable_db import (
     run,
     tool_env,
 )
-from harness_lib import project_root
+from harness_lib import parse_dotenv, project_root
 from paid_run import (
     ACTIVE,
     OTHER_WORK,
@@ -112,12 +112,9 @@ class Record:
 
 
 def read_values(path: Path) -> dict[str, str]:
-    values = {}
-    for line in path.read_text().splitlines():
-        if line.strip() and not line.lstrip().startswith('#') and '=' in line:
-            name, _, value = line.partition('=')
-            values[name.strip()] = value.strip()
-    return values
+    """An install env file's values, verbatim, quotes included, as the install has always read them
+    (harness_lib.parse_dotenv, which names the open question about quoting)."""
+    return parse_dotenv(path.read_text(), 'verbatim')
 
 
 def read_record(directory: Path) -> Record:
@@ -315,6 +312,27 @@ def guarded_apply(stack: AppStack, root: Path, record: Record, requested: str, e
         raise Unavailable(problem)
     return {'status': 'applied', 'project': requested, 'applied': applied, 'bootstrap_applied': bootstrapped,
             'already_applied': len([name for name in recorded if not name.startswith(BOOTSTRAP_ROW)])}
+
+
+def release_images(root: Path) -> list[str]:
+    """Each image the install's merged release and overlay name, so a service upstream adds without an overlay pin is
+    pulled too (SQLI-11). Rendered with placeholder values, so no install is needed or read, and never printed."""
+    values = {**example_defaults(root), **generated_values(55321, 55322)}
+    stack = InstallStack(Target('autobots-images', 55322, 55321), root, root / UPSTREAM / 'docker-compose.yml', values=values)
+    rendered = stack.compose('config', '--format', 'json', timeout=60)
+    if rendered.returncode:
+        raise Unavailable('Compose could not render the release and overlay')
+    return sorted({str(service['image']) for service in json.loads(rendered.stdout)['services'].values()})
+
+
+def pull_images(root: Path) -> int:
+    """`make images`: the only pulls, and only when asked, since every service is pinned with pull_policy never.
+    Stops at the first image that can't be pulled."""
+    for image in release_images(root):
+        print(f'pulling {image}', flush=True)
+        if subprocess.run(['docker', 'pull', image], env=tool_env(), check=False).returncode:
+            return 1
+    return 0
 
 
 def status(root: Path, record: Record) -> dict:
@@ -659,6 +677,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         init.add_argument(f'--{name}-port', type=int, default=default)
     for name in ('up', 'setup', 'status', 'reset'):
         commands.add_parser(name).add_argument('--project', required=True)
+    commands.add_parser('images', help="pull each image the release and overlay pin, for make images; reads no install")
     apply = commands.add_parser('apply', help='apply pending migrations, only to the identified install')
     apply.add_argument('--project', required=True)
     apply.add_argument('--restored-copy', action='store_true', help='the target is a restored, held copy of this install')
@@ -686,6 +705,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if arguments.command == 'reset' or getattr(arguments, 'reset', False):
             raise Refused('this install is never reset. Nothing was changed')
+        if arguments.command == 'images':
+            return pull_images(root)
         record = read_record(arguments.install_dir)
         if arguments.command == 'up':
             if arguments.project != record.project:

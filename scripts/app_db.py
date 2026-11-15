@@ -13,35 +13,32 @@ Passing establishes neither H1 nor product acceptance.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import secrets
 import subprocess
 import sys
 import tempfile
-import time
-from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
+    DisposableRun,
     Refused,
     Target,
     Unavailable,
+    disposable_project,
     free_port,
     last_line,
-    other_resources,
-    remove_stack,
-    require_identity,
     require_marker,
     rows,
-    run,
     tool_env,
     write_marker,
 )
-from harness_lib import fingerprint, project_root
+from harness_lib import project_root
 from qualification.children import (
     CHECK_PYTHON,
     Child,
@@ -50,8 +47,14 @@ from qualification.children import (
     run_child_check,
     service_env,
 )
-from qualification.records import write_report
-from supabase_stack import SupabaseStack, generated_values, require_images, require_rendered
+from qualification.report import finish
+from supabase_stack import (
+    UPSTREAM,
+    SupabaseStack,
+    generated_values,
+    require_images,
+    require_rendered,
+)
 
 MIGRATIONS = Path('supabase/migrations')
 BOOTSTRAP = Path('supabase/bootstrap')
@@ -86,7 +89,7 @@ SNAPSHOT_SCHEMAS = ('public', 'app_private', 'agent_runtime')
 # files apply where Storage has made its own schema.
 SERVICES = ('db', 'rest', 'imgproxy', 'storage')
 REPORT = Path('.checks/app_db/qualification.json')
-# Its child checks drive the goal loop, memory and recovery with a scripted model, as verify.STEP_CLASSES says.
+# Its child checks drive the goal loop, memory and recovery with a scripted model, as its step in qualification/profiles.py says.
 MODEL_TRANSPORT = 'mock'
 MIGRATION_NAME = re.compile(r'\d{14}_[a-z0-9_]+\.sql')
 USER_A, USER_B = 'a1111111-1111-4111-8111-111111111111', 'b2222222-2222-4222-8222-222222222222'
@@ -193,10 +196,67 @@ class AppStack(SupabaseStack):
     def runtime(self, statements: str) -> subprocess.CompletedProcess[str]:
         return self.as_login('autobots_runtime', self.runtime_password, statements)
 
-    def as_role(self, role: str, user: str | None, statement: str) -> subprocess.CompletedProcess[str]:
-        claims = json.dumps({'role': role, **({'sub': user} if user else {})})
-        return self.sql(f"begin;\nset local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
-                        f"set_config('request.jwt.claim.sub', '{user or ''}', true);\n{statement};\nrollback;\n")
+
+def new_app_stack(root: Path, extra_ports: int = 0) -> tuple[AppStack, list[int]]:
+    """A new disposable project of the pinned release and overlay, with generated secrets and its own migration and
+    runtime passwords. The ports, all free in the disposable range, are its gateway's, its database's, then
+    `extra_ports` more. The gateway takes the target's second port, which disposable_db.Target names for Storage."""
+    project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
+    ports: list[int] = []
+    for _ in range(2 + extra_ports):
+        ports.append(free_port(ports))
+    gateway_port, db_port = ports[:2]
+    stack = AppStack(Target(project, db_port, gateway_port), root, root / UPSTREAM / 'docker-compose.yml',
+                     values=generated_values(gateway_port, db_port))
+    stack.migrator_password, stack.runtime_password = secrets.token_hex(24), secrets.token_hex(24)
+    return stack, ports
+
+
+@dataclass(frozen=True)
+class AppRun:
+    """One qualification's application stack, its ports, and the disposable project that owns it. `ports` are the
+    extra ones, beyond the gateway and the database."""
+
+    project: DisposableRun
+    stack: AppStack
+    gateway_port: int
+    db_port: int
+    ports: list[int]
+
+    @property
+    def base(self) -> str:
+        return f'http://127.0.0.1:{self.gateway_port}'
+
+    @property
+    def started_at(self) -> float:
+        return self.project.started_at
+
+
+@contextmanager
+def app_project(root: Path, cases: Cases, *, report: Path, extra_ports: int = 0, services: Sequence[str] = ()) -> Iterator[AppRun]:
+    """A new application stack inside disposable_db.disposable_project, checked before it starts: a safe rendering, and
+    each image of `services`, or of every service, present (SCRP-07). It is removed however the body ends."""
+    stack, ports = new_app_stack(root, extra_ports)
+
+    def prepare() -> None:
+        rendered = require_rendered(stack)
+        require_images({'services': {name: rendered['services'][name] for name in services}} if services else rendered)
+
+    with disposable_project(stack, cases, report=report, prepare=prepare) as owned:
+        yield AppRun(owned, stack, *ports[:2], ports[2:])
+
+
+def start_app(stack: AppStack, root: Path) -> int:
+    """Start every service, then roles, migrations and the reference seed, in the order LM-07 states, and return how
+    many migrations applied. A step that fails raises Unavailable, since no case after it would show anything."""
+    started = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300)
+    if started.returncode:
+        raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
+    bootstrap(stack, root)
+    applied, problem = apply_migrations(stack, root / MIGRATIONS)
+    if problem or seed(stack, root).returncode:
+        raise Unavailable(f'migrations failed: {problem}')
+    return applied
 
 
 def bootstrap(stack: AppStack, root: Path) -> None:
@@ -588,9 +648,7 @@ def profile_cases(stack: AppStack, cases: Cases) -> None:
              f"('{USER_B}', 'Bo');\n")
 
     def as_user(role: str, user: str | None, statement: str) -> subprocess.CompletedProcess[str]:
-        claims = json.dumps({'role': role, **({'sub': user} if user else {})})
-        return stack.sql(f"begin;\n{setup}set local role {role};\nselect set_config('request.jwt.claims', '{claims}', true), "
-                         f"set_config('request.jwt.claim.sub', '{user or ''}', true);\n{statement};\nrollback;\n")
+        return stack.as_role(role, user, statement, setup=setup)
 
     names = last_line(as_user('authenticated', USER_A, 'select string_agg(display_name, \',\' order by display_name) from public.user_profiles'))
     cases.check('a member reads its own and a shared member\'s name', 'Ada,Cy', names, names == 'Ada,Cy')
@@ -619,9 +677,7 @@ def draft_cases(stack: AppStack, cases: Cases) -> None:
              f"insert into public.workflow_drafts (workflow_id, workspace_id, graph, saved_by) values ('{flow}', '{WORKSPACE_A}', '{graph}', '{USER_A}');\n")
 
     def as_user(user: str, statement: str) -> subprocess.CompletedProcess[str]:
-        claims = json.dumps({'role': 'authenticated', 'sub': user})
-        return stack.sql(f"begin;\n{setup}set local role authenticated;\nselect set_config('request.jwt.claims', '{claims}', true), "
-                         f"set_config('request.jwt.claim.sub', '{user}', true);\n{statement};\nrollback;\n")
+        return stack.as_role('authenticated', user, statement, setup=setup)
 
     seen = last_line(as_user(member, f"select count(*) from public.workflow_drafts where workflow_id = '{flow}'"))
     cases.check("a member reads the workflow's draft", '1', seen, seen == '1')
@@ -786,7 +842,7 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     cases.denied('the runtime role cannot delete task times', stack.runtime("delete from app_private.plan_task_times;\n"), 'permission denied')
     # US-15.18: the applied-migration count, the one number the runtime role may read of the history.
     counted = stack.runtime('select app_private.applied_migration_count();\n')
-    expected_count = str(len([path for path in (Path(__file__).resolve().parents[1] / 'supabase/migrations').glob('*.sql') if MIGRATION_NAME.fullmatch(path.name)]))
+    expected_count = str(len([path for path in (root / MIGRATIONS).glob('*.sql') if MIGRATION_NAME.fullmatch(path.name)]))
     cases.check('the runtime role reads the applied-migration count, and only that', expected_count, last_line(counted),
                 counted.returncode == 0 and last_line(counted) == expected_count)
     cases.denied('authenticated cannot read the applied-migration count',
@@ -864,22 +920,9 @@ def type_cases(stack: AppStack, cases: Cases, root: Path, write: bool, snapshot:
 
 
 def qualify(root: Path, write_types: bool = False) -> int:
-    project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
-    gateway_port = free_port()
-    db_port = free_port([gateway_port])
-    target = Target(project, db_port, gateway_port)
-    stack = AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', values=generated_values(gateway_port, db_port))
-    stack.migrator_password, stack.runtime_password = secrets.token_hex(24), secrets.token_hex(24)
-    require_identity(target, tool_env())
-    if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
-        raise Unavailable('the Docker engine is not reachable')
-    (root / REPORT).unlink(missing_ok=True)
-    rendered = require_rendered(stack)
-    require_images({'services': {name: rendered['services'][name] for name in SERVICES}})
     cases = Cases(model_transport=MODEL_TRANSPORT)
-    before = other_resources(project)
-    started_at = time.monotonic()
-    try:
+    with app_project(root, cases, report=root / REPORT, services=SERVICES) as app:
+        stack, db_port = app.stack, app.db_port
         started = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', *SERVICES, timeout=300)
         if started.returncode:
             raise Unavailable(f'the disposable database and Storage did not start: {started.stderr[-300:]}')
@@ -912,20 +955,9 @@ def qualify(root: Path, write_types: bool = False) -> int:
         guard_cases(stack, cases, root)
         type_cases(stack, cases, root, write_types, snapshot)
         static_cases(cases, root)
-    finally:
-        remove_stack(stack)
-    label = f'label=com.docker.compose.project={project}'
-    left = (run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout
-            + run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
-    after = other_resources(project)
-    cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
-    write_report(root / REPORT, {'schema_version': 'autobots.app-db-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
-                                 'status': cases.status, 'target_class': 'disposable', 'project': project, 'cases': cases.records,
-                                 'not_established': ['H1', 'product acceptance', 'the persistent database',
-                                                     'Storage authorization through the Storage API']})
-    return 0 if cases.status == 'passed' else 1
+    return finish(root, root / REPORT, 'autobots.app-db-qualification/v1', cases, app.started_at,
+                  ['H1', 'product acceptance', 'the persistent database', 'Storage authorization through the Storage API'],
+                  project=stack.target.project)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -6,17 +6,20 @@ through the Playwright projects that suites.BROWSER_PROJECTS lists and the runne
 """
 from __future__ import annotations
 
-import ast
 import json
 import sys
 import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
+import harness_lib  # noqa: E402
 import suites  # noqa: E402
+import verify  # noqa: E402
+from qualification.profiles import PROFILES  # noqa: E402
 
 BROWSER_DIR = 'apps/web/tests/browser/'
 TEST_FILES = ('apps/web/tests/unit/**/*.test.ts', 'packages/api-client/tests/**/*.test.ts',
@@ -50,35 +53,11 @@ def pytest_paths(root: Path) -> tuple[str, ...]:
     return tuple(f'services/agent/{path}/' for path in paths)
 
 
-def imported_modules(node: ast.AST) -> list[str]:
-    """The dotted module names an import statement may load: `from a.b import c` may load a.b or a.b.c."""
-    if isinstance(node, ast.Import):
-        return [alias.name for alias in node.names]
-    if isinstance(node, ast.ImportFrom) and node.module and not node.level:
-        return [node.module, *(f'{node.module}.{alias.name}' for alias in node.names)]
-    return []
-
-
-def module_files(root: Path, name: str) -> list[Path]:
-    """Where a module of scripts/ lives, as a file or a package, with each enclosing package (R-39)."""
-    parts = name.split('.')
-    packages = [root / 'scripts' / Path(*parts[:depth]) / '__init__.py' for depth in range(1, len(parts) + 1)]
-    return [root / 'scripts' / Path(*parts[:-1], f'{parts[-1]}.py'), *packages]
-
-
 def profile_scripts(root: Path) -> set[Path]:
-    """The qualifier scripts a profile runs, and every sibling script or package module they import, transitively."""
-    pending = [root / argv[0] for _step, *argv in (*suites.DB_QUALIFIERS, *suites.OPERATIONS_QUALIFIERS)]
-    pending += [root / path for path in suites.FULL_QUALIFIERS]
-    found: set[Path] = set()
-    while pending:
-        path = pending.pop()
-        if path in found or not path.is_file():
-            continue
-        found.add(path)
-        for node in ast.walk(ast.parse(path.read_text())):
-            pending += [file for name in imported_modules(node) for file in module_files(root, name)]
-    return found
+    """The qualifier scripts the full, db and operations profiles run (qualification/profiles.py), and every sibling
+    script or package module they import, transitively, as harness_lib walks them for the Stop hook (R-65)."""
+    entries = [script for name in ('full', 'db', 'operations') for script in PROFILES[name].scripts]
+    return {root / path for path in harness_lib.import_closure(root, entries)}
 
 
 def unclaimed(root: Path) -> list[str]:
@@ -136,11 +115,14 @@ class SuiteClaims(unittest.TestCase):
             with self.subTest(pattern):
                 self.assertTrue(relative(ROOT, pattern))
 
-    def test_verify_builds_the_db_and_operations_steps_from_suites(self) -> None:
-        text = (ROOT / 'scripts/verify.py').read_text()
-        self.assertIn('DB_QUALIFIERS if profile ==', text)
-        for path in suites.FULL_QUALIFIERS:
-            self.assertIn(f"'{path}'", text)
+    def test_verify_builds_the_qualifier_steps_from_the_registry(self) -> None:
+        """No script keeps its own copy of a profile's qualifiers: verify plans exactly the registry's (R-65)."""
+        for name in ('db', 'operations'):
+            with self.subTest(name), mock.patch('verify.find_tools'), mock.patch('verify.missing_prepared_paths', return_value=[]):
+                plan, _ = verify.tool_plan(ROOT, name, None)
+                self.assertEqual([step.argv[1:] for step in plan.steps], [step.argv[1:] for step in PROFILES[name].steps if step.argv])
+        self.assertEqual(set(PROFILES['full'].scripts), {'scripts/generate_contracts.py', 'scripts/qualify_web.py', 'scripts/qualify_faults.py'})
+        self.assertNotIn("'scripts/qualify_", (ROOT / 'scripts/verify.py').read_text())
 
     def test_each_spec_is_in_exactly_one_project(self) -> None:
         # One project per file, so no spec runs twice or under another runner's environment, and none is listed

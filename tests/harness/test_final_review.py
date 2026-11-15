@@ -19,6 +19,7 @@ import qualify_web  # noqa: E402
 import qualify_worker_inference  # noqa: E402
 import toolchain  # noqa: E402
 import verify  # noqa: E402
+from qualification import profiles  # noqa: E402
 
 
 def report(path: Path, specs: list[dict], errors: list[str] | None = None) -> Path:
@@ -64,7 +65,7 @@ class Domains(unittest.TestCase):
     def test_the_db_plan_and_its_required_checks_agree(self) -> None:
         with mock.patch('verify.find_tools'), mock.patch('verify.missing_prepared_paths', return_value=[]):
             plan, _ = verify.tool_plan(ROOT, 'db', None)
-        self.assertEqual({step.id for step in plan.steps}, set(harness_lib.DB_CHECKS))
+        self.assertEqual({step.id for step in plan.steps}, set(profiles.DB_CHECKS))
 
     def test_steps_with_a_scripted_model_say_so(self) -> None:
         self.assertEqual(verify.STEP_CLASSES['identity_qualification'][1], 'mock')

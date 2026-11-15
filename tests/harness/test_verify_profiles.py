@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import harness_lib  # noqa: E402
 import verify  # noqa: E402
+from qualification import profiles  # noqa: E402
 from toolchain import Step, Unavailable  # noqa: E402
 
 
@@ -33,7 +34,7 @@ def passing_full_steps(root: Path) -> list[Step]:
     node = "print('# tests 1'); print('# pass 1')"
     return [python_step(root, name, summary if name == 'toolchain_scope_tests'
                         else node if name in verify.NODE_TEST_STEPS else 'pass')
-            for name in sorted(harness_lib.FULL_CHECKS)]
+            for name in sorted(profiles.FULL_CHECKS)]
 
 
 class Profiles(unittest.TestCase):
@@ -203,7 +204,7 @@ class Profiles(unittest.TestCase):
         passed, reason = harness_lib.evidence_state(self.root)
         self.assertFalse(passed)
         self.assertIn('db', reason)
-        everything = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.DB_CHECKS)]
+        everything = [python_step(self.root, name, 'pass') for name in sorted(profiles.DB_CHECKS)]
         self.assertEqual(self.run_steps('db', everything), 0)
         self.assertTrue(harness_lib.evidence_state(self.root)[0])
 
@@ -217,7 +218,7 @@ class Profiles(unittest.TestCase):
                          {'operations_qualification': 'scripts/qualify_operations.py',
                           'backup_qualification': 'scripts/qualify_backup.py',
                           'upgrade_qualification': 'scripts/qualify_upgrade.py'})
-        self.assertEqual({step.id for step in plan.steps}, harness_lib.OPERATIONS_CHECKS)
+        self.assertEqual({step.id for step in plan.steps}, profiles.OPERATIONS_CHECKS)
         self.assertEqual(plan.env['HOME'], '/home/fixture')
         self.assertNotIn('OPENROUTER_API_KEY', plan.env)
 
@@ -227,20 +228,20 @@ class Profiles(unittest.TestCase):
                 verify.tool_plan(self.root, profile, None)
 
     def test_operations_report_says_it_is_disposable_evidence(self):
-        steps = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.OPERATIONS_CHECKS)]
+        steps = [python_step(self.root, name, 'pass') for name in sorted(profiles.OPERATIONS_CHECKS)]
         self.assertEqual(self.run_steps('operations', steps), 0)
         report = self.report('operations')
         self.assertIn('Disposable evidence only, not H1 or product acceptance', report['scope'])
         self.assertLessEqual({'H1', 'product acceptance', 'the persistent stack', 'resource use under load'},
                              set(report['not_tested']))
-        classes = {check['class'] for check in report['checks'] if check['id'] in harness_lib.OPERATIONS_CHECKS}
+        classes = {check['class'] for check in report['checks'] if check['id'] in profiles.OPERATIONS_CHECKS}
         self.assertEqual(classes, {'disposable'})
         self.assertTrue(harness_lib.report_state(self.root, 'operations')[0])
 
     def test_operations_needs_every_qualifier(self):
-        for missing in sorted(harness_lib.OPERATIONS_CHECKS):
+        for missing in sorted(profiles.OPERATIONS_CHECKS):
             with self.subTest(missing=missing):
-                steps = [python_step(self.root, name, 'pass') for name in sorted(harness_lib.OPERATIONS_CHECKS - {missing})]
+                steps = [python_step(self.root, name, 'pass') for name in sorted(profiles.OPERATIONS_CHECKS - {missing})]
                 self.assertEqual(self.run_steps('operations', steps), 0)
                 self.assertFalse(harness_lib.report_state(self.root, 'operations')[0])
 
@@ -260,7 +261,7 @@ class Profiles(unittest.TestCase):
         git = ['git', '-C', str(self.root), '-c', 'user.name=t', '-c', 'user.email=t@invalid', '-c', 'commit.gpgsign=false']
         subprocess.run([*git, 'commit', '-qam', 'broken'], check=True, capture_output=True)
         self.assertEqual(harness_lib.scope_paths(self.root), ['services/agent/code.py'])
-        chosen = verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), harness_lib.scope_paths(self.root))
+        chosen = verify.selected_steps('fast', sorted(profiles.FULL_CHECKS), harness_lib.scope_paths(self.root))
         self.assertEqual(chosen, set(verify.PYTHON_STEPS))
 
     def test_a_failed_run_does_not_become_the_base_for_scope(self):

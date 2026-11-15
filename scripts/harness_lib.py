@@ -1,10 +1,11 @@
 """Local harness primitives; no package installation or model calls.
 
-`adapter_status` is the only part that runs an external program, and it runs only
-`claude --version`. Whether that command itself reaches the network is not known here.
+`adapter_status` runs only `claude --version`, and `run_bounded` only what its caller hands it. Whether
+`claude --version` itself reaches the network is not known here.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -12,10 +13,15 @@ import re
 import shutil
 import signal
 import subprocess
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import unquote, urlsplit
+
+# Every script's exit codes (AGENTS.md Commands).
+EXIT_PASSED, EXIT_FAILED, EXIT_UNAVAILABLE = 0, 1, 2
 
 # Tests and the version probe receive no inherited API keys, credentials or assistant configuration.
 REDUCED_ENV_KEYS = ('PATH', 'LANG', 'LC_ALL', 'TMPDIR')
@@ -57,24 +63,34 @@ SHARED_CHECK_PREFIXES = ('contracts/', 'tests/toolchain/', 'tests/faults/', 'tes
 RUNNER_FILES = frozenset({'scripts/verify.py', 'scripts/harness_lib.py'})
 # The shared records and errors the runner and every qualifier import (R-39).
 RUNNER_PREFIXES = ('scripts/qualification/',)
+# A floor: check_domains adds to these whatever a profile's scripts import (SCRP-06), and never takes one away.
 DB_CHECK_FILES = frozenset({'scripts/disposable_db.py', 'scripts/supabase_stack.py', 'scripts/app_db.py', 'scripts/qualify_identity.py',
                             'scripts/persistent_install.py', 'scripts/qualify_persistent_apply.py', 'scripts/paid_run.py'})
 DB_CHECK_PREFIXES = ('infra/', 'supabase/', 'tests/db/', 'packages/db-types/')
-HARNESS_CHECKS = frozenset({'project_configuration', 'backlog_validation', 'harness_behavior_tests'})
 APPLICATION_PROFILES = ('fast', 'full')
-PYTHON_STEPS = frozenset({'python_lock', 'python_env', 'ruff_check', 'ruff_format', 'mypy', 'pytest', 'contract_drift'})
-WEB_STEPS = frozenset({'node_lock', 'node_version', 'lint', 'format_check', 'typegen', 'typecheck', 'contract_drift',
-                       'api_client_typecheck', 'api_client_tests', 'web_unit_tests'})
 # R-07: repository Python (scripts, tests and the hooks) under the shared ruff and a strict mypy.
-REPO_PYTHON_STEPS = frozenset({'repo_ruff_check', 'repo_mypy'})
 REPO_PYTHON_PREFIXES = ('scripts/', 'tests/', '.claude/hooks/')
-FULL_ONLY_CHECKS = frozenset({'build', 'fault_qualification', 'toolchain_scope_tests', 'browser_qualification'})
-FULL_CHECKS = PYTHON_STEPS | WEB_STEPS | REPO_PYTHON_STEPS | FULL_ONLY_CHECKS
-DB_CHECKS = frozenset({'disposable_qualification', 'supabase_stack_qualification', 'app_db_qualification', 'identity_qualification',
-                       'persistent_apply_qualification'})
-OPERATIONS_CHECKS = frozenset({'operations_qualification', 'backup_qualification', 'upgrade_qualification'})
-# Recorded by the verifier itself, so they have no command exit code.
-UNCOMMANDED_CHECKS = frozenset({'project_configuration', 'non_mutation_guard'})
+# Each profile's checks are qualification/profiles.py's (SCRP-12). The functions that need them import it when they
+# run, so a script that uses only this module's other helpers, such as generate_contracts.py, also runs from a copy
+# holding just the two files.
+# The domains each profile's checks prove for the scripts it runs and everything they import (SCRP-06). The verifier
+# runs every profile, so what it imports affects them all.
+RUNNER_DOMAINS = frozenset({'python', 'web', 'db'})
+
+# Names of files holding a secret: the install's three env files and its keys, and any `.env` but an example.
+# .claude/hooks/dispatch.py keeps its own copy, which tests/harness/test_secret_names.py holds equal (SCRP-13).
+SECRET_FILE_NAMES = frozenset({'stack.env', 'app.env', 'owner.env', 'master.key', 'provider-master.key', 'backup.key'})
+# Where the install keeps its private record, as the hook's guard names it, case-folded.
+INSTALL_MARKERS = ('application support/autobots/secrets', '.local/share/autobots-install/')
+DotenvMode = Literal['app', 'verbatim']
+
+
+def closure_domains() -> tuple[tuple[tuple[str, ...], frozenset[str]], ...]:
+    """Which scripts each set of domains follows: the verifier's, the db profile's and full's."""
+    from qualification.profiles import PROFILES
+
+    return ((('scripts/verify.py',), RUNNER_DOMAINS), (PROFILES['db'].scripts, frozenset({'db'})),
+            (PROFILES['full'].scripts, frozenset({'python', 'web'})))
 
 FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 INLINE_CODE = re.compile(r'(`+)(?!`)(.+?)(?<!`)\1(?!`)')
@@ -134,11 +150,19 @@ def input_manifest(root: Path) -> dict[str, str]:
     return manifest
 
 
+def is_secret_name(name: str) -> bool:
+    """Whether a file of this name holds a secret. Case-folded, because this machine's default filesystem is
+    case-insensitive."""
+    folded = name.casefold()
+    return folded in SECRET_FILE_NAMES or ((folded == '.env' or folded.startswith('.env.')) and not folded.endswith('.example'))
+
+
 def is_non_input(relative: Path, path: Path) -> bool:
     text = relative.as_posix()
     # Evidence is excluded so a report does not fingerprint itself. The fixture is read by tests.
     evidence = text.startswith('docs/engineering/evidence/') and 'forward-fixture' not in relative.parts
-    secret = (path.name.startswith('.env') and not path.name.endswith('.example')) or path.name == 'provider-master.key'
+    # No secret is hashed into a report (PRD-Development-Harness DH-09.2), by any name the hook refuses (SCRP-13).
+    secret = (path.name.startswith('.env') and not path.name.endswith('.example')) or is_secret_name(path.name)
     return (evidence or secret
             or bool(NON_INPUT_DIRECTORIES.intersection(relative.parts))
             or path.name in {'next-env.d.ts', 'approvals.local.json', 'settings.local.json'}
@@ -146,16 +170,70 @@ def is_non_input(relative: Path, path: Path) -> bool:
             or path.suffix in {'.pyc', '.log', '.tsbuildinfo'})
 
 
-def fingerprint(root: Path) -> str:
-    encoded = json.dumps(input_manifest(root), sort_keys=True, separators=(',', ':'))
+def manifest_fingerprint(manifest: Mapping[str, str]) -> str:
+    encoded = json.dumps(manifest, sort_keys=True, separators=(',', ':'))
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-def check_domains(relative: str) -> set[str]:
-    """The check domains a repository-relative path affects."""
+def fingerprint(root: Path) -> str:
+    return manifest_fingerprint(input_manifest(root))
+
+
+def imported_modules(node: ast.AST) -> list[str]:
+    """The dotted module names an import statement may load: `from a.b import c` may load a.b or a.b.c."""
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+        return [node.module, *(f'{node.module}.{alias.name}' for alias in node.names)]
+    return []
+
+
+def module_files(root: Path, name: str) -> list[Path]:
+    """Where a module of scripts/ would live, as a file or a package, with each enclosing package."""
+    parts = name.split('.')
+    packages = [root / 'scripts' / Path(*parts[:depth]) / '__init__.py' for depth in range(1, len(parts) + 1)]
+    return [root / 'scripts' / Path(*parts[:-1], f'{parts[-1]}.py'), *packages]
+
+
+def import_closure(root: Path, entries: Iterable[str]) -> frozenset[str]:
+    """These scripts and every scripts/ file they import, transitively, as repository-relative paths. Read with
+    ast, so an import inside a function counts too. A file that doesn't parse is kept, without its imports."""
+    pending = [root / entry for entry in entries]
+    found: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in found or not path.is_file():
+            continue
+        found.add(path)
+        try:
+            tree = ast.parse(path.read_text())
+        except (OSError, SyntaxError, UnicodeError, ValueError):
+            continue
+        for node in ast.walk(tree):
+            pending.extend(file for name in imported_modules(node) for file in module_files(root, name))
+    return frozenset(path.relative_to(root).as_posix() for path in found)
+
+
+def derived_domains(root: Path) -> dict[str, frozenset[str]]:
+    """The domains each scripts/ file under `root` has because a profile's scripts import it (SCRP-06)."""
+    derived: dict[str, frozenset[str]] = {}
+    for entries, domains in closure_domains():
+        for path in import_closure(root, entries):
+            derived[path] = derived.get(path, frozenset()) | domains
+    return derived
+
+
+def check_domains(relative: str, root: Path | None = None, *, derived: Mapping[str, frozenset[str]] | None = None) -> set[str]:
+    """The check domains a repository-relative path affects. Given the checkout's root, or its `derived_domains`,
+    a script also has the domains of every profile whose scripts import it. That only adds a domain."""
     if relative in GATE_CONFIG_DOMAINS:
         return set(GATE_CONFIG_DOMAINS[relative])
     domains = _base_domains(relative)
+    closure = derived if derived is not None else derived_domains(root) if root is not None else {}
+    added = closure.get(relative, frozenset())
+    if added:
+        # `harness` means that no other domain applies, which is no longer so.
+        domains = (domains | added) - {'harness'}
     if (relative.endswith('.py') and relative.startswith(REPO_PYTHON_PREFIXES)
             and not relative.startswith('tests/faults/')):
         domains.add('repo_python')
@@ -176,11 +254,17 @@ def _base_domains(relative: str) -> set[str]:
     return {'harness'}
 
 
-def read_report(root: Path, profile: str) -> dict[str, Any] | None:
+def read_json(path: Path) -> object:
+    """The JSON a file holds, or None when it can't be read or parsed."""
     try:
-        data = json.loads((root / '.checks' / profile / 'latest.json').read_text())
+        data: object = json.loads(path.read_text())
     except (OSError, ValueError):
         return None
+    return data
+
+
+def read_report(root: Path, profile: str) -> dict[str, Any] | None:
+    data = read_json(root / '.checks' / profile / 'latest.json')
     return data if isinstance(data, dict) else None
 
 
@@ -193,27 +277,32 @@ def passing_manifest(root: Path, profiles: Iterable[str]) -> dict[str, str] | No
     return max(reports, key=lambda report: str(report.get('completed_at_utc', '')))['input_manifest'] if reports else None
 
 
-def scope_paths(root: Path, profiles: Iterable[str] = APPLICATION_PROFILES) -> list[str] | None:
-    """Inputs that differ from the last passing report, or None when none exists. A clean Git tree proves nothing."""
+def scope_paths(root: Path, profiles: Iterable[str] = APPLICATION_PROFILES,
+                manifest: Mapping[str, str] | None = None) -> list[str] | None:
+    """Inputs that differ from the last passing report, or None when none exists. A clean Git tree proves nothing.
+    `manifest` is the current input manifest, when the caller has already computed it."""
     base = passing_manifest(root, profiles)
     if base is None:
         return None
-    current = input_manifest(root)
+    current = input_manifest(root) if manifest is None else manifest
     return sorted(path for path in current.keys() | base.keys() if current.get(path) != base.get(path))
 
 
-def needs_profile(root: Path, profiles: Iterable[str], domains: set[str]) -> bool:
+def needs_profile(root: Path, profiles: Iterable[str], domains: set[str], *, manifest: Mapping[str, str] | None = None,
+                  derived: Mapping[str, frozenset[str]] | None = None) -> bool:
     """Whether these domains hold inputs no passing report of these profiles has seen."""
-    changed = scope_paths(root, profiles)
-    paths = input_manifest(root) if changed is None else changed
-    return any(check_domains(path) & domains for path in paths)
+    current = input_manifest(root) if manifest is None else manifest
+    closure = derived_domains(root) if derived is None else derived
+    changed = scope_paths(root, profiles, current)
+    paths = current if changed is None else changed
+    return any(check_domains(path, derived=closure) & domains for path in paths)
 
 
-def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
-    report = root / '.checks' / profile / 'latest.json'
-    try:
-        data = json.loads(report.read_text())
-    except (OSError, ValueError):
+def report_state(root: Path, profile: str = 'harness', manifest: Mapping[str, str] | None = None) -> tuple[bool, str]:
+    """Whether the last `profile` report passed, holds every check its profile requires, and saw today's inputs.
+    `manifest` is the current input manifest, when the caller has already computed it (SCRP-12)."""
+    data = read_json(root / '.checks' / profile / 'latest.json')
+    if data is None:
         return False, f'No readable {profile} report exists.'
     if not isinstance(data, dict):
         return False, f'The {profile} report is not a valid result object.'
@@ -226,11 +315,14 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
     checks = data.get('checks')
     if not isinstance(checks, list) or not all(isinstance(check, dict) for check in checks):
         return False, 'The report lacks the required successful checks.'
+    from qualification.profiles import PROFILES, UNCOMMANDED_CHECKS, required_checks
+
+    if profile not in PROFILES:
+        return False, f'{profile} is not a verification profile.'
     ids = {check.get('id') for check in checks}
-    # Only `fast` may leave steps out, and each one stays visible as `not_run`.
-    allowed = {'passed', 'not_run'} if profile == 'fast' else {'passed'}
-    required = set(HARNESS_CHECKS) if profile == 'harness' else {*HARNESS_CHECKS, 'non_mutation_guard'}
-    required |= {'full': FULL_CHECKS, 'db': DB_CHECKS, 'operations': OPERATIONS_CHECKS}.get(profile, frozenset())
+    # Only a profile that selects by change, `fast`, may leave steps out, and each one stays visible as `not_run`.
+    allowed = {'passed', 'not_run'} if PROFILES[profile].selects_by_change else {'passed'}
+    required = required_checks(profile)
     complete = ids == required if profile == 'harness' else required <= ids
     if not complete:
         return False, 'The report lacks the required successful checks.'
@@ -246,21 +338,24 @@ def report_state(root: Path, profile: str = 'harness') -> tuple[bool, str]:
             return False, 'An empty or missing behavioral suite cannot pass.'
         if check.get('tests_skipped'):
             return False, 'A skipped test is not a passing test.'
-    if (data.get('input_fingerprint') != fingerprint(root)
-            or data.get('input_manifest') != input_manifest(root)):
+    current = input_manifest(root) if manifest is None else manifest
+    if data.get('input_fingerprint') != manifest_fingerprint(current) or data.get('input_manifest') != current:
         return False, f'Source/configuration inputs changed after the last {profile} check.'
     return True, f'Current {profile} checks passed; other profiles and live gates remain separate.'
 
 
 def evidence_state(root: Path) -> tuple[bool, str]:
-    """Whether current reports cover what changed since each profile last passed."""
+    """Whether current reports cover what changed since each profile last passed. The input manifest and the import
+    closures are computed once for the whole evaluation, inside the hook's deadline (SCRP-12)."""
+    manifest = input_manifest(root)
+    derived = derived_domains(root)
     groups: list[tuple[str, ...]] = []
-    if needs_profile(root, APPLICATION_PROFILES, {'python', 'web', 'repo_python'}):
+    if needs_profile(root, APPLICATION_PROFILES, {'python', 'web', 'repo_python'}, manifest=manifest, derived=derived):
         groups.append(APPLICATION_PROFILES)
-    if needs_profile(root, ('db',), {'db'}):
+    if needs_profile(root, ('db',), {'db'}, manifest=manifest, derived=derived):
         groups.append(('db',))
     for group in groups or [('harness', *APPLICATION_PROFILES, 'db', 'operations')]:
-        states = [report_state(root, profile) for profile in group]
+        states = [report_state(root, profile, manifest) for profile in group]
         if not any(state[0] for state in states):
             return False, f"Inputs changed since the last passing {' or '.join(group)} report, and none is current."
     return True, 'Current reports cover the changed scope; live gates remain separate.'
@@ -470,21 +565,29 @@ def parse_version(value: object) -> tuple[int, ...] | None:
     return tuple(int(part) for part in value.split('.'))
 
 
-def probe_version(executable: str, root: Path, timeout: float) -> str | None:
-    """Run only `<executable> --version`. Failure, timeout and unparsable output all give None.
+@dataclass(frozen=True)
+class Bounded:
+    """What a bounded process did. `exit_code` is None when it could not start, its `failure` the error's type name,
+    or when it outlived its deadline, `failure` 'timeout'."""
 
-    A new session lets a timeout kill the whole process group, because a child holding the
-    captured pipes open would otherwise outlive the timeout. The path is never recorded.
-    """
+    exit_code: int | None
+    stdout: str
+    stderr: str
+    failure: str | None = None
+
+
+def run_bounded(argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], timeout: float,
+                stderr: int = subprocess.PIPE) -> Bounded:
+    """Run a process in its own session with no stdin, so a timeout kills its whole process group: a child holding
+    the captured pipes open would otherwise outlive the deadline (XTOL-16, SCRP-18). `stderr` is a subprocess
+    constant: PIPE keeps it apart, STDOUT merges it and DEVNULL drops it."""
     try:
-        process = subprocess.Popen([executable, '--version'], cwd=root, env=reduced_env(),
-                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, text=True, errors='replace',
-                                   start_new_session=True)
-    except OSError:
-        return None
+        process = subprocess.Popen(list(argv), cwd=cwd, env=dict(env), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                   stderr=stderr, text=True, errors='replace', start_new_session=True)
+    except OSError as error:
+        return Bounded(None, '', '', type(error).__name__)
     try:
-        output, _ = process.communicate(timeout=timeout)
+        output, errors = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -493,11 +596,54 @@ def probe_version(executable: str, root: Path, timeout: float) -> str | None:
         try:
             process.communicate(timeout=1)
         except subprocess.TimeoutExpired:
-            pass  # A descendant left its group and holds the pipe; report unknown regardless.
+            pass  # A descendant left its group and holds the pipe; the run has failed regardless.
+        return Bounded(None, '', '', 'timeout')
+    return Bounded(process.returncode, output or '', errors or '')
+
+
+def utc() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def parse_dotenv(text: str, mode: DotenvMode) -> dict[str, str]:
+    """`NAME=value` lines as a mapping, for the scripts' one reading of an env file (SCRP-16). A line it can't read
+    is skipped: nothing is raised, printed or logged, so no value can reach a console or a report.
+
+    `app` reads as the service does (autobots.application.credentials.precedence.parse_dotenv): comments,
+    `export`, matching single or double quotes and a trailing ` #` comment. tests/harness/test_dotenv.py holds
+    the two to the same fixtures. `verbatim` keeps every value as written, quotes included, as the install has
+    always read stack.env and the file its values come from, upstream's env.example.
+
+    Open question for the owner: whether stack.env should be read as the app reads. That strips the quotes
+    env.example puts on its four MAILER_URLPATHS_* values, so GoTrue would get them unquoted and the install's
+    auth container would be recreated at its next start, a change to the persistent install that this reading
+    must not make by itself (SCRP-16).
+    """
+    values = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        name, _, value = line.partition('=')
+        value = value.strip()
+        if mode == 'verbatim':
+            values[name.strip()] = value
+            continue
+        if len(value) >= 2 and value[0] in '"\'' and value[-1] == value[0]:
+            value = value[1:-1]
+        elif ' #' in value:
+            value = value.split(' #', 1)[0].rstrip()
+        values[name.strip().removeprefix('export ').strip()] = value
+    return values
+
+
+def probe_version(executable: str, root: Path, timeout: float) -> str | None:
+    """Run only `<executable> --version`. Failure, timeout and unparsable output all give None. The path is
+    never recorded."""
+    result = run_bounded([executable, '--version'], cwd=root, env=reduced_env(), timeout=timeout, stderr=subprocess.DEVNULL)
+    if result.exit_code != 0:
         return None
-    if process.returncode != 0:
-        return None
-    match = re.match(rf'\s*({VERSION})(?:\s|$)', output)
+    match = re.match(rf'\s*({VERSION})(?:\s|$)', result.stdout)
     return match[1] if match else None
 
 

@@ -1,12 +1,12 @@
 """US-14.17, Decision 0024 K2 and K7 and PK-06: `make start` passes only the Tavily and Jina keys,
 the GitHub repository and token (Decision 0025 V5) and the exact browsing switch, as data.
 
-Runs the Makefile's own TOOL_KEYS and BROWSER_SWITCH lines in a shell, against fixture `.env` files in a temporary
-directory, so nothing reads the repository's real `.env`.
+Builds the environment scripts/local_app.py gives a launched process from fixture `.env` files in a temporary
+directory, so nothing reads the repository's real `.env`, and checks that the Makefile asks for the keys only for
+the API and the worker (R-65 moved the launch out of Makefile shell).
 """
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 import sys
@@ -17,22 +17,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'scripts/tool_keys_env.py'
 MAKEFILE = (ROOT / 'Makefile').read_text()
+sys.path.insert(0, str(ROOT / 'scripts'))
+import local_app  # noqa: E402
 
 
 def launch_env(dotenv: str) -> tuple[dict[str, str], Path]:
-    """The environment a launched process would get, with both lines run as the Makefile runs them."""
+    """The environment a launched process would get, with the keys asked for, from a fixture `.env`."""
     work = Path(tempfile.mkdtemp(prefix='tool-keys-env-'))
     (work / '.env').write_text(dotenv)
-    commands = []
-    for name in ('TOOL_KEYS', 'BROWSER_SWITCH'):
-        line = re.search(rf'^{name} := (.+)$', MAKEFILE, re.MULTILINE)
-        assert line is not None
-        commands.append(line.group(1).replace('$$', '$').replace('$(PY)', f'{sys.executable}').replace('scripts/tool_keys_env.py', str(SCRIPT)))
-    shell = f'{" ".join(commands)} env -0'
-    result = subprocess.run(['/bin/sh', '-c', shell], cwd=work, env={'PATH': os.environ.get('PATH', '/usr/bin:/bin')},
-                            capture_output=True, check=True)
-    pairs = [item.split(b'=', 1) for item in result.stdout.split(b'\0') if b'=' in item]
-    return {name.decode(): value.decode() for name, value in pairs}, work
+    env = local_app.launch_env({'PATH': '/usr/bin:/bin'}, 'AUTOBOTS_DATABASE_URL=postgresql://arranged\n',
+                               dotenv=(work / '.env').read_text(), node_bin='', inference='')
+    return env, work
 
 
 class ToolKeysEnv(unittest.TestCase):
@@ -40,7 +35,8 @@ class ToolKeysEnv(unittest.TestCase):
         """Decision 0024 K7: nothing else reaches the process, and no other value turns it on."""
         env, _ = launch_env('AUTOBOTS_BROWSER_EXECUTOR=enabled\nAUTOBOTS_WORKER_INFERENCE=enabled\n')
         self.assertEqual(env.get('AUTOBOTS_BROWSER_EXECUTOR'), 'enabled')
-        self.assertNotIn('AUTOBOTS_WORKER_INFERENCE', env)
+        # Inference stays as the Makefile sets it, empty and so off, whatever the file says.
+        self.assertEqual(env['AUTOBOTS_WORKER_INFERENCE'], '')
         for value in ('', 'Enabled', 'true', "enabled'; touch pwned; '", '1'):
             env, work = launch_env(f'AUTOBOTS_BROWSER_EXECUTOR={value}\n')
             self.assertNotIn('AUTOBOTS_BROWSER_EXECUTOR', env, value)
@@ -58,6 +54,17 @@ class ToolKeysEnv(unittest.TestCase):
         self.assertNotIn('OTHER', env)
         self.assertEqual(sorted(path.name for path in work.iterdir()), ['.env'])
 
+    def test_the_command_quotes_each_value_for_a_shell(self):
+        hostile = "tvly-fixture$(touch pwned)`touch pwned2`'\"; touch pwned3"
+        with tempfile.TemporaryDirectory() as folder:
+            work = Path(folder)
+            (work / '.env').write_text(f"TAVILY_API_KEY='{hostile}'\nOTHER=1\n")
+            printed = subprocess.run([sys.executable, str(SCRIPT), '.env'], cwd=work, capture_output=True, text=True, check=True).stdout
+            shell = subprocess.run(['/bin/sh', '-c', f'{printed}\nprintf %s "$TAVILY_API_KEY"'], cwd=work, capture_output=True, text=True, check=True)
+            self.assertEqual(shell.stdout, hostile.strip("'"))
+            self.assertEqual(sorted(path.name for path in work.iterdir()), ['.env'])
+        self.assertNotIn('OTHER', printed)
+
     def test_blank_keys_and_a_missing_file_pass_nothing(self):
         env, _ = launch_env('TAVILY_API_KEY=\nJINA_API_KEY=   \nGITHUB_REPOSITORY=\nGITHUB_TOKEN= \n')
         for name in ('TAVILY_API_KEY', 'JINA_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN'):
@@ -66,12 +73,11 @@ class ToolKeysEnv(unittest.TestCase):
         self.assertEqual((missing.returncode, missing.stdout, missing.stderr), (0, '', ''))
 
     def test_only_the_api_and_the_worker_get_the_keys(self):
-        launches = dict(re.findall(r'^\t\$\(call launch,(\w+),(.+)\)$', MAKEFILE, re.MULTILINE))
+        launches = dict(re.findall(r'^\t@\$\(LAUNCH\) (\w+) (.+)$', MAKEFILE, re.MULTILINE))
         self.assertEqual(sorted(launches), ['api', 'web', 'worker'])
-        self.assertTrue(launches['api'].endswith(',keys'))
-        self.assertTrue(launches['worker'].endswith(',keys'))
-        self.assertFalse(launches['web'].endswith(',keys'))
-        self.assertIn('$(if $(3),$(TOOL_KEYS) $(BROWSER_SWITCH))', MAKEFILE)
+        self.assertIn('--keys .env --', launches['api'])
+        self.assertIn('--keys .env', launches['worker'])
+        self.assertNotIn('--keys', launches['web'])
         self.assertNotRegex(MAKEFILE, r'(?m)^\s*(set -a; )?\.\s+["\']?\.env')
 
 

@@ -541,6 +541,9 @@ class HookTests(unittest.TestCase):
         shutil.copy2(ROOT / '.claude/hooks/dispatch.py', script)
         (home / 'scripts').mkdir(exist_ok=True)
         shutil.copy2(ROOT / 'scripts/harness_lib.py', home / 'scripts/harness_lib.py')
+        # harness_lib reads each profile's checks from the registry in this package (R-65).
+        shutil.copytree(ROOT / 'scripts/qualification', home / 'scripts/qualification', dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('__pycache__'))
         fake = parent / 'bin/git'
         fake.parent.mkdir(exist_ok=True)
         fake.write_text('#!/bin/sh\n' + body + '\n')
@@ -671,6 +674,9 @@ class HookTests(unittest.TestCase):
             shutil.copy2(ROOT / '.claude/hooks/dispatch.py', script)
             (home / 'scripts').mkdir()
             shutil.copy2(ROOT / 'scripts/harness_lib.py', home / 'scripts/harness_lib.py')
+            # harness_lib reads each profile's checks from the registry in this package (R-65).
+            shutil.copytree(ROOT / 'scripts/qualification', home / 'scripts/qualification',
+                            ignore=shutil.ignore_patterns('__pycache__'))
 
             def respond(event: str, cwd: Path, file_path: Path) -> dict:
                 result = self.dispatch(json.dumps({'hook_event_name': event, 'cwd': str(cwd), 'tool_name': 'Edit',

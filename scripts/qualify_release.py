@@ -48,8 +48,9 @@ from disposable_db import (
 from harness_lib import fingerprint, project_root
 from live_goal import TRACING, disposable_session
 from paid_run import PaidSession
-from qualify_identity import PYTHON, bootstrap_owner
-from qualify_operations import Ops, api_call, wait
+from qualification.children import CHECK_PYTHON as PYTHON
+from qualification.ops import Ops, api_call, wait
+from qualification.owners import bootstrap_owner
 from qualify_web import BROWSERS, start, stop, wait_until_up
 from qualify_web import free_port as any_port
 from release_scoring import (

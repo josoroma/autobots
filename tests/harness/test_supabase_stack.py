@@ -56,9 +56,11 @@ class Rendering(unittest.TestCase):
         labels = {stack.TARGET_LABEL: 'disposable', stack.RUN_LABEL: PROJECT}
         service = {'image': 'x@sha256:0', 'pull_policy': 'never', 'labels': labels}
         services = {name: dict(service) for name in stack.REQUIRED_SERVICES}
+        # Every init script upstream mounts survives the merge (SQLI-19), each read-only from the vendored release.
+        source = str(ROOT / stack.UPSTREAM / 'volumes/db/jwt.sql')
+        init = [{'type': 'bind', 'read_only': True, 'source': source, 'target': target} for target in sorted(stack.upstream_init_targets(ROOT))]
         services['db'] = {**service, 'ports': [{'host_ip': '127.0.0.1', 'published': '55400', 'target': 5432}],
-                          'volumes': [{'type': 'volume', 'source': 'data'},
-                                      {'type': 'bind', 'read_only': True, 'source': str(ROOT / stack.UPSTREAM / 'volumes/db/jwt.sql')}]}
+                          'volumes': [{'type': 'volume', 'source': 'data'}, *init]}
         services['api-gw'] = {**service, 'ports': [{'host_ip': '127.0.0.1', 'published': '55401', 'target': 8000}]}
         services['studio'] = {**service, 'environment': {'OPENAI_API_KEY': '', 'NEXT_TELEMETRY_DISABLED': '1'}}
         return {'services': services, 'volumes': {'data': {'name': f'{PROJECT}_data', 'labels': labels}}}
@@ -81,12 +83,24 @@ class Rendering(unittest.TestCase):
         def host_network(d): d['services']['db']['network_mode'] = 'host'
         def external(d): d['volumes']['data']['external'] = True
         def missing(d): del d['services']['meta']
+        def dropped_init(d): d['services']['db']['volumes'].pop()
         for change in (wildcard, extra_port, pooler, raw_studio, ai, telemetry, provider_key, fixed_name, floating, writable,
-                       foreign, host_network, external, missing):
+                       foreign, host_network, external, missing, dropped_init):
             with self.subTest(change=change.__name__):
                 data = self.rendered()
                 change(data)
                 self.assertTrue(stack.rendered_refusals(data, PROJECT, ROOT))
+
+    def test_every_upstream_init_script_is_read_from_the_vendored_release(self):
+        self.assertEqual(len(stack.upstream_init_targets(ROOT)), 7)
+        self.assertTrue(all(target.startswith(stack.INIT_DIRECTORY) for target in stack.upstream_init_targets(ROOT)))
+
+    def test_a_dropped_init_script_is_named(self):
+        data = self.rendered()
+        dropped = data['services']['db']['volumes'].pop()['target']
+        self.assertIn(f'service db drops the upstream init script {dropped}', stack.rendered_refusals(data, PROJECT, ROOT))
+        # The persistent install's rendering, which carries no disposable marking, is held to it too.
+        self.assertIn(f'service db drops the upstream init script {dropped}', stack.rendered_refusals(data, PROJECT, ROOT, marked=False))
 
 
 class Vendoring(unittest.TestCase):

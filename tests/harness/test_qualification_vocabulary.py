@@ -24,10 +24,10 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import disposable_db  # noqa: E402
 import evidence  # noqa: E402
 import qualify_operations  # noqa: E402
-import suites  # noqa: E402
 import toolchain  # noqa: E402
 import verify  # noqa: E402
 from qualification import errors, records  # noqa: E402
+from qualification.profiles import PROFILES  # noqa: E402
 
 # The qualifiers whose child checks and arrangements go through the shared package.
 QUALIFIERS = ('app_db', 'qualify_identity', 'qualify_operations', 'qualify_upgrade', 'qualify_backup', 'qualify_browse_goal',
@@ -91,11 +91,11 @@ class Vocabulary(unittest.TestCase):
         self.assertEqual((cases.records[1]['observed'], cases.status), ('3', 'failed'))
 
     def test_operations_cases_name_the_scripted_model_their_step_declares(self) -> None:
-        """Their fixture workers run a scripted model, as verify.STEP_CLASSES says (SCRP-10)."""
-        for step, script, *_ in suites.OPERATIONS_QUALIFIERS:
-            with self.subTest(step):
-                self.assertEqual(verify.STEP_CLASSES[step], ('disposable', 'mock'))
-                self.assertIn('Checks(model_transport=MODEL_TRANSPORT)', (ROOT / script).read_text())
+        """Their fixture workers run a scripted model, as their registered steps say (SCRP-10, qualification/profiles.py)."""
+        for step in PROFILES['operations'].steps:
+            with self.subTest(step.id):
+                self.assertEqual(verify.STEP_CLASSES[step.id], ('disposable', 'mock'))
+                self.assertIn('Cases(model_transport=MODEL_TRANSPORT)', (ROOT / str(step.script)).read_text())
         self.assertEqual(qualify_operations.MODEL_TRANSPORT, 'mock')
 
     def test_a_written_report_round_trips(self) -> None:

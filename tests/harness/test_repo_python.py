@@ -11,12 +11,14 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import harness_lib  # noqa: E402
 import toolchain  # noqa: E402
 import verify  # noqa: E402
+from qualification import profiles  # noqa: E402
 
 # The hook's trust boundary, which mypy checks strictly (STD-48).
 # The hook's trust boundary, the runner that records every qualifier's child checks (R-39) and the
 # paid-run session that guards real spend (R-23).
 TRUST_BOUNDARY = {'.claude/hooks/dispatch.py', 'scripts/harness_lib.py', 'scripts/verify.py', 'scripts/specs.py',
-                  'scripts/evidence.py', 'scripts/toolchain.py', 'scripts/qualification/', 'scripts/paid_run.py'}
+                  'scripts/evidence.py', 'scripts/toolchain.py', 'scripts/qualification/', 'scripts/paid_run.py',
+                  'scripts/local_app.py'}
 
 
 class RepositoryPython(unittest.TestCase):
@@ -38,18 +40,18 @@ class RepositoryPython(unittest.TestCase):
             with self.subTest(path):
                 self.assertIn(path, manifest)
                 self.assertEqual(harness_lib.check_domains(path), domains)
-                chosen = verify.selected_steps('fast', sorted(harness_lib.FULL_CHECKS), [path])
-                expected = harness_lib.WEB_STEPS if 'web' in domains else harness_lib.REPO_PYTHON_STEPS
+                chosen = verify.selected_steps('fast', sorted(profiles.FULL_CHECKS), [path])
+                expected = profiles.WEB_STEPS if 'web' in domains else profiles.REPO_PYTHON_STEPS
                 self.assertTrue(expected <= chosen)
 
     def test_fast_runs_the_repository_steps_for_those_files(self) -> None:
-        step_ids = sorted(harness_lib.FULL_CHECKS)
+        step_ids = sorted(profiles.FULL_CHECKS)
         self.assertEqual(verify.selected_steps('fast', step_ids, ['tests/harness/test_hooks.py']),
-                         set(harness_lib.REPO_PYTHON_STEPS))
-        self.assertTrue(harness_lib.REPO_PYTHON_STEPS <= verify.selected_steps('fast', step_ids, ['scripts/verify.py']))
-        self.assertTrue(harness_lib.REPO_PYTHON_STEPS <= verify.selected_steps('fast', step_ids, None))
-        self.assertFalse(harness_lib.REPO_PYTHON_STEPS & verify.selected_steps('fast', step_ids, ['docs/note.md']))
-        self.assertTrue(harness_lib.REPO_PYTHON_STEPS <= harness_lib.FULL_CHECKS)
+                         set(profiles.REPO_PYTHON_STEPS))
+        self.assertTrue(profiles.REPO_PYTHON_STEPS <= verify.selected_steps('fast', step_ids, ['scripts/verify.py']))
+        self.assertTrue(profiles.REPO_PYTHON_STEPS <= verify.selected_steps('fast', step_ids, None))
+        self.assertFalse(profiles.REPO_PYTHON_STEPS & verify.selected_steps('fast', step_ids, ['docs/note.md']))
+        self.assertTrue(profiles.REPO_PYTHON_STEPS <= profiles.FULL_CHECKS)
 
     def test_the_steps_run_prepared_binaries_from_the_root_and_install_nothing(self) -> None:
         tools = toolchain.Tools(node_dir='/stub', python='/stub/python', uv='uv', corepack='corepack',

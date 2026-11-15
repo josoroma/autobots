@@ -22,29 +22,19 @@ import string
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
-from urllib import error, request
 
-from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
+from app_db import AppStack, app_project, apply_bootstrap, start_app
 from disposable_db import (
-    PROJECT_PREFIX,
     Cases,
     Refused,
-    Target,
     Unavailable,
-    free_port,
-    other_resources,
-    remove_stack,
-    require_identity,
     rows,
     tool_env,
 )
-from disposable_db import run as run_command
-from harness_lib import fingerprint, project_root
+from harness_lib import project_root
 from qualification.children import (
     Child,
     ChildRun,
@@ -53,10 +43,11 @@ from qualification.children import (
     run_child_check,
     service_env,
 )
-from qualification.records import write_report
+from qualification.net import http
+from qualification.owners import bootstrap_owner, password_token
+from qualification.report import finish
 from qualify_web import BROWSERS, run_problems, start, stop, summarize, wait_until_up
 from suites import ARRANGED_PROJECT, IDENTITY_PROJECT, SLICE_PROJECT
-from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
 REPORT = Path('.checks/identity/qualification.json')
@@ -68,7 +59,7 @@ PYTHON = Path('services/agent/.venv/bin/python')
 ERR_DIR = Path('.checks/identity')
 # The SQL each arrangement sends, with `${name}` placeholders that `fixture` fills in.
 IDENTITY_FIXTURES = Path('tests/db/identity')
-# Its children drive runs with a scripted model, as verify.STEP_CLASSES says.
+# Its children drive runs with a scripted model, as its step in qualification/profiles.py says.
 MODEL_TRANSPORT = 'mock'
 # The checks after the artifact check, in order, against real Storage through the runtime role. Arguments
 # name workspace A, workspace B or the service's interpreter (qualification/children.py Child).
@@ -124,39 +115,8 @@ SAVED_CHOICES = (('a saved default naming DeepSeek', 'openrouter_deepseek_flash'
 READINESS_TITLES = ("names the service that isn't ready", 'all local services ready')
 
 
-def http(method: str, url: str, headers: Mapping[str, str] | None = None, body: bytes | None = None) -> tuple[int, str]:
-    try:
-        with request.urlopen(request.Request(url, data=body, method=method, headers=dict(headers or {})), timeout=20) as reply:
-            return reply.status, reply.read().decode(errors='replace')
-    except error.HTTPError as failure:
-        return failure.code, failure.read().decode(errors='replace')
-
-
 def denied(status: int) -> bool:
     return 400 <= status < 500
-
-
-def bootstrap_owner(root: Path, base: str, service_key: str, database_url: str, email: str, password: str) -> dict:
-    result = subprocess.run([str(root / PYTHON), '-m', 'autobots.operations.bootstrap_owner', '--email', email, '--workspace-name', email],
-                            env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1',
-                                 'AUTOBOTS_SUPABASE_URL': base, 'AUTOBOTS_SERVICE_ROLE_KEY': service_key,
-                                 'AUTOBOTS_OWNER_PASSWORD': password, 'AUTOBOTS_DATABASE_URL': database_url},
-                            capture_output=True, text=True, timeout=60, check=False)
-    if result.returncode:
-        raise Unavailable(f'owner bootstrap failed: {result.stderr.strip()[-200:]}')
-    try:
-        owner = json.loads(result.stdout)
-    except ValueError as error:
-        raise Unavailable(f'owner bootstrap printed no JSON: {result.stdout.strip()[-200:]}') from error
-    if not isinstance(owner, dict):
-        raise Unavailable('owner bootstrap printed no JSON object')
-    return owner
-
-
-def password_token(base: str, anon: str, email: str, password: str) -> tuple[int, str]:
-    status, body = http('POST', f'{base}/auth/v1/token?grant_type=password', {'apikey': anon, 'Content-Type': 'application/json'},
-                        json.dumps({'email': email, 'password': password}).encode())
-    return status, json.loads(body).get('access_token', '') if status == 200 else ''
 
 
 @dataclass(frozen=True)
@@ -771,30 +731,11 @@ def browser_cases(run: IdentityRun, cases: Cases, fixtures: Mapping[str, str]) -
 
 
 def qualify(root: Path) -> int:
-    project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
-    gateway_port = free_port()
-    db_port = free_port([gateway_port])
-    target = Target(project, db_port, gateway_port)
-    stack = AppStack(target, root, root / 'infra/supabase/upstream/docker-compose.yml', values=generated_values(gateway_port, db_port))
-    stack.migrator_password, stack.runtime_password = secrets.token_hex(24), secrets.token_hex(24)
-    require_identity(target, tool_env())
-    if run_command(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
-        raise Unavailable('the Docker engine is not reachable')
-    (root / REPORT).unlink(missing_ok=True)
-    rendered = require_rendered(stack)
-    require_images(rendered)
     cases = Cases(model_transport=MODEL_TRANSPORT)
-    before = other_resources(project)
-    started_at = time.monotonic()
-    run = IdentityRun(root, stack, f'http://127.0.0.1:{gateway_port}', db_port)
-    try:
-        started = stack.compose('up', '-d', '--wait', '--wait-timeout', '240', timeout=300)
-        if started.returncode:
-            raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
-        bootstrap(stack, root)
-        applied, problem = apply_migrations(stack, root / 'supabase/migrations')
-        if problem or seed(stack, root).returncode:
-            raise Unavailable(f'migrations failed: {problem}')
+    with app_project(root, cases, report=root / REPORT) as app:
+        stack = app.stack
+        run = IdentityRun(root, stack, app.base, app.db_port)
+        applied = start_app(stack, root)
         bootstrapped, stored = apply_bootstrap(stack, root)
         cases.check('the bootstrap files apply, storage.sql first', 'each with its history row', f'{applied} migrations, {bootstrapped}, {stored}',
                     stored is None and bootstrapped[:1] == ['bootstrap/storage.sql'])
@@ -815,19 +756,8 @@ def qualify(root: Path) -> int:
         for arrange in ARRANGEMENTS:
             fixtures |= arrange(run, cases)
         browser_cases(run, cases, fixtures)
-    finally:
-        remove_stack(stack)
-    label = f'label=com.docker.compose.project={project}'
-    left = (run_command(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout
-            + run_command(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
-    after = other_resources(project)
-    cases.check('other Docker resources are untouched', 'same', f'{len(before)} before, {len(after)} after', before == after)
-    write_report(root / REPORT, {'schema_version': 'autobots.identity-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
-                                 'duration_seconds': round(time.monotonic() - started_at, 1), 'input_fingerprint': fingerprint(root),
-                                 'status': cases.status, 'target_class': 'disposable', 'project': project, 'cases': cases.records,
-                                 'not_established': ['H1', 'product acceptance', 'the persistent stack', 'a running Realtime service']})
-    return 0 if cases.status == 'passed' else 1
+    return finish(root, root / REPORT, 'autobots.identity-qualification/v1', cases, app.started_at,
+                  ['H1', 'product acceptance', 'the persistent stack', 'a running Realtime service'], project=stack.target.project)
 
 
 def main() -> int:

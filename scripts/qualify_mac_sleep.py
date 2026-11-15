@@ -35,8 +35,9 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
-from qualify_identity import PYTHON, bootstrap_owner, password_token
-from qualify_operations import Ops, api_call, wait
+from qualification.children import CHECK_PYTHON as PYTHON
+from qualification.ops import Ops, api_call, wait
+from qualification.owners import bootstrap_owner, password_token
 from supabase_stack import generated_values, require_images, require_rendered
 
 OUT = Path('.checks/mac-sleep')

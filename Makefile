@@ -9,7 +9,7 @@ PROJECT      := autobots-install
 INSTALL_DIR  := $(HOME)/.local/share/autobots-install
 WORKSPACE    := Personal
 # install.json holds no secret. Its ports win once it exists, so they're only chosen at first-time.
-recorded      = $(shell python3.12 -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$(INSTALL_DIR)/install.json" $(1) 2>/dev/null)
+recorded      = $(shell python3.12 scripts/local_app.py recorded "$(INSTALL_DIR)" $(1) 2>/dev/null)
 GATEWAY_PORT := $(or $(call recorded,gateway_port),55321)
 DB_PORT      := $(or $(call recorded,db_port),55322)
 API_PORT     := $(or $(call recorded,api_port),8001)
@@ -17,13 +17,18 @@ WEB_PORT     := $(or $(call recorded,web_port),3000)
 # Empty means off. Only `enabled` turns on inference, which spends real money.
 INFERENCE    :=
 
-NODE_BIN := $(HOME)/.nvm/versions/node/v$(shell cat .node-version)/bin
+# The pinned Node, found and checked as scripts/toolchain.py finds it, or empty. Read only when a recipe uses it.
+NODE_BIN  = $(shell python3.12 scripts/toolchain.py node-bin 2>/dev/null)
+NO_NODE  := The pinned Node $(shell cat .node-version) was not found on PATH or under nvm. Install it, then: make toolchain
 PY       := services/agent/.venv/bin/python
 NEXT     := apps/web/node_modules/.bin/next
 INSTALL  := $(PY) scripts/persistent_install.py --install-dir "$(INSTALL_DIR)"
 APP_ENV  := $(INSTALL_DIR)/app.env
 RUN_DIR  := $(INSTALL_DIR)/run
 LOG_DIR  := $(INSTALL_DIR)/logs
+# Process supervision lives in scripts/local_app.py, which tests/harness/test_local_app.py exercises.
+LOCAL_APP = python3.12 scripts/local_app.py --run-dir "$(RUN_DIR)" --log-dir "$(LOG_DIR)"
+LAUNCH    = $(LOCAL_APP) start --env-file "$(APP_ENV)" --inference "$(INFERENCE)" --node-bin "$(NODE_BIN)"
 
 .DEFAULT_GOAL := help
 # Every sequence here depends on its order, including under an inherited -j.
@@ -66,10 +71,10 @@ first-time:
 toolchain:
 	python3.12 scripts/toolchain.py bootstrap
 
-# The overlay sets pull_policy: never, so these are the only pulls, and only when asked for.
+# The overlay sets pull_policy: never, so these are the only pulls, and only when asked for. Each image the merged
+# release and overlay name, so one that upstream adds without an overlay pin is pulled too.
 images:
-	@grep -E '^[[:space:]]+image:' infra/supabase/compose.overlay.yaml | sed -E 's/.*image:[[:space:]]*//' | \
-		while read -r image; do docker pull "$$image" || exit 1; done
+	$(INSTALL) images
 
 # The browser executor's two images, each labelled with the fingerprint of its sources (refactor plan
 # R-57, SQLI-02). Built only when asked for. browse_goal stays off until scripts/qualify_browser_executor.py
@@ -90,7 +95,8 @@ owner:
 		$(PY) -m autobots.operations.bootstrap_owner --email "$$OWNER_EMAIL" --workspace-name "$(WORKSPACE)"
 
 build:
-	cd apps/web && PATH="$(NODE_BIN):$$PATH" NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next build
+	@node_bin='$(NODE_BIN)'; test -n "$$node_bin" || { echo '$(NO_NODE)'; exit 1; }; \
+		cd apps/web && PATH="$$node_bin:$$PATH" NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next build
 
 # Not part of `start`: docs/engineering/runbooks/upgrade.md backs up and tries a copy first.
 migrate:
@@ -98,64 +104,15 @@ migrate:
 
 # --- Start ------------------------------------------------------------------------------
 
-# $(call running,name): the pid file's process is still the one we started. A pid file can outlive
-# a reboot, and its pid can then belong to something else, so the pid has to match its start time.
-# Sets $$pid. ps formats lstart for the caller's timezone and locale, so both reads pin them: another
-# shell's settings mustn't make a live worker, possibly a paid one, look stopped.
-start_time = LC_ALL=C TZ=UTC ps -p "$(1)" -o lstart= 2>/dev/null
-running = pid="$$(sed -n 1p "$(RUN_DIR)/$(1).pid" 2>/dev/null)"; started="$$($(call start_time,$${pid:-0}))"; [ -n "$$started" ] && [ "$$started" = "$$(sed -n 2p "$(RUN_DIR)/$(1).pid")" ]
-
-# $(strays_name): pids that look like this process without being the tracked one. A copy started
-# outside this file, or one whose pid file was lost, would otherwise make the next start fail on its
-# port, or run a second worker. The worker pattern's brackets, and dropping this shell's own pid, keep
-# the recipe's own command line from matching.
-strays_api    = lsof -nP -t -iTCP:$(API_PORT) -sTCP:LISTEN 2>/dev/null
-strays_web    = lsof -nP -t -iTCP:$(WEB_PORT) -sTCP:LISTEN 2>/dev/null
-strays_worker = pgrep -f 'autobots[.]operations[.]worker' 2>/dev/null | grep -vx "$$$$"
-stray_pids    = held="$$($(strays_$(1)) | tr '\n' ' ' | sed 's/ *$$//')"
-
-# Decisions 0024 K2 and 0025 V5: the Tavily and Jina keys and the GitHub repository and token from
-# this repository's .env, for the API and the worker. The script parses the file as data and prints
-# only those four names, shell-quoted, so evaluating its output runs nothing from the file. A blank or
-# missing value prints nothing. A value saved at Settings → Keys & vars still wins for its workspace.
-TOOL_KEYS := eval "$$($(PY) scripts/tool_keys_env.py .env)";
-# Decision 0024 K7: AUTOBOTS_BROWSER_EXECUTOR=enabled from the same .env, and nothing but that exact
-# value. browse_goal still needs a passing executor qualification at the current code.
-BROWSER_SWITCH := eval "$$($(PY) scripts/tool_keys_env.py .env --browser-switch)";
-
-# $(call launch,name,command[,keys]): start in the background, with the install's environment, and
-# with the tool keys and the browsing switch when keys is given. It refuses beside an untracked copy and never stops one
-# itself, as a worker may be in a paid call.
-define launch
-	@mkdir -p "$(RUN_DIR)" "$(LOG_DIR)"; \
-	if $(call running,$(1)); then \
-		echo '$(1): already running'; \
-	elif $(call stray_pids,$(1)); [ -n "$$held" ]; then \
-		echo '$(1): refused. pid '"$$held"' looks like a copy of the $(1) that this install does not track, so a new one would clash with it.'; \
-		echo '  See it with: ps -o pid,lstart,command -p '"$$held"; \
-		echo '  Stop it with: kill -TERM '"$$held"' (a worker drains for up to 30 seconds), then run this again.'; \
-		exit 1; \
-	else \
-		set -a; . "$(APP_ENV)"; set +a; \
-		$(if $(3),$(TOOL_KEYS) $(BROWSER_SWITCH)) \
-		PYTHONPATH=services/agent/src PATH="$(NODE_BIN):$$PATH" NEXT_TELEMETRY_DISABLED=1 AUTOBOTS_WORKER_INFERENCE="$(INFERENCE)" \
-			nohup $(2) >> "$(LOG_DIR)/$(1).log" 2>&1 < /dev/null & \
-		pid=$$!; { echo "$$pid"; $(call start_time,$$pid); } > "$(RUN_DIR)/$(1).pid"; \
-		echo '$(1): started'; \
-	fi
-endef
-
-# $(call await,name,port,url): our own process has to hold the port, so another project's server
-# on it doesn't count. Then any HTTP reply will do, as the API answers 401 without its credential.
-define await
-	@i=0; until { $(call running,$(1)); } && lsof -nP -t -iTCP:$(2) -sTCP:LISTEN 2>/dev/null | grep -qx "$$pid" && curl -s -o /dev/null --max-time 2 "$(3)"; do \
-		i=$$((i + 1)); \
-		if [ $$i -ge 30 ] || ! { $(call running,$(1)); }; then \
-			echo '$(1): not answering at $(3). Something else may hold the port. Read $(LOG_DIR)/$(1).log'; exit 1; \
-		fi; \
-		sleep 1; \
-	done; echo '$(1): answering at $(3)'
-endef
+# scripts/local_app.py keeps the rules (SQLI-10). A pid counts only while its start time matches, read
+# with a pinned locale and zone, so a pid file that outlived a reboot, or another shell's settings, can't
+# make a live worker, possibly a paid one, look stopped. A start is refused beside an untracked copy and
+# never stops one. A stop sends TERM and waits out the worker's drain, never KILL, because a step still
+# running may be in a paid call. Decisions 0024 K2 and K7 and 0025 V5: --keys gives the API and the
+# worker the Tavily and Jina keys, the GitHub repository and token, and AUTOBOTS_BROWSER_EXECUTOR=enabled
+# from this repository's .env, parsed as data and never sourced, and nothing else from it. A value saved
+# at Settings → Keys & vars still wins for its workspace, and browse_goal still needs a passing executor
+# qualification at the current code.
 
 start: start-stack start-api wait-ready start-worker
 	@echo 'Open http://127.0.0.1:$(WEB_PORT), and use 127.0.0.1 rather than localhost.'
@@ -164,43 +121,24 @@ start-stack:
 	$(INSTALL) up --project $(PROJECT)
 
 start-api:
-	$(call launch,api,$(PY) -m uvicorn --factory autobots.api.main:create_configured_app --host 127.0.0.1 --port $(API_PORT) --no-access-log,keys)
+	@$(LAUNCH) api --port $(API_PORT) --keys .env -- $(PY) -m uvicorn --factory autobots.api.main:create_configured_app --host 127.0.0.1 --port $(API_PORT) --no-access-log
 
 start-web:
 	@test -f apps/web/.next/BUILD_ID || { echo 'The web app is not built. Use: make build'; exit 1; }
-	$(call launch,web,$(NEXT) start apps/web -H 127.0.0.1 -p $(WEB_PORT))
+	@test -n '$(NODE_BIN)' || { echo '$(NO_NODE)'; exit 1; }
+	@$(LAUNCH) web --port $(WEB_PORT) -- $(NEXT) start apps/web -H 127.0.0.1 -p $(WEB_PORT)
 
+# It settles for 2 seconds, then fails if the worker has already exited.
 start-worker:
-	$(call launch,worker,$(PY) -m autobots.operations.worker,keys)
-	@sleep 2
-	@if $(call running,worker); then :; else echo 'worker: exited. Read $(LOG_DIR)/worker.log'; exit 1; fi
+	@$(LAUNCH) worker --keys .env --settle 2 -- $(PY) -m autobots.operations.worker
 
+# Our own process has to hold the port, and then any HTTP reply will do, as the API answers 401 without
+# its credential.
 wait-ready: start-web
-	$(call await,api,$(API_PORT),http://127.0.0.1:$(API_PORT)/)
-	$(call await,web,$(WEB_PORT),http://127.0.0.1:$(WEB_PORT)/)
+	@$(LOCAL_APP) await api --port $(API_PORT) --url http://127.0.0.1:$(API_PORT)/
+	@$(LOCAL_APP) await web --port $(WEB_PORT) --url http://127.0.0.1:$(WEB_PORT)/
 
 # --- Stop -------------------------------------------------------------------------------
-
-# $(call halt,name): TERM, then wait out the worker's 30 second drain. It never sends KILL,
-# because a step still running may be in a paid call. operations.md covers a cut-short drain.
-define halt
-	@if $(call running,$(1)); then \
-		kill -TERM "$$pid"; i=0; \
-		while kill -0 "$$pid" 2>/dev/null; do \
-			i=$$((i + 1)); \
-			if [ $$i -ge 45 ]; then echo '$(1): still running after 45 seconds, pid '"$$pid"'. Read $(LOG_DIR)/$(1).log'; exit 1; fi; \
-			sleep 1; \
-		done; \
-		echo '$(1): stopped'; \
-	else \
-		echo '$(1): not running'; \
-		if $(call stray_pids,$(1)); [ -n "$$held" ]; then \
-			echo '$(1): pid '"$$held"' looks like one this install does not track, so it was left running.'; \
-			echo '  See it with: ps -o pid,lstart,command -p '"$$held"'. Stop it with: kill -TERM '"$$held"; \
-		fi; \
-	fi; \
-	rm -f "$(RUN_DIR)/$(1).pid"
-endef
 
 # In this order: nothing new is admitted, then the worker drains, then containers stop. Containers
 # stay up if a process wouldn't stop, and -k still signals the others when one of them won't.
@@ -210,17 +148,17 @@ stop-app:
 	@$(MAKE) -k --no-print-directory stop-web stop-api stop-worker
 
 stop-web:
-	$(call halt,web)
+	@$(LOCAL_APP) stop web --port $(WEB_PORT)
 
 stop-api:
-	$(call halt,api)
+	@$(LOCAL_APP) stop api --port $(API_PORT)
 
 stop-worker:
-	$(call halt,worker)
+	@$(LOCAL_APP) stop worker
 
 # The one stack command outside persistent_install.py, so it checks the recorded project itself.
 stop-stack:
-	@recorded="$$(python3.12 -c 'import json, sys; print(json.load(open(sys.argv[1]))["project"])' "$(INSTALL_DIR)/install.json")" || exit 1; \
+	@recorded="$$(python3.12 scripts/local_app.py recorded "$(INSTALL_DIR)" project)" || exit 1; \
 	if [ "$$recorded" != "$(PROJECT)" ]; then \
 		echo 'Refused: $(PROJECT) is not the recorded install, '"$$recorded"'. Nothing was stopped'; exit 1; \
 	fi; \
@@ -229,9 +167,7 @@ stop-stack:
 # --- Look -------------------------------------------------------------------------------
 
 status:
-	@if $(call running,api); then echo "api: running, pid $$pid"; else echo 'api: not running'; fi
-	@if $(call running,web); then echo "web: running, pid $$pid"; else echo 'web: not running'; fi
-	@if $(call running,worker); then echo "worker: running, pid $$pid"; else echo 'worker: not running'; fi
+	@$(LOCAL_APP) status api web worker
 	@$(INSTALL) status --project $(PROJECT)
 
 logs:

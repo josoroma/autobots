@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict, get_args
 
@@ -64,6 +65,7 @@ class QualificationReport(TypedDict):
     driver: NotRequired[str]
     network: NotRequired[str]
     model: NotRequired[str]
+    images: NotRequired[list[str]]
 
 
 class Cases:
@@ -108,6 +110,11 @@ class Cases:
         return self.arranged(label, 'exit 0', observed, failed is None, required=required)
 
 
-def write_report(path: Path, report: QualificationReport) -> None:
+def write_report(path: Path, report: Mapping[str, object]) -> None:
+    """Write a report whole or not at all: serialized first, then written beside it and moved into place, so a
+    reader never sees half of one and a failed run never leaves a partial file (SCRP-07)."""
+    text = json.dumps(report, indent=2) + '\n'
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report, indent=2) + '\n')
+    temporary = path.with_name(f'.{path.name}.tmp')
+    temporary.write_text(text)
+    temporary.replace(path)

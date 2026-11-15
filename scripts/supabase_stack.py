@@ -20,7 +20,6 @@ import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
@@ -34,20 +33,21 @@ from disposable_db import (
     Stack,
     Target,
     Unavailable,
+    disposable_project,
     free_port,
     jwt,
-    other_resources,
-    remove_stack,
-    require_identity,
     run,
     tool_env,
 )
-from harness_lib import fingerprint, project_root
+from harness_lib import parse_dotenv, project_root
+from qualification.report import finish
 
 UPSTREAM = Path('infra/supabase/upstream')
 COMPOSE_FILES = (UPSTREAM / 'docker-compose.yml', Path('infra/supabase/compose.overlay.yaml'),
                  Path('infra/supabase/compose.disposable.yaml'))
 REPORT = Path('.checks/supabase/qualification.json')
+# Where Postgres runs the scripts a fresh database starts with.
+INIT_DIRECTORY = '/docker-entrypoint-initdb.d/'
 PROPOSED_PORTS = {'gateway': 54321, 'direct database': 54322}
 REQUIRED_SERVICES = frozenset({'db', 'auth', 'rest', 'storage', 'imgproxy', 'meta', 'studio', 'api-gw'})
 PUBLISHED_SERVICES = {'api-gw': 8000, 'db': 5432}
@@ -105,14 +105,26 @@ def jwt_key(secret: str, role: str) -> str:
 
 
 def example_defaults(root: Path) -> dict[str, str]:
-    """The release's non-secret defaults. COMPOSE_FILE must not reselect files behind this wrapper's back."""
-    defaults = {}
-    for line in (root / UPSTREAM / 'env.example').read_text().splitlines():
-        if '=' in line and not line.lstrip().startswith('#'):
-            name, value = line.split('=', 1)
-            if name.strip() != 'COMPOSE_FILE' and name.strip() not in SECRET_NAMES:
-                defaults[name.strip()] = value.strip()
-    return defaults
+    """The release's non-secret defaults. COMPOSE_FILE must not reselect files behind this wrapper's back. They are the
+    install's stack.env values, so they are read verbatim, quotes included (harness_lib.parse_dotenv)."""
+    values = parse_dotenv((root / UPSTREAM / 'env.example').read_text(), 'verbatim')
+    return {name: value for name, value in values.items() if name != 'COMPOSE_FILE' and name not in SECRET_NAMES}
+
+
+def upstream_init_targets(root: Path) -> frozenset[str]:
+    """Where the vendored release's db service mounts the scripts a fresh database runs, read from its own file. The
+    overlay restates that list to make its mounts read-only, so an upstream upgrade that adds one must be noticed
+    (SQLI-19)."""
+    targets: set[str] = set()
+    inside = False
+    for line in (root / UPSTREAM / 'docker-compose.yml').read_text().splitlines():
+        if line.startswith('  ') and not line.startswith('   ') and line.strip().endswith(':'):
+            inside = line.strip() == 'db:'
+        elif inside and line.strip().startswith('- '):
+            parts = line.strip().removeprefix('- ').split(':')
+            if len(parts) > 1 and parts[1].startswith(INIT_DIRECTORY):
+                targets.add(parts[1])
+    return frozenset(targets)
 
 
 @dataclass
@@ -166,6 +178,10 @@ def rendered_refusals(rendered: Mapping, project: str, root: Path, marked: bool 
                     reasons.append(f"service {name} has a writable or foreign bind mount at {mount.get('target')}")
             elif mount.get('type') != 'volume':
                 reasons.append(f"service {name} has an unexpected mount at {mount.get('target')}")
+    if 'db' in services:
+        mounted = {str(mount.get('target')) for mount in services['db'].get('volumes') or []}
+        for target in sorted(upstream_init_targets(root) - mounted):
+            reasons.append(f'service db drops the upstream init script {target}')
     for key, volume in (rendered.get('volumes') or {}).items():
         if volume.get('external') or (marked and (volume.get('labels') or {}).get(TARGET_LABEL) != 'disposable'):
             reasons.append(f'volume {key} is external or unmarked')
@@ -263,18 +279,16 @@ def qualify(root: Path) -> int:
     target = Target(project, db_port, gateway_port)
     stack = SupabaseStack(target, root, root / COMPOSE_FILES[0], values=generated_values(gateway_port, db_port))
     cases = Cases()
-    require_identity(target, tool_env())
-    if run(['docker', 'info', '--format', '{{.ServerVersion}}'], tool_env(), 30).returncode:
-        raise Unavailable('the Docker engine is not reachable')
-    (root / REPORT).unlink(missing_ok=True)
-    rendered = require_rendered(stack)
-    cases.check('rendered configuration is safe', 'no refusal', '8 services, loopback, pinned, labeled; host keys not inherited', True)
-    images = require_images(rendered)
-    cases.check('pinned images are ARM64', 'all arm64', f'{sum(item.endswith(" arm64") for item in images)} of {len(images)}',
-                all(item.endswith(' arm64') for item in images))
-    before = other_resources(project)
-    started_at = time.monotonic()
-    try:
+    images: list[str] = []
+
+    def prepare() -> None:
+        rendered = require_rendered(stack)
+        cases.check('rendered configuration is safe', 'no refusal', '8 services, loopback, pinned, labeled; host keys not inherited', True)
+        images.extend(require_images(rendered))
+        cases.check('pinned images are ARM64', 'all arm64', f'{sum(item.endswith(" arm64") for item in images)} of {len(images)}',
+                    all(item.endswith(' arm64') for item in images))
+
+    with disposable_project(stack, cases, report=root / REPORT, prepare=prepare) as owned:
         started = stack.compose('up', '-d', '--wait', '--wait-timeout', str(WAIT_SECONDS), timeout=WAIT_SECONDS + 60)
         states = stack.compose('ps', '-a', '--format', '{{.Service}} {{.State}} {{.Health}}').stdout.splitlines()
         cases.check('every service is healthy', 'running and healthy', '; '.join(sorted(states))[:400], started.returncode == 0)
@@ -282,9 +296,8 @@ def qualify(root: Path) -> int:
             print(started.stderr[-600:], file=sys.stderr)
         else:
             qualify_addresses(stack, cases, gateway_port, db_port)
-    finally:
-        remove_stack(stack)
-    return finish(root, cases, stack, before, started_at, images)
+    return finish(root, root / REPORT, 'autobots.supabase-qualification/v1', cases, owned.started_at,
+                  ['H1', 'product acceptance', 'the persistent stack', 'the proposed ports 54321 and 54322'], project=project, images=images)
 
 
 def qualify_addresses(stack: SupabaseStack, cases: Cases, gateway_port: int, db_port: int) -> None:
@@ -321,27 +334,6 @@ def qualify_addresses(stack: SupabaseStack, cases: Cases, gateway_port: int, db_
     cases.check('REST refuses a request with no key', '401', str(status), status == 401)
     environment = stack.compose('exec', '-T', 'studio', 'printenv', 'OPENAI_API_KEY')
     cases.check('Studio has no OpenAI key at runtime', 'empty', 'empty' if not environment.stdout.strip() else 'set', not environment.stdout.strip())
-
-
-def finish(root: Path, cases: Cases, stack: Stack, before: Sequence[str], started_at: float, images: Sequence[str]) -> int:
-    project = stack.target.project
-    label = f'label=com.docker.compose.project={project}'
-    left = (run(['docker', 'volume', 'ls', '--filter', label, '--format', '{{.Name}}'], tool_env()).stdout
-            + run(['docker', 'ps', '-a', '--filter', label, '--format', '{{.Names}}'], tool_env()).stdout).strip()
-    cases.check('cleanup removed the owned containers and volumes', 'none left', left or 'none', not left)
-    cases.check('other Docker resources are untouched', 'same containers and volumes',
-                f'{len(before)} before, {len(after := other_resources(project))} after', before == after)
-    passed = all(record['status'] == 'passed' for record in cases.records)
-    path = root / REPORT
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'schema_version': 'autobots.supabase-qualification/v1',
-                                'completed_at_utc': datetime.now(UTC).isoformat(),
-                                'duration_seconds': round(time.monotonic() - started_at, 1),
-                                'input_fingerprint': fingerprint(root), 'status': 'passed' if passed else 'failed',
-                                'target_class': 'disposable', 'project': project, 'images': list(images), 'cases': cases.records,
-                                'not_established': ['H1', 'product acceptance', 'the persistent stack', 'the proposed ports 54321 and 54322']},
-                               indent=2) + '\n')
-    return 0 if passed else 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:

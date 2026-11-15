@@ -33,8 +33,8 @@ from disposable_db import (
 )
 from harness_lib import fingerprint, project_root
 from paid_run import ACTIVE, PaidSession, goal_exit_code
-from qualify_identity import bootstrap_owner
-from qualify_operations import Ops, api_call, wait
+from qualification.ops import Ops, api_call, wait
+from qualification.owners import bootstrap_owner
 from supabase_stack import generated_values, require_images, require_rendered
 
 # The user's go-ahead: "Yes, try one goal", at US$0.25.

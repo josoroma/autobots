@@ -37,7 +37,7 @@ from disposable_db import (
     require_identity,
     tool_env,
 )
-from harness_lib import project_root
+from harness_lib import parse_dotenv, project_root
 
 MANIFEST_VERSION = 'autobots.backup/v1'
 CHUNK = 1024 * 1024
@@ -167,12 +167,8 @@ def inside(child: Path, parent: Path) -> bool:
 
 
 def parse_env(text: str) -> dict[str, str]:
-    values = {}
-    for line in text.splitlines():
-        if line.strip() and not line.lstrip().startswith('#') and '=' in line:
-            name, _, value = line.partition('=')
-            values[name.strip()] = value.strip()
-    return values
+    """A backed-up stack.env's values, verbatim, as the install reads them (harness_lib.parse_dotenv)."""
+    return parse_dotenv(text, 'verbatim')
 
 
 def backup(project: str, env_file: Path, out: Path, backup_key: Path, key_dir: Path, master_key: Path) -> dict:
