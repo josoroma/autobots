@@ -33,7 +33,7 @@ from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Target,
@@ -48,7 +48,7 @@ from disposable_db import (
 from harness_lib import fingerprint, project_root
 from live_goal import TRACING, disposable_session
 from paid_run import PaidSession
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner
+from qualify_identity import PYTHON, bootstrap_owner
 from qualify_operations import Ops, api_call, wait
 from qualify_web import BROWSERS, start, stop, wait_until_up
 from qualify_web import free_port as any_port
@@ -361,7 +361,10 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
             raise Unavailable('the stack did not start')
         bootstrap(stack, root)
         _, problem = apply_migrations(stack, root / 'supabase/migrations')
-        if problem or seed(stack, root).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if problem or seed(stack, root).returncode:
+            raise Unavailable(f'the database setup failed: {problem}')
+        _, problem = apply_bootstrap(stack, root)
+        if problem:
             raise Unavailable(f'the database setup failed: {problem}')
         email, password = 'owner@example.invalid', secrets.token_urlsafe(24)
         workspace = bootstrap_owner(root, ops.base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)['workspace_id']

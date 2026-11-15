@@ -1,10 +1,13 @@
 """Publishing immutable workflow versions, and binding executions to them exactly, PRD 7.3."""
 
 import json
+import logging
 from datetime import UTC
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
+
+from pydantic import ValidationError
 
 from autobots.application.experts import create_session
 from autobots.application.run_admission import saved_workspace_policy
@@ -44,6 +47,7 @@ from autobots.domain.workflows import (
     validate_graph,
 )
 
+logger = logging.getLogger("autobots.workflows")
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
 DEFAULT_LIMIT_MICRO_USD = 1_000_000
 WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
@@ -74,17 +78,24 @@ def _plain(graph: WorkflowGraph) -> dict[str, Any]:
     return ir_normalized(graph.model_dump(mode="json"))
 
 
-async def _draft(connection: Any, workflow_id: UUID) -> WorkflowDraftView | None:
+async def _draft(connection: Any, workflow_id: UUID) -> tuple[WorkflowDraftView | None, bool]:
+    """The saved draft, and whether one is stored that can't be read. An owner can write a draft
+    through PostgREST that the shape check admits and WorkflowGraph refuses (US-15.12#1, migration
+    59). It reads as absent and is reported as unreadable, so the list and the workflow still load,
+    the editor says that saving replaces it, and the owner discards it by key (R-56, SQLI-13)."""
     cursor = await connection.execute(
         "select graph, saved_at from public.workflow_drafts where workflow_id = %s",
         (workflow_id,),
     )
     row = await cursor.fetchone()
     if row is None:
-        return None
-    return WorkflowDraftView(
-        graph=WorkflowGraph.model_validate(row[0]), saved_at=row[1].astimezone(UTC).isoformat()
-    )
+        return None, False
+    try:
+        graph = WorkflowGraph.model_validate(row[0])
+    except ValidationError:
+        logger.warning("workflow.draft_unreadable", extra={"fields": {"workflow": workflow_id}})
+        return None, True
+    return WorkflowDraftView(graph=graph, saved_at=row[1].astimezone(UTC).isoformat()), False
 
 
 async def _view(
@@ -105,6 +116,7 @@ async def _view(
         )
         for row in await cursor.fetchall()
     ]
+    draft, unreadable = await _draft(connection, workflow_id)
     return WorkflowView(
         schema_version=1,
         id=workflow_id,
@@ -112,7 +124,8 @@ async def _view(
         description=description,
         latest_version=latest,
         versions=versions,
-        draft=await _draft(connection, workflow_id),
+        draft=draft,
+        draft_unreadable=unreadable,
         **await _overview(connection, workflow_id, versions),
     )
 
@@ -222,14 +235,18 @@ async def save_draft(
 
 
 async def discard_draft(connection: Any, workspace_id: UUID, workflow_id: UUID) -> WorkflowView:
-    """Removes only the draft. Published versions and their hashes are untouched."""
-    view = await get_workflow(connection, workspace_id, workflow_id)
-    if view.draft is None:
-        raise WorkflowRefused("workflow_draft_not_found")
-    await connection.execute(
-        "delete from public.workflow_drafts where workflow_id = %s and workspace_id = %s",
+    """Removes only the draft, by its key and without reading its graph, so a draft that no longer
+    validates can still be discarded (R-56, SQLI-13). Published versions and their hashes are
+    untouched."""
+    cursor = await connection.execute(
+        "delete from public.workflow_drafts where workflow_id = %s and workspace_id = %s "
+        "returning workflow_id",
         (workflow_id, workspace_id),
     )
+    if await cursor.fetchone() is None:
+        # Not found names a workflow outside this workspace before a missing draft.
+        await get_workflow(connection, workspace_id, workflow_id)
+        raise WorkflowRefused("workflow_draft_not_found")
     return await get_workflow(connection, workspace_id, workflow_id)
 
 

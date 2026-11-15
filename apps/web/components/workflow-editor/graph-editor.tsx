@@ -104,14 +104,17 @@ function ValidationResult({ check }: { check: WorkflowValidation | null }) {
 /**
  * The Graph field, its step labels and the actions on it. Each publish action names its source:
  * the text on screen, or the saved WF-02 draft, which waits while the text differs from it
- * (PRD-Studio WF-02, WBLD-05).
+ * (PRD-Studio WF-02, WBLD-05). A stored draft the service can't read is said to be replaced by the
+ * next save (R-56, SQLI-13).
  */
 export function GraphEditor({
   draft,
   hasDraft,
+  draftUnreadable,
 }: {
   draft: GraphDraft;
   hasDraft: boolean;
+  draftUnreadable: boolean;
 }) {
   return (
     <>
@@ -176,6 +179,14 @@ export function GraphEditor({
           Runs and routines use published versions only.
         </p>
       </div>
+      {draftUnreadable ? (
+        <p
+          data-field="unreadable-draft-note"
+          className="text-muted-foreground text-[12.5px]"
+        >
+          Its saved draft can&apos;t be read, so saving replaces it.
+        </p>
+      ) : null}
       {hasDraft && draft.isDirty ? (
         <p
           data-field="unsaved-note"

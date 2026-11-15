@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import IO
 from urllib import error, request
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -37,7 +37,7 @@ from disposable_db import (
 from harness_lib import fingerprint, project_root
 from qualification.children import launch, run_child_check, service_env
 from qualification.records import Cases, write_report
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
+from qualify_identity import PYTHON, bootstrap_owner, http, password_token
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/operations/qualification.json')
@@ -182,8 +182,9 @@ def qualify(root: Path) -> int:
         applied, problem = apply_migrations(stack, root / 'supabase/migrations')
         if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
-        stored = stack.sql((root / STORAGE_SQL).read_text())
-        cases.check('infrastructure is healthy before migrations and processes', 'exit 0', f'{applied} migrations, storage exit {stored.returncode}', stored.returncode == 0)
+        bootstrapped, stored = apply_bootstrap(stack, root)
+        cases.check('infrastructure is healthy before migrations and processes', 'exit 0, the bootstrap files applied',
+                    f'{applied} migrations, bootstrap {bootstrapped}, {stored}', stored is None and bool(bootstrapped))
         owner_a = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_a, password_a)
         owner_b = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_b, password_b)
         owner_c = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_c, password_c)

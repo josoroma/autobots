@@ -36,7 +36,11 @@ function EditorLayout({
       >
         <WorkflowHeading workflow={workflow} unsaved={draft.isDirty} />
         <DescriptionField description={description} />
-        <GraphEditor draft={draft} hasDraft={workflow.draft !== null} />
+        <GraphEditor
+          draft={draft}
+          hasDraft={workflow.draft !== null}
+          draftUnreadable={workflow.draft_unreadable}
+        />
         {message === null ? null : (
           <p role="status" data-message="editor" className="text-sm">
             {message}

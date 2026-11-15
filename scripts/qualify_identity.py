@@ -29,7 +29,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib import error, request
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
@@ -60,6 +60,7 @@ from supabase_stack import generated_values, require_images, require_rendered
 from toolchain import child_env, find_tools
 
 REPORT = Path('.checks/identity/qualification.json')
+# Read by the recorded evidence scripts under docs/engineering/evidence/ (US-10.2, US-12.4).
 STORAGE_SQL = Path('supabase/bootstrap/storage.sql')
 BUCKET = 'workspace-artifacts'
 PYTHON = Path('services/agent/.venv/bin/python')
@@ -274,13 +275,21 @@ def rest_cases(cases: Cases, stack: AppStack, base: str, anon: str, token_a: str
     cases.check('authenticated holds no usage on private schemas', 'false,false', usage, usage == 'false,false')
 
 
-def storage_cases(cases: Cases, base: str, anon: str, token_a: str, token_b: str, workspace_a: str, workspace_b: str) -> None:
-    def storage(method: str, path: str, token: str | None, body: bytes | None = None, kind: str = 'text/plain') -> tuple[int, str]:
-        headers = {'apikey': anon, **({'Authorization': f'Bearer {token}'} if token else {}), **({'Content-Type': kind} if body is not None else {})}
+def storage_cases(cases: Cases, base: str, anon: str, service: str, token_a: str, token_b: str, workspace_a: str, workspace_b: str) -> None:
+    def storage(method: str, path: str, token: str | None, body: bytes | None = None, kind: str = 'text/plain', key: str = anon) -> tuple[int, str]:
+        headers = {'apikey': key, **({'Authorization': f'Bearer {token}'} if token else {}), **({'Content-Type': kind} if body is not None else {})}
         return http(method, f'{base}/storage/v1/{path}', headers, body)
     target = f'{BUCKET}/{workspace_a}/note.txt'
-    status, _ = storage('POST', f'object/{target}', token_a, b'artifact bytes')
-    cases.check('a member uploads to its workspace', '200', str(status), status == 200)
+    # Decision 0029 F3: the API writes artifacts with the service key, and a member writes none.
+    status, _ = storage('POST', f'object/{target}', service, b'artifact bytes', key=service)
+    cases.check('arranged: the service key writes an object to workspace A', '200', str(status), status == 200)
+    status, _ = storage('POST', f'object/{BUCKET}/{workspace_a}/mine.txt', token_a, b'x')
+    cases.check("a member can't upload to its own workspace", 'a 4xx refusal', str(status), denied(status))
+    status, _ = storage('PUT', f'object/{target}', token_a, b'replaced')
+    cases.check("a member can't overwrite its workspace's object", 'a 4xx refusal', str(status), denied(status))
+    storage('DELETE', f'object/{target}', token_a)
+    status, body = storage('GET', f'object/authenticated/{target}', token_a)
+    cases.check("a member can't delete or change its workspace's object", 'still readable, unchanged', str(status), status == 200 and body == 'artifact bytes')
     status, body = storage('GET', f'object/authenticated/{target}', token_a)
     cases.check('a member reads its object', '200 and the bytes', f'{status}', status == 200 and body == 'artifact bytes')
     for label, token in (('another workspace', token_b), ('anonymous', None), ('a forged token', f'{token_a[:-4]}AAAA')):
@@ -786,10 +795,11 @@ def qualify(root: Path) -> int:
         applied, problem = apply_migrations(stack, root / 'supabase/migrations')
         if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
-        stored = stack.sql((root / STORAGE_SQL).read_text())
-        cases.check('Storage policies apply', 'exit 0', f'{applied} migrations, exit {stored.returncode}', stored.returncode == 0)
-        if stored.returncode:
-            print(stored.stderr[-500:], file=sys.stderr)
+        bootstrapped, stored = apply_bootstrap(stack, root)
+        cases.check('the bootstrap files apply, storage.sql first', 'each with its history row', f'{applied} migrations, {bootstrapped}, {stored}',
+                    stored is None and bootstrapped[:1] == ['bootstrap/storage.sql'])
+        if stored:
+            print(stored[-500:], file=sys.stderr)
         owner_a, owner_b = run.owner(OWNER_A), run.owner(OWNER_B)
         cases.check('owners are bootstrapped through the Auth admin API', 'two users', f'{bool(owner_a.user_id)}, {bool(owner_b.user_id)}',
                     (owner_a.user_id, owner_a.workspace_id) != (owner_b.user_id, owner_b.workspace_id))
@@ -800,7 +810,7 @@ def qualify(root: Path) -> int:
         cases.arrange("workspace A's run", stack.runtime(
             f'insert into public.runs (id, workspace_id, limit_micro_usd) values ({sql_literal(RUN_A)}, {sql_literal(owner_a.workspace_id)}, 1);\n'))
         rest_cases(cases, stack, run.base, run.anon_key, token_a, token_b, RUN_A)
-        storage_cases(cases, run.base, run.anon_key, token_a, token_b, owner_a.workspace_id, owner_b.workspace_id)
+        storage_cases(cases, run.base, run.anon_key, run.service_key, token_a, token_b, owner_a.workspace_id, owner_b.workspace_id)
         fixtures = storage_child_cases(run, cases, token_a, token_b)
         for arrange in ARRANGEMENTS:
             fixtures |= arrange(run, cases)

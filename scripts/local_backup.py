@@ -90,6 +90,8 @@ def read_facts(project: str) -> dict:
     command = ('psql', '-U', 'supabase_admin', '-d', 'postgres', '-X', '-q', '-A', '-t', '-c')
     which = docker('exec', container, *command, "select coalesce(to_regclass('autobots_install.migrations')::text, to_regclass('autobots_disposable.migrations')::text, '');")
     history = which.stdout.strip()
+    # Every row of the history, bootstrap/<file> rows included (R-56), so verify_restore checks the whole
+    # applied history against the manifest. A count of migrations alone matches MIGRATION_NAME instead.
     migrations = f"(select coalesce(json_agg(name order by name), '[]') from {history})" if history else "'[]'::json"
     result = docker('exec', container, *command, FACTS.replace('{migrations}', migrations))
     if which.returncode or result.returncode:

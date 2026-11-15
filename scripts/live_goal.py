@@ -19,7 +19,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Target,
@@ -33,7 +33,7 @@ from disposable_db import (
 )
 from harness_lib import fingerprint, project_root
 from paid_run import ACTIVE, PaidSession, goal_exit_code
-from qualify_identity import STORAGE_SQL, bootstrap_owner
+from qualify_identity import bootstrap_owner
 from qualify_operations import Ops, api_call, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
@@ -95,7 +95,7 @@ def attempt(root: Path, key_file: Path, limit: int, profile: str | None = None) 
         _, problem = apply_migrations(stack, root / 'supabase/migrations')
         if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
-        if stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if apply_bootstrap(stack, root)[1]:
             raise Unavailable('the storage setup failed')
         email, password = 'owner@example.invalid', secrets.token_urlsafe(24)
         workspace = bootstrap_owner(root, ops.base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)['workspace_id']

@@ -16,7 +16,7 @@ In `domain/execution.py`: raise the version. Old runs then stop at `incompatible
 
 ## Upgrade procedure
 
-1. Read the new migrations, and any change in `infra/supabase`, `uv.lock` or adapter version.
+1. Read the new migrations and `supabase/bootstrap/` files, and any change in `infra/supabase`, `uv.lock` or adapter version. The guarded apply runs the migrations, then the seed, then each new bootstrap file as the database superuser.
 2. Drain, stop and back up as in [the operations runbook](operations.md) and [the backup runbook](backup-restore.md).
 3. Restore that backup to an isolated instance and try the upgrade there first, with `services/agent/.venv/bin/python scripts/persistent_install.py apply --project "$RESTORED_PROJECT" --restored-copy`. That needs the copy's matching identity and its restore hold still in place. Physical backups restore only with the Compose files and images they were taken with, so restore from the old revision, then upgrade.
 4. Apply migrations to the install with `services/agent/.venv/bin/python scripts/persistent_install.py apply --project autobots-install`. For a disposable target it's `scripts/app_db.py`.
@@ -37,6 +37,7 @@ For a change to `langgraph-checkpoint-postgres`, on a disposable target. `tests/
 
 - **A migration fails:** it rolls back whole, with no history row, and the error is reported. Fix forward with a new or corrected unapplied file. Workers and API stay on `schema_behind`.
 - **An applied migration was edited:** refused with `never edit an applied migration`. Restore the file, and put the change in a new one.
+- **An applied bootstrap file was edited:** refused with `never edit an applied file`, before any change. Restore the file, and put the change in a new `supabase/bootstrap/<14 digit timestamp>_<description>.sql`; `storage.sql` keeps its bytes.
 - **`incompatible_version` on saved runs:** either run the release that recorded them, or cancel and start linked new runs. Don't edit `execution_contract`.
 - **`adapter_unqualified`:** go back to the qualified release, or finish the qualification above.
 - **Rolling back the application after a migration:** not supported as a downgrade. Restore the pre-upgrade backup to a new instance, or fix forward.

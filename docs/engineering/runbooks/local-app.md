@@ -32,7 +32,7 @@ Public signup is disabled, so the owner is created through the Auth admin API, a
 AUTOBOTS_SUPABASE_URL=<gateway url> AUTOBOTS_SERVICE_ROLE_KEY=<service role key> AUTOBOTS_OWNER_PASSWORD=<password> AUTOBOTS_DATABASE_URL=<runtime role url> PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.bootstrap_owner --email <email> --workspace-name <name>
 ```
 
-Expected: one line of JSON with the new user and workspace IDs. Exit 1 means a service refused, for example an email already in use. Run it once. `supabase/bootstrap/storage.sql` must already have been applied as the database superuser, because the migration role cannot alter Storage's tables.
+Expected: one line of JSON with the new user and workspace IDs. Exit 1 means a service refused, for example an email already in use. Run it once. The files in `supabase/bootstrap/` must already have been applied as the database superuser, `storage.sql` first, because the migration role cannot alter Storage's tables. `persistent_install.py apply` applies them after the migrations and the seed.
 
 ## Seed the concept Experts and workflows (optional)
 

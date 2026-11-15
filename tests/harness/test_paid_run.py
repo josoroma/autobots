@@ -668,7 +668,8 @@ def disposable_fakes(module: ModuleType, ops: FakeOps, clock: FakeClock, config:
     names = {'free_port': lambda *_: next(ports), 'generated_values': lambda *_: {}, 'AppStack': lambda *_, **__: ops.stack,
              'require_identity': anything, 'run': anything, 'require_images': anything, 'require_rendered': anything,
              'Ops': lambda *_: ops, 'other_resources': lambda _: [], 'fingerprint': lambda _: 'fingerprint', 'bootstrap': anything,
-             'apply_migrations': lambda *_: ([], None), 'seed': anything, 'bootstrap_owner': lambda *_: {'workspace_id': 'workspace'},
+             'apply_migrations': lambda *_: ([], None), 'apply_bootstrap': lambda *_: ([], None), 'seed': anything,
+             'bootstrap_owner': lambda *_: {'workspace_id': 'workspace'},
              'wait': anything, 'api_call': api, 'remove_stack': removed.append, 'disposable_session': disposable_session,
              'tempfile': SimpleNamespace(mkdtemp=lambda prefix: str(config)),
              'time': SimpleNamespace(monotonic=clock.monotonic, perf_counter=clock.monotonic, sleep=clock.sleep), **extra}

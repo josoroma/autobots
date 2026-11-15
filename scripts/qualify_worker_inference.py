@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import AppStack, apply_bootstrap, apply_migrations, bootstrap, seed
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -34,7 +34,7 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import fingerprint, project_root
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
+from qualify_identity import PYTHON, bootstrap_owner, password_token
 from qualify_operations import Checks, Ops, api_call, conditions, exited, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
@@ -165,7 +165,7 @@ def qualify(root: Path) -> int:
         _applied, problem = apply_migrations(stack, root / 'supabase/migrations')
         if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
-        if stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if apply_bootstrap(stack, root)[1]:
             raise Unavailable('the storage setup failed')
         service = stack.values['SERVICE_ROLE_KEY']
         email_a, email_b = 'owner-a@example.invalid', 'owner-b@example.invalid'

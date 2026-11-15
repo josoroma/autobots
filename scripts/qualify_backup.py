@@ -15,10 +15,20 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import (
+    BOOTSTRAP_ROW,
+    MIGRATION_NAME,
+    AppStack,
+    apply_bootstrap,
+    apply_migrations,
+    bootstrap,
+    bootstrap_files,
+    seed,
+)
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -35,7 +45,7 @@ from harness_lib import fingerprint, project_root
 from local_backup import restored_values
 from qualification.children import last_json, launch, parse_report, run_child_check
 from qualification.records import write_report
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, http, password_token
+from qualify_identity import PYTHON, bootstrap_owner, http, password_token
 from qualify_operations import (
     MODEL_TRANSPORT,
     Checks,
@@ -52,6 +62,17 @@ REPORT = Path('.checks/backup/qualification.json')
 # Where a failed child check's stderr is kept (qualification/children.py).
 ERR_DIR = Path('.checks/backup')
 FAKE_CREDENTIAL = 'sk-or-arranged-' + secrets.token_hex(24)
+
+
+def recorded_migrations(history: Sequence[str]) -> list[str]:
+    """The migration rows of a manifest's history list. local_backup lists every row of the history table,
+    and since R-56 that holds bootstrap rows; an install's history held bootstrap/storage.sql before
+    that. Counting by the migration name pattern reads every one of those manifests the same way."""
+    return [name for name in history if MIGRATION_NAME.fullmatch(name)]
+
+
+def recorded_bootstrap(history: Sequence[str]) -> list[str]:
+    return [name for name in history if name.startswith(BOOTSTRAP_ROW)]
 
 
 def backup_tool(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -105,8 +126,11 @@ def qualify(root: Path) -> int:
             raise Unavailable(f'the stack did not start: {started.stderr[-300:]}')
         bootstrap(stack, root)
         applied, problem = apply_migrations(stack, root / 'supabase/migrations')
-        if problem or seed(stack, root).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if problem or seed(stack, root).returncode:
             raise Unavailable(f'migrations failed: {problem}')
+        _, problem = apply_bootstrap(stack, root)
+        if problem:
+            raise Unavailable(f'the bootstrap files failed: {problem}')
         owner_a = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_a, password_a)
         bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email_b, password_b)
         workspace_a = owner_a['workspace_id']
@@ -161,7 +185,14 @@ def qualify(root: Path) -> int:
         expected_components = {'configuration', 'volume:db-data', 'volume:storage-data'}
         names = set(manifest['components'])
         cases.check('the manifest is versioned and names every component', 'autobots.backup/v1 with database, Storage and configuration', f"{manifest['schema_version']}, {sorted(names)}", manifest['schema_version'] == 'autobots.backup/v1' and expected_components <= names)
-        cases.check('the manifest binds versions, migrations and artifact hashes', 'images, compose hashes, migrations, hashes', f"{len(manifest['images'])} images, {len(manifest['compose_files'])} files, {len(manifest['facts']['migrations'])} migrations, {len(manifest['facts']['artifacts'])} artifacts", manifest['images'] and manifest['compose_files'] and len(manifest['facts']['migrations']) == applied and manifest['facts']['artifacts'])
+        history = manifest['facts']['migrations']
+        # The manifest lists history rows by name, and the files are in apply order, so they're compared as sets.
+        bootstrapped = [BOOTSTRAP_ROW + path.name for path in bootstrap_files(root)]
+        cases.check('the manifest binds versions, migrations, bootstrap files and artifact hashes', 'images, compose hashes, migrations, bootstrap rows, hashes',
+                    f"{len(manifest['images'])} images, {len(manifest['compose_files'])} files, {len(recorded_migrations(history))} migrations, "
+                    f"{recorded_bootstrap(history)}, {len(manifest['facts']['artifacts'])} artifacts",
+                    manifest['images'] and manifest['compose_files'] and len(recorded_migrations(history)) == applied
+                    and sorted(recorded_bootstrap(history)) == sorted(bootstrapped) and manifest['facts']['artifacts'])
         modes = {path.name: oct(path.stat().st_mode & 0o777) for path in backup_dir.iterdir()}
         cases.check('backup files are private', 'all 0600 in 0700', f'{oct(backup_dir.stat().st_mode & 0o777)}, {sorted(set(modes.values()))}', backup_dir.stat().st_mode & 0o777 == 0o700 and set(modes.values()) == {'0o600'})
         kept_key = key_dir / 'provider-master.key'

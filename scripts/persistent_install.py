@@ -25,7 +25,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import MIGRATION_NAME, MIGRATIONS, ROLES, SEEDS, AppStack
+from app_db import (
+    BOOTSTRAP_ROW,
+    MIGRATION_NAME,
+    MIGRATIONS,
+    ROLES,
+    SEEDS,
+    AppStack,
+    bootstrap_plan,
+    run_bootstrap,
+)
+from app_db import (
+    STORAGE_SQL as STORAGE_SQL,  # scripts/qualify_persistent_apply.py reads it from here
+)
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -63,8 +75,7 @@ from supabase_stack import (
 
 DEFAULT_DIR = Path.home() / '.local/share/autobots-install'
 PERSISTENT_FILES = (UPSTREAM / 'docker-compose.yml', Path('infra/supabase/compose.overlay.yaml'))
-STORAGE_SQL = Path('supabase/bootstrap/storage.sql')
-STORAGE_ROW = 'bootstrap/storage.sql'
+INSTALL_HISTORY = 'autobots_install.migrations'
 PYTHON = Path('services/agent/.venv/bin/python')
 OWNER_EMAIL = 'owner@autobots.invalid'
 TEN_YEARS = 86400 * 3650
@@ -265,43 +276,45 @@ def first_setup(stack: AppStack, root: Path, record: Record, requested: str, exp
 
 def guarded_apply(stack: AppStack, root: Path, record: Record, requested: str, expected_class: str = 'persistent', restored_copy: bool = False,
                   directory: Path | None = None) -> dict:
-    """Pending files in name order, each with its history row in one transaction, as the migration role."""
+    """Pending migrations in name order, each with its history row in one transaction, as the migration role,
+    then the seed, then the pending bootstrap files as the superuser, each with its own history row (R-56,
+    SQLI-07): storage.sql first, then the ordered files, by the rules app_db.bootstrap_plan keeps."""
     require_install(stack, record, requested, expected_class, restored_copy)
     folder = directory or root / MIGRATIONS
-    listing = stack.migrator('select name, sha256 from autobots_install.migrations;')
+    listing = stack.migrator(f'select name, sha256 from {INSTALL_HISTORY};')
     if listing.returncode:
         raise Unavailable('the migration history is unreadable')
     recorded = dict(line.split('|') for line in listing.stdout.splitlines() if line)
     files = sorted(folder.glob('*.sql'))
     # All of it is checked first, so a refusal leaves the database exactly as it was.
-    missing = sorted(set(recorded) - {path.name for path in files} - {STORAGE_ROW})
+    missing = sorted(name for name in set(recorded) - {path.name for path in files} if not name.startswith(BOOTSTRAP_ROW))
     if missing:
         raise Refused(f'{missing[0]} was applied and is not in this checkout, so this is an older revision')
-    storage_digest = hashlib.sha256((root / STORAGE_SQL).read_bytes()).hexdigest()
-    if STORAGE_ROW in recorded and recorded[STORAGE_ROW] != storage_digest:
-        raise Refused(f'{STORAGE_ROW} changed after it was applied; never edit an applied file')
     for path in files:
         if not MIGRATION_NAME.fullmatch(path.name):
             raise Refused(f'{path.name} is not named <14 digit timestamp>_<description>.sql')
         if path.name in recorded and recorded[path.name] != hashlib.sha256(path.read_bytes()).hexdigest():
             raise Refused(f'{path.name} changed after it was applied; never edit an applied migration')
+    bootstrap_pending, refusal = bootstrap_plan(root, recorded)
+    if refusal:
+        raise Refused(refusal)
     applied: list[str] = []
     for path in files:
         if path.name in recorded:
             continue
         checksum = hashlib.sha256(path.read_bytes()).hexdigest()
-        result = stack.migrator(f"begin;\n{path.read_text()}\ninsert into autobots_install.migrations (name, sha256) values ('{path.name}', '{checksum}');\ncommit;\n")
+        result = stack.migrator(f"begin;\n{path.read_text()}\ninsert into {INSTALL_HISTORY} (name, sha256) values ('{path.name}', '{checksum}');\ncommit;\n")
         if result.returncode:
             raise Unavailable(f'{path.name} failed and was rolled back: {result.stderr.strip()[-200:]}')
         applied.append(path.name)
     seeded = stack.migrator(f'begin;\n{(root / SEEDS).read_text()}\ncommit;\n')
     if seeded.returncode:
         raise Unavailable(f'the reference seed failed: {seeded.stderr.strip()[-200:]}')
-    if STORAGE_ROW not in recorded:
-        policy = stack.sql(f"begin;\n{(root / STORAGE_SQL).read_text()}\ninsert into autobots_install.migrations (name, sha256) values ('{STORAGE_ROW}', '{storage_digest}');\ncommit;\n")
-        if policy.returncode:
-            raise Unavailable(f'the Storage policies failed: {policy.stderr.strip()[-200:]}')
-    return {'status': 'applied', 'project': requested, 'applied': applied, 'already_applied': len([name for name in recorded if name != STORAGE_ROW])}
+    bootstrapped, problem = run_bootstrap(stack, bootstrap_pending, INSTALL_HISTORY)
+    if problem:
+        raise Unavailable(problem)
+    return {'status': 'applied', 'project': requested, 'applied': applied, 'bootstrap_applied': bootstrapped,
+            'already_applied': len([name for name in recorded if not name.startswith(BOOTSTRAP_ROW)])}
 
 
 def status(root: Path, record: Record) -> dict:

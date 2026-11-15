@@ -21,7 +21,15 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import AppStack, apply_migrations, bootstrap, seed
+from app_db import (
+    BOOTSTRAP_ROW,
+    AppStack,
+    apply_bootstrap,
+    apply_migrations,
+    bootstrap,
+    bootstrap_files,
+    seed,
+)
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -37,7 +45,7 @@ from disposable_db import (
 from harness_lib import fingerprint, project_root
 from qualification.children import launch, run_child_check
 from qualification.records import write_report
-from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner, password_token
+from qualify_identity import PYTHON, bootstrap_owner, password_token
 from qualify_operations import MODEL_TRANSPORT, Checks, Ops, api_call, conditions, exited, wait
 from supabase_stack import generated_values, require_images, require_rendered
 
@@ -93,8 +101,12 @@ def qualify(root: Path) -> int:
         bootstrap(stack, root)
         applied, problem = apply_migrations(stack, prior / 'supabase/migrations')
         # The prior release's own seeds: this release's can name a profile that schema doesn't have.
-        if problem or seed(stack, prior).returncode or stack.sql((root / STORAGE_SQL).read_text()).returncode:
+        if problem or seed(stack, prior).returncode:
             raise Unavailable(f'prior migrations failed: {problem}')
+        # The prior release shipped storage.sql alone, the first bootstrap file.
+        _, problem = apply_bootstrap(stack, root, upto=1)
+        if problem:
+            raise Unavailable(f"the prior release's storage.sql failed: {problem}")
         cases.check('the prior release schema is applied from its own files', f'{PRIOR_REVISION}', f'{applied} migrations', applied >= 24)
         owner = bootstrap_owner(root, base, stack.values['SERVICE_ROLE_KEY'], ops.url, email, password)
         workspace = owner['workspace_id']
@@ -185,6 +197,10 @@ print(hashlib.sha256(json.dumps(rows, default=str, sort_keys=True).encode()).hex
         cases.check('this release applies forward over the prior one', 'the new migrations, no error', f'{upgraded}, {problem}', upgraded >= 1 and not problem)
         reseeded = seed(stack, root)
         cases.check("this release's seeds apply over the upgraded schema", 'exit 0', reseeded.returncode, reseeded.returncode == 0)
+        newer = [BOOTSTRAP_ROW + path.name for path in bootstrap_files(root)[1:]]
+        bootstrapped, problem = apply_bootstrap(stack, root)
+        cases.check("this release's bootstrap files apply after the prior storage.sql", ', '.join(newer), f'{bootstrapped}, {problem}',
+                    bootstrapped == newer and problem is None)
         policy = ops.sql(f"select default_profile || '/' || (role_overrides ->> 'planner') || '/' || coalesce(role_overrides ->> 'coder', 'none') from app_private.model_policies where workspace_id = '{workspace}';")
         cases.check('a retired choice returns to the default, and no one moves to a model they did not choose (Decision 0004)', 'deepseek default, planner kept, coder cleared', policy, policy == 'openrouter_deepseek_flash/openrouter_deepseek_flash/none')
         profile_rows = ops.sql("select string_agg(profile_id, ',' order by profile_id) from public.model_profiles;")

@@ -29,7 +29,7 @@ from autobots.application.tool_gateway import (
 )
 from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import PLAN_TOOLS, OperationClass
 from autobots.operations.job_dispatch import process_next
 from checklib import Cases, Db, run_check
@@ -179,7 +179,7 @@ async def main(cases: Cases) -> dict[str, object]:
             check('a late approval is refused', 'approval_expired', error.code, error.code == 'approval_expired')
         check('the run pauses on expiry, with no effect', 'paused, expired', (await state(run), await value('select status from public.approval_requests where id = %s', expiring), sent), await state(run) == 'paused' and await value('select status from public.approval_requests where id = %s', expiring) == 'expired' and sent == [])
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, expected_version=version)
         result, model = await advance([say('stop')])
         check('resuming tells the model it expired, and still sends nothing', 'approval_expired, no effect', (replies(model)[0]['code'], sent), replies(model)[0]['code'] == 'approval_expired' and sent == [])
 
@@ -197,18 +197,18 @@ async def main(cases: Cases) -> dict[str, object]:
         await advance([calls(SEND), say('never')])
         waiting, waiting_hash = await approval(run)
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.PAUSE, expected_version=version)
         try:
             await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=waiting, idempotency_key='p1', decision='approve', argument_hash=waiting_hash)
             check('a paused run takes no decision', 'approval_run_not_waiting', 'applied', False)
         except ApprovalRefused as error:
             check('a paused run takes no decision', 'approval_run_not_waiting', error.code, error.code == 'approval_run_not_waiting')
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, expected_version=version)
         result, model = await advance([say('never')])
         check('resuming returns to the same wait, with no model call or new proposal', 'waiting_approval, 0 calls, 1 proposal', (await state(run), len(model.seen), await value('select count(*) from public.approval_requests where run_id = %s', run)), await state(run) == 'waiting_approval' and not model.seen and await value('select count(*) from public.approval_requests where run_id = %s', run) == 1)
         version = await value('select version from public.runs where id = %s', run)
-        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
         check('cancelling withdraws the request', 'withdrawn, no effect', (await value('select status from public.approval_requests where id = %s', waiting), sent), await value('select status from public.approval_requests where id = %s', waiting) == 'withdrawn' and sent == [])
 
         # An approved operation can't run with a different scope.
@@ -239,6 +239,8 @@ async def main(cases: Cases) -> dict[str, object]:
             browser_expert = uuid4()
             await db.execute('insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)',
                              (browser_expert, WORKSPACE, f'Browser {browser_expert.hex[:6]}'))
+            # A run names an Expert version that exists (migration 60's composite key).
+            await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s)", (browser_expert, uuid4()))
             run = await d.admit('Browse twice', tools={'browse_goal': 1}, expert=(browser_expert, 1))
             lease = await d.claim(run)
             first = await browsing.execute(db, ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1}), 'browse_goal', BROWSE)
@@ -272,7 +274,7 @@ async def main(cases: Cases) -> dict[str, object]:
                 if settle == 'approve':
                     await d.approve(run)
                 else:
-                    await d.command(run, RunCommand.CANCEL, Actor.USER)
+                    await d.command(run, RunCommand.CANCEL)
                 facts = ('select a.status, r.status, r.event_sequence from public.approval_requests a '
                          'join public.runs r on r.id = a.run_id where a.id = %s')
                 before = await d.row(facts, request)
@@ -288,6 +290,8 @@ async def main(cases: Cases) -> dict[str, object]:
         owner = await value("select user_id from public.workspace_members where workspace_id = %s and role = 'owner'", WORKSPACE)
         expert = uuid4()
         await db.execute("insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, 'Mail sender', 2)", (expert, WORKSPACE))
+        # A run names an Expert version that exists (migration 60's composite key).
+        await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s), (%s, 2, '{}', %s)", (expert, owner, expert, owner))
         browser_run = await admit(started_by=owner, expert=(expert, 2))
         lease = await claim_next(db, worker_id='browser', lease_seconds=120)
         scope = ToolScope(WORKSPACE, browser_run, lease.generation, {'mock_send': 1})

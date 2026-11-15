@@ -169,6 +169,9 @@ class WorkflowView(BaseModel):
     latest_version: int
     versions: list[WorkflowVersionView]
     draft: WorkflowDraftView | None
+    # A draft is stored that WorkflowGraph refuses, as one written through PostgREST can be; `draft`
+    # is then None, and saving replaces it (R-56, SQLI-13).
+    draft_unreadable: bool
     # WF-01, from the latest published version: its Experts in step order and its step count.
     experts: list[str]
     step_count: int

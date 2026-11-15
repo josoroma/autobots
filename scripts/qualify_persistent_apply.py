@@ -18,7 +18,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_db import MIGRATIONS, AppStack
+from app_db import BOOTSTRAP_ROW, MIGRATIONS, STORAGE_POLICIES, AppStack, bootstrap_files
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
@@ -142,8 +142,16 @@ def qualify(root: Path) -> int:
         applied = attempt()
         names = sorted(path.name for path in (root / MIGRATIONS).glob('*.sql'))
         cases.check('the normal path applies every migration in order, each with a history row', f'{len(names)} applied', str(len(applied['applied'])), applied['applied'] == names)
+        # R-56 (SQLI-07): then every bootstrap file as the superuser, storage.sql first, on this target's real Storage.
+        bootstrapped = [BOOTSTRAP_ROW + path.name for path in bootstrap_files(root)]
+        cases.check('the normal path then applies every bootstrap file, storage.sql first', ', '.join(bootstrapped), str(applied['bootstrap_applied']),
+                    applied['bootstrap_applied'] == bootstrapped)
         again = attempt()
-        cases.check('a second apply has nothing pending', '0 applied', str(len(again['applied'])), again['applied'] == [] and again['already_applied'] == len(names))
+        cases.check('a second apply has nothing pending', '0 applied, 0 bootstrap files', f"{len(again['applied'])} applied, {again['bootstrap_applied']}",
+                    again['applied'] == [] and again['bootstrap_applied'] == [] and again['already_applied'] == len(names))
+        policies = rows(stack, STORAGE_POLICIES)
+        cases.check('afterwards members hold only the read policy on Storage objects (Decision 0029 F3)', 'artifact_read:SELECT', policies,
+                    policies == 'artifact_read:SELECT')
         reading = stack.runtime('select count(*) from autobots_install.identity;')
         cases.check('the runtime role cannot read the install schema', 'refused', str(reading.returncode), reading.returncode != 0)
         writing = stack.migrator("insert into autobots_install.identity values ('x', 'x');")
