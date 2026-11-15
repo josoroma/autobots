@@ -10,12 +10,14 @@ import pytest
 from autobots.adapters.tavily import tavily_tools
 from autobots.adapters.url_guard import UrlRefused
 from autobots.application.tool_gateway import (
+    Refused,
     ToolContext,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
 )
+from autobots.application.tool_gateway import resolve as resolve_call
+from autobots.domain.stops import GatewayCode
 
 KEY = {"TAVILY_API_KEY": "tvly-fixture0123456789"}
 FORBIDDEN = {"include_answer", "auto_parameters", "instructions", "include_raw_content"}
@@ -96,8 +98,7 @@ async def test_no_provider_side_inference_is_offered_or_sent(tool_id: str) -> No
         ("tavily_crawl", {"url": "https://example.com", "instructions": "find pricing"}),
     ],
 )
-@pytest.mark.asyncio
-async def test_a_call_past_a_ceiling_or_with_an_unoffered_option_is_refused_first(
+def test_a_call_past_a_ceiling_or_with_an_unoffered_option_is_refused_first(
     tool_id: str, arguments: dict[str, Any]
 ) -> None:
     fake = Fake()
@@ -105,8 +106,8 @@ async def test_a_call_past_a_ceiling_or_with_an_unoffered_option_is_refused_firs
     tool = tools(fake)[tool_id]
     registry.register(tool)
     scope = ToolScope(uuid4(), uuid4(), 1, {tool_id: 1})
-    result = await ToolGateway(registry).execute(None, scope, tool_id, arguments)
-    assert (result.outcome.value, result.code) == ("denied", "invalid_arguments")
+    refused = resolve_call(registry, scope, tool_id, arguments)
+    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
     assert fake.bodies == []
 
 

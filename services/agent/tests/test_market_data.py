@@ -8,12 +8,14 @@ import pytest
 
 from autobots.adapters.market_data import market_tools
 from autobots.application.tool_gateway import (
+    Refused,
     ToolContext,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
+    resolve,
 )
+from autobots.domain.stops import GatewayCode
 
 CONTEXT = ToolContext(None, ToolScope(uuid4(), uuid4(), 1, {}), None)
 DAY = 86_400
@@ -121,16 +123,16 @@ async def test_history_rows_with_close_to_close_change_source_and_time() -> None
         {"symbols": ["BTC-USD", "BTC-USD"]},
     ],
 )
-@pytest.mark.asyncio
-async def test_invalid_symbols_or_values_are_refused_before_any_request(
+def test_invalid_symbols_or_values_are_refused_before_any_request(
     arguments: dict[str, Any],
 ) -> None:
     fake = Fake({})
+    tool = tools(fake)["market_history"]
     registry = ToolRegistry()
-    registry.register(tools(fake)["market_history"])
+    registry.register(tool)
     scope = ToolScope(uuid4(), uuid4(), 1, {"market_history": 1})
-    result = await ToolGateway(registry).execute(None, scope, "market_history", arguments)
-    assert (result.outcome.value, result.code) == ("denied", "invalid_arguments")
+    refused = resolve(registry, scope, "market_history", arguments)
+    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
     assert fake.seen == []
 
 
@@ -193,14 +195,14 @@ async def test_inflation_rows_by_country_with_indicator_and_source() -> None:
         {"countries": ["CRI", "CRI"], "start_year": 2020, "end_year": 2024},
     ],
 )
-@pytest.mark.asyncio
-async def test_any_other_country_or_range_is_refused_before_a_request(
+def test_any_other_country_or_range_is_refused_before_a_request(
     arguments: dict[str, Any],
 ) -> None:
     fake = Fake({})
+    tool = tools(fake)["inflation_rates"]
     registry = ToolRegistry()
-    registry.register(tools(fake)["inflation_rates"])
+    registry.register(tool)
     scope = ToolScope(uuid4(), uuid4(), 1, {"inflation_rates": 1})
-    result = await ToolGateway(registry).execute(None, scope, "inflation_rates", arguments)
-    assert (result.outcome.value, result.code) == ("denied", "invalid_arguments")
+    refused = resolve(registry, scope, "inflation_rates", arguments)
+    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
     assert fake.seen == []

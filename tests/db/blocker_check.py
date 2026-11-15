@@ -25,6 +25,7 @@ from autobots.application.plans import load_goal
 from autobots.application.reconciliation import record_evidence
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     ToolContext,
     ToolDefinition,
     ToolGateway,
@@ -154,7 +155,7 @@ async def main() -> None:
         # B1: what a reviewer reads is what they approve.
         async def needs_approval(_: Note, __: ToolContext) -> Sent:
             return Sent(delivered=True)
-        approved_tool = ToolDefinition(tool_id='send_note', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=needs_approval, approval_required=True)
+        approved_tool = ToolDefinition(tool_id='send_note', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=needs_approval, approval=ApprovalPolicy(always=True))
         gateway = ToolGateway(ToolRegistry())
         gateway.registry.register(approved_tool)
         for label, size in (('over the old 4,000 cut', 5_000), ('over the review limit', ARGUMENT_LIMIT + 1_000)):

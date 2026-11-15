@@ -15,8 +15,9 @@ from uuid import UUID
 
 from autobots.application.runs import LeaseLost, append_event
 from autobots.application.tool_gateway import (
+    Call,
+    Refused,
     ToolDefinition,
-    ToolRegistry,
     ToolResult,
     ToolScope,
     hold_lease,
@@ -89,20 +90,27 @@ async def served_task(
     return version, None
 
 
-async def begin_use(
-    connection: Any, scope: ToolScope, registry: ToolRegistry, name: str, arguments: Any
-) -> int | None:
-    """Recorded before anything else happens, with a started event in the same transaction."""
-    if connection is None:
+def _public_arguments(resolved: Call | Refused) -> Mapping[str, Any] | None:
+    """The parsed arguments after the tool's own redaction, or None when they didn't parse."""
+    if resolved.tool is None or resolved.parsed is None:
         return None
+    try:
+        return resolved.tool.redact(resolved.parsed.model_dump(mode="json"))
+    except Exception:  # noqa: BLE001 - arguments the tool can't redact stay out of the public record
+        return None
+
+
+async def begin_use(
+    connection: Any, scope: ToolScope, name: str, arguments: Any, resolved: Call | Refused
+) -> int | None:
+    """Recorded before anything else happens, with a started event in the same transaction.
+
+    `arguments` are as the model sent them, for the digest and the served task. `resolved` is the
+    gateway's one resolution of the call, so the tool is looked up and its arguments parsed once.
+    """
     version = scope.tools.get(name)
-    tool = registry.get(name, version) if version is not None else None
-    parsed: Mapping[str, Any] | None = None
-    if tool is not None:
-        try:
-            parsed = tool.redact(tool.input_model.model_validate(arguments).model_dump(mode="json"))
-        except Exception:  # noqa: BLE001 - arguments that fail their model stay out of the public record
-            parsed = None
+    tool = resolved.tool
+    parsed = _public_arguments(resolved)
     plan_version, task_id = await served_task(connection, scope.run_id, name, arguments)
     try:
         async with connection.transaction():
@@ -191,19 +199,20 @@ def is_metered(tool: ToolDefinition | None) -> bool:
 async def complete_use(
     connection: Any,
     scope: ToolScope,
-    registry: ToolRegistry,
     use_id: int,
     name: str,
+    resolved: Call | Refused,
     result: ToolResult,
     fenced: bool = True,
 ) -> None:
     """The outcome, by database time, with a completed event. A lost lease leaves it open.
 
-    `fenced=False` is for the one case where this worker released the lease itself: a call that
-    now waits for a person. Only this generation's own open row can still be completed.
+    `resolved` is the same resolution `begin_use` recorded. `fenced=False` is for the one case
+    where this worker released the lease itself: a call that now waits for a person. Only this
+    generation's own open row can still be completed.
     """
     version = scope.tools.get(name)
-    tool = registry.get(name, version) if version is not None else None
+    tool = resolved.tool
     output = result.output
     output_public = (
         public_projection(output, tool.public_output_fields) if tool and output else None

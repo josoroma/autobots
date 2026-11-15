@@ -20,7 +20,12 @@ from autobots.application.routines import (
     run_routine_now,
     set_enabled,
 )
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_gateway import (
+    ApprovalPolicy,
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+)
 from autobots.application.workflows import WorkflowRefused
 from autobots.contracts.cronjob import (
     CronjobInput,
@@ -188,12 +193,14 @@ def cronjob_tool(credential_check: CredentialCheck | None = None) -> ToolDefinit
         operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
         handler=handle,
         group=ToolGroup.AUTOMATION,
-        approval_when=lambda arguments: arguments.action != "list",
-        approval_reason=(
-            "This action can start or change scheduled work, which may spend money, so policy "
-            "holds it for a person."
+        approval=ApprovalPolicy(
+            when=lambda arguments: arguments.action != "list",
+            reason=(
+                "This action can start or change scheduled work, which may spend money, so policy "
+                "holds it for a person."
+            ),
+            resource_target=_target,
         ),
-        resource_target=_target,
         expert_only=True,
         public_input_fields=("action", "routine_id", "name"),
         public_output_fields=("routine_id", "status", "run_id"),

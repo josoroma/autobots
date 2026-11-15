@@ -267,9 +267,9 @@ async def studio_review(repository: str, token: str, authorization: dict, ledger
         files=[{'path': path, 'content': f'# US-15.16 qualification\n\nOperation {operation}. Closed unmerged.\n'}],
     )
     tool = github_pull_request_tool(transport, environ)
-    assert tool.review_detail is not None
+    assert tool.approval.review_detail is not None
     try:
-        detail = await tool.review_detail(arguments)
+        detail = await tool.approval.review_detail(arguments)
     except ToolFailed as error:
         # GitHub answers 409 for a git ref in a repository with no commits: there is no head to branch from.
         raise Refused(f'the base branch {base} could not be read ({error}); a repository with no commits has no head to propose against') from None

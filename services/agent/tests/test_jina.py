@@ -10,12 +10,14 @@ import pytest
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.url_guard import UrlRefused
 from autobots.application.tool_gateway import (
+    Refused,
     ToolContext,
     ToolFailed,
-    ToolGateway,
     ToolRegistry,
     ToolScope,
 )
+from autobots.application.tool_gateway import resolve as resolve_call
+from autobots.domain.stops import GatewayCode
 
 KEY = {"JINA_API_KEY": "jina_fixture0123456789"}
 MODEL_OPTIONS = ("readerlm", "x-respond-with", "x-with-generated-alt: true", "x-engine")
@@ -86,16 +88,16 @@ async def test_search_returns_labelled_snippets_within_its_ceiling() -> None:
         ("extract_website_content", {"url": "https://example.com", "engine": "readerlm-v2"}),
     ],
 )
-@pytest.mark.asyncio
-async def test_a_call_past_a_ceiling_or_with_an_unoffered_option_is_refused_first(
+def test_a_call_past_a_ceiling_or_with_an_unoffered_option_is_refused_first(
     tool_id: str, arguments: dict[str, Any]
 ) -> None:
     fake = Fake()
+    tool = tools(fake)[tool_id]
     registry = ToolRegistry()
-    registry.register(tools(fake)[tool_id])
+    registry.register(tool)
     scope = ToolScope(uuid4(), uuid4(), 1, {tool_id: 1})
-    result = await ToolGateway(registry).execute(None, scope, tool_id, arguments)
-    assert (result.outcome.value, result.code) == ("denied", "invalid_arguments")
+    refused = resolve_call(registry, scope, tool_id, arguments)
+    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
     assert fake.seen == []
 
 

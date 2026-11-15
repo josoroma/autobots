@@ -11,7 +11,8 @@ from autobots.application.tool_catalog import (
     catalog_registry,
     tool_catalog,
 )
-from autobots.application.tool_gateway import ToolGateway, ToolScope
+from autobots.application.tool_gateway import Refused, ToolScope, resolve
+from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import PLANNED_TOOLS
 from autobots.domain.tools import OperationClass
 from test_api import client, headers, token
@@ -64,16 +65,15 @@ def test_planned_tools_are_disabled_and_never_registered() -> None:
     assert browse.grantable_to == []
 
 
-@pytest.mark.asyncio
-async def test_discovery_does_not_grant() -> None:
+def test_discovery_does_not_grant() -> None:
     registry = catalog_registry()
     scope = ToolScope(workspace_id=uuid4(), run_id=uuid4(), generation=1, tools={"calculate": 1})
     shown = {entry["name"] for entry in registry.catalog(scope)}
     assert shown == {"calculate"}
     assert "read_run_file" in {item.tool_id for item in tool_catalog({}).tools}
-    # Refused before the connection is touched, so before any effect.
-    result = await ToolGateway(registry).execute(None, scope, "read_run_file", {"path": "x"})
-    assert (result.outcome.value, result.code) == ("denied", "tool_not_granted")
+    # Refused as the call resolves, before anything about the run is read.
+    refused = resolve(registry, scope, "read_run_file", {"path": "x"})
+    assert refused == Refused(GatewayCode.TOOL_NOT_GRANTED)
 
 
 def test_no_key_value_appears_in_the_catalog() -> None:

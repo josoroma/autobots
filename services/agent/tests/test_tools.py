@@ -10,12 +10,11 @@ from pydantic import ValidationError
 from autobots.application.approvals import requesting_agent, scope_hash, scope_snapshot
 from autobots.application.tool_gateway import (
     APPROVAL_POLICY_VERSION,
+    ApprovalPolicy,
     ToolDefinition,
     ToolGateway,
     ToolRegistry,
     ToolScope,
-    _approval_reason,
-    _approval_rule,
 )
 from autobots.application.tools import default_registry, first_grants
 from autobots.contracts.tools import CalculateInput, CalculateOutput
@@ -102,32 +101,72 @@ def test_calculate_refuses_extra_fields_and_non_finite_values() -> None:
         CalculateInput.model_validate({"operation": "sum", "values": [float("inf")]})
 
 
+MARKED = "This tool is marked to wait for a person, so policy holds each call."
+EXTERNAL = "This tool changes something outside this Mac, so policy holds each call for a person."
+
+
+def _sums(arguments: CalculateInput) -> bool:
+    return arguments.operation == "sum"
+
+
+# Each approval policy a tool can declare.
+DECLARED: dict[str, ApprovalPolicy] = {
+    "plain": ApprovalPolicy(),
+    "marked": ApprovalPolicy(always=True),
+    "by_action": ApprovalPolicy(when=_sums),
+    "marked_and_by_action": ApprovalPolicy(always=True, when=_sums),
+}
+
+
 def test_the_approval_policy_version_names_these_rules() -> None:
-    """Decision 0015. Changing a rule or its text fails here until the version changes too."""
-    rules = {
-        kind: (_approval_rule(_tool(kind)), _approval_reason(_tool(kind)))
-        for kind in (OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, OperationClass.READ_ONLY)
+    """Decision 0015. Changing the condition, a rule, its text or the catalog's label fails here
+    until the version changes too. Each row is (label, held for a matching call, held for another
+    call, rule, reason text), for every operation class and every declared policy (PTOL-04)."""
+    matching = CalculateInput(operation="sum", values=[1])
+    other = CalculateInput(operation="mean", values=[1])
+    table = {}
+    for kind in OperationClass:
+        for name, chosen in DECLARED.items():
+            policy = replace(_tool(kind), approval=chosen).approval
+            table[kind.value, name] = (
+                policy.label(kind),
+                policy.applies(kind, matching),
+                policy.applies(kind, other),
+                policy.rule(kind),
+                policy.reason_text(kind),
+            )
+    # A consequential external write is held on every call, whatever else is declared.
+    external = ("always", True, True, "consequential_external_write", EXTERNAL)
+    declared = {
+        "plain": ("never", False, False, "tool_marked", MARKED),
+        "marked": ("always", True, True, "tool_marked", MARKED),
+        "by_action": ("by_action", True, False, "action_marked", MARKED),
+        "marked_and_by_action": ("always", True, True, "tool_marked", MARKED),
     }
-    assert (APPROVAL_POLICY_VERSION, rules) == (
+    assert (APPROVAL_POLICY_VERSION, table) == (
         "approval-policy/2",
         {
-            OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE: (
-                "consequential_external_write",
-                "This tool changes something outside this Mac, so policy holds each call for a "
-                "person.",
-            ),
-            OperationClass.READ_ONLY: (
-                "tool_marked",
-                "This tool is marked to wait for a person, so policy holds each call.",
-            ),
+            (kind.value, name): (
+                external if kind is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE else row
+            )
+            for kind in OperationClass
+            for name, row in declared.items()
         },
     )
-    by_action = replace(
-        _tool(OperationClass.REVERSIBLE_INTERNAL_WRITE), approval_when=lambda _: True
-    )
-    assert _approval_rule(by_action) == "action_marked"
+    own = ApprovalPolicy(reason="Own.")
+    assert own.reason_text(OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE) == "Own."
     snapshot = scope_snapshot({"b": 2, "a": 1}, ("outputs",))
     assert snapshot == {"tools": {"b": 2, "a": 1}, "paths": ["outputs"]}
     digest = hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
     assert digest == scope_hash({"a": 1, "b": 2}, ["outputs"])
     assert requesting_agent(None, None) == {"kind": "coordinator"}
+
+
+def test_the_catalog_shows_the_label_the_gateway_holds_by() -> None:
+    """Decision 0026 C9: the Tools page's approval label is the gateway's own rule."""
+    from autobots.application.tool_catalog import describe
+
+    for kind in OperationClass:
+        for chosen in DECLARED.values():
+            tool = replace(_tool(kind), tool_id="held_x", approval=chosen)
+            assert describe(tool, {}).approval == tool.approval.label(kind)

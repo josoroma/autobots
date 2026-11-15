@@ -35,7 +35,12 @@ from autobots.adapters.loop_middleware import LoopStopped, ModelRoute, current_m
 from autobots.adapters.provider_http import fit
 from autobots.application.bounded import stop_task
 from autobots.application.browsing_loop import BrowseOutcome, admitted_steps, browse
-from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
+from autobots.application.tool_gateway import (
+    ApprovalPolicy,
+    ToolContext,
+    ToolDefinition,
+    ToolFailed,
+)
 from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalOutput, within
 from autobots.domain.tool_catalog import CostClass, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
@@ -189,14 +194,16 @@ def browse_tool(
         operation_class=OperationClass.ARBITRARY_EXECUTION,
         handler=handler,
         timeout_seconds=300 + GRACE_SECONDS + 30,
-        approval_required=True,
-        approval_reason=(
-            "Browsing runs a real browser on third-party sites, and each of its steps is a paid "
-            "model call on the run's budget."
-        ),
-        resource_target=lambda args: (
-            f"{args.start_url} within {', '.join(args.allowed_domains)}, "
-            f"up to {args.max_steps} steps and {args.max_seconds} s"
+        approval=ApprovalPolicy(
+            always=True,
+            reason=(
+                "Browsing runs a real browser on third-party sites, and each of its steps is a "
+                "paid model call on the run's budget."
+            ),
+            resource_target=lambda args: (
+                f"{args.start_url} within {', '.join(args.allowed_domains)}, "
+                f"up to {args.max_steps} steps and {args.max_seconds} s"
+            ),
         ),
         group=ToolGroup.BROWSING,
         provider=ToolProvider.AUTOBOTS,

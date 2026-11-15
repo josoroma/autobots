@@ -8,7 +8,8 @@ own identity can pass, so a changed argument is a different operation that needs
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any
+from enum import Enum
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from autobots.application.runs import (
@@ -81,9 +82,47 @@ def scope_snapshot(tools: Any, paths: Any) -> dict[str, Any]:
     return {"tools": dict(tools), "paths": list(paths)}
 
 
+def _digest(snapshot: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
+
+
 def scope_hash(tools: Any, paths: Any) -> str:
-    encoded = json.dumps(scope_snapshot(tools, paths), sort_keys=True)
-    return hashlib.sha256(encoded.encode()).hexdigest()
+    return _digest(scope_snapshot(tools, paths))
+
+
+class Requester(LeaseHolder, Protocol):
+    """The run a proposal comes from, at the generation that holds it, such as a call's scope."""
+
+    @property
+    def workspace_id(self) -> UUID: ...
+
+
+@dataclass(frozen=True)
+class ApprovalProposal:
+    """What a held call asks a person to approve, built once per dispatch by the gateway.
+
+    SP-013 binds the operation's identity, its tool version, the argument hash and the scope.
+    Decision 0015 adds the scope snapshot, the policy version and the rule that held the call.
+    Every field is required, so no request is stored without them. `resource_target` is None when
+    the tool names no target, and `review_detail` when it has no review (PRD-Studio GH-06)."""
+
+    operation_id: str
+    tool_id: str
+    tool_version: int
+    operation_class: str
+    argument_hash: str
+    arguments: dict[str, Any]
+    scope: dict[str, Any]
+    policy_version: str
+    policy_rule: str
+    policy_reason: str
+    resource_target: str | None
+    review_detail: dict[str, Any] | None
+
+    @property
+    def scope_hash(self) -> str:
+        """Computed from the snapshot, so the two always agree (Decision 0015)."""
+        return _digest(self.scope)
 
 
 def requesting_agent(expert_id: UUID | None, expert_version: int | None) -> dict[str, Any]:
@@ -122,121 +161,167 @@ async def _reopen(
     await append_event(connection, run_id, _requested(approval_id, tool_id))
 
 
-async def _enter_wait(
-    connection: Any, workspace_id: UUID, run_id: UUID, generation: int, detail: str
-) -> None:
+async def _enter_wait(connection: Any, run: Requester, approval_id: UUID) -> None:
     await apply_command(
         connection,
-        workspace_id=workspace_id,
-        run_id=run_id,
+        workspace_id=run.workspace_id,
+        run_id=run.run_id,
         command=RunCommand.REQUEST_APPROVAL,
         actor=Actor.WORKER,
-        expected_version=await _version(connection, run_id),
-        generation=generation,
-        detail=detail,
+        expected_version=await _version(connection, run.run_id),
+        generation=run.generation,
+        detail=str(approval_id),
     )
 
 
-async def approval_gate(  # noqa: PLR0911, PLR0913 - baseline 2026-11-14, shrink only (STD-06)
+async def _request_review(
+    connection: Any, run: Requester, proposal: ApprovalProposal, ttl_seconds: int
+) -> UUID:
+    """Stores the request with every Decision 0015 field and announces it. Who asked is read from
+    the run in this transaction, never from the call."""
+    approval_id = uuid4()
+    cursor = await connection.execute(
+        "select started_by, expert_id, expert_version from public.runs where id = %s",
+        (run.run_id,),
+    )
+    started_by, expert_id, expert_version = await cursor.fetchone()
+    await connection.execute(
+        "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
+        "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
+        "policy_reason, resource_target, requested_by, requested_by_agent, "
+        "scope_snapshot, policy_version, policy_rule, review_detail, expires_at) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "clock_timestamp() + make_interval(secs => %s))",
+        (
+            approval_id,
+            run.workspace_id,
+            run.run_id,
+            proposal.operation_id,
+            proposal.tool_id,
+            proposal.tool_version,
+            proposal.operation_class,
+            proposal.argument_hash,
+            json.dumps(proposal.arguments),
+            proposal.scope_hash,
+            proposal.policy_reason,
+            proposal.resource_target,
+            started_by,
+            json.dumps(requesting_agent(expert_id, expert_version)),
+            json.dumps(proposal.scope),
+            proposal.policy_version,
+            proposal.policy_rule,
+            None if proposal.review_detail is None else json.dumps(proposal.review_detail),
+            ttl_seconds,
+        ),
+    )
+    await append_event(connection, run.run_id, _requested(approval_id, proposal.tool_id))
+    return approval_id
+
+
+@dataclass(frozen=True)
+class RequestRow:
+    """The operation's approval request, as the gate reads it under the request's row lock."""
+
+    approval_id: UUID
+    status: str
+    scope_hash: str
+    expired: bool
+
+
+@dataclass(frozen=True)
+class ReceiptState:
+    """The operation's receipt, as the gate reads it: whether a person ruled on its last attempt,
+    and the code that attempt failed with."""
+
+    status: str
+    ruled: bool
+    failure_code: str | None
+
+
+class Gate(Enum):
+    """What the gate does with a call that no refusal stopped."""
+
+    RELEASE = "release"  # the effect may run
+    REQUEST = "request"  # no request yet: store one, then wait for a person
+    WAIT = "wait"  # a person hasn't decided yet
+    REOPEN = "reopen"  # approved, but stale with nothing sent: back to a person, then wait
+
+
+def gate_decision(
+    row: RequestRow | None, scope_hash: str, receipt: ReceiptState | None
+) -> Gate | GatewayCode:
+    """The decision table. `scope_hash` is the call's current scope. `receipt` is the operation's
+    receipt, or None when it has none, and is consulted only for an approved request."""
+    if row is None:
+        return Gate.REQUEST
+    if row.status == "pending":
+        return GatewayCode.APPROVAL_EXPIRED if row.expired else Gate.WAIT
+    if row.status != "approved":
+        rejected = row.status == "rejected"
+        return GatewayCode.APPROVAL_REJECTED if rejected else GatewayCode.APPROVAL_EXPIRED
+    if row.scope_hash != scope_hash:
+        return GatewayCode.APPROVAL_SCOPE_CHANGED
+    if receipt_may_have_sent(None if receipt is None else receipt.status):
+        # It was already sent, or may have been. Its receipt answers that, whatever the date, and
+        # refusing here would report an effect that happened as not happening (Decision 0025 V8).
+        return Gate.RELEASE
+    if receipt is not None and not receipt.ruled and receipt.failure_code != LEASE_LOST:
+        # A failure nobody ruled on used this decision. A ruling grants one more try. An attempt
+        # whose lease was lost wrote nothing and wasn't the run's current owner's, so the decision
+        # still stands for that owner.
+        return GatewayCode.APPROVAL_CONSUMED
+    return Gate.REOPEN if row.expired else Gate.RELEASE
+
+
+async def _request_row(connection: Any, operation_id: str) -> RequestRow | None:
+    """Locked until the gate's transaction ends, so concurrent attempts decide one at a time."""
+    cursor = await connection.execute(
+        "select id, status, scope_hash, expires_at <= clock_timestamp() "
+        "from public.approval_requests where operation_id = %s for update",
+        (operation_id,),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else RequestRow(row[0], row[1], row[2], bool(row[3]))
+
+
+async def _receipt_state(connection: Any, operation_id: str) -> ReceiptState | None:
+    cursor = await connection.execute(
+        "select status, reconciled_at, failure_code from app_private.tool_receipts "
+        "where operation_id = %s",
+        (operation_id,),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else ReceiptState(row[0], row[1] is not None, row[2])
+
+
+async def approval_gate(
     connection: Any,
-    *,
-    workspace_id: UUID,
-    run_id: UUID,
-    generation: int,
-    operation_id: str,
-    tool_id: str,
-    tool_version: int,
-    operation_class: str,
-    argument_hash: str,
-    arguments: dict[str, Any],
-    current_scope_hash: str,
-    policy_reason: str,
-    resource_target: str | None,
-    scope: dict[str, Any] | None = None,
-    policy_version: str | None = None,
-    policy_rule: str | None = None,
+    run: Requester,
+    proposal: ApprovalProposal,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
-    review_detail: dict[str, Any] | None = None,
-) -> str | None:
+) -> GatewayCode | None:
     """None releases the operation. Any code means no effect, and says why."""
     async with connection.transaction():
-        cursor = await connection.execute(
-            "select id, status, scope_hash, expires_at <= clock_timestamp() "
-            "from public.approval_requests where operation_id = %s for update",
-            (operation_id,),
+        row = await _request_row(connection, proposal.operation_id)
+        receipt = (
+            await _receipt_state(connection, proposal.operation_id)
+            if row is not None and row.status == "approved"
+            else None
         )
-        row = await cursor.fetchone()
-        if row is None:
-            approval_id = uuid4()
-            # Who asked is read from the run in this transaction, never from the call.
-            cursor = await connection.execute(
-                "select started_by, expert_id, expert_version from public.runs where id = %s",
-                (run_id,),
-            )
-            started_by, expert_id, expert_version = await cursor.fetchone()
-            await connection.execute(
-                "insert into public.approval_requests (id, workspace_id, run_id, operation_id, "
-                "tool_id, tool_version, operation_class, argument_hash, arguments, scope_hash, "
-                "policy_reason, resource_target, requested_by, requested_by_agent, "
-                "scope_snapshot, policy_version, policy_rule, review_detail, expires_at) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-                "clock_timestamp() + make_interval(secs => %s))",
-                (
-                    approval_id,
-                    workspace_id,
-                    run_id,
-                    operation_id,
-                    tool_id,
-                    tool_version,
-                    operation_class,
-                    argument_hash,
-                    json.dumps(arguments),
-                    current_scope_hash,
-                    policy_reason,
-                    resource_target,
-                    started_by,
-                    json.dumps(requesting_agent(expert_id, expert_version)),
-                    None if scope is None else json.dumps(scope),
-                    policy_version,
-                    policy_rule,
-                    None if review_detail is None else json.dumps(review_detail),
-                    ttl_seconds,
-                ),
-            )
-            await append_event(connection, run_id, _requested(approval_id, tool_id))
-            await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
-            return "approval_pending"
-        approval_id, status, stored_scope, expired = row
-        if status == "pending":
-            if expired:
-                return "approval_expired"
-            await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
-            return "approval_pending"
-        if status == "approved":
-            if stored_scope != current_scope_hash:
-                return "approval_scope_changed"
-            cursor = await connection.execute(
-                "select status, reconciled_at, failure_code from app_private.tool_receipts "
-                "where operation_id = %s",
-                (operation_id,),
-            )
-            receipt = await cursor.fetchone()
-            if receipt_may_have_sent(None if receipt is None else receipt[0]):
-                # It was already sent, or may have been. Its receipt answers that, whatever the
-                # date, and refusing here would report an effect that happened as not happening.
-                return None
-            if receipt is not None and receipt[1] is None and receipt[2] != LEASE_LOST:
-                # A failure nobody ruled on used this decision. A ruling grants one more try. An
-                # attempt whose lease was lost wrote nothing and wasn't the run's current owner's,
-                # so the decision still stands for that owner.
-                return "approval_consumed"
-            if expired:
-                # Nothing was sent, so this is only stale. A person can look at it again.
-                await _reopen(connection, run_id, approval_id, tool_id, ttl_seconds)
-                await _enter_wait(connection, workspace_id, run_id, generation, str(approval_id))
-                return "approval_pending"
+        decision = gate_decision(row, proposal.scope_hash, receipt)
+        if isinstance(decision, GatewayCode):
+            return decision
+        if decision is Gate.RELEASE:
             return None
-        return "approval_rejected" if status == "rejected" else "approval_expired"
+        if row is None:
+            approval_id = await _request_review(connection, run, proposal, ttl_seconds)
+        else:
+            approval_id = row.approval_id
+            if decision is Gate.REOPEN:
+                # Nothing was sent, so this is only stale. A person can look at it again.
+                await _reopen(connection, run.run_id, approval_id, proposal.tool_id, ttl_seconds)
+        await _enter_wait(connection, run, approval_id)
+        return GatewayCode.APPROVAL_PENDING
 
 
 async def return_to_review(

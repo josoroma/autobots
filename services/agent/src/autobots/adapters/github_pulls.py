@@ -28,6 +28,7 @@ from autobots.adapters.github_issues import (
 )
 from autobots.application.approvals import approved_request, return_to_review
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     NotDelivered,
     ToolContext,
     ToolDefinition,
@@ -261,9 +262,9 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         output_model=GithubOpenPullRequestOutput,
         handler=open_pull_request,
         reconcile=readback,
-        review_detail=review,
-        resource_target=review_target,
-        target_resolver=resolve_target,
+        approval=ApprovalPolicy(
+            review_detail=review, resource_target=review_target, target_resolver=resolve_target
+        ),
         timeout_seconds=60.0,
         max_output_bytes=10_000,
         public_input_fields=("title", "base"),

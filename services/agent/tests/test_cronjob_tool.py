@@ -34,8 +34,8 @@ ROUTINE = str(uuid4())
 )
 def test_each_action_takes_its_own_fields(arguments: dict[str, Any]) -> None:
     parsed = CronjobInput.model_validate(arguments)
-    assert CRONJOB.approval_when is not None
-    assert CRONJOB.approval_when(parsed) is (arguments["action"] != "list")
+    assert CRONJOB.approval.when is not None
+    assert CRONJOB.approval.when(parsed) is (arguments["action"] != "list")
 
 
 @pytest.mark.parametrize(

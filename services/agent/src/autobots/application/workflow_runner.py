@@ -28,6 +28,7 @@ from autobots.application.recovery import classify_interrupted
 from autobots.application.run_usage import ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     ToolContext,
     ToolDefinition,
     ToolGateway,
@@ -83,7 +84,9 @@ APPROVAL_GATE = ToolDefinition(
     output_model=ApprovalOutput,
     operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE,
     handler=_release,
-    approval_reason="This workflow has an approval step, so policy holds it for a person.",
+    approval=ApprovalPolicy(
+        reason="This workflow has an approval step, so policy holds it for a person."
+    ),
 )
 
 

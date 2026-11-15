@@ -377,7 +377,7 @@ def test_every_code_the_gateway_produces_is_classified() -> None:
     gateway = _tree("application/tool_gateway.py")
     named = {
         GatewayCode[name].value
-        for node in ast.walk(gateway)
+        for node in (*ast.walk(gateway), *ast.walk(_tree("application/approvals.py")))
         if isinstance(node, ast.expr) and (name := _named(node, "GatewayCode")) is not None
     }
     # tool_gateway.py names codes only through GatewayCode; a bare string as a code fails here.

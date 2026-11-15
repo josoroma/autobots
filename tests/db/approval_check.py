@@ -15,6 +15,7 @@ from autobots.application.approvals import ApprovalRefused, decide, expire_due
 from autobots.application.goal_loop import LoopConfig, process_next
 from autobots.application.runs import Inheritance, admit_run, apply_command
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     ToolContext,
     ToolDefinition,
     ToolGateway,
@@ -57,7 +58,7 @@ async def send(arguments: SendInput, _: ToolContext) -> SendOutput:
     return SendOutput(delivered=True)
 
 
-MOCK = ToolDefinition(tool_id='mock_send', version=1, description='Send a message to a controlled sink.', input_model=SendInput, output_model=SendOutput, resource_target=lambda arguments: f'Mail to {arguments.to}', operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=send)
+MOCK = ToolDefinition(tool_id='mock_send', version=1, description='Send a message to a controlled sink.', input_model=SendInput, output_model=SendOutput, approval=ApprovalPolicy(resource_target=lambda arguments: f'Mail to {arguments.to}'), operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=send)
 SEND = ('mock_send', {'to': 'team@example.invalid', 'body': 'hello'})
 CONFIG = LoopConfig(route=ROUTE, tools=(MOCK,), sleep=lambda _: asyncio.sleep(0))
 

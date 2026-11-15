@@ -6,16 +6,16 @@ import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
 from autobots.application.approvals import (
+    ApprovalProposal,
     approval_gate,
     approved_request,
     receipt_may_have_sent,
-    scope_hash,
     scope_snapshot,
 )
 from autobots.application.runs import LeaseLost
@@ -94,6 +94,71 @@ class ToolContext:
 Handler = Callable[[Any, ToolContext], Awaitable[BaseModel]]
 Reconcile = Callable[[Any, ToolContext], Awaitable[BaseModel | None]]
 
+# Decision 0015. Change it whenever ApprovalPolicy's condition, rule or reason text changes, so a
+# request names the rules it was held under. The pin test in test_tools.py fails until it changes.
+# Version 2 adds a tool's per-call condition, ApprovalPolicy's `when` (Decision 0026 C3).
+APPROVAL_POLICY_VERSION = "approval-policy/2"
+
+
+def _no_target(_: Any) -> str | None:
+    return None
+
+
+@dataclass(frozen=True)
+class ApprovalPolicy:
+    """When a call waits for a person, and what its request records (Decision 0015). A tool
+    declares it as `ToolDefinition.approval`, and the gateway, the catalog and the pin test all
+    read it, so the rule is written once (PTOL-04).
+
+    A consequential external write always waits. Any other call waits when its tool is marked
+    `always`, or when `when` holds for its parsed arguments (Decision 0026 C3).
+    """
+
+    always: bool = False
+    when: Callable[[Any], bool] | None = None
+    # Why policy asks, when the tool has a reason of its own. Never from the model.
+    reason: str | None = None
+    # What a reviewer is told this touches, from the arguments or server configuration.
+    resource_target: Callable[[Any], str | None] = _no_target
+    # Decision 0025 V7: the target resolved for this call's workspace. When set, it is what the
+    # approval records, and an approved call whose target now resolves differently is refused.
+    target_resolver: Callable[[Any, ToolContext], Awaitable[str | None]] | None = None
+    # PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval
+    # request exists. It may read the destination, never write it.
+    review_detail: Callable[[Any, ToolContext], Awaitable[dict[str, Any]]] | None = None
+
+    def _every_call(self, operation_class: OperationClass) -> bool:
+        return self.always or operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+
+    def applies(self, operation_class: OperationClass, parsed: Any) -> bool:
+        """Whether this call, with these parsed arguments, waits for a person."""
+        return self._every_call(operation_class) or (self.when is not None and self.when(parsed))
+
+    def label(self, operation_class: OperationClass) -> Literal["always", "by_action", "never"]:
+        """How the catalog shows the policy (Decision 0026 C9)."""
+        if self._every_call(operation_class):
+            return "always"
+        return "by_action" if self.when is not None else "never"
+
+    def rule(self, operation_class: OperationClass) -> str:
+        """Which of the policy's rules held a call."""
+        if operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
+            return "consequential_external_write"
+        if not self.always and self.when is not None:
+            return "action_marked"
+        return "tool_marked"
+
+    def reason_text(self, operation_class: OperationClass) -> str:
+        """Fixed text from the tool's policy, so nothing a model wrote can reach it."""
+        if self.reason is not None:
+            return self.reason
+        if operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
+            return (
+                "This tool changes something outside this Mac, so policy holds each call for a "
+                "person."
+            )
+        return "This tool is marked to wait for a person, so policy holds each call."
+
 
 @dataclass(frozen=True)
 class ToolDefinition:
@@ -107,16 +172,9 @@ class ToolDefinition:
     timeout_seconds: float = 10.0
     retries: int = 0
     max_output_bytes: int = 300_000
-    approval_required: bool = False
-    # Decision 0026 C3: approval for some calls only, decided from the parsed arguments.
-    approval_when: Callable[[Any], bool] | None = None
-    # What a reviewer is told this touches, from the arguments or server configuration.
-    resource_target: Callable[[Any], str | None] = lambda _: None
-    # Decision 0025 V7: the target resolved for this call's workspace. When set, it is what the
-    # approval records, and an approved call whose target now resolves differently is refused.
-    target_resolver: Callable[[Any, "ToolContext"], Awaitable[str | None]] | None = None
-    # Why policy asks, when this tool has a reason of its own. Never from the model.
-    approval_reason: str | None = None
+    # When a call waits for a person and what its request records. The default holds only a
+    # consequential external write.
+    approval: ApprovalPolicy = field(default_factory=ApprovalPolicy)
     # What the arguments touch, checked against the scope's path grants.
     resources: Callable[[Any], tuple[str, ...]] = lambda _: ()
     # Finds out whether an interrupted effect happened, from the destination rather than memory.
@@ -134,9 +192,6 @@ class ToolDefinition:
     cost_note: str | None = None
     key_requirement: KeyRequirement | None = None
     # Top-level fields a run's screens may show, TU-04. The default shows none.
-    # PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval
-    # request exists. It may read the destination, never write it.
-    review_detail: Callable[[Any, "ToolContext"], Awaitable[dict[str, Any]]] | None = None
     public_input_fields: tuple[str, ...] = ()
     public_output_fields: tuple[str, ...] = ()
     # AB-02: an `arbitrary_execution` tool exists only while its executor reports qualified.
@@ -213,37 +268,65 @@ def _hash(arguments: BaseModel) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-# Decision 0015. Change it whenever `_approval_rule`, `_approval_reason` or the condition that asks
-# for approval changes, so a request names the rules it was held under. A unit test pins it.
-# Version 2 adds a tool's per-call condition, `approval_when` (Decision 0026 C3).
-APPROVAL_POLICY_VERSION = "approval-policy/2"
-
-
-def _approval_rule(tool: ToolDefinition) -> str:
-    """Which of the policy's rules held this call."""
-    if tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
-        return "consequential_external_write"
-    if not tool.approval_required and tool.approval_when is not None:
-        return "action_marked"
-    return "tool_marked"
-
-
-def _approval_reason(tool: ToolDefinition) -> str:
-    """Fixed text from this tool's policy, so nothing a model wrote can reach it."""
-    if tool.approval_reason is not None:
-        return tool.approval_reason
-    if tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE:
-        return (
-            "This tool changes something outside this Mac, so policy holds each call for a person."
-        )
-    return "This tool is marked to wait for a person, so policy holds each call."
+def _identity(scope: ToolScope, tool: ToolDefinition, argument_hash: str) -> str:
+    # Two foreach items can be equal and still be two pieces of work.
+    place = f"|{scope.instance}" if scope.instance else ""
+    identity = f"{scope.run_id}{place}|{tool.tool_id}|{tool.version}|{argument_hash}"
+    return hashlib.sha256(identity.encode()).hexdigest()
 
 
 def _operation_id(scope: ToolScope, tool: ToolDefinition, parsed: BaseModel) -> str:
-    # Two foreach items can be equal and still be two pieces of work.
-    place = f"|{scope.instance}" if scope.instance else ""
-    identity = f"{scope.run_id}{place}|{tool.tool_id}|{tool.version}|{_hash(parsed)}"
-    return hashlib.sha256(identity.encode()).hexdigest()
+    """The same identity `resolve` gives a call, from its parsed arguments."""
+    return _identity(scope, tool, _hash(parsed))
+
+
+@dataclass(frozen=True)
+class Call:
+    """One tool call, resolved once per dispatch: its granted definition, its parsed arguments,
+    and the identity that binds an approval to its effect and names its receipt (SP-013)."""
+
+    tool: ToolDefinition
+    parsed: BaseModel
+    argument_hash: str
+    operation_id: str
+
+
+@dataclass(frozen=True)
+class Refused:
+    """Why `resolve` refused a call, with the definition and parsed arguments it reached first,
+    which the call's tool-use record shows (TU-01, TU-04)."""
+
+    code: GatewayCode
+    tool: ToolDefinition | None = None
+    parsed: BaseModel | None = None
+
+
+def resolve(registry: ToolRegistry, scope: ToolScope, name: str, arguments: Any) -> Call | Refused:
+    """The call, or why it is refused before anything about the run is read: not granted, not
+    registered, an executor no longer qualified, invalid arguments or a path outside the grants,
+    in that order (SP-013)."""
+    version = scope.tools.get(name)
+    if version is None:
+        return Refused(GatewayCode.TOOL_NOT_GRANTED)
+    tool = registry.get(name, version)
+    if tool is None:
+        return Refused(GatewayCode.TOOL_NOT_REGISTERED)
+    parsed: BaseModel | None
+    try:
+        # Parsed before the qualification check so that refusal's record still shows the call's
+        # public fields; the refusals keep their order.
+        parsed = tool.input_model.model_validate(arguments)
+    except ValidationError:
+        parsed = None
+    if tool.operation_class is OperationClass.ARBITRARY_EXECUTION and not tool.executor_qualified():
+        # Checked at each call, as a qualification can be withdrawn while a worker runs (AB-02).
+        return Refused(GatewayCode.CAPABILITY_DISABLED, tool, parsed)
+    if parsed is None:
+        return Refused(GatewayCode.INVALID_ARGUMENTS, tool)
+    if not all(path_granted(path, scope.paths) for path in tool.resources(parsed)):
+        return Refused(GatewayCode.RESOURCE_NOT_GRANTED, tool, parsed)
+    argument_hash = _hash(parsed)
+    return Call(tool, parsed, argument_hash, _identity(scope, tool, argument_hash))
 
 
 async def _target_unchanged(connection: Any, operation_id: str, target: str | None) -> bool:
@@ -339,6 +422,92 @@ async def hold_running(connection: Any, scope: ToolScope) -> None:
         raise NotRunning
 
 
+async def admission_refusal(connection: Any, scope: ToolScope, call: Call) -> GatewayCode | None:
+    """The run is running and this worker owns it, then an Expert-only tool has an Expert behind
+    the run (AB-02). Both are read fresh, after the call resolved and before any approval."""
+    refusal = await ownership_refusal(connection, scope)
+    if refusal is not None:
+        return refusal
+    if call.tool.expert_only and not await _expert_behind(connection, scope):
+        return GatewayCode.EXPERT_GRANT_REQUIRED
+    return None
+
+
+def _proposal(
+    scope: ToolScope, call: Call, target: str | None, detail: dict[str, Any] | None
+) -> ApprovalProposal:
+    tool, policy = call.tool, call.tool.approval
+    return ApprovalProposal(
+        operation_id=call.operation_id,
+        tool_id=tool.tool_id,
+        tool_version=tool.version,
+        operation_class=tool.operation_class.value,
+        argument_hash=call.argument_hash,
+        arguments=tool.redact(call.parsed.model_dump(mode="json")),
+        scope=scope_snapshot(scope.tools, scope.paths),
+        policy_version=APPROVAL_POLICY_VERSION,
+        policy_rule=policy.rule(tool.operation_class),
+        policy_reason=policy.reason_text(tool.operation_class),
+        resource_target=target,
+        review_detail=detail,
+    )
+
+
+async def hold_for_approval(
+    connection: Any, scope: ToolScope, call: Call
+) -> GatewayCode | str | None:
+    """None lets the call through: its policy doesn't hold it, or a person approved this operation
+    and its target still resolves to the one they approved (Decision 0015, Decision 0025 V7).
+
+    A code means it waits for a person or is refused. A tool's own code from its target resolver
+    or review passes through."""
+    tool, policy = call.tool, call.tool.approval
+    if not policy.applies(tool.operation_class, call.parsed):
+        return None
+    reviewing = ToolContext(connection, scope, call.operation_id)
+    target = policy.resource_target(call.parsed)
+    if policy.target_resolver is not None:
+        try:
+            target = await policy.target_resolver(call.parsed, reviewing)
+        except ToolFailed as error:
+            # Nothing to approve: the destination isn't configured for this workspace.
+            return str(error) or GatewayCode.CONNECTOR_NOT_CONFIGURED
+    detail = None
+    if policy.review_detail is not None and not await _has_approval(connection, call.operation_id):
+        try:
+            detail = await asyncio.wait_for(
+                policy.review_detail(call.parsed, reviewing), tool.timeout_seconds
+            )
+        except ToolFailed as error:
+            return str(error) or GatewayCode.REVIEW_UNAVAILABLE
+        except Exception as error:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
+            # A denial keeps no receipt, so the log line is all that's kept.
+            _log_failure("tool.operation.review_failed", tool, call.operation_id, error)
+            return GatewayCode.REVIEW_UNAVAILABLE
+    code = await approval_gate(connection, scope, _proposal(scope, call, target, detail))
+    if code is not None:
+        return code
+    if policy.target_resolver is not None and not await _target_unchanged(
+        connection, call.operation_id, target
+    ):
+        return GatewayCode.APPROVAL_TARGET_CHANGED
+    return None
+
+
+async def admit_budget(
+    connection: Any, scope: ToolScope, call: Call, use: int | None
+) -> GatewayCode | None:
+    """Decision 0017 Q4: a metered call is counted per root run tree, before any request leaves.
+    After approval, so a call waiting for a person isn't counted twice."""
+    from autobots.application.tool_uses import admit_metered, is_metered
+
+    if not is_metered(call.tool):
+        return None
+    if use is None or not await admit_metered(connection, scope, use):
+        return GatewayCode.TOOL_BUDGET_EXCEEDED
+    return None
+
+
 @dataclass(frozen=True)
 class ToolGateway:
     registry: ToolRegistry
@@ -350,116 +519,46 @@ class ToolGateway:
         that lost its lease records nothing, and is refused below as before."""
         from autobots.application.tool_uses import begin_use, complete_use
 
-        use = await begin_use(connection, scope, self.registry, name, arguments)
-        result = await self._dispatch(connection, scope, name, arguments, use)
+        resolved = resolve(self.registry, scope, name, arguments)
+        use = await begin_use(connection, scope, name, arguments, resolved)
+        result = await self._dispatch(connection, scope, resolved, use)
         if use is not None:
             # A call now waiting for a person released the lease in its own approval gate.
             waiting = result.code == GatewayCode.APPROVAL_PENDING
-            await complete_use(
-                connection, scope, self.registry, use, name, result, fenced=not waiting
-            )
+            await complete_use(connection, scope, use, name, resolved, result, fenced=not waiting)
         return result
 
-    async def _dispatch(  # noqa: C901, PLR0911, PLR0912 - baseline 2026-11-14, shrink only (STD-06)
-        self, connection: Any, scope: ToolScope, name: str, arguments: Any, use: int | None
+    async def _dispatch(
+        self, connection: Any, scope: ToolScope, resolved: Call | Refused, use: int | None
     ) -> ToolResult:
-        """Refused before any effect: ungranted, unqualified, invalid, out of scope or unowned."""
-        version = scope.tools.get(name)
-        if version is None:
-            return _denied(GatewayCode.TOOL_NOT_GRANTED)
-        tool = self.registry.get(name, version)
-        if tool is None:
-            return _denied(GatewayCode.TOOL_NOT_REGISTERED)
-        if (
-            tool.operation_class is OperationClass.ARBITRARY_EXECUTION
-            and not tool.executor_qualified()
-        ):
-            # Checked again here, as a qualification can be withdrawn while a worker runs.
-            return _denied(GatewayCode.CAPABILITY_DISABLED)
-        try:
-            parsed = tool.input_model.model_validate(arguments)
-        except ValidationError:
-            return _denied(GatewayCode.INVALID_ARGUMENTS)
-        if not all(path_granted(path, scope.paths) for path in tool.resources(parsed)):
-            return _denied(GatewayCode.RESOURCE_NOT_GRANTED)
-        refusal = await ownership_refusal(connection, scope)
+        """Refused before any effect, in the order that is the gateway's security contract (SP-013):
+        the call doesn't resolve, admission refuses it, it waits for a person or is refused at
+        approval, or the metered budget refuses it."""
+        if isinstance(resolved, Refused):
+            return _denied(resolved.code)
+        call = resolved
+        refusal: GatewayCode | str | None = await admission_refusal(connection, scope, call)
+        if refusal is None:
+            refusal = await hold_for_approval(connection, scope, call)
+        if refusal is None:
+            refusal = await admit_budget(connection, scope, call, use)
         if refusal is not None:
             return _denied(refusal)
-        if tool.expert_only and not await _expert_behind(connection, scope):
-            return _denied(GatewayCode.EXPERT_GRANT_REQUIRED)
-        if (
-            tool.approval_required
-            or tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
-            or (tool.approval_when is not None and tool.approval_when(parsed))
-        ):
-            detail = None
-            reviewing = ToolContext(connection, scope, _operation_id(scope, tool, parsed))
-            target = tool.resource_target(parsed)
-            if tool.target_resolver is not None:
-                try:
-                    target = await tool.target_resolver(parsed, reviewing)
-                except ToolFailed as error:
-                    # Nothing to approve: the destination isn't configured for this workspace.
-                    return _denied(str(error) or GatewayCode.CONNECTOR_NOT_CONFIGURED)
-            if tool.review_detail is not None and not await _has_approval(
-                connection, _operation_id(scope, tool, parsed)
-            ):
-                try:
-                    detail = await asyncio.wait_for(
-                        tool.review_detail(parsed, reviewing), tool.timeout_seconds
-                    )
-                except ToolFailed as error:
-                    return _denied(str(error) or GatewayCode.REVIEW_UNAVAILABLE)
-                except Exception as error:  # noqa: BLE001 - a review that can't be built denies the call, so nothing runs
-                    # A denial keeps no receipt, so the log line is all that's kept.
-                    _log_failure(
-                        "tool.operation.review_failed", tool, reviewing.operation_id, error
-                    )
-                    return _denied(GatewayCode.REVIEW_UNAVAILABLE)
-            code = await approval_gate(
-                connection,
-                workspace_id=scope.workspace_id,
-                run_id=scope.run_id,
-                generation=scope.generation,
-                operation_id=_operation_id(scope, tool, parsed),
-                tool_id=tool.tool_id,
-                tool_version=tool.version,
-                operation_class=tool.operation_class.value,
-                argument_hash=_hash(parsed),
-                arguments=tool.redact(parsed.model_dump(mode="json")),
-                current_scope_hash=scope_hash(scope.tools, scope.paths),
-                policy_reason=_approval_reason(tool),
-                resource_target=target,
-                scope=scope_snapshot(scope.tools, scope.paths),
-                policy_version=APPROVAL_POLICY_VERSION,
-                policy_rule=_approval_rule(tool),
-                review_detail=detail,
-            )
-            if code is not None:
-                return _denied(code)
-            if tool.target_resolver is not None and not await _target_unchanged(
-                connection, _operation_id(scope, tool, parsed), target
-            ):
-                return _denied(GatewayCode.APPROVAL_TARGET_CHANGED)
-        if tool.cost_class is CostClass.METERED_PROVIDER:
-            # Decision 0017 Q4: counted per root run tree, before any request leaves. After
-            # approval, so a call waiting for a person isn't counted twice.
-            from autobots.application.tool_uses import admit_metered
+        if call.tool.operation_class in EFFECTFUL:
+            return await self._effect(connection, scope, call)
+        return await self._read(connection, scope, call)
 
-            if use is None or not await admit_metered(connection, scope, use):
-                return _denied(GatewayCode.TOOL_BUDGET_EXCEEDED)
-        if tool.operation_class in EFFECTFUL:
-            return await self._effect(connection, scope, tool, parsed)
-        return await self._read(connection, scope, tool, parsed)
-
-    async def _read(
-        self, connection: Any, scope: ToolScope, tool: ToolDefinition, parsed: BaseModel
-    ) -> ToolResult:
+    async def _read(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
         """No effect, so no receipt. A repeated read must see current content."""
+        tool = call.tool
         context = ToolContext(connection, scope, None)
         for attempt in range(tool.retries + 1):
             try:
-                output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
+                output = await asyncio.wait_for(
+                    tool.handler(call.parsed, context), tool.timeout_seconds
+                )
+                # An output its model refuses is a defect in the read, recorded like any other.
+                visible, too_large = _visible(tool, output)
             except TimeoutError:
                 code = GatewayCode.TOOL_TIMEOUT
             except ToolFailed as error:
@@ -469,7 +568,6 @@ class ToolGateway:
                 _log_failure("tool.operation.failed", tool, None, error)
                 code = GatewayCode.TOOL_FAILED
             else:
-                visible, too_large = _visible(tool, output)
                 if too_large:
                     return ToolResult(ToolOutcome.FAILED, GatewayCode.OUTPUT_TOO_LARGE)
                 return ToolResult(ToolOutcome.SUCCEEDED, output=visible)
@@ -479,11 +577,8 @@ class ToolGateway:
                     return _denied(refusal)
         return ToolResult(ToolOutcome.FAILED, code)
 
-    async def _effect(
-        self, connection: Any, scope: ToolScope, tool: ToolDefinition, parsed: BaseModel
-    ) -> ToolResult:
-        argument_hash = _hash(parsed)
-        operation_id = _operation_id(scope, tool, parsed)
+    async def _effect(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
+        operation_id = call.operation_id
         context = ToolContext(connection, scope, operation_id)
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
         # The lease is held for it, so a worker that stalled after its check can't admit anything.
@@ -499,16 +594,16 @@ class ToolGateway:
                         operation_id,
                         scope.run_id,
                         scope.workspace_id,
-                        tool.tool_id,
-                        tool.version,
-                        argument_hash,
+                        call.tool.tool_id,
+                        call.tool.version,
+                        call.argument_hash,
                         scope.generation,
-                        tool.reconcile is not None,
+                        call.tool.reconcile is not None,
                     ),
                 )
                 created = await cursor.fetchone() is not None
             if not created:
-                replayed = await self._replay(context, tool, parsed, operation_id)
+                replayed = await self._replay(context, call)
                 if replayed is not None:
                     return replayed
                 # A crash during this new attempt has to be classified like any other.
@@ -526,7 +621,7 @@ class ToolGateway:
                     reopened = await cursor.fetchone() is not None
                 if not reopened:
                     # A late success or a person's ruling landed since that read. Never send again.
-                    replayed = await self._replay(context, tool, parsed, operation_id)
+                    replayed = await self._replay(context, call)
                     if replayed is not None:
                         return replayed
                     return _denied(GatewayCode.LEASE_LOST)
@@ -534,12 +629,11 @@ class ToolGateway:
             return _denied(GatewayCode.LEASE_LOST)
         except NotRunning:
             return _denied(GatewayCode.RUN_NOT_RUNNING)
-        return await self._attempt(context, tool, parsed, operation_id)
+        return await self._attempt(context, call)
 
-    async def _replay(
-        self, context: ToolContext, tool: ToolDefinition, parsed: BaseModel, operation_id: str
-    ) -> ToolResult | None:
+    async def _replay(self, context: ToolContext, call: Call) -> ToolResult | None:
         """The earlier outcome, if there is one. None means it failed for certain, so try again."""
+        tool, operation_id = call.tool, call.operation_id
         cursor = await context.connection.execute(
             "select status, result from app_private.tool_receipts where operation_id = %s",
             (operation_id,),
@@ -556,16 +650,17 @@ class ToolGateway:
         if tool.reconcile is not None:
             try:
                 found = await asyncio.wait_for(
-                    tool.reconcile(parsed, context), tool.timeout_seconds
+                    tool.reconcile(call.parsed, context), tool.timeout_seconds
                 )
+                # A readback whose output its model refuses is a failed readback.
+                visible = None if found is None else _visible(tool, found)[0]
             except NotDelivered:
                 return None
             except Exception as error:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
                 _log_failure("tool.operation.readback_failed", tool, operation_id, error)
                 detail = f"readback:{_diagnosis(error)}"
-                found = None
-            if found is not None:
-                visible, _ = _visible(tool, found)
+                visible = None
+            if visible is not None:
                 await _record(context, operation_id, "succeeded", visible)
                 return ToolResult(
                     ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id, replayed=True
@@ -580,43 +675,66 @@ class ToolGateway:
             replayed=True,
         )
 
-    async def _attempt(
-        self, context: ToolContext, tool: ToolDefinition, parsed: BaseModel, operation_id: str
-    ) -> ToolResult:
+    async def _attempt(self, context: ToolContext, call: Call) -> ToolResult:
+        """Runs the effect once and records on its receipt what is known about it."""
+        tool = call.tool
         try:
-            output = await asyncio.wait_for(tool.handler(parsed, context), tool.timeout_seconds)
+            output = await asyncio.wait_for(
+                tool.handler(call.parsed, context), tool.timeout_seconds
+            )
+            # The handler returned, so the effect happened: an output its model refuses is a defect
+            # whose outcome is unknown, never an escape that leaves the receipt started (XERR-02).
+            visible, too_large = _visible(tool, output)
         except ToolFailed as error:
-            code = str(error) or GatewayCode.TOOL_FAILED
-            detail = error.detail
-            if code in GATEWAY_ONLY:
-                # Only the gateway may say the lease refused an attempt: the approval gate trusts
-                # that code to mean nothing was written (Decision 0025 V8).
-                code, detail = GatewayCode.TOOL_FAILED, f"reserved_code:{code}"
-            await _record(context, operation_id, "failed", None, code, detail)
-            return ToolResult(ToolOutcome.FAILED, code, operation_id=operation_id)
+            return await _known_failure(context, call, error)
         except LeaseLost:
             # The write's transaction refused it, so nothing happened. The code tells the approval
             # gate that this attempt didn't use a person's decision.
-            await _record(context, operation_id, "failed", None, GatewayCode.LEASE_LOST)
-            return ToolResult(ToolOutcome.DENIED, GatewayCode.LEASE_LOST, operation_id=operation_id)
+            await _record(context, call.operation_id, "failed", None, GatewayCode.LEASE_LOST)
+            return ToolResult(
+                ToolOutcome.DENIED, GatewayCode.LEASE_LOST, operation_id=call.operation_id
+            )
         except Exception as error:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
-            _log_failure("tool.operation.unknown", tool, operation_id, error)
-            await _record(context, operation_id, "unknown", None, failure_detail=_diagnosis(error))
-            return ToolResult(
-                ToolOutcome.UNKNOWN, GatewayCode.OUTCOME_UNKNOWN, operation_id=operation_id
-            )
-        visible, too_large = _visible(tool, output)
+            return await _unexpected_failure(context, call, error)
         if too_large:
-            await _record(context, operation_id, "unknown", None, failure_detail="output_too_large")
-            return ToolResult(
-                ToolOutcome.UNKNOWN, GatewayCode.OUTPUT_TOO_LARGE, operation_id=operation_id
+            await _record(
+                context, call.operation_id, "unknown", None, failure_detail="output_too_large"
             )
-        # The effect happened, so it is recorded whoever owns the run now.
-        await _record(context, operation_id, "succeeded", visible)
-        refusal = await ownership_refusal(context.connection, context.scope)
-        if refusal is not None:
-            return ToolResult(ToolOutcome.DENIED, refusal, operation_id=operation_id)
-        return ToolResult(ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id)
+            return ToolResult(
+                ToolOutcome.UNKNOWN, GatewayCode.OUTPUT_TOO_LARGE, operation_id=call.operation_id
+            )
+        return await _succeeded(context, call, visible)
+
+
+async def _known_failure(context: ToolContext, call: Call, error: ToolFailed) -> ToolResult:
+    """The tool knows the effect didn't happen, and says why with its own code and detail."""
+    code = str(error) or GatewayCode.TOOL_FAILED
+    detail = error.detail
+    if code in GATEWAY_ONLY:
+        # Only the gateway may say the lease refused an attempt: the approval gate trusts that code
+        # to mean nothing was written (Decision 0025 V8).
+        code, detail = GatewayCode.TOOL_FAILED, f"reserved_code:{code}"
+    await _record(context, call.operation_id, "failed", None, code, detail)
+    return ToolResult(ToolOutcome.FAILED, code, operation_id=call.operation_id)
+
+
+async def _unexpected_failure(context: ToolContext, call: Call, error: BaseException) -> ToolResult:
+    """A failure the tool didn't choose leaves the outcome unknown, for a readback or a person to
+    settle. Its receipt keeps the diagnosis and its log line the cause (R-25, XERR-02)."""
+    _log_failure("tool.operation.unknown", call.tool, call.operation_id, error)
+    await _record(context, call.operation_id, "unknown", None, failure_detail=_diagnosis(error))
+    return ToolResult(
+        ToolOutcome.UNKNOWN, GatewayCode.OUTCOME_UNKNOWN, operation_id=call.operation_id
+    )
+
+
+async def _succeeded(context: ToolContext, call: Call, visible: dict[str, Any]) -> ToolResult:
+    # The effect happened, so it is recorded whoever owns the run now.
+    await _record(context, call.operation_id, "succeeded", visible)
+    refusal = await ownership_refusal(context.connection, context.scope)
+    if refusal is not None:
+        return ToolResult(ToolOutcome.DENIED, refusal, operation_id=call.operation_id)
+    return ToolResult(ToolOutcome.SUCCEEDED, output=visible, operation_id=call.operation_id)
 
 
 def _visible(tool: ToolDefinition, output: BaseModel) -> tuple[dict[str, Any], bool]:

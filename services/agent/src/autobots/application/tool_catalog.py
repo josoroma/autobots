@@ -36,7 +36,6 @@ from autobots.domain.tool_catalog import (
     key_availability,
 )
 from autobots.domain.tool_guides import TOOL_GUIDES
-from autobots.domain.tools import OperationClass
 
 _SCHEMA_KEYS = (
     "enum",
@@ -170,9 +169,6 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
     output_schema = tool.output_model.model_json_schema()
     availability, reason = key_availability(tool.key_requirement, environ)
     requirement = tool.key_requirement
-    approval = tool.approval_required or (
-        tool.operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
-    )
     return ToolDescriptor(
         tool_id=tool.tool_id,
         guide=guide_for(tool.tool_id),
@@ -200,9 +196,8 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
             if requirement
             else None
         ),
-        approval=(
-            "always" if approval else "by_action" if tool.approval_when is not None else "never"
-        ),
+        # The gateway's own rule, so the label can't disagree with what it holds (PTOL-04).
+        approval=tool.approval.label(tool.operation_class),
         input_schema=input_schema,
         output_schema=output_schema,
         fields=[

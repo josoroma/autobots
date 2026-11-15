@@ -42,6 +42,7 @@ from autobots.application.routines import create_routine, evaluate_routines
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import Inheritance, admit_run, apply_command
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     NotDelivered,
     ToolContext,
     ToolDefinition,
@@ -150,7 +151,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
         attempts.append(arguments.text)
         raise ToolFailed('destination_refused')
 
-    gated = ToolDefinition(tool_id='gated', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=fails, approval_required=True)
+    gated = ToolDefinition(tool_id='gated', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=fails, approval=ApprovalPolicy(always=True))
     gateway = ToolGateway(ToolRegistry())
     gateway.registry.register(gated)
 
@@ -179,7 +180,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
         delivered.append(arguments.text)
         return Sent(delivered=True)
 
-    done_tool = ToolDefinition(tool_id='gated_ok', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=delivers, approval_required=True)
+    done_tool = ToolDefinition(tool_id='gated_ok', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=delivers, approval=ApprovalPolicy(always=True))
     gateway.registry.register(done_tool)
     await clear()
     run = await admit()

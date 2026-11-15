@@ -15,6 +15,7 @@ import httpx
 
 from autobots.application.approvals import approved_request
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     NotDelivered,
     OutcomeUnknown,
     ToolContext,
@@ -228,8 +229,7 @@ def github_issue_tool(
         handler=create,
         timeout_seconds=30.0,
         reconcile=readback,
-        resource_target=review_target,
-        target_resolver=resolve_target,
+        approval=ApprovalPolicy(resource_target=review_target, target_resolver=resolve_target),
     )
 
 

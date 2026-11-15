@@ -21,6 +21,7 @@ from autobots.adapters import github_pulls
 from autobots.adapters.github_issues import UnclearReply
 from autobots.application.bounded import stop_task
 from autobots.application.tool_gateway import (
+    ApprovalPolicy,
     OutcomeUnknown,
     ToolContext,
     ToolDefinition,
@@ -131,8 +132,7 @@ def tool(
         timeout_seconds=timeout_seconds,
         max_output_bytes=max_output_bytes,
         reconcile=reconcile,
-        approval_required=approval_required,
-        review_detail=review_detail,
+        approval=ApprovalPolicy(always=approval_required, review_detail=review_detail),
     )
 
 
