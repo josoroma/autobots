@@ -6,10 +6,11 @@ run one at a time through the real API and worker with the application's default
 GitHub connector's destination is fake. It refuses the next goal if the worst case could pass the cap, so
 the cap can't be overrun by more than OpenRouter's own reporting. Resources are sampled while goals run,
 and --ui adds the real web app and a browser timing of committed events. --trials 0 runs no goal, so it
-makes no model call, for trying the rest for free. A goal whose spend can't be read counts its whole
-budget and stops the corpus. The helper, the sign-in and the worker are the paid session's
-(scripts/paid_run.py). The stack is removed at the end. Exit 0 the run finished, whatever it measured,
-1 it stopped early, 2 a prerequisite is missing.
+makes no model call, for trying the rest for free. A goal whose spend can't be read, or that stops
+before it is read, counts its whole budget and stops the corpus, and a protocol run whose report is
+missing leaves its spend unknown, so no goal starts after it (Decision 0028 E2). The helper, the sign-in
+and the worker are the paid session's (scripts/paid_run.py). The stack is removed at the end. Exit 0 the
+run finished, whatever it measured, 1 it stopped early, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 
@@ -25,6 +26,8 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib import error as urlerror
@@ -44,6 +47,7 @@ from disposable_db import (
 )
 from harness_lib import fingerprint, project_root
 from live_goal import TRACING, disposable_session
+from paid_run import PaidSession
 from qualify_identity import PYTHON, STORAGE_SQL, bootstrap_owner
 from qualify_operations import Ops, api_call, wait
 from qualify_web import BROWSERS, start, stop, wait_until_up
@@ -70,6 +74,180 @@ PROTOCOL = {'plain_text': 9, 'tool_auto': 9, 'tool_required': 9, 'tool_named_con
 UNCERTAIN = {'uncertain_model_call', 'uncertain_acceptance', 'partial_stream'}
 WORKER = 'tests/qualification/worker.py'
 ADMIT = 'tests/qualification/helper.py'
+PROTOCOL_REPORTS = 'report*rerun.json'
+PROTOCOL_FIELDS = ('summary', 'calls', 'committed_micro_usd', 'reported_micro_usd', 'calls_without_a_reported_charge')
+# call(method, path, body=None): one API request as the owner, answered with its status and body.
+Call = Callable[..., tuple[int, str]]
+
+
+@dataclass
+class GoalStack:
+    """What one corpus goal uses of its disposable stack: the owner's workspace and API, the runtime
+    role's SQL (Ops.sql, '' when unreadable), the paid session's rows and worker, the fake GitHub
+    destination's issues, and a way to start a worker again after the restart task kills one."""
+
+    root: Path
+    workspace: str
+    env: Mapping[str, str]
+    sql: Callable[[str], str]
+    session: PaidSession
+    call: Call
+    issues_since: Callable[[int], list[dict]]
+    restart_worker: Callable[[], None]
+    clock: Callable[[], float] = time.monotonic
+    sleep: Callable[[float], None] = time.sleep
+
+
+def run_task(stack: GoalStack, task: dict, trial: int) -> dict:
+    """One corpus goal through the real API, or the admission helper for an approval task, and the worker,
+    read back from the ledger. A goal whose model calls can't be read is `spend_unknown`, and counts its
+    whole budget as charged, so the cost summary never shows it cheaper than it may have been and the
+    corpus stops after it (Decision 0028 E2)."""
+    session, sql, call = stack.session, stack.sql, stack.call
+    mode = task.get('mode', '')
+    start_issues = len(stack.issues_since(0))
+    started = stack.clock()
+    if mode in {'approve', 'reject'}:
+        admitted = subprocess.run([str(stack.root / PYTHON), str(stack.root / ADMIT), stack.workspace, str(GOAL_LIMIT_MICRO_USD), json.dumps(task)], env=dict(stack.env), capture_output=True, text=True, errors='replace', timeout=60, check=False)
+        if admitted.returncode:
+            raise Unavailable(f'admission failed: {admitted.stderr.strip()[-300:]}')
+        run_id = admitted.stdout.strip().splitlines()[-1]
+    else:
+        admission, reply = call('POST', '/v1/runs', {'goal_text': task['goal'], 'limit_micro_usd': GOAL_LIMIT_MICRO_USD, 'required_artifacts': [{'name': task['artifact']}],
+                                                     'input_documents': [{'path': path, 'content': content} for path, content in task['documents'].items()]})
+        if admission != 202:
+            raise Unavailable(f'the API refused a goal: {admission} {reply[:200]}')
+        run_id = json.loads(reply)['run_id']
+    approved = interventions = calls_then = 0
+    killed_at = recovery = reclaimed = None
+    killed_generation = 0
+    lease_left = 0.0
+    while stack.clock() - started < GOAL_SECONDS:
+        status = sql(f"select status from public.runs where id = '{run_id}';")
+        usage = (session.rows(f"select model_calls, stop_reason from app_private.run_usage where run_id = '{run_id}'") or [{}])[0]
+        if status in FINAL:
+            break
+        worker = session.worker
+        if worker is not None and worker.poll() is not None and killed_at is None:
+            raise Unavailable(f'the worker exited early: {worker.poll()}')
+        if status == 'waiting_approval':
+            for item in json.loads(call('GET', '/v1/approvals')[1])['approvals']:
+                if item['run_id'] == run_id:
+                    decision = 'reject' if mode == 'reject' else 'approve'
+                    call('POST', f"/v1/approvals/{item['id']}/decision", {'decision': decision, 'argument_hash': item['argument_hash']})
+                    approved += decision == 'approve'
+        if mode == 'restart' and killed_at is None and worker is not None and (usage.get('model_calls') or 0) >= 2:
+            worker.send_signal(signal.SIGKILL)
+            worker.wait(timeout=10)
+            killed_at = stack.clock()
+            calls_then = usage.get('model_calls') or 0
+            # Read after the kill, as no heartbeat can move the expiry from here on.
+            leases = session.rows(f"select generation, round(extract(epoch from lease_expires_at - now())::numeric, 1) as left_seconds from app_private.run_jobs where run_id = '{run_id}'")
+            if not leases:
+                raise Unavailable("the killed worker's lease could not be read")
+            killed_generation, lease_left = int(leases[0]['generation']), float(leases[0]['left_seconds'] or 0)
+            stack.restart_worker()
+        if killed_at is not None and reclaimed is None and int((session.rows(f"select generation from app_private.run_jobs where run_id = '{run_id}'") or [{}])[0].get('generation') or 0) > killed_generation:
+            reclaimed = round(stack.clock() - killed_at - lease_left, 1)
+        if killed_at is not None and recovery is None and (usage.get('model_calls') or 0) > calls_then:
+            recovery = round(stack.clock() - killed_at, 1)
+        if status == 'paused':
+            if usage.get('stop_reason') in UNCERTAIN and interventions < 3:
+                # What an owner would do: record the worst case, as the provider's charge isn't known here.
+                held = (session.rows(f"select coalesce(sum(reserved_micro_usd), 0) as held from app_private.model_invocations where root_run_id = '{run_id}' and status = 'uncertain'") or [{}])[0].get('held') or 0
+                call('POST', f'/v1/runs/{run_id}/model-calls/reconcile', {'charged_micro_usd': int(held)})
+                version = (session.rows(f"select version from public.runs where id = '{run_id}'") or [{}])[0].get('version')
+                call('POST', f'/v1/runs/{run_id}/resume', {'expected_version': version})
+                interventions += 1
+            else:
+                break
+        stack.sleep(1)
+    status = sql(f"select status from public.runs where id = '{run_id}';")
+    if status not in FINAL:
+        version = (session.rows(f"select version from public.runs where id = '{run_id}'") or [{}])[0].get('version')
+        call('POST', f'/v1/runs/{run_id}/cancel', {'expected_version': version})
+    usage = (session.rows(f"select model_calls, tool_dispatches, repairs, stop_reason from app_private.run_usage where run_id = '{run_id}'") or [{}])[0]
+    invocations = session.rows(f"select attempt, profile, status, failure_class, finish_reason, input_tokens, output_tokens, reasoning_tokens, tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
+    observed = {'status': status, 'stop_reason': usage.get('stop_reason'), 'invocations': invocations or [],
+                'receipts': session.rows(f"select tool_id, status, failure_code, failure_detail from app_private.tool_receipts where run_id = '{run_id}' order by created_at") or [],
+                'verifications': session.rows(f"select passed, unmet from app_private.run_verifications where run_id = '{run_id}' order by created_at") or [],
+                'files': session.rows(f"select path, version, content from app_private.run_files where run_id = '{run_id}' order by created_at") or [],
+                'published': session.rows(f"select name, status from public.artifacts where run_id = '{run_id}'") or [],
+                'issues': stack.issues_since(start_issues), 'approved': approved,
+                'duplicate_receipts': int(sql(f"select count(*) from (select tool_id, argument_hash from app_private.tool_receipts where run_id = '{run_id}' and status = 'succeeded' group by 1, 2 having count(*) > 1) d;") or 0)}
+    if invocations is None:
+        # Unknown spend fails closed (Decision 0028 E2): the goal's whole budget is its charge.
+        charged, held = GOAL_LIMIT_MICRO_USD, 0
+    else:
+        charged = sum(call_.get('charged_micro_usd') or 0 for call_ in invocations)
+        held = sum(call_.get('reserved_micro_usd') or 0 for call_ in invocations if call_.get('charged_micro_usd') is None)
+    return {**observed, 'task': task['id'], 'trial': trial, 'spend_unknown': invocations is None, 'category': task['category'], 'adversarial': bool(task.get('adversarial')), 'mode': mode, 'run_id': run_id,
+            'seconds': round(stack.clock() - started, 1), 'charged': charged, 'held': held, 'repairs': usage.get('repairs'), 'interventions': interventions, 'recovery_seconds': recovery, 'reclaim_after_lease_expiry_seconds': reclaimed,
+            'reasons': score(task, observed), 'safety': safety_failures(task, observed)}
+
+
+@dataclass
+class Corpus:
+    """The running total under the user's cap. The next goal starts only if its whole budget still fits.
+    A goal counts its whole budget until its spend is read, so one that raises first is never left out
+    of `spent` (Decision 0028 E2): it is recorded as `interrupted` and the corpus stops."""
+
+    authorized: int
+    spent: int
+    results: list[dict] = field(default_factory=list)
+    interrupted: dict | None = None
+
+    def run(self, tasks: list[dict], trials: int, goal: Callable[[dict, int], dict], keep: Callable[[dict], None]) -> str:
+        """Each task once per trial, in order. Answers why the corpus stopped early, or '' when it didn't."""
+        for trial in range(1, trials + 1):
+            for task in tasks:
+                if self.spent + GOAL_LIMIT_MICRO_USD > self.authorized:
+                    return f'the next goal could pass the authorized total, at {self.spent} micro-USD'
+                try:
+                    result = goal(task, trial)
+                except BaseException as failure:
+                    self.spent += GOAL_LIMIT_MICRO_USD
+                    self.interrupted = {'task': task['id'], 'trial': trial, 'counted_micro_usd': GOAL_LIMIT_MICRO_USD, 'failed_with': type(failure).__name__}
+                    raise
+                self.spent += result['charged'] + result['held']
+                self.results.append(result)
+                keep(result)
+                print(f"{task['id']}/{trial}: {'PASS' if not result['reasons'] else 'FAIL ' + ';'.join(result['reasons'])[:150]}{' SAFETY ' + str(result['safety']) if result['safety'] else ''}, {result['seconds']}s, charged {result['charged']}, total {self.spent}", flush=True)
+                if result['spend_unknown']:
+                    return f"the spend of {task['id']}/{trial} could not be read, so it counts its whole budget and no further goal starts"
+        return ''
+
+    def interruption(self) -> str:
+        """Why the corpus stopped, when a goal raised before its spend was read, or ''."""
+        if self.interrupted is None:
+            return ''
+        return f"{self.interrupted['task']}/{self.interrupted['trial']} stopped before its spend was read, so it counts its whole budget"
+
+
+def protocol_reports(folder: Path) -> dict[Path, int]:
+    """Each protocol report already in `folder`, by modification time, so one an earlier run left can't
+    stand in for this run's."""
+    return {path: path.stat().st_mtime_ns for path in folder.glob(PROTOCOL_REPORTS)}
+
+
+def protocol_result(folder: Path, earlier: Mapping[Path, int], returncode: int) -> tuple[dict, str]:
+    """The protocol run's summary from the report it wrote, and why the corpus stops, or ''. A report
+    that is missing, left from before this run or unreadable leaves the run's spend unknown, so no goal
+    starts after it (Decision 0028 E2)."""
+    written = sorted(path for path in folder.glob(PROTOCOL_REPORTS) if earlier.get(path) != path.stat().st_mtime_ns)
+    try:
+        protocol = json.loads(written[-1].read_text())
+        section = {key: protocol[key] for key in PROTOCOL_FIELDS}
+        cases = list(protocol['trials'])
+        section['cases'] = len(cases)
+        section['passed'] = sum(1 for trial in cases if trial['verdict'] == 'passed')
+        readable = isinstance(section['committed_micro_usd'], int)
+    except (IndexError, OSError, ValueError, KeyError, TypeError):
+        readable = False
+    if not readable:
+        return ({'error': f'exit {returncode}, and no readable report from this run', 'spend_unknown': True},
+                f'the protocol run left no readable report (exit {returncode}), so its spend is unknown and no goal starts')
+    return section, ''
 
 
 def main() -> int:
@@ -99,8 +277,8 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
     out = root / arguments.out
     logs = out / 'logs'
     logs.mkdir(parents=True, exist_ok=True)
-    corpus = (root / arguments.tasks).read_bytes()
-    tasks = json.loads(corpus)
+    raw_corpus = (root / arguments.tasks).read_bytes()
+    tasks = json.loads(raw_corpus)
     project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
     gateway_port = free_port()
     db_port = free_port([gateway_port])
@@ -121,13 +299,13 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
 
     report: dict = {'schema_version': 'autobots.release-qualification/v1', 'started_at_utc': datetime.now(UTC).isoformat(), 'evidence_class': 'live, on a disposable stack',
                     'input_fingerprint': fingerprint(root), 'git_head': run(['git', 'rev-parse', 'HEAD'], tool_env()).stdout.strip(),
-                    'corpus': arguments.tasks, 'corpus_sha256': hashlib.sha256(corpus).hexdigest(), 'tasks': len(tasks), 'trials': arguments.trials,
+                    'corpus': arguments.tasks, 'corpus_sha256': hashlib.sha256(raw_corpus).hexdigest(), 'tasks': len(tasks), 'trials': arguments.trials,
                     'authorized_total_micro_usd': arguments.authorized_micro_usd, 'load_average_at_start': os.getloadavg(),
                     'not_established': ['H1', 'product acceptance', 'real GitHub behavior', 'tasks chosen independently of the author']}
     (out / 'manifest.json').write_text(json.dumps(report, indent=2))
     report['key_usage_before_usd'] = float(session.helper('usage', str(key_file)))
-    spent = arguments.already_spent_micro_usd
-    results: list[dict] = []
+    corpus = Corpus(arguments.authorized_micro_usd, arguments.already_spent_micro_usd)
+    results = corpus.results
     stopped = ''
     web = None
     web_url = ''
@@ -205,127 +383,28 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         def issues_since(start: int) -> list[dict]:
             return [json.loads(line) for line in sink.read_text().splitlines()][start:] if sink.exists() else []
 
-        def run_task(task: dict, trial: int) -> dict:
-            mode = task.get('mode', '')
-            start_issues = len(issues_since(0))
-            started = time.monotonic()
-            if mode in {'approve', 'reject'}:
-                admitted = subprocess.run([str(root / PYTHON), str(root / ADMIT), workspace, str(GOAL_LIMIT_MICRO_USD), json.dumps(task)], env=ops.env, capture_output=True, text=True, errors='replace', timeout=60, check=False)
-                if admitted.returncode:
-                    raise Unavailable(f'admission failed: {admitted.stderr.strip()[-300:]}')
-                run_id = admitted.stdout.strip().splitlines()[-1]
-            else:
-                admission, reply = call('POST', '/v1/runs', {'goal_text': task['goal'], 'limit_micro_usd': GOAL_LIMIT_MICRO_USD, 'required_artifacts': [{'name': task['artifact']}],
-                                                             'input_documents': [{'path': path, 'content': content} for path, content in task['documents'].items()]})
-                if admission != 202:
-                    raise Unavailable(f'the API refused a goal: {admission} {reply[:200]}')
-                run_id = json.loads(reply)['run_id']
-            approved = interventions = 0
-            killed_at = recovery = reclaimed = None
-            killed_generation = 0
-            lease_left = 0.0
-            while time.monotonic() - started < GOAL_SECONDS:
-                status = ops.sql(f"select status from public.runs where id = '{run_id}';")
-                usage = (session.rows(f"select model_calls, stop_reason from app_private.run_usage where run_id = '{run_id}'") or [{}])[0]
-                if status in FINAL:
-                    break
-                worker = session.worker
-                if worker is not None and worker.poll() is not None and killed_at is None:
-                    raise Unavailable(f'the worker exited early: {worker.poll()}')
-                if status == 'waiting_approval':
-                    for item in json.loads(call('GET', '/v1/approvals')[1])['approvals']:
-                        if item['run_id'] == run_id:
-                            decision = 'reject' if mode == 'reject' else 'approve'
-                            call('POST', f"/v1/approvals/{item['id']}/decision", {'decision': decision, 'argument_hash': item['argument_hash']})
-                            approved += decision == 'approve'
-                if mode == 'restart' and killed_at is None and worker is not None and (usage.get('model_calls') or 0) >= 2:
-                    worker.send_signal(signal.SIGKILL)
-                    worker.wait(timeout=10)
-                    killed_at = time.monotonic()
-                    calls_then = usage.get('model_calls') or 0
-                    # Read after the kill, as no heartbeat can move the expiry from here on.
-                    leases = session.rows(f"select generation, round(extract(epoch from lease_expires_at - now())::numeric, 1) as left_seconds from app_private.run_jobs where run_id = '{run_id}'")
-                    if not leases:
-                        raise Unavailable("the killed worker's lease could not be read")
-                    killed_generation, lease_left = int(leases[0]['generation']), float(leases[0]['left_seconds'] or 0)
-                    start_worker()
-                if killed_at is not None and reclaimed is None and int((session.rows(f"select generation from app_private.run_jobs where run_id = '{run_id}'") or [{}])[0].get('generation') or 0) > killed_generation:
-                    reclaimed = round(time.monotonic() - killed_at - lease_left, 1)
-                if killed_at is not None and recovery is None and (usage.get('model_calls') or 0) > calls_then:
-                    recovery = round(time.monotonic() - killed_at, 1)
-                if status == 'paused':
-                    if usage.get('stop_reason') in UNCERTAIN and interventions < 3:
-                        # What an owner would do: record the worst case, as the provider's charge isn't known here.
-                        held = (session.rows(f"select coalesce(sum(reserved_micro_usd), 0) as held from app_private.model_invocations where root_run_id = '{run_id}' and status = 'uncertain'") or [{}])[0].get('held') or 0
-                        call('POST', f'/v1/runs/{run_id}/model-calls/reconcile', {'charged_micro_usd': int(held)})
-                        version = (session.rows(f"select version from public.runs where id = '{run_id}'") or [{}])[0].get('version')
-                        call('POST', f'/v1/runs/{run_id}/resume', {'expected_version': version})
-                        interventions += 1
-                    else:
-                        break
-                time.sleep(1)
-            status = ops.sql(f"select status from public.runs where id = '{run_id}';")
-            if status not in FINAL:
-                version = (session.rows(f"select version from public.runs where id = '{run_id}'") or [{}])[0].get('version')
-                call('POST', f'/v1/runs/{run_id}/cancel', {'expected_version': version})
-            usage = (session.rows(f"select model_calls, tool_dispatches, repairs, stop_reason from app_private.run_usage where run_id = '{run_id}'") or [{}])[0]
-            invocations = session.rows(f"select attempt, profile, status, failure_class, finish_reason, input_tokens, output_tokens, reasoning_tokens, tool_names, invalid_tool_calls, reserved_micro_usd, charged_micro_usd, round(extract(epoch from finished_at - created_at)::numeric, 1) as seconds from app_private.model_invocations where root_run_id = '{run_id}' order by created_at")
-            observed = {'status': status, 'stop_reason': usage.get('stop_reason'), 'invocations': invocations or [],
-                        'receipts': session.rows(f"select tool_id, status, failure_code, failure_detail from app_private.tool_receipts where run_id = '{run_id}' order by created_at") or [],
-                        'verifications': session.rows(f"select passed, unmet from app_private.run_verifications where run_id = '{run_id}' order by created_at") or [],
-                        'files': session.rows(f"select path, version, content from app_private.run_files where run_id = '{run_id}' order by created_at") or [],
-                        'published': session.rows(f"select name, status from public.artifacts where run_id = '{run_id}'") or [],
-                        'issues': issues_since(start_issues), 'approved': approved,
-                        'duplicate_receipts': int(ops.sql(f"select count(*) from (select tool_id, argument_hash from app_private.tool_receipts where run_id = '{run_id}' and status = 'succeeded' group by 1, 2 having count(*) > 1) d;") or 0)}
-            if invocations is None:
-                # Unreadable spend fails closed, as the paid-run watchdog's does (Decision 0028 E2): the goal
-                # counts its whole budget toward the authorized total, and no further goal starts.
-                charged, held = 0, GOAL_LIMIT_MICRO_USD
-            else:
-                charged = sum(call_.get('charged_micro_usd') or 0 for call_ in invocations)
-                held = sum(call_.get('reserved_micro_usd') or 0 for call_ in invocations if call_.get('charged_micro_usd') is None)
-            return {**observed, 'task': task['id'], 'trial': trial, 'spend_unknown': invocations is None, 'category': task['category'], 'adversarial': bool(task.get('adversarial')), 'mode': mode, 'run_id': run_id,
-                    'seconds': round(time.monotonic() - started, 1), 'charged': charged, 'held': held, 'repairs': usage.get('repairs'), 'interventions': interventions, 'recovery_seconds': recovery, 'reclaim_after_lease_expiry_seconds': reclaimed,
-                    'reasons': score(task, observed), 'safety': safety_failures(task, observed)}
-
         if arguments.protocol:
             protocol_out = out / 'protocol'
+            earlier = protocol_reports(protocol_out)
             done = subprocess.run([str(root / PYTHON), '-m', 'autobots.operations.route_qualification', '--paid', '--profile', 'openai_gpt_6_1_terra', '--key-file', str(key_file), '--out', str(protocol_out),
                                    '--only', ','.join(f'{name}={count}' for name, count in PROTOCOL.items())],
                                   env={**tool_env(), 'PYTHONPATH': str(root / 'services/agent/src'), 'PYTHONDONTWRITEBYTECODE': '1'}, cwd=root, capture_output=True, text=True, errors='replace', timeout=1800, check=False)
             (logs / 'protocol.log').write_text(done.stdout[-4000:] + done.stderr[-4000:])
             print(f'protocol exit {done.returncode}', flush=True)
-            found = sorted(protocol_out.glob('report*rerun.json'))
-            if found:
-                protocol = json.loads(found[-1].read_text())
-                report['protocol'] = {key: protocol[key] for key in ('summary', 'calls', 'committed_micro_usd', 'reported_micro_usd', 'calls_without_a_reported_charge')}
-                spent += protocol['committed_micro_usd']
-                cases = [trial for trial in protocol['trials']]
-                report['protocol']['cases'] = len(cases)
-                report['protocol']['passed'] = sum(1 for trial in cases if trial['verdict'] == 'passed')
-            else:
-                report['protocol'] = {'error': f'exit {done.returncode}, no report'}
-            print(f"protocol: {report['protocol'].get('passed')}/{report['protocol'].get('cases')}, running total {spent}", flush=True)
+            report['protocol'], stopped = protocol_result(protocol_out, earlier, done.returncode)
+            corpus.spent += report['protocol'].get('committed_micro_usd') or 0
+            print(f"protocol: {report['protocol'].get('passed')}/{report['protocol'].get('cases')}, running total {corpus.spent}", flush=True)
 
-        start_worker()
-        results_file = (out / 'results.jsonl').open('a')
-        for trial in range(1, arguments.trials + 1):
-            for task in tasks:
-                if spent + GOAL_LIMIT_MICRO_USD > arguments.authorized_micro_usd:
-                    stopped = f'the next goal could pass the authorized total, at {spent} micro-USD'
-                    break
-                result = run_task(task, trial)
-                spent += result['charged'] + result['held']
-                results.append(result)
-                results_file.write(json.dumps(result, default=str) + '\n')
-                results_file.flush()
-                print(f"{task['id']}/{trial}: {'PASS' if not result['reasons'] else 'FAIL ' + ';'.join(result['reasons'])[:150]}{' SAFETY ' + str(result['safety']) if result['safety'] else ''}, {result['seconds']}s, charged {result['charged']}, total {spent}", flush=True)
-                if result['spend_unknown']:
-                    stopped = f"the spend of {task['id']}/{trial} could not be read, so it counts its whole budget and no further goal starts"
-                    break
-            if stopped:
-                break
-        results_file.close()
+        if not stopped:
+            start_worker()
+            goals = GoalStack(root, workspace, ops.env, ops.sql, session, call, issues_since, start_worker)
+            with (out / 'results.jsonl').open('a') as results_file:
+
+                def keep(result: dict) -> None:
+                    results_file.write(json.dumps(result, default=str) + '\n')
+                    results_file.flush()
+
+                stopped = corpus.run(tasks, arguments.trials, lambda task, trial: run_task(goals, task, trial), keep)
 
         # The local benchmark, with no model and no worker claiming.
         session.stop_worker(report)
@@ -368,7 +447,7 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
                                          'AUTOBOTS_WEB_REPORT': str(out / 'playwright.json'), 'AUTOBOTS_WEB_OUTPUT': str(out / 'playwright-results')})
             (logs / 'playwright.log').write_text(played.stdout[-4000:] + played.stderr[-4000:])
             if played.returncode or not latency_file.exists():
-                stopped = f'the browser timing failed with {played.returncode}'
+                stopped = '; '.join(filter(None, (stopped, f'the browser timing failed with {played.returncode}')))
             else:
                 timed = json.loads(latency_file.read_text())
                 shown = [item['shown_ms'] for item in timed]
@@ -377,15 +456,22 @@ def attempt(root: Path, arguments: argparse.Namespace, key_file: Path) -> int:
         report['benchmark'] = bench
         report['resources'] = summarize_resources(samples)
         report['summary'] = summarize(results) if results else None
-        report['cost_per_goal_micro_usd'] = {'median': statistics.median(item['charged'] for item in results) if results else None, 'max': max((item['charged'] for item in results), default=None)}
+        # A goal whose spend is unknown is in these at its whole budget (run_task), and counted here.
+        report['cost_per_goal_micro_usd'] = {'median': statistics.median(item['charged'] for item in results) if results else None, 'max': max((item['charged'] for item in results), default=None),
+                                             'goals_at_their_whole_budget': sum(1 for item in results if item['spend_unknown'])}
         durable, logged = session.helper('leaks', str(key_file), str(logs)).split()
         report['key_found'] = {'durable_rows': int(durable), 'log_files': int(logged)}
         written = '\n'.join(path.read_text(errors='replace') for path in logs.glob('*.log'))
         report['step_failures_in_logs'] = written.count('worker.step_failed')
     except Unavailable as error:
-        stopped = str(error)
+        # Kept with any earlier stop, so a later failure can't hide why the corpus stopped.
+        stopped = '; '.join(filter(None, (stopped, str(error))))
     finally:
-        report['spent_micro_usd'] = spent
+        # Whatever a goal raised, it is in the total at its whole budget, and the report says which.
+        if corpus.interrupted is not None:
+            report['interrupted_goal'] = corpus.interrupted
+            stopped = '; '.join(filter(None, (stopped, corpus.interruption())))
+        report['spent_micro_usd'] = corpus.spent
         report['stopped'] = stopped
         sampling.set()
         if sampler.is_alive():

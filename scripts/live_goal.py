@@ -3,9 +3,9 @@
 
 This spends money. It refuses without --paid, and nothing in `verify.py` runs it. The run's own budget
 is the limit under test, so the paid session's watchdog (scripts/paid_run.py) also stops the worker if
-what's committed ever passes it, or can't be read for three polls in a row (Decision 0028 E2). The
-stack, its copy of the key and its master key are removed at the end. Exit 0 the run succeeded with its
-spend known and the key found nowhere, 1 it didn't, 2 a prerequisite is missing.
+what's committed ever passes it, can't be read for three polls in a row (Decision 0028 E2) or a poll
+fails. The stack, its copy of the key and its master key are removed at the end. Exit 0 the run
+succeeded with its spend known and the key found nowhere, 1 it didn't, 2 a prerequisite is missing.
 """
 from __future__ import annotations
 

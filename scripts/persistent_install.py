@@ -400,10 +400,11 @@ def goal(root: Path, record: Record, requested: str, key_file: Path, limit: int,
         session.start_worker()
         watched = session.watch(lambda: {'status': session.sql(status) or ''}, lambda current: bool(current['status']) and current['status'] not in ACTIVE,
                                 limit, spend, GOAL_SECONDS)
+        # Recorded first, so a read below that raises can't lose why the watch ended.
+        watched.record(report)
         # Stopped before anything is read, since it can still dispatch while it drains.
         session.stop_worker(report)
         final = session.sql(status) or ''
-        watched.record(report)
         report['status'] = final
         report['stop_reason'] = session.sql(f"select coalesce(stop_reason, 'none') from app_private.run_usage where run_id = '{run_id}';")
         report['verification'] = session.sql(f"select passed::text || ' ' || unmet::text from app_private.run_verifications where run_id = '{run_id}' order by created_at desc limit 1;")
@@ -495,7 +496,9 @@ def cancel_unstarted(sql: Sql, api: str, headers: Mapping[str, str], workspace: 
 
 
 def examples_done(current: Mapping[str, str]) -> bool:
-    """Every goal run terminal, and the workflow terminal or stopped at its approval gate."""
+    """Every goal run terminal, and the workflow terminal or stopped at its approval gate. This is the
+    examples' outcome (Decision 0023 E6): what the system actually did, a failed run included, which a
+    rerun repeats."""
     goals_done = all(status in TERMINAL for label, status in current.items() if label != 'workflow')
     return goals_done and current.get('workflow') in TERMINAL | {'waiting_approval'}
 
@@ -572,9 +575,9 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
 
         session.start_worker()
         watched = session.watch(statuses, examples_done, EXAMPLES_LIMIT, spend, GOAL_SECONDS)
+        watched.record(report)
         session.stop_worker(report)
         finals = statuses()
-        watched.record(report)
         report['status'] = finals
         report['artifacts'] = {label: sql(f"select coalesce(string_agg(name || ' ' || size_bytes, ', '), 'none') from public.artifacts where run_id = '{run}' and status = 'published';")
                                for label, run in runs.items()}
@@ -598,7 +601,7 @@ def examples(root: Path, record: Record, requested: str, key_file: Path, ledger_
     if runs:
         session.after_run_checks(key_file, record.directory / 'logs', report)
     write_report(record, 'examples', report)
-    return goal_exit_code(report, achieved=bool(runs))
+    return goal_exit_code(report, achieved=examples_done(finals))
 
 
 def screens(root: Path, record: Record, requested: str, grep: str) -> int:

@@ -7,9 +7,10 @@ mechanics: the live-key helper (autobots.operations.live_key, in its own process
 the key), the runtime role's SQL, which answers None when it can't be read and never '', the owner's
 sign-in, and the one worker that has inference on. Each entry point still refuses without `--paid`;
 the persistent install also calls refuse_other_work and takes its reservation on the shared ledger
-(`reserve`) before any request. The watchdog SIGKILLs the worker past its limit, and after
-UNREADABLE_POLL_LIMIT unreadable spend polls in a row (Decision 0028 E2). A run that can still go on
-holds its whole reservation. tests/harness/test_paid_run.py proves all of it with fakes, and no paid run.
+(`reserve`) before any request. The watchdog SIGKILLs the worker past its limit, after
+UNREADABLE_POLL_LIMIT unreadable spend polls in a row (Decision 0028 E2), and when a poll raises, so the
+worker is never left running unwatched. A run that can still go on holds its whole reservation.
+tests/harness/test_paid_run.py proves all of it with fakes, and no paid run.
 
 It needs only the standard library at import. `reserve` loads the service's ledger, so the entry points
 that reserve run with the service's interpreter.
@@ -95,8 +96,8 @@ class Worker(Protocol):
 Spawn = Callable[[list[str], dict[str, str]], Worker]
 Report = MutableMapping[str, Any]
 WatchVerdict = Literal['continue', 'unreadable', 'over_cap', 'spend_unreadable']
-WatchEnd = Literal['finished', 'timed_out', 'worker_exited', 'over_cap', 'spend_unreadable']
-STOPS: frozenset[str] = frozenset({'over_cap', 'spend_unreadable'})
+WatchEnd = Literal['finished', 'timed_out', 'worker_exited', 'over_cap', 'spend_unreadable', 'watch_failed']
+STOPS: frozenset[str] = frozenset({'over_cap', 'spend_unreadable', 'watch_failed'})
 
 
 @dataclass(frozen=True)
@@ -139,8 +140,10 @@ def settlement(started: bool, finals: Mapping[str, str], charged: int | None) ->
 
 
 def goal_exit_code(report: Mapping[str, Any], achieved: bool) -> int:
-    """0 only when the entry point's own outcome was reached, every after-run check ran, the key was
-    found nowhere and the watchdog never fired. A spend that couldn't be read is a failed check."""
+    """0 only when `achieved`, every after-run check ran, the key was found nowhere and the watchdog never
+    fired. A spend that couldn't be read is a failed check. `achieved` is the outcome each entry point
+    states: its run succeeded, for `goal` and `live_goal`; every example run finished, the workflow
+    terminal or at its approval gate, for `examples` (persistent_install.examples_done)."""
     found = report.get('key_found')
     leaked = isinstance(found, dict) and any(found.values())
     clean = 'after_run_check_failed' not in report and not leaked and not report.get('watchdog_fired')
@@ -196,13 +199,15 @@ def settle(ledger: Ledger, entry: LedgerEntry, started: bool, finals: Mapping[st
 
 @dataclass
 class WatchResult:
-    """How a watch ended, the runs' last statuses, each change of them, and every unreadable spend poll."""
+    """How a watch ended, the runs' last statuses, each change of them, every unreadable spend poll and,
+    for `watch_failed`, what the poll raised."""
 
     end: WatchEnd
     statuses: dict[str, str]
     timeline: list[dict[str, Any]]
     unreadable_polls: int
     worker_exit: int | None
+    failure: str | None = None
 
     def record(self, report: Report) -> None:
         report['timeline'] = self.timeline
@@ -210,6 +215,8 @@ class WatchResult:
         if self.end in STOPS:
             report['watchdog_fired'] = True
             report['watchdog_stop'] = self.end
+        if self.failure is not None:
+            report['watch_failure'] = self.failure
         if self.end == 'worker_exited':
             report['worker_exited_early'] = self.worker_exit
 
@@ -288,7 +295,9 @@ class PaidSession:
     def watch(self, statuses: Callable[[], dict[str, str]], done: Callable[[dict[str, str]], bool], limit: int,
               spend_query: str, seconds: float) -> WatchResult:
         """Polls until `done`, the worker exits or `seconds` pass. Each poll reads the committed spend, and
-        the watchdog SIGKILLs the worker when watchdog_verdict says stop."""
+        the watchdog SIGKILLs the worker when watchdog_verdict says stop. A poll that raises, such as a
+        psql call past its timeout, would leave the worker spending unwatched, so it is SIGKILLed as on
+        a cap breach and the watch ends `watch_failed`, with what was raised."""
         worker = self.worker
         if worker is None:
             raise Unavailable('no worker was started, so there is nothing to watch')
@@ -297,28 +306,34 @@ class PaidSession:
         current: dict[str, str] = {}
         last: dict[str, str] | None = None
         in_a_row = unreadable = 0
-        while self.clock() - began < seconds:
-            elapsed = round(self.clock() - began, 1)
-            current = statuses()
-            if current != last:
-                timeline.append({'seconds': elapsed, **current})
-                print(f'{round(elapsed)}s: {next(iter(current.values())) if len(current) == 1 else current}', flush=True)
-                last = current
-            if done(current):
-                return WatchResult('finished', current, timeline, unreadable, None)
-            verdict = watchdog_verdict(parsed_spend(self.sql(spend_query)), limit, in_a_row)
-            in_a_row = verdict.unreadable_polls
-            if verdict.verdict in ('unreadable', 'spend_unreadable'):
-                unreadable += 1
-                print(f'{round(elapsed)}s: the committed spend could not be read, {in_a_row} in a row; '
-                      f'the worker stops at {UNREADABLE_POLL_LIMIT}', file=sys.stderr, flush=True)
-            if verdict.verdict == 'over_cap' or verdict.verdict == 'spend_unreadable':
-                worker.send_signal(signal.SIGKILL)
-                return WatchResult(verdict.verdict, current, timeline, unreadable, None)
-            code = worker.poll()
-            if code is not None:
-                return WatchResult('worker_exited', current, timeline, unreadable, code)
-            self.sleep(POLL_SECONDS)
+        try:
+            while self.clock() - began < seconds:
+                elapsed = round(self.clock() - began, 1)
+                current = statuses()
+                if current != last:
+                    timeline.append({'seconds': elapsed, **current})
+                    print(f'{round(elapsed)}s: {next(iter(current.values())) if len(current) == 1 else current}', flush=True)
+                    last = current
+                if done(current):
+                    return WatchResult('finished', current, timeline, unreadable, None)
+                verdict = watchdog_verdict(parsed_spend(self.sql(spend_query)), limit, in_a_row)
+                in_a_row = verdict.unreadable_polls
+                if verdict.verdict in ('unreadable', 'spend_unreadable'):
+                    unreadable += 1
+                    print(f'{round(elapsed)}s: the committed spend could not be read, {in_a_row} in a row; '
+                          f'the worker stops at {UNREADABLE_POLL_LIMIT}', file=sys.stderr, flush=True)
+                if verdict.verdict == 'over_cap' or verdict.verdict == 'spend_unreadable':
+                    worker.send_signal(signal.SIGKILL)
+                    return WatchResult(verdict.verdict, current, timeline, unreadable, None)
+                code = worker.poll()
+                if code is not None:
+                    return WatchResult('worker_exited', current, timeline, unreadable, code)
+                self.sleep(POLL_SECONDS)
+        except (Unavailable, subprocess.SubprocessError, OSError) as problem:
+            worker.send_signal(signal.SIGKILL)
+            cause = str(problem) if isinstance(problem, Unavailable) else type(problem).__name__
+            print(f'the watch could not poll, so the worker was stopped: {cause}', file=sys.stderr, flush=True)
+            return WatchResult('watch_failed', current, timeline, unreadable, None, cause)
         return WatchResult('timed_out', current, timeline, unreadable, None)
 
     def spend_after(self, watched: WatchResult, spend_query: str, report: Report) -> int | None:
