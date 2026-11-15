@@ -2,8 +2,9 @@
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
@@ -62,6 +63,84 @@ class Inheritance:
     session_id: UUID
     expert_id: UUID
     version: int
+
+
+class AdmissionGrant(Protocol):
+    """What a run is granted at admission: its tools and instructions, and the session and Expert
+    revision they came from. RunBinding, Inheritance and RunGrant satisfy it structurally, so they
+    stay distinct types (refactor plan R-30, PPRD-01)."""
+
+    @property
+    def session_id(self) -> UUID | None: ...
+
+    @property
+    def expert_id(self) -> UUID | None: ...
+
+    @property
+    def version(self) -> int | None: ...
+
+    @property
+    def instructions(self) -> str: ...
+
+    @property
+    def tools(self) -> Mapping[str, int]: ...
+
+
+@dataclass(frozen=True)
+class RunGrant:
+    """A grant its caller builds with no session to resolve: a routine's Expert run, a workflow's
+    run, a held-out replay or a trial."""
+
+    instructions: str
+    tools: Mapping[str, int]
+    session_id: UUID | None = None
+    expert_id: UUID | None = None
+    version: int | None = None
+
+
+@dataclass(frozen=True)
+class Fresh:
+    """A run of its own. It freezes this role policy, and its grant, or the default loop's if None.
+
+    `started_by` is the person who started it, never the actor, which can be a routine. A routine's
+    run has none, Decision 0015.
+    """
+
+    policy: RolePolicy
+    grant: AdmissionGrant | None = None
+    started_by: UUID | None = None
+
+
+@dataclass(frozen=True)
+class Inherited:
+    """A child. It takes its parent's frozen policy and started_by (Decision 0015), and its grant is
+    the inheritance itself."""
+
+    inheritance: Inheritance
+
+    @property
+    def grant(self) -> AdmissionGrant:
+        return self.inheritance
+
+
+@dataclass(frozen=True)
+class RunAdmission:
+    """One request to admit a run. Its origin is a policy unless inherited, as a type (PRUN-04).
+
+    A `goal_text` of None repeats the goal of `continues_run_id`.
+    """
+
+    workspace_id: UUID
+    actor_id: UUID
+    idempotency_key: str
+    goal_text: str | None
+    limit_micro_usd: int
+    origin: Fresh | Inherited
+    acceptance_criteria: tuple[str, ...] = ()
+    continues_run_id: UUID | None = None
+    required_artifacts: tuple[RequiredArtifact, ...] = ()
+    input_documents: tuple[InputDocument, ...] = ()
+    run_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -134,9 +213,7 @@ async def store_receipt(
     )
 
 
-def _snapshot(policy: RolePolicy | None) -> str:
-    if policy is None:
-        raise ValueError("a run needs a role policy or an inherited one")
+def _snapshot(policy: RolePolicy) -> str:
     return json.dumps(
         {
             "version": policy.version,
@@ -170,6 +247,171 @@ async def _goal_to_repeat(connection: Any, workspace_id: UUID, run_id: UUID | No
     return str(row[0])
 
 
+def _fingerprint(admission: RunAdmission, goal: str, criteria: list[str]) -> str:
+    """The receipt's request hash. Its payload stays byte-identical, or stored receipts stop
+    replaying: tests/test_run_admission.py holds each caller shape's golden digest (R-30)."""
+    grant = admission.origin.grant
+    return request_hash(
+        {
+            "goal_text": goal,
+            "limit_micro_usd": admission.limit_micro_usd,
+            "criteria": criteria,
+            "continues": str(admission.continues_run_id),
+            "required": [item.model_dump() for item in admission.required_artifacts],
+            "expert": [str(grant.expert_id), grant.version] if grant is not None else None,
+            # The media type only when chosen, so a receipt from before that field still matches.
+            "documents": [
+                item.model_dump(exclude={"media_type"} if item.media_type == "text/plain" else None)
+                for item in admission.input_documents
+            ],
+            # Only when chosen, so a receipt from before this field still matches.
+            **({"run_profile": admission.run_profile} if admission.run_profile else {}),
+        }
+    )
+
+
+async def _require_continuable(connection: Any, workspace_id: UUID, run_id: UUID | None) -> None:
+    if run_id is None:
+        return
+    cursor = await connection.execute(
+        "select status from public.runs where id = %s and workspace_id = %s",
+        (run_id, workspace_id),
+    )
+    previous = await cursor.fetchone()
+    if previous is None or RunStatus(previous[0]) not in TERMINAL:
+        raise LinkRefused("only a terminal run in this workspace can be continued")
+
+
+def _lineage(origin: Fresh | Inherited) -> tuple[str, UUID | None, UUID | None, UUID | None]:
+    """The policy snapshot, parent, root and started_by a run row records. A child's started_by is
+    None here, so the insert takes its parent's, Decision 0015."""
+    if isinstance(origin, Inherited):
+        inherited = origin.inheritance
+        return json.dumps(inherited.snapshot), inherited.parent_run_id, inherited.root_run_id, None
+    return _snapshot(origin.policy), None, None, origin.started_by
+
+
+async def _insert_run_and_job(
+    connection: Any, run_id: UUID, status: str, admission: RunAdmission, goal: str
+) -> None:
+    snapshot, parent, root, started_by = _lineage(admission.origin)
+    grant = admission.origin.grant
+    await connection.execute(
+        "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
+        "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
+        "expert_version, parent_run_id, root_run_id, execution_contract, started_by) "
+        "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "coalesce(%s, (select started_by from public.runs where id = %s)))",
+        (
+            run_id,
+            admission.workspace_id,
+            status,
+            admission.limit_micro_usd,
+            goal,
+            goal[:200],
+            snapshot,
+            admission.continues_run_id,
+            grant.session_id if grant is not None else None,
+            grant.expert_id if grant is not None else None,
+            grant.version if grant is not None else None,
+            parent,
+            root,
+            json.dumps(current_contract()),
+            started_by,
+            parent,
+        ),
+    )
+    await connection.execute(
+        "insert into app_private.run_jobs (run_id, workspace_id) values (%s, %s)",
+        (run_id, admission.workspace_id),
+    )
+
+
+async def _insert_inputs(
+    connection: Any, run_id: UUID, documents: tuple[InputDocument, ...]
+) -> None:
+    for document in documents:
+        content = document.content
+        await connection.execute(
+            "insert into app_private.run_files (run_id, path, version, content, sha256, "
+            "media_type, operation_id) values (%s, %s, 1, %s, %s, %s, %s)",
+            (
+                run_id,
+                document.path,
+                content,
+                hashlib.sha256(content.encode()).hexdigest(),
+                document.media_type,
+                f"input:{run_id}:{document.path}",
+            ),
+        )
+
+
+async def _insert_goal_spec(
+    connection: Any,
+    run_id: UUID,
+    admission: RunAdmission,
+    request: str,
+    goal: str,
+    criteria: list[str],
+) -> None:
+    """Tools, instructions and paths come from the grant, or the default loop's with none."""
+    origin = admission.origin
+    grant = origin.grant
+    spec = GoalSpec(
+        objective=goal,
+        original_request=request,
+        criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
+        allowed_tools=dict(grant.tools) if grant is not None else dict(LOOP_TOOL_GRANTS),
+        instructions=grant.instructions if grant is not None else "",
+        allowed_paths=(
+            list(origin.inheritance.paths)
+            if isinstance(origin, Inherited)
+            else list(RUN_FILE_GRANTS)
+        ),
+        required_artifacts=list(admission.required_artifacts),
+    )
+    await connection.execute(
+        "insert into app_private.goal_specs (run_id, spec) values (%s, %s)",
+        (run_id, spec.model_dump_json()),
+    )
+
+
+async def admit(connection: Any, admission: RunAdmission) -> AdmissionResult:
+    """Run, job, inputs, goal, first event and receipt commit together, SP-014. A repeat of the key
+    with the same content returns the original result, and with other content is refused."""
+    workspace_id = admission.workspace_id
+    request = admission.goal_text
+    if request is None:
+        request = await _goal_to_repeat(connection, workspace_id, admission.continues_run_id)
+    goal = request.strip()
+    # With no stated criteria, the goal itself is the one thing to meet.
+    criteria = [text.strip() for text in admission.acceptance_criteria if text.strip()] or [goal]
+    fingerprint = _fingerprint(admission, goal, criteria)
+    scope = (
+        workspace_id,
+        admission.actor_id,
+        "admit_run",
+        str(workspace_id),
+        admission.idempotency_key,
+    )
+    async with connection.transaction():
+        existing = await existing_receipt(connection, scope, fingerprint)
+        if existing is not None:
+            return AdmissionResult(
+                UUID(existing["run_id"]), existing["version"], existing["status"], True
+            )
+        await _require_continuable(connection, workspace_id, admission.continues_run_id)
+        run_id = uuid4()
+        status = RunStatus.QUEUED.value
+        await _insert_run_and_job(connection, run_id, status, admission, goal)
+        await _insert_inputs(connection, run_id, admission.input_documents)
+        await _insert_goal_spec(connection, run_id, admission, request, goal, criteria)
+        await append_event(connection, run_id, _status_changed(status, status))
+        result = {"run_id": str(run_id), "version": 1, "status": status}
+        await store_receipt(connection, scope, fingerprint, result)
+    return AdmissionResult(run_id, 1, status, False)
+
+
 async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
     connection: Any,
     *,
@@ -183,117 +425,36 @@ async def admit_run(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06
     continues_run_id: UUID | None = None,
     required_artifacts: tuple[RequiredArtifact, ...] = (),
     input_documents: tuple[InputDocument, ...] = (),
-    binding: Any = None,
+    binding: AdmissionGrant | None = None,
     inherit: Inheritance | None = None,
     run_profile: str | None = None,
     started_by: UUID | None = None,
 ) -> AdmissionResult:
-    """Run, job and first event commit together. A repeat returns the original result.
-
-    `started_by` is the person who started it, never `actor_id`, which can be a routine or a parent
-    run. A child takes its parent's, and a routine's run has none, Decision 0015.
-    """
+    """`admit` by keywords, as the database checks call it. An inheritance makes a child, which
+    ignores `binding`, `policy` and `started_by` and takes its parent's, Decision 0015."""
+    origin: Fresh | Inherited
     if inherit is not None:
-        binding = inherit
-    if goal_text is None:
-        goal_text = await _goal_to_repeat(connection, workspace_id, continues_run_id)
-    goal = goal_text.strip()
-    # With no stated criteria, the goal itself is the one thing to meet.
-    criteria = [text.strip() for text in acceptance_criteria if text.strip()] or [goal]
-    fingerprint = request_hash(
-        {
-            "goal_text": goal,
-            "limit_micro_usd": limit_micro_usd,
-            "criteria": criteria,
-            "continues": str(continues_run_id),
-            "required": [item.model_dump() for item in required_artifacts],
-            "expert": [str(binding.expert_id), binding.version] if binding else None,
-            # The media type only when chosen, so a receipt from before that field still matches.
-            "documents": [
-                item.model_dump(exclude={"media_type"} if item.media_type == "text/plain" else None)
-                for item in input_documents
-            ],
-            # Only when chosen, so a receipt from before this field still matches.
-            **({"run_profile": run_profile} if run_profile else {}),
-        }
+        origin = Inherited(inherit)
+    elif policy is not None:
+        origin = Fresh(policy, binding, started_by)
+    else:
+        raise ValueError("a run needs a role policy or an inherited one")
+    return await admit(
+        connection,
+        RunAdmission(
+            workspace_id=workspace_id,
+            actor_id=actor_id,
+            idempotency_key=idempotency_key,
+            goal_text=goal_text,
+            limit_micro_usd=limit_micro_usd,
+            origin=origin,
+            acceptance_criteria=acceptance_criteria,
+            continues_run_id=continues_run_id,
+            required_artifacts=required_artifacts,
+            input_documents=input_documents,
+            run_profile=run_profile,
+        ),
     )
-    scope = (workspace_id, actor_id, "admit_run", str(workspace_id), idempotency_key)
-    async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint)
-        if existing is not None:
-            return AdmissionResult(
-                UUID(existing["run_id"]), existing["version"], existing["status"], True
-            )
-        if continues_run_id is not None:
-            cursor = await connection.execute(
-                "select status from public.runs where id = %s and workspace_id = %s",
-                (continues_run_id, workspace_id),
-            )
-            previous = await cursor.fetchone()
-            if previous is None or RunStatus(previous[0]) not in TERMINAL:
-                raise LinkRefused("only a terminal run in this workspace can be continued")
-        run_id = uuid4()
-        status = RunStatus.QUEUED.value
-        await connection.execute(
-            "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
-            "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
-            "expert_version, parent_run_id, root_run_id, execution_contract, started_by) "
-            "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s, "
-            "coalesce(%s, (select started_by from public.runs where id = %s)))",
-            (
-                run_id,
-                workspace_id,
-                status,
-                limit_micro_usd,
-                goal,
-                goal[:200],
-                json.dumps(inherit.snapshot) if inherit else _snapshot(policy),
-                continues_run_id,
-                binding.session_id if binding else None,
-                binding.expert_id if binding else None,
-                binding.version if binding else None,
-                inherit.parent_run_id if inherit else None,
-                inherit.root_run_id if inherit else None,
-                json.dumps(current_contract()),
-                None if inherit else started_by,
-                inherit.parent_run_id if inherit else None,
-            ),
-        )
-        await connection.execute(
-            "insert into app_private.run_jobs (run_id, workspace_id) values (%s, %s)",
-            (run_id, workspace_id),
-        )
-        for document in input_documents:
-            content = document.content
-            await connection.execute(
-                "insert into app_private.run_files (run_id, path, version, content, sha256, "
-                "media_type, operation_id) values (%s, %s, 1, %s, %s, %s, %s)",
-                (
-                    run_id,
-                    document.path,
-                    content,
-                    hashlib.sha256(content.encode()).hexdigest(),
-                    document.media_type,
-                    f"input:{run_id}:{document.path}",
-                ),
-            )
-        spec = GoalSpec(
-            objective=goal,
-            original_request=goal_text,
-            criteria={f"c{index}": text for index, text in enumerate(criteria, start=1)},
-            allowed_tools=dict(binding.tools) if binding else dict(LOOP_TOOL_GRANTS),
-            instructions=binding.instructions if binding else "",
-            allowed_paths=list(inherit.paths) if inherit else list(RUN_FILE_GRANTS),
-            required_artifacts=list(required_artifacts),
-        )
-        await connection.execute(
-            "insert into app_private.goal_specs (run_id, spec) values (%s, %s)",
-            (run_id, spec.model_dump_json()),
-        )
-        await append_event(connection, run_id, _status_changed(status, status))
-        result = {"run_id": str(run_id), "version": 1, "status": status}
-        await store_receipt(connection, scope, fingerprint, result)
-    return AdmissionResult(run_id, 1, status, False)
 
 
 def _job_status(following: RunStatus) -> str | None:
@@ -488,13 +649,19 @@ async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (ST
 
 __all__ = [
     "Actor",
+    "AdmissionGrant",
     "CommandRefused",
+    "Fresh",
     "IdempotencyConflict",
     "Inheritance",
+    "Inherited",
     "LeaseLost",
     "LinkRefused",
+    "RunAdmission",
+    "RunGrant",
     "RunNotFound",
     "VersionConflict",
+    "admit",
     "admit_run",
     "append_event",
     "apply_command",

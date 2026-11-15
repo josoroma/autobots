@@ -8,15 +8,17 @@ import logging
 import os
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import ExpertRefused, get_expert
 from autobots.application.improvements import active_skill_text
 from autobots.application.runs import (
+    Fresh,
     IdempotencyConflict,
-    admit_run,
+    RunAdmission,
+    RunGrant,
+    admit,
     existing_receipt,
     request_hash,
     store_receipt,
@@ -374,21 +376,23 @@ async def _admit(
         require_available(tools, await key_sources(connection, workspace_id, os.environ))
     except ToolsUnavailable as refused:
         raise RoutineRefused(refused.code) from None
-    admitted = await admit_run(
+    grant = RunGrant(
+        expert_id=config.target.id,
+        version=pinned_version(config),
+        instructions=expert.instructions
+        + await active_skill_text(connection, workspace_id, expert.skills),
+        tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in tools}},
+    )
+    # No started_by: a routine's run has none, Decision 0015.
+    admitted = await admit(
         connection,
-        workspace_id=workspace_id,
-        actor_id=actor,
-        idempotency_key=key,
-        goal_text=config.goal,
-        limit_micro_usd=config.limit_micro_usd,
-        policy=policy,
-        binding=SimpleNamespace(
-            session_id=None,
-            expert_id=config.target.id,
-            version=pinned_version(config),
-            instructions=expert.instructions
-            + await active_skill_text(connection, workspace_id, expert.skills),
-            tools={**PLAN_TOOLS, **{tool: EXPERT_TOOLS[tool] for tool in tools}},
+        RunAdmission(
+            workspace_id=workspace_id,
+            actor_id=actor,
+            idempotency_key=key,
+            goal_text=config.goal,
+            limit_micro_usd=config.limit_micro_usd,
+            origin=Fresh(policy, grant),
         ),
     )
     return admitted.run_id

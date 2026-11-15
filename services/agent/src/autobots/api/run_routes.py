@@ -23,11 +23,13 @@ from autobots.application.reconciliation import (
 from autobots.application.recovery import outstanding
 from autobots.application.run_projection import public_text, read_summary
 from autobots.application.runs import (
+    Fresh,
     IdempotencyConflict,
     LinkRefused,
+    RunAdmission,
     RunNotFound,
     VersionConflict,
-    admit_run,
+    admit,
     apply_command,
     existing_receipt,
     request_hash,
@@ -248,21 +250,21 @@ async def post_run(
             named = body.run_profile is not None and not is_offered(body.run_profile)
             raise ApiError(422 if named else 409, refused.code, str(refused)) from None
         try:
-            result = await admit_run(
+            result = await admit(
                 connection,
-                workspace_id=workspace_id,
-                actor_id=user_id,
-                started_by=user_id,
-                idempotency_key=idempotency_key,
-                goal_text=body.goal_text,
-                limit_micro_usd=limit,
-                acceptance_criteria=tuple(body.acceptance_criteria),
-                continues_run_id=body.continues_run_id,
-                required_artifacts=tuple(body.required_artifacts),
-                binding=binding,
-                input_documents=tuple(body.input_documents),
-                policy=policy,
-                run_profile=body.run_profile.value if body.run_profile else None,
+                RunAdmission(
+                    workspace_id=workspace_id,
+                    actor_id=user_id,
+                    idempotency_key=idempotency_key,
+                    goal_text=body.goal_text,
+                    limit_micro_usd=limit,
+                    origin=Fresh(policy, binding, started_by=user_id),
+                    acceptance_criteria=tuple(body.acceptance_criteria),
+                    continues_run_id=body.continues_run_id,
+                    required_artifacts=tuple(body.required_artifacts),
+                    input_documents=tuple(body.input_documents),
+                    run_profile=body.run_profile.value if body.run_profile else None,
+                ),
             )
         except (IdempotencyConflict, LinkRefused) as error:
             raise as_api_error(error) from None

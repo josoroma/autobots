@@ -485,6 +485,8 @@ def run_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
         return
     cases.denied('authenticated cannot read the job table', stack.as_role('authenticated', USER_A, 'select * from app_private.run_jobs'), 'permission denied')
     cases.denied('authenticated cannot read the policy snapshot', stack.as_role('authenticated', USER_A, 'select policy_snapshot from public.runs'), 'permission denied')
+    # Receipts stored with the digests captured before typed admission replay, and new ones store them (refactor plan R-30).
+    child_check(stack, cases, root, db_port, Child('admission_replay_check.py', 'the admission replay check', ('{workspace}',)))
 
 
 def worker_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:

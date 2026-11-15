@@ -2,13 +2,20 @@
 
 import json
 from datetime import UTC
-from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.experts import create_session
 from autobots.application.run_projection import public_text
-from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
+from autobots.application.runs import (
+    Fresh,
+    RunAdmission,
+    RunGrant,
+    admit,
+    existing_receipt,
+    request_hash,
+    store_receipt,
+)
 from autobots.application.workflow_overview import expert_chain, recent_executions, run_count
 from autobots.contracts.experts import SessionExpert
 from autobots.contracts.plans import InputDocument
@@ -385,22 +392,20 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
                     if name in tools or name in PLAN_TOOLS or name == "workflow_approval"
                 }
             )
-            admitted = await admit_run(
+            admitted = await admit(
                 connection,
-                workspace_id=workspace_id,
-                actor_id=actor_id,
-                started_by=started_by,
-                idempotency_key=f"workflow:{execution_id}",
-                goal_text=f"Workflow {name}, version {version}",
-                limit_micro_usd=limit_micro_usd,
-                policy=policy,
-                input_documents=documents,
-                binding=SimpleNamespace(
-                    session_id=session_id,
-                    expert_id=None,
-                    version=None,
-                    instructions="",
-                    tools=granted,
+                RunAdmission(
+                    workspace_id=workspace_id,
+                    actor_id=actor_id,
+                    idempotency_key=f"workflow:{execution_id}",
+                    goal_text=f"Workflow {name}, version {version}",
+                    limit_micro_usd=limit_micro_usd,
+                    origin=Fresh(
+                        policy,
+                        RunGrant(instructions="", tools=granted, session_id=session_id),
+                        started_by=started_by,
+                    ),
+                    input_documents=documents,
                 ),
             )
             run_id = admitted.run_id

@@ -6,11 +6,18 @@ policy or a model default, and the checks below refuse text that claims it can.
 
 import json
 import re
-from types import SimpleNamespace
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from autobots.application.runs import admit_run, existing_receipt, request_hash, store_receipt
+from autobots.application.runs import (
+    Fresh,
+    RunAdmission,
+    RunGrant,
+    admit,
+    existing_receipt,
+    request_hash,
+    store_receipt,
+)
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.improvements import (
     CandidateView,
@@ -389,25 +396,26 @@ async def request_replay(
             (replay_id, workspace_id, candidate_id, actor_id),
         )
         # The default loop's grants, so a replay can't propose or reach anything an Expert adds.
-        binding = SimpleNamespace(
-            session_id=None,
-            expert_id=None,
-            version=None,
-            instructions=REFERENCE_HEADER + f"{key}:\n{content}" if kind == "skill" else "",
-            tools=dict(LOOP_TOOL_GRANTS),
+        origin = Fresh(
+            policy,
+            RunGrant(
+                instructions=REFERENCE_HEADER + f"{key}:\n{content}" if kind == "skill" else "",
+                tools=dict(LOOP_TOOL_GRANTS),
+            ),
+            started_by=actor_id,
         )
         for position, task in enumerate(tasks):
-            admitted = await admit_run(
+            admitted = await admit(
                 connection,
-                workspace_id=workspace_id,
-                actor_id=actor_id,
-                started_by=actor_id,
-                idempotency_key=f"replay:{replay_id}:{position}",
-                goal_text=task["goal_text"],
-                limit_micro_usd=limit_micro_usd,
-                acceptance_criteria=tuple(task["criteria"]),
-                policy=policy,
-                binding=binding,
+                RunAdmission(
+                    workspace_id=workspace_id,
+                    actor_id=actor_id,
+                    idempotency_key=f"replay:{replay_id}:{position}",
+                    goal_text=task["goal_text"],
+                    limit_micro_usd=limit_micro_usd,
+                    origin=origin,
+                    acceptance_criteria=tuple(task["criteria"]),
+                ),
             )
             await connection.execute(
                 "insert into app_private.improvement_replay_runs (replay_id, run_id, position, "

@@ -149,7 +149,7 @@ async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06
     from autobots.application.approvals import decide
     from autobots.application.experts import create_expert
     from autobots.application.run_usage import RootLimits, ensure_usage
-    from autobots.application.runs import admit_run
+    from autobots.application.runs import Fresh, RunAdmission, RunGrant, admit
     from autobots.application.tool_gateway import ToolGateway, ToolRegistry, ToolScope
     from autobots.application.worker_inference import frozen_policy
     from autobots.application.worker_leases import claim_next
@@ -172,26 +172,19 @@ async def run_trial(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06
             name=f"Browse trial {uuid4().hex[:6]}",
             config=ExpertConfig(tools=["browse_goal"]),
         )
-        binding = type(
-            "Binding",
-            (),
-            {
-                "session_id": None,
-                "expert_id": expert.id,
-                "version": 1,
-                "instructions": "",
-                "tools": grant,
-            },
-        )()
-        admitted = await admit_run(
+        admitted = await admit(
             db,
-            workspace_id=workspace,
-            actor_id=actor,
-            idempotency_key=str(uuid4()),
-            goal_text="Live browse trial",
-            limit_micro_usd=LIMIT_MICRO_USD,
-            policy=resolve_role_policy(),
-            binding=binding,
+            RunAdmission(
+                workspace_id=workspace,
+                actor_id=actor,
+                idempotency_key=str(uuid4()),
+                goal_text="Live browse trial",
+                limit_micro_usd=LIMIT_MICRO_USD,
+                origin=Fresh(
+                    resolve_role_policy(),
+                    RunGrant(instructions="", tools=grant, expert_id=expert.id, version=1),
+                ),
+            ),
         )
         run = admitted.run_id
         cursor = await db.execute("select policy_snapshot from public.runs where id = %s", (run,))

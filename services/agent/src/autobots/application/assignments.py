@@ -11,7 +11,13 @@ from autobots.application.experts import ExpertRefused, resolve_binding
 from autobots.application.plans import load_goal, plan_view
 from autobots.application.recovery import outstanding
 from autobots.application.run_usage import LimitReached, RootLimits, consume, ensure_usage
-from autobots.application.runs import Inheritance, admit_run, apply_command
+from autobots.application.runs import (
+    Inheritance,
+    Inherited,
+    RunAdmission,
+    admit,
+    apply_command,
+)
 from autobots.application.tool_gateway import (
     ToolContext,
     ToolDefinition,
@@ -122,24 +128,28 @@ async def _create(
             raise ToolFailed(GatewayCode.CHILDREN_LIMIT) from None
         namespace = f"outputs/child-{total + 1}"
         paths = (*[path for path in goal.allowed_paths if path == "inputs"], namespace)
-        admitted = await admit_run(
+        admitted = await admit(
             connection,
-            workspace_id=scope.workspace_id,
-            actor_id=scope.run_id,
-            idempotency_key=str(context.operation_id),
-            goal_text=arguments.goal,
-            limit_micro_usd=limit,
-            acceptance_criteria=tuple(arguments.criteria),
-            inherit=Inheritance(
-                parent_run_id=scope.run_id,
-                root_run_id=root,
-                snapshot=snapshot,
-                tools=tools,
-                paths=paths,
-                instructions=binding.instructions,
-                session_id=session_id,
-                expert_id=binding.expert_id,
-                version=binding.version,
+            RunAdmission(
+                workspace_id=scope.workspace_id,
+                actor_id=scope.run_id,
+                idempotency_key=str(context.operation_id),
+                goal_text=arguments.goal,
+                limit_micro_usd=limit,
+                origin=Inherited(
+                    Inheritance(
+                        parent_run_id=scope.run_id,
+                        root_run_id=root,
+                        snapshot=snapshot,
+                        tools=tools,
+                        paths=paths,
+                        instructions=binding.instructions,
+                        session_id=session_id,
+                        expert_id=binding.expert_id,
+                        version=binding.version,
+                    )
+                ),
+                acceptance_criteria=tuple(arguments.criteria),
             ),
         )
         assignment_id = uuid4()
