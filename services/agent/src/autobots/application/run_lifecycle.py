@@ -1,5 +1,6 @@
 """The lifecycle every pass under a lease shares: its settings and result, a keeper that holds the
-lease while it works, and finishing the run through the canonical transitions (SP-010, SP-012).
+lease while it works, finishing the run through the canonical transitions, and recording a pass
+that raised (SP-010, SP-012, Decision 0028 E4).
 
 The goal loop and the workflow runner both build on it, and neither imports the other: the goal loop
 passes its own drive function to the workflow runner, which drives its agent steps' children with it
@@ -27,10 +28,16 @@ from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import ToolDefinition
 from autobots.application.worker_leases import (
     DEFAULT_LEASE_SECONDS,
+    RETRY_DELAYS_SECONDS,
     Lease,
     WakeClock,
     claim_run,
+    count_failure,
+    failure_type,
     heartbeat,
+    let_go,
+    release,
+    retry_delay,
     revive_lease,
 )
 from autobots.contracts.plans import GoalSpec
@@ -491,3 +498,106 @@ async def finish(
     if decision.command is not None:
         code, status = await _transition(connection, lease, decision.command, code)
     return await result_of(connection, lease, goal, outcome_of(code), code, status)
+
+
+class FailureEnding(StrEnum):
+    """What recording a failed pass did to its job (Decision 0028 E4)."""
+
+    # The lease's generation no longer holds a claimed job, so nothing was written (SP-012).
+    LOST = "lost"
+    # Requeued, and claimable again after its backoff.
+    RETRY = "retry"
+    # A person paused the run while the pass held it: its job is let go until their resume.
+    LET_GO = "let_go"
+    # The bound: the run is suspended with `worker_failed`, paused and resumable.
+    SUSPENDED = "suspended"
+    # The bound on a run a person is cancelling, which can't be suspended: its cancellation is
+    # settled instead, as the person asked, so the retries still end (SP-010, SP-012).
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class PassFailure:
+    """How a failed pass was recorded: its ending, the job's consecutive failures including this
+    one, and the backoff before the job may be claimed again."""
+
+    ending: FailureEnding
+    attempt: int | None = None
+    retry_seconds: float | None = None
+
+
+async def _bound(
+    connection: Connection, lease: Lease, attempt: int, status: RunStatus
+) -> PassFailure:
+    """The step after counting a failure, inside the transaction that counted it."""
+    if status is RunStatus.PAUSED:
+        await let_go(connection, lease)
+        return PassFailure(FailureEnding.LET_GO, attempt)
+    delay = retry_delay(attempt)
+    if delay is None:
+        if status is RunStatus.CANCELLING:
+            # Settled once this transaction commits, by `_settle_at_bound`.
+            return PassFailure(FailureEnding.CANCELLED, attempt)
+        _, reached = await _transition(
+            connection, lease, RunCommand.SUSPEND, StopCode.WORKER_FAILED
+        )
+        if reached is not None:
+            return PassFailure(FailureEnding.SUSPENDED, attempt)
+        # A lapsed lease can't apply a suspension, or a person's command moved the run meanwhile.
+        # A later pass suspends it once it holds a live lease.
+        delay = RETRY_DELAYS_SECONDS[-1]
+    await release(connection, lease, delay)
+    return PassFailure(FailureEnding.RETRY, attempt, delay)
+
+
+async def _settle_at_bound(
+    connection: Connection, lease: Lease, failure: PassFailure
+) -> PassFailure:
+    """Settles the cancellation of a run that reached the bound while being cancelled, as `finish`
+    does: children first, then what is in flight, then FINISH_CANCEL (SP-010). A child still owned
+    elsewhere requeues the job until it settles; a refused or lost transition retries later."""
+    code = await _settle(connection, lease)
+    if code is None:
+        return PassFailure(FailureEnding.RETRY, failure.attempt)
+    _, reached = await _transition(connection, lease, RunCommand.FINISH_CANCEL, code)
+    if reached is not None:
+        return failure
+    delay = RETRY_DELAYS_SECONDS[-1]
+    await release(connection, lease, delay)
+    return PassFailure(FailureEnding.RETRY, failure.attempt, delay)
+
+
+async def record_failure(connection: Connection, lease: Lease, error: Exception) -> PassFailure:
+    """Records a pass that raised an exception no handler classifies, and bounds its retries
+    (Decision 0028 E4, SP-012).
+
+    One transaction under the lease's generation counts the failure and keeps its qualified type,
+    never its message. A run a person paused lets its job go, and their resume resets the count.
+    Below the bound the job is requeued after its backoff. At the bound the run is suspended with
+    `worker_failed` through `apply_command`, its stop reason committing with it; a run a person is
+    cancelling has its cancellation settled instead, and a lapsed lease requeues the job after the
+    longest backoff.
+    The log names the run, and the error by type and frames only.
+    """
+    async with connection.transaction():
+        counted = await count_failure(connection, lease, failure_type(error))
+        if counted is None:
+            failure = PassFailure(FailureEnding.LOST)
+        else:
+            failure = await _bound(connection, lease, counted[0], RunStatus(counted[1]))
+    if failure.ending is FailureEnding.CANCELLED:
+        failure = await _settle_at_bound(connection, lease, failure)
+    fields: dict[str, object] = {"run": str(lease.run_id), "ending": failure.ending.value}
+    if failure.attempt is not None:
+        fields["attempt"] = failure.attempt
+    if failure.retry_seconds is not None:
+        fields["retry_seconds"] = failure.retry_seconds
+    fields["error"] = error
+    # ERROR once a person has to look; until then the worker retries by itself (R-25, XERR-12).
+    level = (
+        logging.ERROR
+        if failure.ending in {FailureEnding.SUSPENDED, FailureEnding.CANCELLED}
+        else logging.WARNING
+    )
+    logger.log(level, "run.pass_failed", extra={"fields": fields})
+    return failure

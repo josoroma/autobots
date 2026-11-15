@@ -64,6 +64,8 @@ REQUIRED_COLUMNS = (
     ("app_private.tool_uses", "instance_key"),
     ("public.workflows", "description"),
     ("app_private.tool_key_settings", "value"),
+    ("app_private.run_jobs", "failed_attempts"),
+    ("app_private.run_jobs", "last_failure_type"),
     ("public.routines", "removed_at"),
     ("public.approval_requests", "review_detail"),
 )

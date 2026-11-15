@@ -641,6 +641,12 @@ async def apply_command(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (ST
                 "lease_expires_at = null where run_id = %s",
                 (job_status, run_id),
             )
+        if command is RunCommand.RESUME:
+            # A person's resume starts the job's consecutive failed passes again from none
+            # (Decision 0028 E4).
+            await connection.execute(
+                "update app_private.run_jobs set failed_attempts = 0 where run_id = %s", (run_id,)
+            )
         result = {"version": new_version, "status": following.value}
         if scope is not None:
             await store_receipt(connection, scope, fingerprint, result)

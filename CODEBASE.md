@@ -152,7 +152,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 
 ## Data and Persistence
 
-- **Migrations:** `supabase/migrations/` holds 54 ordered files, from `20261105000001_workspaces.sql` to `20261114000054_runtime_cannot_delete_runs.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, and R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
+- **Migrations:** `supabase/migrations/` holds 55 ordered files, from `20261105000001_workspaces.sql` to `20261114000055_run_job_failures.sql` (US-14.17's Tavily and Jina providers and `app_private.tool_key_settings`, US-14.18's GitHub provider and saved values, US-14.19's `routines.removed_at` and `action_marked` approval rule, R-17's revocation of the runtime role's DELETE on runs, run events, workspaces, members and profiles, and R-35's private `failed_attempts` and `last_failure_type` on `app_private.run_jobs`, after the analyzed revision), in the schemas `public`, `app_private` and `agent_runtime`. Since migration 35:
 
 | Migration | Change |
 |---|---|

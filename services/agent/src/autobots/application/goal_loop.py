@@ -38,12 +38,18 @@ from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
 from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_lifecycle import LoopResult as LoopResult
-from autobots.application.run_lifecycle import finish, lease_heartbeat, result_of, run_status
+from autobots.application.run_lifecycle import (
+    finish,
+    lease_heartbeat,
+    record_failure,
+    result_of,
+    run_status,
+)
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import ToolGateway, ToolScope
 from autobots.application.verification import verify_candidate
-from autobots.application.worker_leases import Lease, claim_next, is_held
+from autobots.application.worker_leases import Lease, claim_next, is_held, reset_failures
 from autobots.application.workflow_runner import run_workflow
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.execution import incompatibility
@@ -272,6 +278,12 @@ async def process_next(
 
     A worker that serves whatever comes passes `bind`, which replaces the model and route for the
     job it just claimed. Without it, `run_goal` refuses any run that isn't bound to `config.route`.
+
+    A pass that raises an exception no handler classifies is recorded by `record_failure`, which
+    requeues the job after a backoff or, at the bound, suspends the run; the exception still
+    propagates, so the worker logs the step as failed. Cancellation is a BaseException and a lost
+    lease is the next owner's to fence, so neither is recorded. A pass that completes resets the
+    count (Decision 0028 E4, SP-012).
     """
     if await is_held(connection) or not await adapter_qualified(connection):
         return None
@@ -279,9 +291,16 @@ async def process_next(
     lease = await claim_next(connection, worker_id=worker_id, lease_seconds=config.lease_seconds)
     if lease is None:
         return None
-    if bind is not None:
-        model_factory, config = await bind(connection, lease, config)
-    return await drive_lease(connection, database_url, lease, model_factory, config)
+    try:
+        if bind is not None:
+            model_factory, config = await bind(connection, lease, config)
+        result = await drive_lease(connection, database_url, lease, model_factory, config)
+    except Exception as error:
+        if not isinstance(error, LeaseLost) and not is_stale_owner(error):
+            await record_failure(connection, lease, error)
+        raise
+    await reset_failures(connection, lease)
+    return result
 
 
 async def execution_block(connection: Any, run_id: UUID) -> str | None:

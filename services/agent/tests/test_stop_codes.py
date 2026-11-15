@@ -4,7 +4,8 @@ The `OLD_*` literals are copies of the sets the table replaced: goal_loop's PAUS
 loop_middleware's STOPPING and REPAIRABLE, plans' PLAN_REJECTIONS and workflow_runner's STOPS. A
 derived set that drifts from them changes run behavior, so it fails here (PRUN-02, PPRD-03,
 PTOL-09). The deliberate changes are Decision 0028 E3, by which a code missing from the table
-suspends the run instead of failing it, and R-34's `command_refused`, which releases the run.
+suspends the run instead of failing it, R-34's `command_refused`, which releases the run, and
+Decision 0028 E4's `worker_failed`, which suspends it.
 """
 
 import ast
@@ -78,6 +79,9 @@ OLD_PAUSE_FOR = {
 OLD_NOT_OURS = {"lease_lost", "run_not_running", "run_not_found", "approval_pending"}
 # A refused transition reports this instead of lease_lost, and releases the run (R-34, PRUN-03).
 ADDED_RELEASE = {"command_refused"}
+# A pass that kept raising an unclassified exception suspends the run at the bound (Decision 0028
+# E4, R-35).
+ADDED_SUSPEND = {"worker_failed"}
 # Every other code that reached `finish` failed the run, these by name.
 OLD_FAILS = {
     "rate_limited",
@@ -242,7 +246,7 @@ def test_each_value_is_the_stored_string() -> None:
         for member in vocabulary:
             assert member.value == member.name.lower() and str(member) == member.value
     assert {code.value for code in StopCode} == (
-        OLD_PAUSE_FOR | OLD_NOT_OURS | ADDED_RELEASE | OLD_FAILS | OLD_SETTLEMENT
+        OLD_PAUSE_FOR | ADDED_SUSPEND | OLD_NOT_OURS | ADDED_RELEASE | OLD_FAILS | OLD_SETTLEMENT
     )
     assert {outcome.value for outcome in PassOutcome} == {
         "candidate",
@@ -271,7 +275,7 @@ def test_every_disposition_keeps_todays_behavior() -> None:
     for code, disposition in DISPOSITION.items():
         if code in OLD_NOT_OURS | ADDED_RELEASE:
             assert disposition is Disposition.RELEASE, code
-        elif code in OLD_PAUSE_FOR:
+        elif code in OLD_PAUSE_FOR | ADDED_SUSPEND:
             assert disposition is Disposition.SUSPEND, code
         else:
             assert disposition is Disposition.FAIL, code
@@ -281,7 +285,7 @@ def test_every_disposition_keeps_todays_behavior() -> None:
     }
     assert counts == {
         Disposition.VERIFY: 0,
-        Disposition.SUSPEND: 19,
+        Disposition.SUSPEND: 20,
         Disposition.FAIL: 22,
         Disposition.RELEASE: 5,
     }
@@ -289,7 +293,7 @@ def test_every_disposition_keeps_todays_behavior() -> None:
 
 
 def test_derived_sets_equal_the_literals_they_replaced() -> None:
-    assert PAUSE_FOR == OLD_PAUSE_FOR
+    assert PAUSE_FOR == OLD_PAUSE_FOR | ADDED_SUSPEND
     assert NOT_OURS == OLD_NOT_OURS | ADDED_RELEASE
     # The loop stopped on these two inline as well, beside its STOPPING set.
     assert STOPPING == OLD_STOPPING | {"lease_lost", "run_not_running"}

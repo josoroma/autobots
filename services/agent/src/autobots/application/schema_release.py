@@ -3,5 +3,5 @@ count with this, and a harness check fails unless both values match `supabase/mi
 migration, then change both lines.
 """
 
-SHIPPED_MIGRATIONS = 54
-NEWEST_MIGRATION = "20261114000054_runtime_cannot_delete_runs.sql"
+SHIPPED_MIGRATIONS = 55
+NEWEST_MIGRATION = "20261114000055_run_job_failures.sql"

@@ -248,7 +248,11 @@ def credential_check_from_environment() -> Callable[[Any, UUID], Awaitable[str]]
 def inference_step(
     config: WorkerConfig, source: InferenceSource, store: Any, stop: asyncio.Event | None = None
 ) -> Step:
-    """Claims through `process_next`, and each job's own policy picks its route."""
+    """Claims through `process_next`, and each job's own policy picks its route.
+
+    A pass that raises an exception no handler classifies is recorded there and its retries are
+    bounded, then the exception reaches `serve`, which logs `worker.step_failed` (Decision 0028 E4).
+    """
     base = LoopConfig(route=UNBOUND, object_store=store)
 
     async def step(connection: Any) -> bool:

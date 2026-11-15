@@ -537,6 +537,8 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
 def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Cancellation from every state, resume, and a real stopped process for Mac sleep."""
     child_check(stack, cases, root, db_port, Child('recovery_check.py', 'the recovery check', ('{workspace}', '{other}', '{python}'), timeout=240))
+    # Decision 0028 E4: a pass that keeps raising is claimed a bounded number of times, then the run is paused.
+    child_check(stack, cases, root, db_port, Child('worker_failure_check.py', 'the worker failure check', ('{workspace}',), timeout=180))
     cases.denied('authenticated cannot read obligations', stack.as_role('authenticated', USER_A, 'select * from app_private.run_obligations'), 'permission denied')
 
 

@@ -1,9 +1,10 @@
 """Job ownership by database time and a rising generation, SP-012."""
 
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 from uuid import UUID
 
 from autobots.application.runs import LeaseLost, record_transition
@@ -14,6 +15,13 @@ DEFAULT_LEASE_SECONDS = 60.0
 SLEEP_GAP_SECONDS = 20.0
 # Long enough for Docker's VM to correct its clock, which it did late in the first real sleep.
 WAKE_WINDOW_SECONDS = 300.0
+# A pass that raises an exception no handler classifies is retried after each delay in turn, and
+# the bound's consecutive failure suspends its run instead (Decision 0028 E4, SP-012).
+FAILURE_BOUND: Final = 3
+RETRY_DELAYS_SECONDS: Final = (30.0, 60.0)
+# The longest stored type, as the column's check bounds it (20261114000055_run_job_failures.sql).
+FAILURE_TYPE_LIMIT: Final = 200
+_OUTSIDE_A_NAME = re.compile(r"[^A-Za-z0-9_.<>]")
 
 
 class WakeClock:
@@ -173,3 +181,66 @@ async def heartbeat(
     )
     if await cursor.fetchone() is None:
         raise LeaseLost("this worker no longer owns the run")
+
+
+def retry_delay(failed_attempts: int) -> float | None:
+    """Seconds before a job whose pass failed `failed_attempts` consecutive times may be claimed
+    again, or None at the bound, where its run is suspended instead (Decision 0028 E4)."""
+    if failed_attempts >= FAILURE_BOUND:
+        return None
+    return RETRY_DELAYS_SECONDS[max(failed_attempts, 1) - 1]
+
+
+def failure_type(error: BaseException) -> str:
+    """A failure's module-qualified type, as `run_jobs.last_failure_type` keeps it: never its
+    message, which can hold a key or a provider's reply (Decision 0028 E4). Anything outside a
+    name becomes `_`, and it is cut to the column's bound, so the column's check always passes."""
+    kind = type(error)
+    name = _OUTSIDE_A_NAME.sub("_", f"{kind.__module__}.{kind.__qualname__}")
+    return name[:FAILURE_TYPE_LIMIT]
+
+
+async def count_failure(connection: Any, lease: Lease, kind: str) -> tuple[int, str] | None:
+    """Adds a failed pass to the job this lease claims, with its type, and returns the consecutive
+    count and the run's status. None when the lease's generation no longer holds a claimed job, so
+    a worker that lost the run records nothing (SP-012). The row stays locked until its caller's
+    transaction ends."""
+    cursor = await connection.execute(
+        "update app_private.run_jobs j set failed_attempts = j.failed_attempts + 1, "
+        "last_failure_type = %s from public.runs r where r.id = j.run_id "
+        "and j.run_id = %s and j.generation = %s and j.status = 'claimed' "
+        "returning j.failed_attempts, r.status",
+        (kind, lease.run_id, lease.generation),
+    )
+    row = await cursor.fetchone()
+    return None if row is None else (int(row[0]), str(row[1]))
+
+
+async def release(connection: Any, lease: Lease, delay_seconds: float) -> None:
+    """Requeues the job this lease claims, claimable again `delay_seconds` from now by database
+    time. The lease's generation fences it."""
+    await connection.execute(
+        "update app_private.run_jobs set status = 'queued', lease_owner = null, "
+        "lease_expires_at = null, available_at = clock_timestamp() + make_interval(secs => %s) "
+        "where run_id = %s and generation = %s and status = 'claimed'",
+        (delay_seconds, lease.run_id, lease.generation),
+    )
+
+
+async def let_go(connection: Any, lease: Lease) -> None:
+    """Ends this lease's claim on a run a person paused. Their resume queues the job again."""
+    await connection.execute(
+        "update app_private.run_jobs set status = 'done', lease_owner = null, "
+        "lease_expires_at = null where run_id = %s and generation = %s and status = 'claimed'",
+        (lease.run_id, lease.generation),
+    )
+
+
+async def reset_failures(connection: Any, lease: Lease) -> None:
+    """A pass under this lease completed, so the job's consecutive failures start again from none
+    (Decision 0028 E4). The generation fences it, so a later claim keeps a count of its own."""
+    await connection.execute(
+        "update app_private.run_jobs set failed_attempts = 0 "
+        "where run_id = %s and generation = %s and failed_attempts <> 0",
+        (lease.run_id, lease.generation),
+    )

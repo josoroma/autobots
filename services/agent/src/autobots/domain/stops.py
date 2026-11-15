@@ -90,6 +90,9 @@ class StopCode(_Code):
     # The transition `run_lifecycle.finish` applied was refused under the run's row lock. Never
     # stored, since the transaction that would store it rolls back (R-34, PRUN-03).
     COMMAND_REFUSED = "command_refused"
+    # Passes kept raising an exception no handler classifies until the bound, so the run is
+    # suspended (run_lifecycle.record_failure, Decision 0028 E4).
+    WORKER_FAILED = "worker_failed"
     # The plan and verification's verdict (run_lifecycle.decide and goal_loop.py).
     PLAN_MISSING = "plan_missing"
     PLAN_INCOMPLETE = "plan_incomplete"
@@ -131,6 +134,9 @@ DISPOSITION: Final[Mapping[StopCode, Disposition]] = MappingProxyType(
         StopCode.INCOMPATIBLE_VERSION: Disposition.SUSPEND,
         # A worker on another model, say after a release, leaves the saved run for the right one.
         StopCode.ROUTE_NOT_BOUND: Disposition.SUSPEND,
+        # A defect that retries didn't ride out waits for a person, who can resume it (Decision 0028
+        # E4).
+        StopCode.WORKER_FAILED: Disposition.SUSPEND,
         # Another owner, a person's pause or cancel, or a pending approval has the run.
         StopCode.LEASE_LOST: Disposition.RELEASE,
         StopCode.RUN_NOT_RUNNING: Disposition.RELEASE,
