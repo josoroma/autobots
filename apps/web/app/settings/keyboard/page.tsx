@@ -33,7 +33,7 @@ export default function KeyboardPage() {
                   {shortcut.keys.map((key) => (
                     <kbd
                       key={key}
-                      className="border-border bg-muted min-w-6 rounded-md border px-1.5 py-0.5 text-center font-mono text-[12px]"
+                      className="border-border bg-muted min-w-6 rounded-md border px-1.5 py-0.5 text-center font-mono text-caption"
                     >
                       {key}
                     </kbd>

@@ -1,39 +1,37 @@
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 
 import { ToolDetail } from "@/components/tools/tool-detail";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 
 /**
- * The detail in a native modal dialog, which makes the page behind it inert and traps focus. Escape,
- * Close and a click on the backdrop close it, and the URL keeps ?tool= (Decision 0026 G2, G3).
+ * The detail in a native modal dialog, open while the URL names the tool (?tool=). Escape, Close and a
+ * click outside close it, and focus returns through `returnFocus` (Decision 0026 G2, G3). The tool's
+ * title names the dialog once it loads, and its ID until then (WTAP-13).
  */
 export function ToolDialog({
   toolId,
   onClosed,
+  returnFocus,
 }: {
   toolId: string;
   onClosed: () => void;
+  returnFocus: () => HTMLElement | null;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const element = dialog.current;
-    if (element !== null && !element.open) element.showModal();
-  }, []);
   return (
-    <dialog
-      ref={dialog}
+    <Dialog
+      open
+      onClose={onClosed}
+      returnFocus={returnFocus}
+      surface="page"
+      size="3xl"
       data-panel={toolId}
       aria-labelledby="tool-heading"
-      onClose={onClosed}
-      onClick={(event) => {
-        // The content fills the dialog's box, so a click on the dialog itself is the backdrop.
-        if (event.target === event.currentTarget) event.currentTarget.close();
-      }}
-      className="bg-background text-foreground border-border m-auto max-h-[min(92vh,60rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border p-0 shadow-lg backdrop:bg-black/60"
+      aria-label={toolId}
+      className="max-h-[min(92vh,60rem)] overflow-y-auto overscroll-contain p-0"
     >
       <div className="space-y-3 p-5 sm:p-6">
-        <div className="flex items-center gap-3 text-[13px]">
+        <div className="flex items-center gap-3 text-ui">
           <Link
             href={`/tools/${encodeURIComponent(toolId)}`}
             className="underline underline-offset-4"
@@ -48,6 +46,6 @@ export function ToolDialog({
         </div>
         <ToolDetail toolId={toolId} />
       </div>
-    </dialog>
+    </Dialog>
   );
 }

@@ -1,9 +1,9 @@
 import type { RunList } from "@autobots/api-client";
 
 import { Input, Select } from "@/components/ui/field";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { PROFILE_NAME, profileChoice } from "@/lib/model-profile";
 import { RUN_GROUPS, type RunFilters, type RunGroup } from "@/lib/runs/list";
-import { cn } from "@/lib/utils";
 
 /** RN-02: status groups with the server's counts, a goal or Expert filter, and a model filter. */
 export function RunListFilters({
@@ -23,7 +23,7 @@ export function RunListFilters({
         onChoose={(group) => onChange({ group })}
       />
       <span className="hidden flex-1 lg:block" />
-      <label className="flex items-center gap-2 text-[13px]">
+      <label className="flex items-center gap-2 text-ui">
         <span className="sr-only">Filter by goal or Expert</span>
         <Input
           type="search"
@@ -33,7 +33,7 @@ export function RunListFilters({
           className="h-8 w-full lg:w-64"
         />
       </label>
-      <label className="flex items-center gap-2 text-[13px]">
+      <label className="flex items-center gap-2 text-ui">
         <span className="text-muted-foreground">Model</span>
         <Select
           value={filters.profile}
@@ -66,30 +66,17 @@ function GroupButtons({
   onChoose: (group: RunGroup) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Status"
-      className="bg-muted/60 inline-flex w-fit flex-wrap gap-0.5 rounded-lg p-[3px]"
-    >
-      {RUN_GROUPS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          aria-pressed={group === item.id}
-          data-group={item.id}
-          onClick={() => onChoose(item.id)}
-          className={cn(
-            "text-foreground/80 inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[13px]",
-            group === item.id &&
-              "bg-background text-foreground border-border font-medium dark:bg-accent",
-          )}
-        >
-          {item.label}{" "}
-          <span className="tabular-nums">
-            {counts === null ? "" : counts[item.id]}
-          </span>
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      label="Status"
+      dataKey="group"
+      wrap
+      items={RUN_GROUPS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        count: counts === null ? "" : counts[item.id],
+      }))}
+      value={group}
+      onChange={onChoose}
+    />
   );
 }

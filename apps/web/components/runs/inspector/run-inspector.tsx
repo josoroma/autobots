@@ -21,7 +21,7 @@ export function InspectorLead({
 }) {
   return (
     <>
-      <span className="text-foreground font-document text-[17px] break-words">
+      <span className="text-foreground font-document text-goal break-words">
         {view.goal_summary === "" ? "Untitled run" : view.goal_summary}.
       </span>{" "}
       <Link

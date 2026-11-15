@@ -47,16 +47,16 @@ export function SearchResults({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onOpen(result)}
           className={cn(
-            "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-[13.5px]",
+            "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-body",
             index === active && "bg-accent text-accent-foreground",
           )}
         >
-          <span className="text-muted-foreground w-16 shrink-0 text-[12px]">
+          <span className="text-muted-foreground w-16 shrink-0 text-caption">
             {KIND[result.kind]}
           </span>
           <span className="min-w-0 flex-1 truncate">{result.title}</span>
           {result.detail === null ? null : (
-            <span className="text-muted-foreground shrink-0 font-mono text-[11.5px]">
+            <span className="text-muted-foreground shrink-0 font-mono text-tag">
               {result.detail.replaceAll("_", " ")}
             </span>
           )}

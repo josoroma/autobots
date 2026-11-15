@@ -1,6 +1,8 @@
 import type { RetentionSummary } from "@autobots/api-client";
 import Link from "next/link";
 
+import { SettingsSection } from "@/components/ui/section";
+
 function kept(days: number | null, what: string): string {
   return days === null
     ? `${what} are kept until a retention window is set.`
@@ -11,19 +13,12 @@ function kept(days: number | null, what: string): string {
 // on Operations, so only the owner is offered the link. The page reads it on the server (R-67).
 export function DataSummary({ summary }: { summary: RetentionSummary }) {
   return (
-    <section
-      aria-labelledby="retention-heading"
+    <SettingsSection
+      id="retention-heading"
+      title="Retention"
+      description="Everything here stays on this Mac. This summary is read-only."
       data-field="retention-summary"
-      className="border-border grid gap-4 border-t pt-5 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:gap-7"
     >
-      <div className="space-y-1">
-        <h2 id="retention-heading" className="text-sm font-semibold">
-          Retention
-        </h2>
-        <p className="text-muted-foreground text-[12.5px] leading-relaxed">
-          Everything here stays on this Mac. This summary is read-only.
-        </p>
-      </div>
       <div className="space-y-2 text-sm leading-relaxed">
         <p data-field="run-retention">
           {kept(
@@ -54,6 +49,6 @@ export function DataSummary({ summary }: { summary: RetentionSummary }) {
           </p>
         )}
       </div>
-    </section>
+    </SettingsSection>
   );
 }

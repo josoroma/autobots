@@ -19,7 +19,7 @@ export function JobsLegend({ sums }: { sums: Counts }) {
   return (
     <ul
       data-field="jobs-legend"
-      className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px]"
+      className="flex flex-wrap gap-x-4 gap-y-1.5 text-meta"
     >
       {SERIES.map((series) => (
         <li

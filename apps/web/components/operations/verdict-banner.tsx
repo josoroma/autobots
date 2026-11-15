@@ -49,13 +49,13 @@ export function VerdictBanner({
       <div className="min-w-0 flex-1 space-y-1">
         <p
           role="status"
-          className="font-serif text-[21px] leading-snug tracking-[-0.01em]"
+          className="font-serif text-banner leading-snug tracking-[-0.01em]"
         >
           {verdictText(ready)}
         </p>
         <p
           data-field="verdict"
-          className="text-muted-foreground text-[13px] tabular-nums"
+          className="text-muted-foreground text-ui tabular-nums"
         >
           <span data-field="checks-passing">
             {passingText(status.conditions)}

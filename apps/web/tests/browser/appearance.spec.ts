@@ -6,6 +6,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expectNoA11yViolations, WCAG_22_AA } from "./support/a11y.ts";
 import { screenshotPath } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
+import { BACKDROP, boxOf, dragOut } from "./support/pointer.ts";
 
 const LUMA = readFileSync(
   join(__dirname, "../../../../docs/design/luma.css"),
@@ -323,6 +324,31 @@ for (const theme of ["dark", "light"] as const) {
     await expect(opener).toBeFocused();
   });
 }
+
+// Decision 0026 G2 through the shared dialog: a click on About's padding keeps it open, and so does a
+// press on its text dragged out over the backdrop. A click on the backdrop closes it, and focus
+// returns to the button that opened it.
+test("About closes on a click outside its box, not on its padding or a drag out", async ({
+  page,
+}) => {
+  await visit(page);
+  const opener = page.getByRole("button", { name: "About local services" });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "About local services" });
+  await expect(dialog).toBeVisible();
+
+  const box = await boxOf(dialog);
+  await page.mouse.click(box.x + box.width / 2, box.y + 8);
+  await expect(dialog).toBeVisible();
+
+  await dragOut(page, dialog.getByText(/run natively on this Mac/), BACKDROP);
+  await expect(dialog).toBeVisible();
+
+  await page.mouse.click(BACKDROP.x, BACKDROP.y);
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+});
 
 test("status meaning is in text and icon, not color alone", async ({
   page,

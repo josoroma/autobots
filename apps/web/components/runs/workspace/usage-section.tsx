@@ -1,7 +1,7 @@
 import type { RunWorkspace } from "@autobots/api-client";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { formatUsd } from "@/lib/format";
 
 /** What the run has done and spent, and the known unknowns, which stay visible when it ends. */
@@ -14,8 +14,8 @@ export const UsageSection = memo(function UsageSection({
 }) {
   const { usage, outstanding, run } = snapshot;
   return (
-    <Section id="usage-heading" title="Usage">
-      <p className="text-[13px] leading-relaxed tabular-nums">
+    <HairlineSection id="usage-heading" title="Usage">
+      <p className="text-ui leading-relaxed tabular-nums">
         {usage.model_calls} model calls, {usage.tool_dispatches} tool calls,{" "}
         {usage.repairs} repairs. Spent {formatUsd(run.budget.spent_micro_usd)}{" "}
         of {formatUsd(run.budget.limit_micro_usd)}, with{" "}
@@ -24,7 +24,7 @@ export const UsageSection = memo(function UsageSection({
       {unsettled === 0 ? null : (
         <p
           data-outstanding="true"
-          className="text-[13px] leading-relaxed tabular-nums"
+          className="text-ui leading-relaxed tabular-nums"
         >
           Not settled: {outstanding.uncertain_calls} model calls with unknown
           outcomes, {outstanding.unknown_effects} tool effects with unknown
@@ -32,6 +32,6 @@ export const UsageSection = memo(function UsageSection({
           charge.
         </p>
       )}
-    </Section>
+    </HairlineSection>
   );
 });

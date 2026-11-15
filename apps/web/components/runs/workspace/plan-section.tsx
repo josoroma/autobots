@@ -2,7 +2,8 @@ import type { RunWorkspace } from "@autobots/api-client";
 import { CircleCheck, CircleDashed } from "lucide-react";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
+import { Card } from "@/components/ui/card";
 import { planNote, taskProgress } from "@/lib/runs/workspace-view";
 
 /** The current plan's version, why it was revised, and each task's state and evidence. */
@@ -12,13 +13,13 @@ export const PlanSection = memo(function PlanSection({
   plan: RunWorkspace["plan"];
 }) {
   return (
-    <Section id="plan-heading" title="Plan">
+    <HairlineSection id="plan-heading" title="Plan">
       {plan === null ? (
         <p className="text-muted-foreground text-sm">No plan yet.</p>
       ) : (
         <>
           <p className="text-muted-foreground text-xs">{planNote(plan)}</p>
-          <ul className="bg-card divide-y rounded-xl border text-sm">
+          <Card as="ul" className="divide-y p-0 text-sm">
             {plan.tasks.map((task) => (
               <li
                 key={task.id}
@@ -44,9 +45,9 @@ export const PlanSection = memo(function PlanSection({
                 </span>
               </li>
             ))}
-          </ul>
+          </Card>
         </>
       )}
-    </Section>
+    </HairlineSection>
   );
 });

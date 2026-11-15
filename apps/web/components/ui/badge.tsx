@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
+import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/utils";
 
 // A pill label. Its words carry the meaning; a dot or icon only repeats it, never replaces it.
@@ -38,9 +39,7 @@ export function Badge({
       className={cn(badgeVariants({ variant }), className)}
       {...props}
     >
-      {dot ? (
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      ) : null}
+      {dot ? <StatusDot /> : null}
       {children}
     </span>
   );

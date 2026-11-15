@@ -1,6 +1,6 @@
 import type { ModelList } from "@autobots/api-client";
 
-import { Select } from "@/components/ui/field";
+import { Label, Select } from "@/components/ui/field";
 import { LoadState } from "@/components/ui/load-state";
 import { executorOptions, WORKSPACE_SETTING } from "@/lib/experts/draft";
 import type { Resource } from "@/lib/use-resource";
@@ -64,9 +64,7 @@ export function ExecutorField({
   return (
     <>
       <div className="space-y-1.5 border-t pt-5">
-        <label htmlFor="executor" className="text-sm font-medium">
-          Model for its work
-        </label>
+        <Label htmlFor="executor">Model for its work</Label>
         <ExecutorChoice
           value={value}
           models={models.value}

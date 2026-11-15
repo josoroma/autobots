@@ -1,7 +1,7 @@
 import type { RunWorkspace } from "@autobots/api-client";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { formatUsd } from "@/lib/format";
 
 /** MP-07's limits this run works under, and what it has used of them. */
@@ -14,10 +14,10 @@ export const BudgetsSection = memo(function BudgetsSection({
 }) {
   const { budgets, usage, run } = snapshot;
   return (
-    <Section id="budgets-heading" title="Budgets">
+    <HairlineSection id="budgets-heading" title="Budgets">
       <div
         data-field="budgets"
-        className="space-y-2 text-[13px] leading-relaxed tabular-nums"
+        className="space-y-2 text-ui leading-relaxed tabular-nums"
       >
         <p>
           Tokens: up to {budgets.max_output_tokens_per_call} output tokens per
@@ -34,6 +34,6 @@ export const BudgetsSection = memo(function BudgetsSection({
           </span>
         </p>
       </div>
-    </Section>
+    </HairlineSection>
   );
 });

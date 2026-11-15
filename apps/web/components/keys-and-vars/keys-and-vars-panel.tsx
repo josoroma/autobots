@@ -36,7 +36,7 @@ export function KeysAndVarsPanel() {
   );
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground max-w-2xl text-[13px] leading-relaxed">
+      <p className="text-muted-foreground max-w-2xl text-ui leading-relaxed">
         A key or value saved here is used for this workspace instead of the
         server environment and .env, from the next tool call, with no restart.
         Saving checks a key&apos;s format only and calls no provider. Only the

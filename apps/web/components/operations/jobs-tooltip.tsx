@@ -12,7 +12,7 @@ export function JobsTooltip({ hour, left }: { hour: JobHour; left: string }) {
     <div
       aria-hidden="true"
       data-field="jobs-tooltip"
-      className="bg-popover text-popover-foreground border-border pointer-events-none absolute top-0 z-10 rounded-lg border px-3 py-2 text-[12px] shadow-sm"
+      className="bg-popover text-popover-foreground border-border pointer-events-none absolute top-0 z-10 rounded-lg border px-3 py-2 text-caption shadow-sm"
       style={{ left }}
     >
       <p className="font-medium tabular-nums">{hour.hour}</p>

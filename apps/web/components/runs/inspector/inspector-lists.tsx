@@ -1,6 +1,6 @@
 import type { RunInspector } from "@autobots/api-client";
 
-import { InspectorSection } from "@/components/runs/inspector/inspector-section";
+import { HairlineSection } from "@/components/ui/section";
 
 /** What each tool operation did. Its arguments and result stay out of this view. */
 export function ToolAttempts({
@@ -9,7 +9,7 @@ export function ToolAttempts({
   attempts: RunInspector["tool_attempts"];
 }) {
   return (
-    <InspectorSection
+    <HairlineSection
       id="tools-heading"
       title="Tool operation attempts"
       note="This run only. A child run shows its own."
@@ -25,7 +25,7 @@ export function ToolAttempts({
               data-tool-status={attempt.status}
               className="py-2 break-words"
             >
-              <code className="font-mono text-[13px] font-medium break-all">
+              <code className="font-mono text-ui font-medium break-all">
                 {attempt.tool_id}
               </code>
               <span className="text-muted-foreground">
@@ -39,14 +39,14 @@ export function ToolAttempts({
           ))}
         </ul>
       )}
-    </InspectorSection>
+    </HairlineSection>
   );
 }
 
 /** What completed tasks cited. An artifact it names links to its download. */
 export function Evidence({ items }: { items: RunInspector["evidence"] }) {
   return (
-    <InspectorSection id="evidence-heading" title="Evidence">
+    <HairlineSection id="evidence-heading" title="Evidence">
       {items.length === 0 ? (
         <p data-field="evidence" className="text-muted-foreground text-sm">
           No task has cited evidence.
@@ -66,7 +66,7 @@ export function Evidence({ items }: { items: RunInspector["evidence"] }) {
                   </span>
                   :
                 </span>{" "}
-                <span className="font-document text-[15px] leading-relaxed">
+                <span className="font-document text-lead leading-relaxed">
                   {item.summary}
                 </span>
               </p>
@@ -88,14 +88,14 @@ export function Evidence({ items }: { items: RunInspector["evidence"] }) {
           ))}
         </ul>
       )}
-    </InspectorSection>
+    </HairlineSection>
   );
 }
 
 /** That checkpoints exist, and where. Never what they hold. */
 export function Checkpoints({ view }: { view: RunInspector }) {
   return (
-    <InspectorSection id="checkpoints-heading" title="Checkpoints">
+    <HairlineSection id="checkpoints-heading" title="Checkpoints">
       {view.checkpoints.length === 0 ? (
         <p className="text-muted-foreground text-sm">No checkpoints.</p>
       ) : (
@@ -120,6 +120,6 @@ export function Checkpoints({ view }: { view: RunInspector }) {
           Showing the first {view.checkpoints.length} checkpoints.
         </p>
       ) : null}
-    </InspectorSection>
+    </HairlineSection>
   );
 }

@@ -4,7 +4,7 @@ import { HeldNote } from "@/components/held-note";
 import type { CreateByName as Create } from "@/components/list-detail/use-create-by-name";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/card";
-import { Input } from "@/components/ui/field";
+import { Input, Label } from "@/components/ui/field";
 
 /**
  * A list's create section: a name and Create, then the screen's message, which the suites read as
@@ -28,7 +28,7 @@ export function CreateByName({
     >
       <div className="flex items-center gap-3">
         <IconTile icon={Plus} className="rounded-full" />
-        <h2 id="create-heading" className="text-[15px] font-semibold">
+        <h2 id="create-heading" className="text-lead font-semibold">
           {heading}
         </h2>
       </div>
@@ -37,9 +37,7 @@ export function CreateByName({
         className="flex flex-col gap-3 sm:flex-row sm:items-end"
       >
         <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-sm">
-          <label htmlFor={inputId} className="text-sm font-medium">
-            Name
-          </label>
+          <Label htmlFor={inputId}>Name</Label>
           <Input
             id={inputId}
             value={create.name}

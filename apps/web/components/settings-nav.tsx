@@ -21,7 +21,7 @@ const ELSEWHERE = [
 ] as const;
 
 const ITEM =
-  "text-foreground/85 hover:bg-accent block rounded-md px-2.5 py-1.5 text-[13px]";
+  "text-foreground/85 hover:bg-accent block rounded-md px-2.5 py-1.5 text-ui";
 
 export function SettingsNav() {
   const path = usePathname();
@@ -49,7 +49,7 @@ export function SettingsNav() {
           );
         })}
       </ul>
-      <span className="text-muted-foreground text-[11.5px] font-medium">
+      <span className="text-muted-foreground text-tag font-medium">
         Also in Settings
       </span>
       <ul data-field="settings-elsewhere" className="flex flex-wrap gap-1">

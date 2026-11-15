@@ -14,6 +14,7 @@ import {
 import { optionId, SearchResults } from "@/components/search/search-results";
 import { SearchStatus } from "@/components/search/search-status";
 import { useSearch } from "@/components/search/use-search";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/field";
 import { moveActive } from "@/lib/keyboard";
 import { SEARCH_SHORTCUT } from "@/lib/shortcuts";
@@ -24,7 +25,7 @@ import { useShortcut } from "@/lib/use-shortcut";
 // open, Escape to close, and focus goes back to where it was.
 export function SearchPalette() {
   const router = useRouter();
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [shown, setShown] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const listId = useId();
@@ -39,7 +40,7 @@ export function SearchPalette() {
   const results = search.results;
 
   const open = useCallback(() => {
-    if (dialog.current?.open) return;
+    if (shown) return;
     opener.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -48,15 +49,14 @@ export function SearchPalette() {
     // Nothing from an earlier search shows, so the same words typed again read again.
     clear();
     setChosen({ read: -1, index: 0 });
-    dialog.current?.showModal();
-    input.current?.focus();
-  }, [clear]);
+    setShown(true);
+  }, [clear, shown]);
   useShortcut(SEARCH_SHORTCUT.matches, open);
 
   function go(result: SearchResult | undefined): void {
     if (result === undefined) return;
     opener.current = null;
-    dialog.current?.close();
+    setShown(false);
     router.push(result.href);
   }
 
@@ -82,25 +82,27 @@ export function SearchPalette() {
         onClick={open}
         aria-keyshortcuts={SEARCH_SHORTCUT.aria}
         data-field="search-button"
-        className="text-sidebar-foreground/80 hover:bg-sidebar-accent border-sidebar-border flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]"
+        className="text-sidebar-foreground/80 hover:bg-sidebar-accent border-sidebar-border flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-ui"
       >
         <Search aria-hidden="true" className="size-3.5 shrink-0" />
         <span className="flex-1 text-left">Search</span>
         <kbd
           aria-hidden="true"
-          className="text-muted-foreground border-sidebar-border rounded border px-1 font-mono text-[11px]"
+          className="text-muted-foreground border-sidebar-border rounded border px-1 font-mono text-kbd"
         >
           {SEARCH_SHORTCUT.keys.join("")}
         </kbd>
       </button>
-      <dialog
-        ref={dialog}
+      <Dialog
+        open={shown}
+        onClose={() => setShown(false)}
+        initialFocus={input}
+        // A chosen result clears the opener, so focus stays where the result's page puts it.
+        returnFocus={() => opener.current}
+        size="xl"
+        placement="top"
         aria-label="Search"
-        onClose={() => {
-          opener.current?.focus();
-          opener.current = null;
-        }}
-        className="bg-popover text-popover-foreground border-border mx-auto mt-[12vh] w-[calc(100%-2rem)] max-w-xl rounded-2xl border p-0 shadow-lg backdrop:bg-black/50"
+        className="p-0"
       >
         <div className="border-border flex items-center gap-2.5 border-b px-4 py-3">
           <Search
@@ -121,7 +123,7 @@ export function SearchPalette() {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Search runs, Experts, workflows and tools"
-            className="placeholder:text-muted-foreground h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-[15px] dark:bg-transparent"
+            className="placeholder:text-muted-foreground h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-lead dark:bg-transparent"
           />
         </div>
         <SearchResults
@@ -132,7 +134,7 @@ export function SearchPalette() {
           onOpen={go}
         />
         <SearchStatus search={search} />
-      </dialog>
+      </Dialog>
     </>
   );
 }

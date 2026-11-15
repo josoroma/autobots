@@ -3,6 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { memo } from "react";
 
 import { UnknownEffects } from "@/components/runs/effects/unknown-effects";
+import { Card } from "@/components/ui/card";
 
 /** Effects that may or may not have happened, which a person settles before the run resumes. */
 export const UnknownOutcomesSection = memo(function UnknownOutcomesSection({
@@ -16,9 +17,9 @@ export const UnknownOutcomesSection = memo(function UnknownOutcomesSection({
 }) {
   if (operations.length === 0) return null;
   return (
-    <section
+    <Card
       aria-labelledby="unknown-heading"
-      className="border-attention/40 bg-card dark:bg-attention/5 space-y-3 rounded-xl border p-5"
+      className="border-attention/40 dark:bg-attention/5 space-y-3"
     >
       <h2
         id="unknown-heading"
@@ -35,6 +36,6 @@ export const UnknownOutcomesSection = memo(function UnknownOutcomesSection({
         operations={operations}
         onResolved={onResolved}
       />
-    </section>
+    </Card>
   );
 });

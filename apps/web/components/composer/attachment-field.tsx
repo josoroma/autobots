@@ -2,7 +2,7 @@ import { FileText, Paperclip, X } from "lucide-react";
 
 import type { Attachments } from "@/components/composer/use-attachments";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Input, Label } from "@/components/ui/field";
 import {
   ACCEPTED_FILES,
   type Attached,
@@ -23,7 +23,7 @@ function FileChip({
   return (
     <li
       data-attached={file.path}
-      className="bg-background flex max-w-full min-w-0 items-center gap-2.5 rounded-lg border py-1.5 pr-1.5 pl-2 text-[13px]"
+      className="bg-background flex max-w-full min-w-0 items-center gap-2.5 rounded-lg border py-1.5 pr-1.5 pl-2 text-ui"
     >
       <span
         aria-hidden="true"
@@ -35,7 +35,7 @@ function FileChip({
         <span data-field="file-name" className="truncate font-medium">
           {file.name}
         </span>
-        <span className="text-muted-foreground truncate text-[11.5px]">
+        <span className="text-muted-foreground truncate text-tag">
           <span data-field="file-type">{file.media_type}</span>
           {" · "}
           <span data-field="file-size" className="tabular-nums">
@@ -74,16 +74,13 @@ export function AttachmentField({
       className="flex flex-col gap-2 border-t px-5 pt-4"
       data-field="attachments"
     >
-      <label
-        htmlFor="attachments"
-        className="flex items-center gap-2 text-sm font-medium"
-      >
+      <Label htmlFor="attachments" className="flex items-center gap-2">
         <Paperclip
           aria-hidden="true"
           className="text-muted-foreground size-4"
         />
         Attach files
-      </label>
+      </Label>
       <Input
         id="attachments"
         type="file"

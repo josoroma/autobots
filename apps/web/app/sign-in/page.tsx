@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 export default function SignInPage() {
   return (
     <div className="mx-auto w-full max-w-sm space-y-6 md:pt-16">
-      <h1 className="text-center text-[32px] leading-tight">Sign in</h1>
+      <h1 className="text-center text-title leading-tight">Sign in</h1>
       <Card
         aria-labelledby="sign-in-heading"
         className="space-y-5 rounded-2xl p-6"

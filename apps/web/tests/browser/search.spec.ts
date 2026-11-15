@@ -7,6 +7,7 @@ import { signIn, users } from "./support/auth.ts";
 import { need } from "./support/env.ts";
 import { objectOf } from "./support/db-helpers.ts";
 import { expect, test } from "./support/fixtures.ts";
+import { BACKDROP, dragOut } from "./support/pointer.ts";
 
 // US-15.22, PRD-Studio SR-01 and Decision 0022 D3. scripts/qualify_identity.py names a run's goal, an
 // Expert and a workflow with "read" in the ops-n workspace, and a run and an Expert in another workspace.
@@ -153,6 +154,32 @@ test("arrows move the announced option, Enter opens it, and Escape returns focus
   await page.keyboard.press(`${MODIFIER}+k`);
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(runs).toBeFocused();
+});
+
+// Decision 0026 G2 through the shared dialog: a click outside the palette closes it and gives focus
+// back, and a press in its field dragged out over the backdrop keeps it open with the words typed.
+test("a click outside closes the palette and returns focus, and a drag out of its field doesn't", async ({
+  page,
+}) => {
+  await signIn(page, users.ops);
+  await page.goto("/runs");
+  const runs = page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Runs" });
+  await runs.focus();
+  await page.keyboard.press(`${MODIFIER}+k`);
+  const dialog = page.getByRole("dialog", { name: "Search" });
+  await expect(dialog).toBeVisible();
+  const box = dialog.getByRole("combobox", { name: "Search this workspace" });
+  await box.fill("read");
+
+  await dragOut(page, box, BACKDROP);
+  await expect(dialog).toBeVisible();
+  await expect(box).toHaveValue("read");
+
+  await page.mouse.click(BACKDROP.x, BACKDROP.y);
   await expect(dialog).toBeHidden();
   await expect(runs).toBeFocused();
 });

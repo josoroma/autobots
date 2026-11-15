@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Field, Input } from "@/components/ui/field";
 import { failureOf, signIn } from "@/lib/api/browser";
 import {
   SIGN_IN_FAILURE_TEXT,
@@ -46,30 +46,28 @@ export function SignInForm() {
 
   return (
     <form onSubmit={(event) => void submit(event)} className="space-y-4">
-      <div className="space-y-1.5">
-        <label htmlFor="email" className="text-sm font-medium">
-          Email
-        </label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="username"
-          required
-        />
-      </div>
-      <div className="space-y-1.5">
-        <label htmlFor="password" className="text-sm font-medium">
-          Password
-        </label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-      </div>
+      <Field id="email" label="Email">
+        {(control) => (
+          <Input
+            {...control}
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+          />
+        )}
+      </Field>
+      <Field id="password" label="Password">
+        {(control) => (
+          <Input
+            {...control}
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+          />
+        )}
+      </Field>
       {failed === null ? null : (
         <p
           role="alert"

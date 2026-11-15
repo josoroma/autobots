@@ -36,7 +36,7 @@ export function RunRows({
         aria-hidden="true"
         className={cn(
           COLUMNS,
-          "text-muted-foreground hidden border-b px-3 pb-2.5 text-[12.5px] font-medium lg:grid",
+          "text-muted-foreground hidden border-b px-3 pb-2.5 text-meta font-medium lg:grid",
         )}
       >
         <span>Goal</span>
@@ -45,7 +45,7 @@ export function RunRows({
         <span className="text-right">Spend</span>
         <span className="text-right">Started</span>
       </div>
-      <ul className="divide-border divide-y border-b text-[13.5px] max-lg:border-t">
+      <ul className="divide-border divide-y border-b text-body max-lg:border-t">
         {list.runs.map((run) => (
           <Row
             key={run.id}
@@ -55,7 +55,7 @@ export function RunRows({
           />
         ))}
       </ul>
-      <div className="mt-4 flex items-center gap-3 text-[12.5px]">
+      <div className="mt-4 flex items-center gap-3 text-meta">
         <span data-state="shown" className="text-muted-foreground">
           Showing {list.runs.length} of {list.total}
         </span>

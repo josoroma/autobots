@@ -25,16 +25,26 @@ export const SEARCH_SHORTCUT: BoundShortcut = {
     event.key.toLowerCase() === "k",
 };
 
+/**
+ * PRD-Studio SH-02 and Decision 0022 D16: ⇧⌘O, or Shift+Ctrl+O, opens Home's composer. It matches
+ * the O key by `code`, which Shift doesn't change. The button, its hint and Settings → Keyboard read
+ * this one definition (XWEB-18).
+ */
+export const NEW_RUN_SHORTCUT: BoundShortcut = {
+  keys: ["⇧", "⌘", "O"],
+  action: "Open Home's composer with focus in the goal. Ctrl works for ⌘",
+  aria: "Shift+Meta+O Shift+Control+O",
+  matches: (event) =>
+    event.shiftKey === true &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    event.code === "KeyO",
+};
+
 export const SHORTCUTS: ShortcutGroup[] = [
   {
     where: "Anywhere",
-    shortcuts: [
-      {
-        keys: ["⇧", "⌘", "O"],
-        action: "Open Home's composer with focus in the goal. Ctrl works for ⌘",
-      },
-      SEARCH_SHORTCUT,
-    ],
+    shortcuts: [NEW_RUN_SHORTCUT, SEARCH_SHORTCUT],
   },
   {
     where: "Approvals",

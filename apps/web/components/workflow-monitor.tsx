@@ -12,6 +12,7 @@ import { useToolUses } from "@/components/runs/tool-uses/use-tool-uses";
 import { Card } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { SectionLabel } from "@/components/ui/page-header";
+import { StatusDot } from "@/components/ui/status-dot";
 import { backoff, readOf, type Loaded } from "@/lib/load";
 import { isRunStatus, isTerminal, stopReasonText } from "@/lib/runs/status";
 import { useResource } from "@/lib/use-resource";
@@ -104,7 +105,7 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
         <div className="flex flex-col gap-x-8 gap-y-2 text-sm @2xl:flex-row @2xl:flex-wrap @2xl:items-baseline">
           <p data-binding="true">
             Version {view.workflow_version}, hash{" "}
-            <span className="font-mono text-[12.5px]">
+            <span className="font-mono text-meta">
               {view.graph_hash.slice(0, 12)}
             </span>
             .
@@ -137,10 +138,7 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
                 : "text-foreground",
             )}
           >
-            <span
-              aria-hidden="true"
-              className="size-1.5 shrink-0 rounded-full bg-current"
-            />
+            <StatusDot />
             {connection === "reconnecting"
               ? "Reconnecting. Showing the last known state."
               : "Live"}
@@ -167,12 +165,12 @@ export function WorkflowMonitor({ executionId }: { executionId: string }) {
                 data-emission={`${emission.instance_key}.${emission.port}.${emission.sequence}`}
                 className="border-t py-2 wrap-anywhere first:border-t-0 first:pt-0"
               >
-                <span className="font-mono text-[12.5px] font-medium">
+                <span className="font-mono text-meta font-medium">
                   {emission.instance_key}.{emission.port}
                   {emission.sequence === 0 ? "" : ` [${emission.sequence}]`}
                 </span>
                 :{" "}
-                <code className="rounded-md border px-1.5 py-px font-mono text-[12.5px] dark:border-transparent dark:bg-muted">
+                <code className="rounded-md border px-1.5 py-px font-mono text-meta dark:border-transparent dark:bg-muted">
                   {emission.value}
                 </code>
               </li>
@@ -188,24 +186,24 @@ function InstancesCard({ view }: { view: ExecutionView }) {
   return (
     <Card aria-labelledby="instances-heading" className="space-y-3">
       <SectionLabel id="instances-heading">Node instances</SectionLabel>
-      <table className="w-full text-left text-[13.5px]">
+      <table className="w-full text-left text-body">
         <thead>
           <tr className="border-b">
             <th
               scope="col"
-              className="text-muted-foreground pr-3 pb-2.5 text-[12.5px] font-medium"
+              className="text-muted-foreground pr-3 pb-2.5 text-meta font-medium"
             >
               Instance
             </th>
             <th
               scope="col"
-              className="text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium"
+              className="text-muted-foreground px-3 pb-2.5 text-meta font-medium"
             >
               Block version
             </th>
             <th
               scope="col"
-              className="text-muted-foreground pb-2.5 pl-3 text-[12.5px] font-medium"
+              className="text-muted-foreground pb-2.5 pl-3 text-meta font-medium"
             >
               Status
             </th>
@@ -219,18 +217,17 @@ function InstancesCard({ view }: { view: ExecutionView }) {
               data-status={instance.status}
               className="border-b align-top last:border-b-0"
             >
-              <td className="py-2.5 pr-3 font-mono text-[12.5px] font-medium wrap-anywhere">
+              <td className="py-2.5 pr-3 font-mono text-meta font-medium wrap-anywhere">
                 {instance.key}
               </td>
-              <td className="px-3 py-2.5 font-mono text-[12.5px]">
+              <td className="px-3 py-2.5 font-mono text-meta">
                 {view.block_versions[instance.node_id]}
               </td>
               <td className="py-2.5 pl-3">
                 <span className="inline-flex items-baseline gap-2">
-                  <span
-                    aria-hidden="true"
+                  <StatusDot
                     className={cn(
-                      "size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-current",
+                      "translate-y-[-1px]",
                       tone(instance.status) || "text-muted-foreground",
                     )}
                   />
@@ -292,7 +289,7 @@ function NodeToolUses({
               className="space-y-1.5 border-t pt-3"
             >
               <h3 id={`node-tools-${key}`} className="text-sm font-medium">
-                Node <span className="font-mono text-[12.5px]">{key}</span>
+                Node <span className="font-mono text-meta">{key}</span>
               </h3>
               <ToolUseTable
                 uses={uses.filter((use) => use.instance_key === key)}

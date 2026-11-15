@@ -13,10 +13,11 @@ import { AdmissionMessage } from "@/components/admission-message";
 import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
 import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
-import { Card } from "@/components/ui/card";
-import { Choice, Textarea } from "@/components/ui/field";
+import { Card, CardTitle, InitialTile } from "@/components/ui/card";
+import { Choice, Field, Textarea } from "@/components/ui/field";
 import { SectionLabel } from "@/components/ui/page-header";
 import { writes } from "@/lib/api/browser";
+import { initialOf } from "@/lib/experts/card";
 import { profileField } from "@/lib/model-profile";
 import {
   ADMISSION_UNKNOWN,
@@ -98,20 +99,19 @@ export function SessionPanel({ session }: { session: SessionView }) {
         </SectionLabel>
         <ul className="grid gap-3 @xl:grid-cols-2">
           {session.options.map((option) => (
-            <li
+            <Card
+              as="li"
               key={option.expert_id}
               data-option={option.name}
-              className="bg-card text-card-foreground has-checked:border-primary/60 has-checked:ring-primary/15 flex gap-3 rounded-xl border p-4 has-checked:ring-3"
+              className="has-checked:border-primary/60 has-checked:ring-primary/15 flex gap-3 p-4 has-checked:ring-3"
             >
-              <span
-                aria-hidden="true"
-                className="bg-background grid size-9 shrink-0 place-items-center rounded-[10px] border font-serif text-base dark:border-transparent dark:bg-muted"
-              >
-                {option.name.trim().charAt(0).toUpperCase()}
-              </span>
+              <InitialTile
+                initial={initialOf(option.name)}
+                className="size-9 text-base"
+              />
               <div className="min-w-0 flex-1 space-y-1.5">
                 {session.kind === "coordinator" ? (
-                  <label className="flex items-start gap-2 text-[15px] font-semibold">
+                  <label className="flex items-start gap-2 text-lead font-semibold">
                     <Choice
                       type="radio"
                       name="expert"
@@ -125,13 +125,13 @@ export function SessionPanel({ session }: { session: SessionView }) {
                     </span>
                   </label>
                 ) : (
-                  <p className="text-[15px] font-semibold">
+                  <p className="text-lead font-semibold">
                     {option.name}, version {option.version}
                   </p>
                 )}
                 <p data-field="tools" className="text-sm wrap-anywhere">
                   <span className="text-muted-foreground">Tools:</span>{" "}
-                  <span className="font-mono text-[12.5px]">
+                  <span className="font-mono text-meta">
                     {option.tools.length === 0
                       ? "none"
                       : option.tools.join(", ")}
@@ -139,7 +139,7 @@ export function SessionPanel({ session }: { session: SessionView }) {
                 </p>
                 <p data-field="models" className="text-sm wrap-anywhere">
                   <span className="text-muted-foreground">Models:</span>{" "}
-                  <span className="font-mono text-[12.5px]">
+                  <span className="font-mono text-meta">
                     {Object.keys(option.role_bindings).length === 0
                       ? "the workspace setting"
                       : Object.entries(option.role_bindings)
@@ -148,29 +148,25 @@ export function SessionPanel({ session }: { session: SessionView }) {
                   </span>
                 </p>
               </div>
-            </li>
+            </Card>
           ))}
         </ul>
       </section>
       <Card aria-labelledby="work-heading" className="space-y-4 p-6">
-        <h2
-          id="work-heading"
-          className="font-serif text-[22px] leading-tight font-normal tracking-tight"
-        >
+        <CardTitle id="work-heading" size="display">
           New work
-        </h2>
-        <div className="space-y-1.5">
-          <label htmlFor="session-goal" className="text-sm font-medium">
-            Goal
-          </label>
-          <Textarea
-            id="session-goal"
-            rows={3}
-            value={goal}
-            readOnly={held}
-            onChange={(event) => setGoal(event.target.value)}
-          />
-        </div>
+        </CardTitle>
+        <Field id="session-goal" label="Goal">
+          {(control) => (
+            <Textarea
+              {...control}
+              rows={3}
+              value={goal}
+              readOnly={held}
+              onChange={(event) => setGoal(event.target.value)}
+            />
+          )}
+        </Field>
         <RunDisclosure
           chosen={profile}
           // While held, the model shows as chosen with no picker (Decision 0027 D2).

@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 // A chip wraps its label above the select when narrow, and the select shrinks to the row, so nothing
 // scrolls sideways at 400% zoom. The select keeps its own right padding for the chevron.
 const CHIP =
-  "flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]";
+  "flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-ui";
 const CHIP_CONTROL = "min-w-0 max-w-full";
 const CHIP_SELECT =
-  "h-8 w-auto max-w-full truncate rounded-full py-0 pl-3 text-[13px] leading-8";
+  "h-8 w-auto max-w-full truncate rounded-full py-0 pl-3 text-ui leading-8";
 
 /** The budget's options: the default while no range is known, the range, or that nothing is left. */
 function BudgetOptions({ budget }: { budget: BudgetChoices }) {
@@ -114,7 +114,7 @@ export function RunOptionChips({
       {budget.remainingMicroUsd === null ? null : (
         <p
           data-field="daily-left"
-          className="text-muted-foreground text-[12.5px] tabular-nums"
+          className="text-muted-foreground text-meta tabular-nums"
         >
           {formatUsd(budget.remainingMicroUsd)} left of today&apos;s cap
         </p>

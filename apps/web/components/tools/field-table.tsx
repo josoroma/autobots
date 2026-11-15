@@ -19,7 +19,7 @@ function FieldRow({ field }: { field: FieldDescriptor }) {
       className="border-b align-top last:border-b-0"
     >
       <th scope="row" className="py-2 pr-3 font-normal">
-        <code className="font-mono text-[12.5px]">{field.path}</code>
+        <code className="font-mono text-meta">{field.path}</code>
         {field.description ? (
           <span className="text-muted-foreground block text-xs">
             {field.description}
@@ -27,7 +27,7 @@ function FieldRow({ field }: { field: FieldDescriptor }) {
         ) : null}
       </th>
       <td className="py-2 pr-3">
-        <code className="font-mono text-[12.5px]">{field.type}</code>
+        <code className="font-mono text-meta">{field.type}</code>
       </td>
       <td className="py-2 pr-3">{field.required ? "Required" : "Optional"}</td>
       <td className="py-2 pr-3">{constraintText(field.constraints)}</td>
@@ -65,10 +65,7 @@ export function FieldTable({
           aria-label={`${title} table`}
           className="overflow-x-auto"
         >
-          <table
-            className="w-full text-left text-[13px]"
-            data-fields={direction}
-          >
+          <table className="w-full text-left text-ui" data-fields={direction}>
             <caption className="sr-only">{caption}</caption>
             <thead>
               <tr className="text-muted-foreground border-b text-xs">

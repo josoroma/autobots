@@ -37,19 +37,19 @@ function ToolRow({
           href={href}
           scroll={false}
           aria-current={selected ? "true" : undefined}
-          className="text-[13.5px] font-semibold underline-offset-4 hover:underline"
+          className="text-body font-semibold underline-offset-4 hover:underline"
         >
           {tool.title}
         </Link>
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-          <code className="font-mono text-[11.5px]">
+          <code className="font-mono text-tag">
             {tool.tool_id} v{tool.version}
           </code>
           <span>{rowFacts(tool)}</span>
         </p>
-        <p className="text-[13px] leading-relaxed">{tool.description}</p>
+        <p className="text-ui leading-relaxed">{tool.description}</p>
         {fix === null ? null : (
-          <p className="text-[13px]" data-field="repair">
+          <p className="text-ui" data-field="repair">
             {fix}
           </p>
         )}
@@ -83,18 +83,16 @@ export function ToolGroupSection({
   return (
     <section aria-labelledby={`group-${group.group}`} data-group={group.group}>
       <div className="mb-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-        <h2 id={`group-${group.group}`} className="text-[13.5px] font-semibold">
+        <h2 id={`group-${group.group}`} className="text-body font-semibold">
           {group.title}
         </h2>
         <span
           data-field="count"
-          className="text-muted-foreground text-[12.5px] tabular-nums"
+          className="text-muted-foreground text-meta tabular-nums"
         >
           {tools.length} {tools.length === 1 ? "tool" : "tools"}
         </span>
-        <p className="text-muted-foreground text-[12.5px]">
-          {group.description}
-        </p>
+        <p className="text-muted-foreground text-meta">{group.description}</p>
       </div>
       <ul>
         {tools.map((tool) => (

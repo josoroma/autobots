@@ -3,6 +3,7 @@ import { CircleDollarSign } from "lucide-react";
 import type { ChargeWrites } from "@/components/runs/controls/use-run-controls";
 import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 
 /** The owner records a charge seen in OpenRouter's own records, for the oldest open call. */
@@ -16,10 +17,11 @@ export function ChargeForm({
   busy: boolean;
 }) {
   return (
-    <form
+    <Card
+      as="form"
       onSubmit={(event) => void charge.reconcile(event)}
       data-reconcile="true"
-      className="border-attention/40 bg-card dark:bg-attention/5 space-y-3 rounded-xl border p-4 text-sm"
+      className="border-attention/40 dark:bg-attention/5 space-y-3 p-4 text-sm"
     >
       <p className="flex items-start gap-2.5 leading-relaxed">
         <CircleDollarSign
@@ -54,6 +56,6 @@ export function ChargeForm({
         </div>
         {charge.held ? <HeldNote /> : null}
       </div>
-    </form>
+    </Card>
   );
 }

@@ -16,7 +16,7 @@ export function DecisionBar({
 }) {
   return (
     <>
-      <p className={cn(INNER_BOX, "flex items-start gap-3 text-[13.5px]")}>
+      <p className={cn(INNER_BOX, "flex items-start gap-3 text-body")}>
         <Lock
           aria-hidden="true"
           className="text-muted-foreground mt-0.5 size-4 shrink-0"
@@ -39,7 +39,7 @@ export function DecisionBar({
         <Button size="lg" variant="outline" onClick={() => onDecide("reject")}>
           Reject
         </Button>
-        <span className="text-muted-foreground ml-auto text-[12.5px]">
+        <span className="text-muted-foreground ml-auto text-meta">
           Approve ⌘↵ · Reject ⌘⌫, each pressed twice · J and K move
         </span>
       </div>

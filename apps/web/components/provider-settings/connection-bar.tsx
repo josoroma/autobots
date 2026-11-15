@@ -3,6 +3,7 @@ import { Cpu } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { IconTile } from "@/components/ui/card";
+import { StatusDot, type StatusDotTone } from "@/components/ui/status-dot";
 import {
   AUTH_LABEL,
   AUTH_TONE,
@@ -11,25 +12,16 @@ import {
   SOURCE_LABEL,
   type Tone,
 } from "@/lib/provider-text";
-import { cn } from "@/lib/utils";
 
 // Decorative dots beside each status. The words carry the meaning; the dot only repeats it.
-const DOT: Readonly<Record<Tone, string>> = {
-  ok: "bg-success-text",
-  bad: "bg-destructive",
-  idle: "border-muted-foreground border-[1.5px]",
+const DOT: Readonly<Record<Tone, StatusDotTone>> = {
+  ok: "success",
+  bad: "danger",
+  idle: "idle",
 };
 
-function StatusDot({ tone }: { tone: Tone }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "mt-[7px] inline-block size-[7px] shrink-0 rounded-full",
-        DOT[tone],
-      )}
-    />
-  );
+function ToneDot({ tone }: { tone: Tone }) {
+  return <StatusDot tone={DOT[tone]} size="md" className="mt-[7px]" />;
 }
 
 function Cell({
@@ -63,16 +55,16 @@ export function ConnectionBar({ status }: { status: ProviderStatus }) {
           OpenRouter
         </h2>
       </div>
-      <dl className="divide-border border-border grid min-w-0 flex-1 divide-y border-t text-[13px] lg:auto-cols-fr lg:grid-flow-col lg:divide-x lg:divide-y-0 lg:border-t-0 lg:border-l">
+      <dl className="divide-border border-border grid min-w-0 flex-1 divide-y border-t text-ui lg:auto-cols-fr lg:grid-flow-col lg:divide-x lg:divide-y-0 lg:border-t-0 lg:border-l">
         <Cell label="Source" field="source">
           {SOURCE_LABEL[status.source]}
         </Cell>
         <Cell label="Authentication" field="auth" className="flex gap-2">
-          <StatusDot tone={AUTH_TONE[status.auth_status]} />
+          <ToneDot tone={AUTH_TONE[status.auth_status]} />
           {AUTH_LABEL[status.auth_status]}
         </Cell>
         <Cell label="Catalog" field="catalog" className="flex gap-2">
-          <StatusDot tone={CATALOG_TONE[status.catalog_status]} />
+          <ToneDot tone={CATALOG_TONE[status.catalog_status]} />
           {CATALOG_LABEL[status.catalog_status]}
         </Cell>
         {status.credential_version === null ? null : (

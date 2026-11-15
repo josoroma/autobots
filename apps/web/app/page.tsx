@@ -13,7 +13,7 @@ import { ServiceStatusBadge } from "@/components/service-status-badge";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { SectionLabel } from "@/components/ui/page-header";
+import { SectionHeading } from "@/components/ui/section";
 import {
   fetchReadiness,
   fetchServiceStatus,
@@ -29,7 +29,6 @@ export const dynamic = "force-dynamic";
 // Decision 0021: the two lower sections are quiet hairline lists. They share a row and end in their one
 // action at the same height, so Tab never climbs from one to the next.
 const LOWER_SECTION = "flex min-w-0 flex-col";
-const LOWER_HEAD = "mb-2 flex items-center gap-2";
 const LOWER_ITEM = "border-t py-3 text-sm";
 const LOWER_ACTION = "mt-auto pt-2";
 
@@ -92,10 +91,10 @@ export default async function HomePage() {
             }
           />
         )}
-        <h1 className="text-4xl leading-[1.1] md:text-[44px]">
+        <h1 className="text-4xl leading-[1.1] md:text-hero">
           What should we work on?
         </h1>
-        <p className="text-muted-foreground mx-auto max-w-xl text-[15px]">
+        <p className="text-muted-foreground mx-auto max-w-xl text-lead">
           Start a goal, see what it would use, and check the services on this
           Mac.
         </p>
@@ -119,18 +118,17 @@ export default async function HomePage() {
       )}
       <div className="mt-14 grid gap-10 md:grid-cols-2 md:gap-8">
         <section aria-labelledby="account-heading" className={LOWER_SECTION}>
-          <div className={LOWER_HEAD}>
-            <UserRound
-              aria-hidden="true"
-              className="text-muted-foreground size-3.5 shrink-0"
-            />
-            <SectionLabel id="account-heading" className="text-[12.5px]">
-              Account
-            </SectionLabel>
-            <Badge variant={badge.variant} dot className="ml-auto">
-              {badge.words}
-            </Badge>
-          </div>
+          <SectionHeading
+            icon={UserRound}
+            id="account-heading"
+            badge={
+              <Badge variant={badge.variant} dot className="ml-auto">
+                {badge.words}
+              </Badge>
+            }
+          >
+            Account
+          </SectionHeading>
           <div className={LOWER_ITEM}>
             <AccountState read={read} />
           </div>
@@ -139,15 +137,9 @@ export default async function HomePage() {
           </div>
         </section>
         <section aria-labelledby="services-heading" className={LOWER_SECTION}>
-          <div className={LOWER_HEAD}>
-            <Server
-              aria-hidden="true"
-              className="text-muted-foreground size-3.5 shrink-0"
-            />
-            <SectionLabel id="services-heading" className="text-[12.5px]">
-              Services
-            </SectionLabel>
-          </div>
+          <SectionHeading icon={Server} id="services-heading">
+            Services
+          </SectionHeading>
           <p className={cn(LOWER_ITEM, "text-muted-foreground")}>
             The app and your data stay on this Mac. Model calls go to
             OpenRouter, and this page makes none.

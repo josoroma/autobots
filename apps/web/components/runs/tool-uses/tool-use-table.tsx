@@ -133,7 +133,7 @@ function ToolUseRow({ use }: { use: ToolUseView }) {
         {toolUseWhen(use)}
       </td>
       <th scope="row" className={cn(CELL, "font-normal")}>
-        <code className="font-mono text-[13px] font-medium">{use.tool_id}</code>
+        <code className="font-mono text-ui font-medium">{use.tool_id}</code>
         {use.tool_version === null ? "" : ` v${use.tool_version}`}
         {use.group === null ? null : (
           <span className="text-muted-foreground block text-xs">

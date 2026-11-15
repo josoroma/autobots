@@ -30,7 +30,7 @@ function WindowField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[13px]">
+    <label className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-ui">
       <span>{label}</span>
       <Input
         className="w-28"
@@ -76,7 +76,7 @@ export function RetentionForm({
 
   return (
     <OperationsBox icon={Trash2} heading="Retention">
-      <p className="text-muted-foreground text-[13px] leading-relaxed">
+      <p className="text-muted-foreground text-ui leading-relaxed">
         Empty keeps everything. Expiring a finished run removes its checkpoints,
         working files and artifact bytes. Its record, activity and operation
         receipts stay, and a run with an unresolved effect is never touched.

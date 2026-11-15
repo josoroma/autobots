@@ -8,6 +8,7 @@ import { AdmissionMessage } from "@/components/admission-message";
 import { useContinueRun } from "@/components/runs/continue/use-continue-run";
 import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 // A finished run never reopens. This starts a new one linked to it, which is how failed work goes on.
 export function ContinueRun({ runId }: { runId: string }) {
@@ -22,10 +23,7 @@ export function ContinueRun({ runId }: { runId: string }) {
     );
   }
   return (
-    <div
-      data-continue-run="true"
-      className="bg-card space-y-3 rounded-xl border p-4 text-sm"
-    >
+    <Card as="div" data-continue-run="true" className="space-y-3 p-4 text-sm">
       <p className="leading-relaxed">
         This starts a new run with the same goal, linked to this one, which
         stays as it is. Its steps are new, so it can repeat what this run did,
@@ -67,6 +65,6 @@ export function ContinueRun({ runId }: { runId: string }) {
           <span>{flow.problem.text}</span>
         </AdmissionMessage>
       )}
-    </div>
+    </Card>
   );
 }

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ModelPolicyPanel } from "@/components/model-policy/model-policy-panel";
 import { ProviderSettingsPanel } from "@/components/provider-settings/provider-settings-panel";
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata: Metadata = { title: "Models" };
 
 // The page owns its navigation, so the link back to Home's draft sits between the provider and the
 // policy whatever either panel shows (WSYS-07).

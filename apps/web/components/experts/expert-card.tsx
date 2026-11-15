@@ -2,19 +2,20 @@ import type { ExpertView } from "@autobots/api-client";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
-import { InitialTile } from "@/components/experts/initial-tile";
 import { Button } from "@/components/ui/button";
+import { Card, InitialTile } from "@/components/ui/card";
 import { Choice } from "@/components/ui/field";
 import {
   approvalNote,
   executorLine,
+  initialOf,
   runsLine,
   toolChips,
   type CatalogTools,
 } from "@/lib/experts/card";
 
 const CHIP =
-  "text-muted-foreground rounded-md border px-1.5 py-px font-mono text-[11.5px] wrap-anywhere";
+  "text-muted-foreground rounded-md border px-1.5 py-px font-mono text-tag wrap-anywhere";
 
 /** The first tools a version grants, how many more, and its groups. */
 function ToolChips({ chips }: { chips: readonly string[] }) {
@@ -56,19 +57,25 @@ export function ExpertCard({
   const purpose = latest.purpose?.trim() ?? "";
   const approval = approvalNote(latest.tools ?? [], tools);
   return (
-    <li className="bg-card text-card-foreground has-checked:border-primary/60 has-checked:ring-primary/15 flex flex-col gap-3 rounded-xl border p-[18px] has-checked:ring-3">
+    <Card
+      as="li"
+      className="has-checked:border-primary/60 has-checked:ring-primary/15 flex flex-col gap-3 p-[18px] has-checked:ring-3"
+    >
       <div className="flex items-start gap-3">
-        <InitialTile name={expert.name} className="size-9 text-base" />
+        <InitialTile
+          initial={initialOf(expert.name)}
+          className="size-9 text-base"
+        />
         <div className="min-w-0 flex-1">
           <Link
             href={`/experts/${expert.id}`}
-            className="text-[15px] font-semibold wrap-anywhere underline-offset-4 hover:underline"
+            className="text-lead font-semibold wrap-anywhere underline-offset-4 hover:underline"
           >
             {expert.name}
           </Link>
           <p
             data-field="role"
-            className="text-muted-foreground font-mono text-[11.5px] wrap-anywhere"
+            className="text-muted-foreground font-mono text-tag wrap-anywhere"
           >
             {executorLine(expert)}
           </p>
@@ -94,23 +101,23 @@ export function ExpertCard({
         />
       </div>
       {purpose === "" ? null : (
-        <p className="text-muted-foreground text-[13.5px] leading-normal">
+        <p className="text-muted-foreground text-body leading-normal">
           {purpose}
         </p>
       )}
-      <p data-field="runs" className="text-muted-foreground text-[12.5px]">
+      <p data-field="runs" className="text-muted-foreground text-meta">
         {runsLine(expert, now)}
       </p>
       {approval === null ? null : (
         <p
           data-field="approval"
-          className="text-attention flex items-center gap-1.5 text-[12.5px]"
+          className="text-attention flex items-center gap-1.5 text-meta"
         >
           <ShieldAlert aria-hidden="true" className="size-3.5" />
           {approval}
         </p>
       )}
       <ToolChips chips={toolChips(latest)} />
-    </li>
+    </Card>
   );
 }

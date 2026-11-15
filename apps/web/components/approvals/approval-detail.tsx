@@ -7,7 +7,7 @@ import { DecisionBar } from "@/components/approvals/decision-bar";
 import { ExactRequest } from "@/components/approvals/exact-request";
 import { ReviewDiffs } from "@/components/approvals/review-diffs";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import type { Decision } from "@/lib/approval-shortcut";
 import { TOO_LARGE } from "@/lib/approval-text";
 import { cn } from "@/lib/utils";
@@ -30,9 +30,9 @@ export function ApprovalDetail({
   return (
     <Card data-approval={approval.id} className="min-w-0 space-y-5 p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h2 className="font-serif text-[22px] leading-tight font-normal tracking-tight break-words">
+        <CardTitle size="display" className="break-words">
           {approval.tool_id}, version {approval.tool_version}
-        </h2>
+        </CardTitle>
         <Link
           href={`/runs/${approval.run_id}`}
           className={cn(

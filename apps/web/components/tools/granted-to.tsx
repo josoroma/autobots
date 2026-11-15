@@ -39,7 +39,7 @@ export function GrantedTo({
         state.value.workflows.length === 0 ? (
         <LoadEmpty>No Expert or published workflow grants it.</LoadEmpty>
       ) : (
-        <ul className="flex flex-wrap gap-2 text-[12.5px]">
+        <ul className="flex flex-wrap gap-2 text-meta">
           {state.value.experts.map((item) => (
             <li key={item.id} data-granted-expert={item.id}>
               <Link href={`/experts/${item.id}`} className={CHIP_LINK}>

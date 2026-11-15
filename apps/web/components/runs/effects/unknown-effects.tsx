@@ -89,7 +89,7 @@ function EffectRow({
 }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <p className="min-w-0 font-mono text-[13px] font-medium break-all">
+      <p className="min-w-0 font-mono text-ui font-medium break-all">
         {operation.tool_id}
       </p>
       <div className="flex flex-wrap gap-2">

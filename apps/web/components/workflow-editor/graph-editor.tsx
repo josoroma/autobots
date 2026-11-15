@@ -25,7 +25,7 @@ function StepLabels({
   return (
     <fieldset data-field="step-labels" className="min-w-0 space-y-2">
       <legend className={cn(FIELD_LABEL, "mb-1")}>Step labels</legend>
-      <p className="text-muted-foreground text-[12.5px]">
+      <p className="text-muted-foreground text-meta">
         Optional. A label says what a step does, and a labelled graph is
         published at IR version 2.
       </p>
@@ -36,7 +36,7 @@ function StepLabels({
         >
           <label
             htmlFor={`label-${node.id}`}
-            className="w-40 shrink-0 font-mono text-[12.5px] break-all"
+            className="w-40 shrink-0 font-mono text-meta break-all"
           >
             {node.id} ({node.block})
           </label>
@@ -70,7 +70,7 @@ function ValidationResult({ check }: { check: WorkflowValidation | null }) {
         />
         <span>
           <span className="text-success-text font-medium">Valid.</span> Hash{" "}
-          <span className="font-mono text-[12.5px]">
+          <span className="font-mono text-meta">
             {check.graph_hash?.slice(0, 12)}
           </span>
           .
@@ -129,7 +129,7 @@ export function GraphEditor({
           value={draft.text}
           readOnly={draft.publishHeld}
           onChange={(event) => draft.edit(event.target.value)}
-          className="font-mono text-[12.5px] leading-relaxed"
+          className="font-mono text-meta leading-relaxed"
         />
       </div>
       {draft.graph === null ? null : (
@@ -175,14 +175,14 @@ export function GraphEditor({
         >
           Discard draft
         </Button>
-        <p className="text-muted-foreground text-[12.5px]">
+        <p className="text-muted-foreground text-meta">
           Runs and routines use published versions only.
         </p>
       </div>
       {draftUnreadable ? (
         <p
           data-field="unreadable-draft-note"
-          className="text-muted-foreground text-[12.5px]"
+          className="text-muted-foreground text-meta"
         >
           Its saved draft can&apos;t be read, so saving replaces it.
         </p>
@@ -190,7 +190,7 @@ export function GraphEditor({
       {hasDraft && draft.isDirty ? (
         <p
           data-field="unsaved-note"
-          className="text-muted-foreground text-[12.5px]"
+          className="text-muted-foreground text-meta"
         >
           Publish saved draft publishes what was last saved, so it waits until
           these changes are saved.

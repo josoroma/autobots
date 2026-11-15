@@ -34,7 +34,7 @@ export function WorkflowToolbar({
             aria-current={filter.tab === item.id ? "page" : undefined}
             data-tab={item.id}
             className={cn(
-              "rounded-lg border px-3 py-1.5 text-[13px]",
+              "rounded-lg border px-3 py-1.5 text-ui",
               filter.tab === item.id
                 ? "border-foreground font-medium"
                 : "border-transparent",
@@ -47,7 +47,7 @@ export function WorkflowToolbar({
           </Link>
         ))}
       </nav>
-      <label className="ml-auto flex items-center gap-2 text-[13px]">
+      <label className="ml-auto flex items-center gap-2 text-ui">
         <span className="text-muted-foreground">Search</span>
         <Input
           type="search"

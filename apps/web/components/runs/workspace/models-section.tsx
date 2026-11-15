@@ -1,7 +1,7 @@
 import type { RunWorkspace } from "@autobots/api-client";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { BINDING_SOURCE_LABEL } from "@/lib/model-roles";
 
 /** The role map this run froze at admission, which later settings don't change. */
@@ -13,23 +13,20 @@ export const ModelsSection = memo(function ModelsSection({
   summarizerDiffers: boolean;
 }) {
   return (
-    <Section id="models-heading" title="Models">
+    <HairlineSection id="models-heading" title="Models">
       {roleMap.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           This run has no frozen role map.
         </p>
       ) : (
         <div data-field="role-map" className="space-y-2.5 text-sm">
-          <p className="text-muted-foreground text-[13px] leading-relaxed">
+          <p className="text-muted-foreground text-ui leading-relaxed">
             What this run froze when it was admitted. Only the executor&apos;s
             binding dispatches in this release, and other roles that differ from
             it don&apos;t take effect.
           </p>
           {summarizerDiffers ? (
-            <p
-              data-role-map="summarizer"
-              className="text-[13px] leading-relaxed"
-            >
+            <p data-role-map="summarizer" className="text-ui leading-relaxed">
               The summarizer differs here, so this run pauses with
               route_not_bound if it needs compaction, and resuming won&apos;t
               clear that.
@@ -42,7 +39,7 @@ export const ModelsSection = memo(function ModelsSection({
           </ul>
         </div>
       )}
-    </Section>
+    </HairlineSection>
   );
 });
 
@@ -53,7 +50,7 @@ function FrozenRole({
   binding: RunWorkspace["role_map"][number];
 }) {
   return (
-    <li className="text-[13px] leading-snug break-words">
+    <li className="text-ui leading-snug break-words">
       {binding.role}:{" "}
       <span className="font-mono text-xs break-all">
         {binding.canonical_id}

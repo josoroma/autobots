@@ -23,11 +23,11 @@ export function PanelSummary({ view }: { view: RunWorkspace }) {
       <StateLine status={run.status} />
       <h2
         id="run-panel-heading"
-        className="text-[15px] font-semibold break-words"
+        className="text-lead font-semibold break-words"
       >
         {view.objective ?? "Untitled run"}
       </h2>
-      <dl className="text-muted-foreground grid gap-x-3 gap-y-0.5 text-[12.5px] sm:grid-cols-[auto_1fr]">
+      <dl className="text-muted-foreground grid gap-x-3 gap-y-0.5 text-meta sm:grid-cols-[auto_1fr]">
         <dt>Expert</dt>
         <dd data-field="panel-expert" className="text-foreground">
           {view.expert?.name ?? "None, a direct goal"}
@@ -45,11 +45,11 @@ export function PanelSummary({ view }: { view: RunWorkspace }) {
 export function PanelPlan({ tasks }: { tasks: readonly Task[] }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[13px] font-semibold">Plan</h3>
+      <h3 className="text-ui font-semibold">Plan</h3>
       {tasks.length === 0 ? (
         <p className="text-muted-foreground text-sm">No plan yet.</p>
       ) : (
-        <ol data-field="panel-plan" className="space-y-2 text-[13.5px]">
+        <ol data-field="panel-plan" className="space-y-2 text-body">
           {tasks.map((task) => (
             <PanelTask key={task.id} task={task} />
           ))}
@@ -73,7 +73,7 @@ function PanelTask({ task }: { task: Task }) {
         <span
           data-field="task-marker"
           className={cn(
-            "text-[12px] font-medium",
+            "text-caption font-medium",
             task.marker === "to_do" && "text-muted-foreground",
           )}
         >
@@ -81,7 +81,7 @@ function PanelTask({ task }: { task: Task }) {
         </span>
         <span className="font-medium break-words">{task.title}</span>
       </p>
-      <dl className="text-muted-foreground mt-1 grid gap-x-3 gap-y-0.5 text-[12.5px] sm:grid-cols-[auto_1fr]">
+      <dl className="text-muted-foreground mt-1 grid gap-x-3 gap-y-0.5 text-meta sm:grid-cols-[auto_1fr]">
         <dt>Tools</dt>
         <dd
           data-field="task-tools"
@@ -107,7 +107,7 @@ export function PanelFacts({ view }: { view: RunWorkspace }) {
     view.outstanding.unreported_charges > 0,
   );
   return (
-    <dl className="grid gap-x-3 gap-y-1 text-[13px] sm:grid-cols-[auto_1fr]">
+    <dl className="grid gap-x-3 gap-y-1 text-ui sm:grid-cols-[auto_1fr]">
       <dt className="text-muted-foreground">Spend</dt>
       <dd data-field="panel-spend" className="tabular-nums">
         {estimated ? "≈ " : ""}

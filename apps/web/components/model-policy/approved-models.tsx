@@ -13,7 +13,7 @@ function Capabilities({ names }: { names: readonly string[] }) {
         <li
           key={name}
           data-capability={name}
-          className="border-border rounded-full border px-2 py-0.5 font-mono text-[11.5px]"
+          className="border-border rounded-full border px-2 py-0.5 font-mono text-tag"
         >
           {name}
         </li>
@@ -62,7 +62,7 @@ function ApprovedModelCard({ model }: { model: ModelAvailability }) {
         model.offered ? "bg-card text-card-foreground" : "bg-background",
       )}
     >
-      <span className="font-mono text-[12.5px] wrap-anywhere">
+      <span className="font-mono text-meta wrap-anywhere">
         {modelLabel(model.canonical_id, model.wire_id)}
       </span>
       {model.available ? "" : ". Not in the catalog right now."}
@@ -80,7 +80,7 @@ export function ApprovedModels({ models }: { models: ModelList }) {
     <>
       <ul
         data-field="approved-models"
-        className="grid gap-3.5 text-[13px] md:grid-cols-2 xl:grid-cols-3"
+        className="grid gap-3.5 text-ui md:grid-cols-2 xl:grid-cols-3"
       >
         {models.models.map((model) => (
           <ApprovedModelCard key={model.profile} model={model} />
@@ -88,7 +88,7 @@ export function ApprovedModels({ models }: { models: ModelList }) {
       </ul>
       <p
         data-field="catalog-fetched"
-        className="text-muted-foreground text-[12.5px]"
+        className="text-muted-foreground text-meta"
       >
         {fetchedAt(models.fetched_at)} Prices and capabilities come from the
         catalog. Whether a route is qualified is recorded separately, under the

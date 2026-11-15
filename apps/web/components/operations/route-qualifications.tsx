@@ -26,12 +26,12 @@ export function RouteQualifications({
             data-operations-route={route.profile}
             className="space-y-0.5 py-2.5"
           >
-            <p className="font-mono text-[12.5px] font-medium break-all">
+            <p className="font-mono text-meta font-medium break-all">
               {route.canonical_id}
             </p>
             <p>{routeStatusText(route)}</p>
             {route.limits === null ? null : (
-              <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+              <p className="text-muted-foreground text-meta leading-relaxed">
                 {route.limits}
               </p>
             )}

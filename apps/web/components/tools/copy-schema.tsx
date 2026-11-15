@@ -27,7 +27,7 @@ export function CopySchema({
         Copy schema
       </Button>
       {copied === null ? null : (
-        <p role="status" data-message="copied" className="text-[13px]">
+        <p role="status" data-message="copied" className="text-ui">
           {copied}
         </p>
       )}

@@ -197,7 +197,7 @@ export function DataNotice({
   sendsOnlyIfAgent: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 border-t pt-3 text-[13px]">
+    <div className="flex flex-col gap-1.5 border-t pt-3 text-ui">
       <p
         data-disclosure="data"
         className="text-muted-foreground flex items-start gap-2"

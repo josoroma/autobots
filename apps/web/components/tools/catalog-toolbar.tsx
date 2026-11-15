@@ -11,7 +11,7 @@ import {
 } from "@/lib/tools/text";
 
 const TOOLBAR_LABEL =
-  "flex w-full flex-col items-stretch gap-1 text-[13px] font-medium sm:w-auto sm:flex-row sm:items-center sm:gap-2 [&>span:first-child]:text-muted-foreground";
+  "flex w-full flex-col items-stretch gap-1 text-ui font-medium sm:w-auto sm:flex-row sm:items-center sm:gap-2 [&>span:first-child]:text-muted-foreground";
 
 const trim = (raw: string): string => raw.trim();
 
@@ -99,7 +99,7 @@ export function CatalogToolbar({
         </label>
       </form>
       <p
-        className="text-muted-foreground text-[12.5px] sm:ml-auto"
+        className="text-muted-foreground text-meta sm:ml-auto"
         data-field="digest"
       >
         {shown} of {catalog.tools.length} tools. Catalog{" "}

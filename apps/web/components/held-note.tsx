@@ -9,7 +9,7 @@ export function HeldNote({ className }: { className?: string }) {
   return (
     <p
       data-held-note="true"
-      className={cn("text-muted-foreground text-[12.5px]", className)}
+      className={cn("text-muted-foreground text-meta", className)}
     >
       {HELD_INPUTS}
     </p>

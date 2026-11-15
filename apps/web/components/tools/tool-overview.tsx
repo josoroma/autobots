@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 
 import { AvailabilityBadge } from "@/components/tools/availability-badge";
 import { GROUP_ICONS } from "@/components/tools/group-icons";
-import { IconTile } from "@/components/ui/card";
+import { CardTitle, IconTile } from "@/components/ui/card";
 import {
   APPROVAL_TEXT,
   costText,
@@ -33,13 +33,14 @@ export function ToolHeader({ tool }: { tool: ToolDescriptor }) {
           <AvailabilityBadge tool={tool} />
         </div>
       </div>
-      <h2
+      <CardTitle
         id="tool-heading"
-        className="font-serif text-[22px] leading-tight font-normal tracking-[-0.015em]"
+        size="display"
+        className="tracking-[-0.015em]"
       >
         {tool.title}
-      </h2>
-      <p className="text-muted-foreground text-[13.5px] leading-relaxed">
+      </CardTitle>
+      <p className="text-muted-foreground text-body leading-relaxed">
         {tool.description}
       </p>
       {fix === null ? null : (
@@ -67,7 +68,7 @@ export function ToolGuide({ guide }: { guide: ToolDescriptor["guide"] }) {
           </dt>
           <dd
             data-guide={term.toLowerCase()}
-            className="text-[13.5px] leading-relaxed"
+            className="text-body leading-relaxed"
           >
             {text}
           </dd>
@@ -89,8 +90,8 @@ function Fact({
   children: ReactNode;
 }) {
   return (
-    <div className="border-border bg-background rounded-lg border px-3 py-2.5 text-[13px]">
-      <dt className="text-muted-foreground mb-0.5 flex items-center gap-1.5 text-[11.5px]">
+    <div className="border-border bg-background rounded-lg border px-3 py-2.5 text-ui">
+      <dt className="text-muted-foreground mb-0.5 flex items-center gap-1.5 text-tag">
         <Icon aria-hidden="true" className="size-3.5 shrink-0" />
         {term}
       </dt>
@@ -143,7 +144,7 @@ export function GrantableTo({
             {grantors.map((item) => (
               <li
                 key={item}
-                className="border-border rounded-full border px-2.5 py-0.5 text-[12.5px]"
+                className="border-border rounded-full border px-2.5 py-0.5 text-meta"
               >
                 {grantorText(item)}
               </li>

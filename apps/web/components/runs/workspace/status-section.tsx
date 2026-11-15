@@ -4,7 +4,7 @@ import { memo } from "react";
 
 import { ContinueRun } from "@/components/runs/continue/continue-run";
 import { RunControls } from "@/components/runs/controls/run-controls";
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { Button } from "@/components/ui/button";
 import { RUN_STATUS_SENTENCE, stopReasonText } from "@/lib/runs/status";
 import type { Connection } from "@/lib/runs/workspace-load";
@@ -27,11 +27,11 @@ export const StatusSection = memo(function StatusSection({
 }) {
   const view = toWorkspaceView(snapshot);
   return (
-    <Section id="status-heading" title="Status">
+    <HairlineSection id="status-heading" title="Status">
       <p
         role="status"
         data-run-status={snapshot.run.status}
-        className="text-[15px] leading-relaxed"
+        className="text-lead leading-relaxed"
       >
         {RUN_STATUS_SENTENCE[snapshot.run.status]}
         {snapshot.stop_reason === null ? null : (
@@ -60,7 +60,7 @@ export const StatusSection = memo(function StatusSection({
         openCalls={view.openCalls}
         onChanged={onChanged}
       />
-    </Section>
+    </HairlineSection>
   );
 });
 

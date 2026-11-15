@@ -14,7 +14,7 @@ export function JobsPlot({ chart }: { chart: JobsChart }) {
   const shown = active === null ? undefined : chart.hours[active];
   return (
     <div className="space-y-3">
-      <p className="text-muted-foreground text-[12.5px]">
+      <p className="text-muted-foreground text-meta">
         Hours in {chart.timezone}. Each bar stacks one hour&apos;s jobs by how
         they ended; the table below gives the same counts.
       </p>

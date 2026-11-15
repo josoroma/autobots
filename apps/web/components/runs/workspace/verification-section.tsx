@@ -2,7 +2,7 @@ import type { RunWorkspace } from "@autobots/api-client";
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { unmetText } from "@/lib/runs/workspace-view";
 
 /** Whether the result met its required artifacts and checks, once the run has been verified. */
@@ -13,7 +13,7 @@ export const VerificationSection = memo(function VerificationSection({
 }) {
   if (verification === null) return null;
   return (
-    <Section id="verification-heading" title="Verification">
+    <HairlineSection id="verification-heading" title="Verification">
       {verification.passed ? (
         <p
           data-verification="passed"
@@ -48,6 +48,6 @@ export const VerificationSection = memo(function VerificationSection({
           </div>
         </div>
       )}
-    </Section>
+    </HairlineSection>
   );
 });

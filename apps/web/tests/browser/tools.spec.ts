@@ -104,6 +104,24 @@ test("filters live in the URL, so a view can be linked", async ({ page }) => {
   await expect(page.locator('[data-tool="browse_goal"]')).toBeVisible();
 });
 
+// PRD-Tool-Catalog TG-02 and WTAP-13: a deep link to a tool the filters hide still opens it, and on
+// closing, focus falls back to the first tool the list shows, since the tool's own link isn't there.
+test("closing a deep-linked tool the filters hide puts focus on the list's first tool", async ({
+  page,
+}) => {
+  await signedIn(page, "/tools?group=files&tool=calculate");
+  await expect(page.locator('[data-tool="calculate"]')).toHaveCount(0);
+  const dialog = page.getByRole("dialog", { name: "Calculate" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]tool=/);
+  await expect(page).toHaveURL(/group=files/);
+  await expect(
+    page.locator("[data-tool]").first().getByRole("link"),
+  ).toBeFocused();
+});
+
 test("unavailable tools say so in words, with their repair", async ({
   page,
 }) => {

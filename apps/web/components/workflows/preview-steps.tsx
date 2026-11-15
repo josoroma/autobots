@@ -4,7 +4,7 @@ import { ShieldCheck } from "lucide-react";
 /** An agent step's Expert, model and tools, as the version binds them. */
 function AgentFacts({ step }: { step: WorkflowStepView }) {
   return (
-    <dl className="text-muted-foreground mt-1 grid gap-x-3 gap-y-0.5 text-[12.5px] sm:grid-cols-[auto_1fr]">
+    <dl className="text-muted-foreground mt-1 grid gap-x-3 gap-y-0.5 text-meta sm:grid-cols-[auto_1fr]">
       <dt>Expert</dt>
       <dd data-field="step-expert" className="text-foreground">
         {step.expert_name ?? "Unavailable"}
@@ -28,7 +28,7 @@ export function PreviewSteps({
   steps: readonly WorkflowStepView[];
 }) {
   return (
-    <ol data-field="preview-steps" className="space-y-2 text-[13.5px]">
+    <ol data-field="preview-steps" className="space-y-2 text-body">
       {steps.map((step, index) => (
         <li
           key={step.id}
@@ -40,14 +40,14 @@ export function PreviewSteps({
               {index + 1}.
             </span>{" "}
             <span className="font-medium">{step.label ?? step.id}</span>{" "}
-            <span className="text-muted-foreground font-mono text-[12px]">
+            <span className="text-muted-foreground font-mono text-caption">
               {step.block}
             </span>
           </p>
           {step.approval ? (
             <p
               data-field="approval-gate"
-              className="mt-1 flex items-center gap-1.5 text-[13px] font-medium"
+              className="mt-1 flex items-center gap-1.5 text-ui font-medium"
             >
               <ShieldCheck aria-hidden="true" className="size-3.5" />
               Approval gate: a person approves before the run continues.

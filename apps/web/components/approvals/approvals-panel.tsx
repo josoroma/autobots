@@ -80,7 +80,7 @@ export function ApprovalsPanel() {
       <p
         aria-live="polite"
         data-message="shortcut"
-        className="text-muted-foreground min-h-5 text-[12.5px]"
+        className="text-muted-foreground min-h-5 text-meta"
       >
         {shortcuts.announcement}
       </p>

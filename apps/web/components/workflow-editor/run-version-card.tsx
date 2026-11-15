@@ -8,7 +8,7 @@ import { Play } from "lucide-react";
 import { HeldNote } from "@/components/held-note";
 import { RunDisclosure } from "@/components/runs/disclosure/run-disclosure";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Select, Textarea } from "@/components/ui/field";
 import { LoadState } from "@/components/ui/load-state";
 import { FIELD_LABEL } from "@/components/workflow-editor/field-label";
@@ -97,12 +97,9 @@ export function RunVersionCard({
       aria-labelledby="run-heading"
       className={cn("space-y-4 p-6", className)}
     >
-      <h2
-        id="run-heading"
-        className="font-serif text-[22px] leading-tight font-normal tracking-tight"
-      >
+      <CardTitle id="run-heading" size="display">
         Run a version
-      </h2>
+      </CardTitle>
       {workflow.versions.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           Publish a version first.
@@ -139,7 +136,7 @@ export function RunVersionCard({
               value={run.inputs}
               readOnly={run.held}
               onChange={(event) => run.setInputs(event.target.value)}
-              className="font-mono text-[12.5px] leading-relaxed"
+              className="font-mono text-meta leading-relaxed"
             />
           </div>
           <BudgetField

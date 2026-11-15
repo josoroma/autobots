@@ -29,10 +29,10 @@ function ToolIdentity({
   version: ReactNode;
 }) {
   return (
-    <dl className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5 border-t pt-4 text-[13px]">
+    <dl className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5 border-t pt-4 text-ui">
       <dt className="text-muted-foreground">ID</dt>
       <dd>
-        <code className="border-border rounded-md border px-1.5 py-0.5 font-mono text-[12px]">
+        <code className="border-border rounded-md border px-1.5 py-0.5 font-mono text-caption">
           {tool.tool_id}
         </code>
       </dd>

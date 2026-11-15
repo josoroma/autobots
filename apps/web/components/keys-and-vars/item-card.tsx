@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/field";
+import { fieldIds, Input, Label, Select } from "@/components/ui/field";
 import {
   FIELD,
   fieldLabel,
@@ -22,15 +22,20 @@ function ItemSummary({ item, field }: { item: KeyOrVar; field: string }) {
         <h2 id={`${field}-heading`} className="text-sm font-semibold">
           {TITLE[item.name]}
         </h2>
-        <p className="text-muted-foreground text-[12.5px]">{USES[item.name]}</p>
+        <p
+          id={fieldIds(field).description}
+          className="text-muted-foreground text-meta"
+        >
+          {USES[item.name]}
+        </p>
       </div>
-      <dl className="grid gap-1 text-[13px] sm:grid-cols-[8rem_minmax(0,1fr)]">
+      <dl className="grid gap-1 text-ui sm:grid-cols-[8rem_minmax(0,1fr)]">
         <dt className="text-muted-foreground">Source</dt>
         <dd data-field="source">{sourceLabel(item)}</dd>
         {item.kind === "secret" ? null : (
           <>
             <dt className="text-muted-foreground">Value</dt>
-            <dd data-field="value" className="font-mono text-[12.5px]">
+            <dd data-field="value" className="font-mono text-meta">
               {item.value ?? "None"}
             </dd>
           </>
@@ -47,6 +52,7 @@ function ItemControl({ item, field }: { item: KeyOrVar; field: string }) {
       <Select
         id={field}
         name={field}
+        aria-describedby={fieldIds(field).description}
         defaultValue={toggleValue(item)}
         className="sm:flex-1"
       >
@@ -60,6 +66,7 @@ function ItemControl({ item, field }: { item: KeyOrVar; field: string }) {
     <Input
       id={field}
       name={field}
+      aria-describedby={fieldIds(field).description}
       type={secret ? "password" : "text"}
       required
       autoComplete="off"
@@ -86,7 +93,7 @@ function RemoveSaved({
       <Button variant="outline" disabled={busy} onClick={onRemove}>
         Remove
       </Button>
-      <p className="text-muted-foreground max-w-2xl text-[12.5px] leading-relaxed">
+      <p className="text-muted-foreground max-w-2xl text-meta leading-relaxed">
         Remove deletes this workspace&apos;s saved{" "}
         {item.kind === "secret" ? "key" : "value"}, so {item.variable} from the
         environment or .env applies again. It never edits .env.
@@ -131,9 +138,9 @@ export function ItemCard({
     >
       <ItemSummary item={item} field={field} />
       <form onSubmit={submit} className="max-w-xl space-y-2">
-        <label htmlFor={field} className="block text-sm font-medium">
+        <Label htmlFor={field} className="block">
           {fieldLabel(item)}
-        </label>
+        </Label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <ItemControl item={item} field={field} />
           <Button type="submit" disabled={busy} className="shrink-0">

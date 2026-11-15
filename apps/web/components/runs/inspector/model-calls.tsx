@@ -1,14 +1,14 @@
 import type { ModelCallView } from "@autobots/api-client";
 import { CircleAlert } from "lucide-react";
 
-import { InspectorSection } from "@/components/runs/inspector/inspector-section";
+import { HairlineSection } from "@/components/ui/section";
 import { formatUsd } from "@/lib/format";
 import { callCharge, callOutcome, tokens } from "@/lib/runs/inspector";
 
 /** Every model call in this run's tree, which shares its budget. */
 export function ModelCalls({ calls }: { calls: readonly ModelCallView[] }) {
   return (
-    <InspectorSection
+    <HairlineSection
       id="calls-heading"
       title="Model calls"
       note="This run and any child runs, since they share its budget."
@@ -22,7 +22,7 @@ export function ModelCalls({ calls }: { calls: readonly ModelCallView[] }) {
           ))}
         </ul>
       )}
-    </InspectorSection>
+    </HairlineSection>
   );
 }
 

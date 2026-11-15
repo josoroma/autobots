@@ -1,7 +1,7 @@
 import type { RunWorkspace } from "@autobots/api-client";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 
 /** The goal as it was stored, and its criteria. */
 export const GoalSection = memo(function GoalSection({
@@ -12,8 +12,8 @@ export const GoalSection = memo(function GoalSection({
   criteria: RunWorkspace["criteria"];
 }) {
   return (
-    <Section id="goal-heading" title="Goal">
-      <p className="font-document text-[17px] leading-relaxed break-words">
+    <HairlineSection id="goal-heading" title="Goal">
+      <p className="font-document text-goal leading-relaxed break-words">
         {objective ?? "No goal is recorded."}
       </p>
       {criteria.length === 0 ? null : (
@@ -25,6 +25,6 @@ export const GoalSection = memo(function GoalSection({
           ))}
         </ul>
       )}
-    </Section>
+    </HairlineSection>
   );
 });

@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/field";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { EXPERT_FILTERS, type ExpertFilter } from "@/lib/experts/card";
-import { cn } from "@/lib/utils";
 
 /**
  * The Experts list's filter and search (PRD-Studio EX-02), which the panel keeps in the URL (XWEB-13).
@@ -25,38 +25,19 @@ export function ExpertFilters({
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div
-        role="group"
-        aria-label="Show"
-        className="bg-muted/60 inline-flex w-fit flex-wrap gap-0.5 rounded-lg p-[3px]"
-      >
-        {EXPERT_FILTERS.map(([id, label]) => {
+      <SegmentedControl
+        label="Show"
+        dataKey="filter"
+        wrap
+        items={EXPERT_FILTERS.map(([id, label]) => {
           const waiting = !known && id !== "all";
-          return (
-            <button
-              key={id}
-              type="button"
-              data-filter={id}
-              aria-pressed={filter === id}
-              disabled={waiting}
-              onClick={() => onFilter(id)}
-              className={cn(
-                "text-foreground/80 inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[13px] disabled:opacity-50",
-                filter === id &&
-                  "bg-background text-foreground border-border font-medium dark:bg-accent",
-              )}
-            >
-              {label}
-              {waiting ? null : (
-                <>
-                  {" "}
-                  <span className="tabular-nums">{counts.get(id) ?? 0}</span>
-                </>
-              )}
-            </button>
-          );
+          return waiting
+            ? { id, label, disabled: true }
+            : { id, label, disabled: false, count: counts.get(id) ?? 0 };
         })}
-      </div>
+        value={filter}
+        onChange={onFilter}
+      />
       <span className="hidden flex-1 sm:block" />
       <label className="block">
         <span className="sr-only">Search Experts</span>

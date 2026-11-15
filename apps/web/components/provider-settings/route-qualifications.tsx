@@ -2,6 +2,7 @@ import type { RouteQualification } from "@autobots/api-client";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { QUALIFICATION_LABEL, QUALIFICATION_TONE } from "@/lib/provider-text";
 
 function FactRow({
@@ -27,15 +28,15 @@ function FactRow({
 
 function RouteCard({ route }: { route: RouteQualification }) {
   return (
-    <section
+    <Card
       data-route={route.profile}
       aria-label={route.canonical_id}
-      className="bg-card text-card-foreground border-border flex min-w-0 flex-col gap-3 rounded-xl border px-[18px] py-4"
+      className="flex min-w-0 flex-col gap-3 px-[18px] py-4"
     >
-      <h3 className="font-mono text-[12.5px] font-medium break-all">
+      <h3 className="font-mono text-meta font-medium break-all">
         {route.canonical_id}
       </h3>
-      <dl className="border-border space-y-2 border-t pt-3 text-[13px]">
+      <dl className="border-border space-y-2 border-t pt-3 text-ui">
         <FactRow term="Status" field="status">
           <Badge
             variant={QUALIFICATION_TONE[route.status]}
@@ -64,7 +65,7 @@ function RouteCard({ route }: { route: RouteQualification }) {
           </FactRow>
         )}
       </dl>
-    </section>
+    </Card>
   );
 }
 
@@ -84,7 +85,7 @@ export function RouteQualifications({
         <h2 id="qualification-heading" className="text-sm font-semibold">
           Live qualification
         </h2>
-        <p className="text-muted-foreground text-[12.5px]">
+        <p className="text-muted-foreground text-meta">
           What a live test of each route found. A configured key does not mean a
           route was tested, and an available catalog does not either.
         </p>

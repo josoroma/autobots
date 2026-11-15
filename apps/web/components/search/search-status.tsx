@@ -9,7 +9,7 @@ export function SearchStatus({ search }: { search: Search }) {
         role="status"
         data-field="search-status"
         data-reason={search.failure?.kind}
-        className="text-muted-foreground flex-1 text-[12px]"
+        className="text-muted-foreground flex-1 text-caption"
       >
         {search.status}
       </p>

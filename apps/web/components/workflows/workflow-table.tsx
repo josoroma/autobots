@@ -6,7 +6,7 @@ import { formatRelative } from "@/lib/format";
 import { runStatusText } from "@/lib/runs/status";
 import { cn } from "@/lib/utils";
 
-const TH = "text-muted-foreground px-3 pb-2.5 text-[12.5px] font-medium";
+const TH = "text-muted-foreground px-3 pb-2.5 text-meta font-medium";
 const TD = "px-3 py-3.5 align-top";
 // At 400% zoom the list keeps the name, version and Preview, so nothing scrolls sideways.
 const NARROW_HIDDEN = "hidden @xl:table-cell";
@@ -80,16 +80,13 @@ function WorkflowRow({
         {workflow.description === null ? null : (
           <p
             data-field="description"
-            className="text-muted-foreground mt-0.5 text-[12.5px] wrap-anywhere"
+            className="text-muted-foreground mt-0.5 text-meta wrap-anywhere"
           >
             {workflow.description}
           </p>
         )}
       </td>
-      <td
-        data-field="experts"
-        className={cn(TD, NARROW_HIDDEN, "text-[12.5px]")}
-      >
+      <td data-field="experts" className={cn(TD, NARROW_HIDDEN, "text-meta")}>
         {workflow.experts.length === 0 ? (
           <span className="text-muted-foreground">None</span>
         ) : (
@@ -107,7 +104,7 @@ function WorkflowRow({
       </td>
       <td
         data-field="last-execution"
-        className={cn(TD, NARROW_HIDDEN, "text-[12.5px]")}
+        className={cn(TD, NARROW_HIDDEN, "text-meta")}
       >
         <LastExecution workflow={workflow} now={now} />
       </td>
@@ -123,7 +120,7 @@ function WorkflowRow({
           scroll={false}
           aria-current={selected ? "true" : undefined}
           aria-label={`Preview ${workflow.name}`}
-          className="text-[13px] underline underline-offset-4"
+          className="text-ui underline underline-offset-4"
         >
           Preview
         </Link>
@@ -152,7 +149,7 @@ export function WorkflowTable({
       aria-label="Workflows table"
       className="overflow-x-auto"
     >
-      <table className="w-full text-left text-[13.5px]">
+      <table className="w-full text-left text-body">
         <thead>
           <tr className="border-b">
             <th scope="col" className={cn(TH, "pl-0")}>

@@ -28,7 +28,7 @@ function Chips({ preview }: { preview: RunPreview }) {
             <li
               key={tool}
               data-preview-tool={tool}
-              className="border-border rounded-full border px-2.5 py-0.5 font-mono text-[12px]"
+              className="border-border rounded-full border px-2.5 py-0.5 font-mono text-caption"
             >
               {tool}
             </li>
@@ -51,7 +51,7 @@ export function PreviewChips({
   failed: boolean;
 }) {
   return (
-    <div data-field="preview" className="flex flex-col gap-2 text-[13px]">
+    <div data-field="preview" className="flex flex-col gap-2 text-ui">
       {failed ? (
         <p className="text-muted-foreground">
           What this run would use can&apos;t be read right now.

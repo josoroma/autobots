@@ -5,7 +5,7 @@ import type {
 } from "@autobots/api-client";
 
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/field";
+import { fieldIds, Select } from "@/components/ui/field";
 import {
   BUILTIN_DEFAULT,
   choices,
@@ -49,7 +49,7 @@ function WorkspaceDefaultRow({
       <div className={ROW}>
         <label
           htmlFor="workspace-default"
-          className="min-w-0 text-[13.5px] font-medium"
+          className="min-w-0 text-body font-medium"
         >
           Workspace default
         </label>
@@ -86,12 +86,13 @@ function RoleOverrideRow({
   return (
     <div className={ROW}>
       <div className="min-w-0">
-        <label htmlFor={id} className="block font-mono text-[12.5px] break-all">
+        <label htmlFor={id} className="block font-mono text-meta break-all">
           {binding.role}
         </label>
         <span
+          id={fieldIds(id).description}
           data-binding-source={binding.source}
-          className="text-muted-foreground block text-[12px]"
+          className="text-muted-foreground block text-caption"
         >
           {sourceText(binding.source)}
           {", "}
@@ -101,6 +102,7 @@ function RoleOverrideRow({
       <div className={ROW_CONTROL}>
         <Select
           id={id}
+          aria-describedby={fieldIds(id).description}
           value={value ?? WORKSPACE_DEFAULT}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -180,7 +182,7 @@ export function PolicyForm(props: PolicyFormProps) {
         </Button>
         <p
           data-field="policy-summary"
-          className="text-muted-foreground ml-auto text-[13px] tabular-nums"
+          className="text-muted-foreground ml-auto text-ui tabular-nums"
         >
           {followingCount(bindings)} of {bindings.length} roles follow the
           workspace default

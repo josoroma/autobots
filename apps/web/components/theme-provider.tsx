@@ -3,6 +3,7 @@
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
 import { type ReactNode, useEffect, useSyncExternalStore } from "react";
 
+import { DEFAULT_THEME, THEME_KEY, THEMES } from "@/lib/preferences";
 import {
   NO_CHOICE,
   publishThemeChoice,
@@ -30,10 +31,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     <>
       <NextThemesProvider
         attribute="class"
-        defaultTheme="dark"
+        defaultTheme={DEFAULT_THEME}
         enableSystem
-        themes={["dark", "light"]}
-        storageKey="autobots.theme"
+        themes={[...THEMES]}
+        storageKey={THEME_KEY}
         disableTransitionOnChange
       >
         <ThemeBridge />

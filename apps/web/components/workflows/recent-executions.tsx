@@ -18,7 +18,7 @@ export function RecentExecutions({
     return <p className="text-muted-foreground text-sm">No executions yet.</p>;
   }
   return (
-    <ul className="text-[13px]">
+    <ul className="text-ui">
       {executions.map((execution) => (
         <li
           key={execution.id}

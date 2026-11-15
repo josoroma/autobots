@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EMPTY_VIEW, RunConnection, type RunView } from "@/lib/runs/connection";
+import { streamWanted } from "@/lib/preferences";
 import { openEventSource } from "@/lib/runs/stream";
 
 export interface RunWorkspaceState extends RunView {
@@ -19,12 +20,6 @@ export interface RunWorkspaceState extends RunView {
 function later(run: () => void, ms: number): () => void {
   const timer = setTimeout(run, ms);
   return () => clearTimeout(timer);
-}
-
-// US-15.24, PRD-Studio SE-03: "Stream text as it's written", on unless turned off in this browser.
-// The Appearance control and the before-paint script both set this root attribute.
-function streamWanted(): boolean {
-  return document.documentElement.dataset.stream !== "off";
 }
 
 function report(record: { event: string; name: string }): void {
@@ -43,7 +38,8 @@ export function useRunWorkspace(runId: string): RunWorkspaceState {
       runId,
       open: openEventSource,
       later,
-      streamWanted,
+      // US-15.24, PRD-Studio SE-03: on unless turned off in this browser.
+      streamWanted: () => streamWanted(document.documentElement),
       report,
       onChange: (view) => setShown({ runId, view }),
     });

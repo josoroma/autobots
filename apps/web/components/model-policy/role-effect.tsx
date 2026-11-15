@@ -12,7 +12,7 @@ export function RoleEffect({ state }: { state: ModelPolicyState }) {
   return (
     <div
       data-field="role-effect"
-      className={cn(INNER_BOX, "flex gap-3 px-3.5 text-[13.5px]")}
+      className={cn(INNER_BOX, "flex gap-3 px-3.5 text-body")}
     >
       <Info
         aria-hidden="true"
@@ -53,7 +53,7 @@ export function NotOfferedAlert() {
     <p
       data-field="not-offered"
       role="alert"
-      className="border-destructive/40 dark:bg-destructive/10 flex gap-3 rounded-lg border px-3.5 py-3 text-[13.5px] font-medium"
+      className="border-destructive/40 dark:bg-destructive/10 flex gap-3 rounded-lg border px-3.5 py-3 text-body font-medium"
     >
       <TriangleAlert
         aria-hidden="true"

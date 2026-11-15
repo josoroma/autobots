@@ -56,7 +56,7 @@ export function ApprovalFacts({
   waiting: boolean;
 }) {
   return (
-    <dl className="grid overflow-hidden rounded-lg border text-[13px] sm:grid-cols-2">
+    <dl className="grid overflow-hidden rounded-lg border text-ui sm:grid-cols-2">
       <Fact data-approval-requester="true" label="Requested by">
         {requesterText(approval)}
       </Fact>

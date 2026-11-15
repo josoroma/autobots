@@ -1,7 +1,7 @@
 import type { RunWorkspace } from "@autobots/api-client";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 
 /** The run this one is a part of, when it is a child run. */
 export const ParentRunLink = memo(function ParentRunLink({
@@ -35,7 +35,7 @@ export const AssignmentsSection = memo(function AssignmentsSection({
 }) {
   if (assignments.length === 0) return null;
   return (
-    <Section id="assignments-heading" title="Assignments">
+    <HairlineSection id="assignments-heading" title="Assignments">
       <ul className="divide-y text-sm">
         {assignments.map((assignment) => (
           <li
@@ -55,6 +55,6 @@ export const AssignmentsSection = memo(function AssignmentsSection({
           </li>
         ))}
       </ul>
-    </Section>
+    </HairlineSection>
   );
 });

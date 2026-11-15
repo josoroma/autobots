@@ -5,6 +5,7 @@ import {
   ToolUseTable,
 } from "@/components/runs/tool-uses/tool-use-table";
 import { useToolUses } from "@/components/runs/tool-uses/use-tool-uses";
+import { HairlineSection } from "@/components/ui/section";
 import { toolOutcome } from "@/lib/runs/tool-uses";
 
 /** The run workspace's section. `version` changes when a tool-use event arrives. */
@@ -19,13 +20,7 @@ export const ToolsUsed = memo(function ToolsUsed({
   const { uses } = read;
   const latest = uses?.at(-1);
   return (
-    <section
-      aria-labelledby="tools-used-heading"
-      className="space-y-3 border-t pt-6"
-    >
-      <h2 id="tools-used-heading" className="text-sm font-semibold">
-        Tools used
-      </h2>
+    <HairlineSection id="tools-used-heading" title="Tools used">
       <p className="sr-only" aria-live="polite" data-field="tool-announcement">
         {latest === undefined
           ? ""
@@ -36,6 +31,6 @@ export const ToolsUsed = memo(function ToolsUsed({
       ) : (
         <ToolUseTable uses={uses} caption="Tools this run used, in order" />
       )}
-    </section>
+    </HairlineSection>
   );
 });

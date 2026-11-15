@@ -1,6 +1,7 @@
 import type { WorkflowView } from "@autobots/api-client";
 
 import { Badge } from "@/components/ui/badge";
+import { CardTitle } from "@/components/ui/card";
 
 /**
  * The workflow's name, its published version, whether a WF-02 draft is saved, and whether the
@@ -15,12 +16,9 @@ export function WorkflowHeading({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <h2
-        id="graph-heading"
-        className="font-serif text-[22px] leading-tight font-normal tracking-tight wrap-anywhere"
-      >
+      <CardTitle id="graph-heading" size="display" className="wrap-anywhere">
         {workflow.name}
-      </h2>
+      </CardTitle>
       {workflow.latest_version === 0 ? (
         <Badge variant="attention" dot>
           Not published

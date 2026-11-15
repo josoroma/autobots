@@ -17,7 +17,7 @@ import {
   conditionText,
   type CheckName,
 } from "@/lib/operations-text";
-import { cn } from "@/lib/utils";
+import { StatusDot, type StatusDotTone } from "@/components/ui/status-dot";
 
 // Decorative: each check's name and message carry its meaning.
 const ICONS: Readonly<Record<CheckName, LucideIcon>> = {
@@ -32,10 +32,10 @@ const ICONS: Readonly<Record<CheckName, LucideIcon>> = {
 };
 
 // The dot only repeats the message beside it (Decision 0021 R4).
-const DOTS: Readonly<Record<OperationCondition["state"], string>> = {
-  ok: "bg-success-text",
-  degraded: "bg-muted-foreground",
-  unavailable: "bg-destructive",
+const DOTS: Readonly<Record<OperationCondition["state"], StatusDotTone>> = {
+  ok: "success",
+  degraded: "muted",
+  unavailable: "danger",
 };
 
 function ConditionTile({
@@ -52,28 +52,22 @@ function ConditionTile({
       data-state={condition.state}
       className="bg-background min-h-24 space-y-1.5 px-4 py-3.5"
     >
-      <p className="flex items-center gap-2 text-[13.5px] font-semibold">
+      <p className="flex items-center gap-2 text-body font-semibold">
         <Icon
           aria-hidden="true"
           className="text-muted-foreground size-3.5 shrink-0"
         />
         {CHECK_LABEL[condition.name]}
         <span className="sr-only">: </span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "ml-auto size-1.5 shrink-0 rounded-full",
-            DOTS[condition.state],
-          )}
-        />
+        <StatusDot tone={DOTS[condition.state]} className="ml-auto" />
       </p>
-      <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+      <p className="text-muted-foreground text-meta leading-relaxed">
         {conditionText(condition.code)}
       </p>
       {value === null ? null : (
         <p
           data-field={`value-${condition.name}`}
-          className="text-foreground text-[12.5px] break-words tabular-nums"
+          className="text-foreground text-meta break-words tabular-nums"
         >
           {value}
         </p>

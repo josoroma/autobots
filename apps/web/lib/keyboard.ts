@@ -12,12 +12,14 @@ export function typing(target: EventTarget | null): boolean {
   );
 }
 
-/** The parts of a key press a shortcut reads. */
+/** The parts of a key press a shortcut reads. A shortcut that needs Shift or the key's position reads those too. */
 export interface KeyPress {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
+  shiftKey?: boolean;
+  code?: string;
 }
 
 /**

@@ -11,11 +11,20 @@ import { readOf } from "@/lib/load";
 import { filterTools, groupTools } from "@/lib/tools/filters";
 import { useResource } from "@/lib/use-resource";
 
-/** Back to the link that opened a tool's dialog, or the list's first link for a deep link. */
-function focusOpener(toolId: string): void {
-  document
-    .querySelector<HTMLAnchorElement>(`[data-tool="${CSS.escape(toolId)}"] a`)
-    ?.focus();
+/**
+ * Where focus goes when a tool's dialog closes (PRD-Tool-Catalog TG-02, WTAP-13): the tool's link, or
+ * for a deep link to a tool the filters hide, the list's first link, or else the catalog's search.
+ */
+function opener(toolId: string): HTMLElement | null {
+  return (
+    document.querySelector<HTMLAnchorElement>(
+      `[data-tool="${CSS.escape(toolId)}"] a`,
+    ) ??
+    document.querySelector<HTMLAnchorElement>("[data-tool] a") ??
+    document.querySelector<HTMLInputElement>(
+      'form[aria-label="Filter tools"] input[type="search"]',
+    )
+  );
 }
 
 /**
@@ -62,10 +71,8 @@ export function ToolCatalogPanel() {
           <ToolDialog
             key={selected}
             toolId={selected}
-            onClosed={() => {
-              filters.close();
-              focusOpener(selected);
-            }}
+            onClosed={filters.close}
+            returnFocus={() => opener(selected)}
           />
         )}
       </div>

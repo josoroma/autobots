@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /** The same counts as a text table, the plot's alternative (PRD-Studio OP-03). */
 export function JobsTable({ chart }: { chart: JobsChart }) {
   return (
-    <details data-field="jobs-table" className="text-[12.5px]">
+    <details data-field="jobs-table" className="text-meta">
       <summary className="cursor-pointer font-medium">
         Table of the same counts
       </summary>

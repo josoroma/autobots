@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AccountForm } from "@/components/account-form";
 import { SignOutButton } from "@/components/sign-out-button";
 import { PageHeader } from "@/components/ui/page-header";
+import { SettingsSection } from "@/components/ui/section";
 import { ROLE_LABEL } from "@/lib/account";
 import { fetchSession, readValue } from "@/lib/service-status";
+
+export const metadata: Metadata = { title: "Account" };
 
 export const dynamic = "force-dynamic";
 
@@ -34,29 +38,21 @@ export default async function AccountPage() {
         </p>
       ) : (
         <>
-          <section
-            aria-labelledby="name-heading"
-            className="border-border grid gap-4 border-t pt-5 md:grid-cols-[260px_1fr]"
+          <SettingsSection
+            id="name-heading"
+            title="Name"
+            description="Shown in the sidebar and greetings."
+            layout="wide"
           >
-            <div>
-              <h2 id="name-heading" className="text-sm font-semibold">
-                Name
-              </h2>
-              <p className="text-muted-foreground text-[13px]">
-                Shown in the sidebar and greetings.
-              </p>
-            </div>
             <AccountForm
               initial={session.display_name_saved ? session.display_name : ""}
             />
-          </section>
-          <section
-            aria-labelledby="identity-heading"
-            className="border-border grid gap-4 border-t pt-5 md:grid-cols-[260px_1fr]"
+          </SettingsSection>
+          <SettingsSection
+            id="identity-heading"
+            title="Sign-in and role"
+            layout="wide"
           >
-            <h2 id="identity-heading" className="text-sm font-semibold">
-              Sign-in and role
-            </h2>
             <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-y-2 text-sm">
               <dt className="text-muted-foreground">Email</dt>
               <dd data-field="email" className="wrap-anywhere">
@@ -73,7 +69,7 @@ export default async function AccountPage() {
                 </div>
               ))}
             </dl>
-          </section>
+          </SettingsSection>
           <div className="border-border border-t pt-5">
             <SignOutButton />
           </div>

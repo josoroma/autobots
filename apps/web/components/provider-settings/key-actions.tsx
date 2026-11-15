@@ -33,7 +33,7 @@ export function KeyActions({
         </div>
       )}
       {stored ? (
-        <p className="text-muted-foreground max-w-2xl text-[12.5px] leading-relaxed">
+        <p className="text-muted-foreground max-w-2xl text-meta leading-relaxed">
           Disconnect removes this workspace&apos;s stored key. It does not touch
           an environment key. A request already sent may still finish.
         </p>

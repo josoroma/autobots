@@ -70,7 +70,7 @@ function PendingBadge({ count }: { count: number }) {
   return (
     <span
       data-approvals-badge
-      className="bg-attention text-attention-foreground ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11.5px] font-semibold tabular-nums"
+      className="bg-attention text-attention-foreground ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-tag font-semibold tabular-nums"
     >
       {count}
       <span className="sr-only"> waiting</span>

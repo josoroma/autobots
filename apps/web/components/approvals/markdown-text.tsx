@@ -6,7 +6,7 @@ function inline(parts: InlinePart[]): ReactNode[] {
   return parts.map((part, index) => {
     if (part.kind === "code")
       return (
-        <code key={index} className="font-mono text-[13px]">
+        <code key={index} className="font-mono text-ui">
           {part.text}
         </code>
       );

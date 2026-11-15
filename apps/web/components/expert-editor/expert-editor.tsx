@@ -17,12 +17,12 @@ import { ToolGrants } from "@/components/expert-editor/tool-grants";
 import { useExpert } from "@/components/expert-editor/use-expert";
 import { useExpertDraft } from "@/components/expert-editor/use-expert-draft";
 import { VersionHistory } from "@/components/expert-editor/version-history";
-import { InitialTile } from "@/components/experts/initial-tile";
 import { useStartSession } from "@/components/experts/use-start-session";
 import { HeldNote } from "@/components/held-note";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle, InitialTile } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
+import { initialOf } from "@/lib/experts/card";
 import { expansion } from "@/lib/experts/grants";
 import { readOf } from "@/lib/load";
 import { profileChoice } from "@/lib/model-profile";
@@ -57,13 +57,13 @@ function EditorLayout({
     <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_300px]">
       <Card aria-labelledby="config-heading" className="space-y-6 p-6">
         <div className="flex items-center gap-3">
-          <InitialTile name={expert.name} className="size-10 text-lg" />
-          <h2
-            id="config-heading"
-            className="font-serif text-[22px] leading-tight font-normal tracking-tight"
-          >
+          <InitialTile
+            initial={initialOf(expert.name)}
+            className="size-10 text-lg"
+          />
+          <CardTitle id="config-heading" size="display">
             {expert.name}, version {expert.latest_version}
-          </h2>
+          </CardTitle>
         </div>
         <form onSubmit={(event) => void form.save(event)} className="space-y-6">
           <PurposeFields draft={draft} held={held} onChange={setDraft} />

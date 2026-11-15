@@ -2,6 +2,7 @@ import type { RunStatus } from "@autobots/api-client";
 import type { ComponentProps } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { StatusDot, type StatusDotTone } from "@/components/ui/status-dot";
 import { RUN_STATUS_LABEL, runTone, type RunTone } from "@/lib/runs/status";
 import { cn } from "@/lib/utils";
 
@@ -15,12 +16,12 @@ const TONE_TEXT: Readonly<Record<RunTone, string>> = {
   idle: "text-foreground",
 };
 
-const TONE_DOT: Readonly<Record<RunTone, string>> = {
-  live: "bg-live-text ring-live-text/20 ring-[3px]",
-  attention: "bg-attention",
-  success: "bg-success-text",
-  failure: "bg-destructive",
-  idle: "border-muted-foreground border-[1.5px]",
+const TONE_DOT: Readonly<Record<RunTone, StatusDotTone>> = {
+  live: "live",
+  attention: "attention",
+  success: "success",
+  failure: "danger",
+  idle: "idle",
 };
 
 const TONE_BADGE: Readonly<
@@ -46,15 +47,9 @@ export function StateLine({
   return (
     <span
       data-field="state"
-      className={cn(
-        "inline-flex items-center gap-2 text-[13px]",
-        TONE_TEXT[tone],
-      )}
+      className={cn("inline-flex items-center gap-2 text-ui", TONE_TEXT[tone])}
     >
-      <span
-        aria-hidden="true"
-        className={cn("size-[7px] shrink-0 rounded-full", TONE_DOT[tone])}
-      />
+      <StatusDot tone={TONE_DOT[tone]} size="md" />
       {text ?? RUN_STATUS_LABEL[status]}
     </span>
   );

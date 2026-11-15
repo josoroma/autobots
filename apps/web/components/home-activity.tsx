@@ -3,7 +3,7 @@ import { CircleAlert, History } from "lucide-react";
 import Link from "next/link";
 
 import { LoadEmpty, ServerLoadState } from "@/components/ui/load-state";
-import { SectionLabel } from "@/components/ui/page-header";
+import { SectionHeading } from "@/components/ui/section";
 import { spendOf } from "@/lib/budget";
 import { formatRelative, formatUsd } from "@/lib/format";
 import { RUN_STATUS_LABEL } from "@/lib/runs/status";
@@ -24,7 +24,6 @@ function progressOrSpend(run: Run): string {
   return `${estimated ? "≈ " : ""}${formatUsd(micro)} spent`;
 }
 
-const HEAD = "mb-2 flex items-center gap-2";
 const ITEM =
   "flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t py-3 text-sm";
 const QUIET = "text-muted-foreground border-t py-3 text-sm";
@@ -69,15 +68,9 @@ function NeedsYou({
       data-field="needs-you"
       className="flex min-w-0 flex-col"
     >
-      <div className={HEAD}>
-        <CircleAlert
-          aria-hidden="true"
-          className="text-muted-foreground size-3.5 shrink-0"
-        />
-        <SectionLabel id="needs-you-heading" className="text-[12.5px]">
-          Needs you
-        </SectionLabel>
-      </div>
+      <SectionHeading icon={CircleAlert} id="needs-you-heading">
+        Needs you
+      </SectionHeading>
       {pending.length === 0 && replies.length === 0 ? (
         <LoadEmpty className={QUIET}>Nothing needs you right now.</LoadEmpty>
       ) : (
@@ -90,7 +83,7 @@ function NeedsYou({
             >
               <span className="min-w-0 flex-1 wrap-anywhere">
                 <span className="text-muted-foreground">Approve </span>
-                <code className="text-[12.5px]">{approval.tool_id}</code>
+                <code className="text-meta">{approval.tool_id}</code>
                 {approval.run_goal === null ? null : (
                   <span className="text-muted-foreground">
                     {" "}
@@ -136,15 +129,9 @@ function RecentRuns({ recent, now }: { recent: RunList; now: number }) {
       data-field="recent-runs"
       className="flex min-w-0 flex-col"
     >
-      <div className={HEAD}>
-        <History
-          aria-hidden="true"
-          className="text-muted-foreground size-3.5 shrink-0"
-        />
-        <SectionLabel id="recent-heading" className="text-[12.5px]">
-          Recent runs
-        </SectionLabel>
-      </div>
+      <SectionHeading icon={History} id="recent-heading">
+        Recent runs
+      </SectionHeading>
       {recent.runs.length === 0 ? (
         <LoadEmpty className={QUIET}>No runs yet.</LoadEmpty>
       ) : (
@@ -157,7 +144,7 @@ function RecentRuns({ recent, now }: { recent: RunList; now: number }) {
               >
                 {run.goal_summary}
               </Link>
-              <span className="text-muted-foreground flex flex-wrap gap-x-2 text-[12.5px] tabular-nums">
+              <span className="text-muted-foreground flex flex-wrap gap-x-2 text-meta tabular-nums">
                 <span data-field="state">{RUN_STATUS_LABEL[run.status]}</span>
                 <span aria-hidden="true">·</span>
                 <span data-field="progress">{progressOrSpend(run)}</span>

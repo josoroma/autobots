@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Input, Label } from "@/components/ui/field";
 import { writes } from "@/lib/api/browser";
 import { refusalText } from "@/lib/submit";
 import { useSubmit } from "@/lib/use-submit";
@@ -46,9 +46,9 @@ export function AccountForm({ initial }: { initial: string }) {
 
   return (
     <form onSubmit={(event) => void save(event)} className="space-y-3">
-      <label htmlFor="display-name" className="block text-sm font-medium">
+      <Label htmlFor="display-name" className="block">
         Display name
-      </label>
+      </Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           id="display-name"

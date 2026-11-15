@@ -2,7 +2,7 @@ import type { RunWorkspace } from "@autobots/api-client";
 import { FileText } from "lucide-react";
 import { memo } from "react";
 
-import { Section } from "@/components/runs/workspace/section";
+import { HairlineSection } from "@/components/ui/section";
 import { artifactFacts } from "@/lib/runs/workspace-view";
 
 /** The run's artifacts: a published one links to its download, and a missing one says so. */
@@ -12,7 +12,7 @@ export const ArtifactsSection = memo(function ArtifactsSection({
   artifacts: RunWorkspace["artifacts"];
 }) {
   return (
-    <Section id="artifacts-heading" title="Artifacts">
+    <HairlineSection id="artifacts-heading" title="Artifacts">
       {artifacts.length === 0 ? (
         <p className="text-muted-foreground text-sm">No artifacts yet.</p>
       ) : (
@@ -31,12 +31,12 @@ export const ArtifactsSection = memo(function ArtifactsSection({
                 {artifact.status === "published" ? (
                   <a
                     href={`/api/v1/artifacts/${artifact.id}/download`}
-                    className="font-mono text-[13px] font-medium underline underline-offset-4"
+                    className="font-mono text-ui font-medium underline underline-offset-4"
                   >
                     {artifact.name}
                   </a>
                 ) : (
-                  <span className="font-mono text-[13px]">
+                  <span className="font-mono text-ui">
                     {`${artifact.name}: missing`}
                   </span>
                 )}{" "}
@@ -48,6 +48,6 @@ export const ArtifactsSection = memo(function ArtifactsSection({
           ))}
         </ul>
       )}
-    </Section>
+    </HairlineSection>
   );
 });

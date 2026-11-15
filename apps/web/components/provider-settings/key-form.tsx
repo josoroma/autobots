@@ -2,7 +2,7 @@ import { KeyRound } from "lucide-react";
 import type { FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { fieldIds, Input, Label } from "@/components/ui/field";
 
 const FIELD = "openrouter-key";
 
@@ -31,9 +31,9 @@ export function KeyForm({
 
   return (
     <form onSubmit={submit} className="max-w-xl space-y-2">
-      <label htmlFor={FIELD} className="block text-sm font-medium">
+      <Label htmlFor={FIELD} className="block">
         {replacing ? "Replace key" : "API key"}
-      </label>
+      </Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           id={FIELD}
@@ -43,6 +43,7 @@ export function KeyForm({
           autoComplete="off"
           data-1p-ignore
           spellCheck={false}
+          aria-describedby={fieldIds(FIELD).description}
           className="sm:flex-1"
         />
         <Button type="submit" disabled={pending} className="shrink-0">
@@ -50,7 +51,10 @@ export function KeyForm({
           {pending ? "Validating" : "Save & validate"}
         </Button>
       </div>
-      <p className="text-muted-foreground text-[12.5px] leading-relaxed">
+      <p
+        id={fieldIds(FIELD).description}
+        className="text-muted-foreground text-meta leading-relaxed"
+      >
         The key is sent to this Mac&apos;s server, checked against
         OpenRouter&apos;s key metadata, then encrypted. It starts no model call.
       </p>
@@ -61,7 +65,7 @@ export function KeyForm({
 /** Said instead of the field when the key comes from the server environment. */
 export function EnvironmentKeyNote() {
   return (
-    <p className="text-muted-foreground max-w-2xl text-[13px]">
+    <p className="text-muted-foreground max-w-2xl text-ui">
       This key is set in the server environment. Changing it there needs a
       coordinated restart, and Disconnect does not apply.
     </p>

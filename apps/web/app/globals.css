@@ -74,6 +74,28 @@ html[data-density="compact"] {
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  /* DS-03: an inner frame inside an `rounded-lg` card, 3px under the canonical base. */
+  --radius-inset: calc(var(--radius) - 3px);
+  /* Decision 0021 R4: the status dot beside a state's words. Fixed, so compact density keeps it whole. */
+  --spacing-dot: 0.4375rem;
+  /* DS-03: the Studio type scale, one step per size the screens use (R-68). Each step is in rem and
+     equals the pixel size beside it at a 16px root. It sets only the font size, so line height still
+     comes from the element or a leading utility. No step reuses a
+     --color-* name: `text-control` is already the control border color. lib/type-scale.ts lists
+     these names for `cn`. */
+  --text-kbd: 0.6875rem; /* 11px, key hints */
+  --text-tag: 0.71875rem; /* 11.5px, counts and monospaced tags */
+  --text-caption: 0.75rem; /* 12px, captions and code chips */
+  --text-meta: 0.78125rem; /* 12.5px, hints and secondary lines */
+  --text-ui: 0.8125rem; /* 13px, small buttons, tabs and navigation */
+  --text-body: 0.84375rem; /* 13.5px, list rows and dense text */
+  --text-intro: 0.90625rem; /* 14.5px, a page header's description */
+  --text-lead: 0.9375rem; /* 15px, item titles and reading text */
+  --text-goal: 1.0625rem; /* 17px, a run's goal */
+  --text-banner: 1.3125rem; /* 21px, the operations verdict */
+  --text-display: 1.375rem; /* 22px, serif card and dialog titles */
+  --text-title: 2rem; /* 32px, page titles */
+  --text-hero: 2.75rem; /* 44px, Home's greeting */
 }
 
 @layer base {

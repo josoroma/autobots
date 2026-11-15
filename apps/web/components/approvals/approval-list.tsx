@@ -35,7 +35,7 @@ export function ApprovalList({
             tabIndex={approval.id === selected ? 0 : -1}
             onClick={() => onSelect(approval.id)}
             className={cn(
-              "hover:bg-accent/60 block w-full border-l-2 border-transparent px-3.5 py-3 text-left text-[13.5px]",
+              "hover:bg-accent/60 block w-full border-l-2 border-transparent px-3.5 py-3 text-left text-body",
               approval.id === selected &&
                 "border-l-attention bg-background font-medium dark:bg-accent",
             )}

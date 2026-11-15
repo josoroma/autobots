@@ -44,7 +44,7 @@ export function HomeGreeting({
   return (
     <p
       data-field="greeting"
-      className="text-muted-foreground min-h-[1.5em] text-[15px]"
+      className="text-muted-foreground min-h-[1.5em] text-lead"
     >
       {greeting === null ? null : (
         <>

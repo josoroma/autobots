@@ -8,7 +8,7 @@ import { useResource } from "@/lib/use-resource";
 import { cn } from "@/lib/utils";
 
 const HEADER = "text-muted-foreground pb-2 text-xs font-medium";
-const CELL = "text-muted-foreground py-2 font-mono text-[12px] wrap-anywhere";
+const CELL = "text-muted-foreground py-2 font-mono text-caption wrap-anywhere";
 
 /**
  * The blocks a graph can use, with their ports. Its read has its own loading and unavailable
@@ -31,7 +31,7 @@ export function BlockCatalogTable({ className }: { className?: string }) {
           pending={catalog.pending}
         />
       ) : (
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-ui">
           <thead>
             <tr className="border-b">
               <th scope="col" className={cn(HEADER, "pr-2")}>
@@ -52,7 +52,7 @@ export function BlockCatalogTable({ className }: { className?: string }) {
                 data-block={block.block}
                 className="border-b align-top last:border-b-0"
               >
-                <td className="py-2 pr-2 font-mono text-[12px] font-medium wrap-anywhere">
+                <td className="py-2 pr-2 font-mono text-caption font-medium wrap-anywhere">
                   {block.block} v{block.version}
                 </td>
                 <td className={cn(CELL, "px-2")}>

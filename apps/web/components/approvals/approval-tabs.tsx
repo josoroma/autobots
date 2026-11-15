@@ -1,6 +1,6 @@
 import type { ApprovalCounts } from "@autobots/api-client";
 
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 export type Tab = "waiting" | "decided";
 
@@ -26,35 +26,18 @@ export function ApprovalTabs({
   onChoose: (tab: Tab) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Requests"
-      className="bg-muted/60 inline-flex w-fit gap-0.5 rounded-lg p-[3px]"
-    >
-      {TABS.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          data-tab={id}
-          aria-pressed={tab === id}
-          onClick={() => {
-            if (id !== tab) onChoose(id);
-          }}
-          className={cn(
-            "text-foreground/80 inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-3 text-[13px]",
-            tab === id &&
-              "bg-background text-foreground border-border font-medium dark:bg-accent",
-          )}
-        >
-          {label}
-          {counts === null ? null : (
-            <>
-              {" "}
-              <span className="tabular-nums">{counts[id]}</span>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      label="Requests"
+      dataKey="tab"
+      items={TABS.map(([id, label]) => ({
+        id,
+        label,
+        ...(counts === null ? {} : { count: counts[id] }),
+      }))}
+      value={tab}
+      onChange={(id) => {
+        if (id !== tab) onChoose(id);
+      }}
+    />
   );
 }

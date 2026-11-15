@@ -19,7 +19,7 @@ function VersionSwitch({
   onChoose: (version: string) => void;
 }) {
   return (
-    <label className="ml-auto flex items-center gap-2 text-[13px]">
+    <label className="ml-auto flex items-center gap-2 text-ui">
       <span className="text-muted-foreground">Version</span>
       <Select
         value={shown}
@@ -85,7 +85,7 @@ export function WorkflowPreview({
           id="preview-heading"
           ref={heading}
           tabIndex={-1}
-          className="scroll-mt-4 text-[15px] font-semibold outline-none"
+          className="scroll-mt-4 text-lead font-semibold outline-none"
         >
           Preview: {workflow.name}
         </h2>

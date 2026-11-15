@@ -1,36 +1,27 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 
 import { useThemeChoice } from "@/components/theme-provider";
 import { Choice } from "@/components/ui/field";
+import {
+  applyPreference,
+  PRESENTATION,
+  readPreference,
+  type Preference,
+  type PreferenceValue,
+  type ThemeChoiceName,
+} from "@/lib/preferences";
+import { PREVIEWS, type PreviewTheme } from "@/lib/theme-preview";
+import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
-const subscribe = () => () => undefined;
-
-// Fixed swatches, so each card previews its own theme whatever the page is in. Decorative: the label names
-// it. Each value is the exact luma.css declaration for that theme (background, sidebar, border or muted,
-// sidebar-primary), repeated because a light preview can't inherit :root inside a dark page.
-const PREVIEWS = {
-  dark: {
-    surface: "bg-[oklch(0.145_0_0)]",
-    side: "bg-[oklch(0.205_0_0)]",
-    bar: "bg-[oklch(0.269_0_0)]",
-    accent: "bg-[oklch(0.623_0.214_259.815)]",
-  },
-  light: {
-    surface: "bg-[oklch(1_0_0)]",
-    side: "bg-[oklch(0.985_0_0)]",
-    bar: "bg-[oklch(0.922_0_0)]",
-    accent: "bg-[oklch(0.546_0.245_262.881)]",
-  },
-} as const;
-
+// Decorative: the label names the theme each pane previews.
 function Pane({
   theme,
   className,
 }: {
-  theme: keyof typeof PREVIEWS;
+  theme: PreviewTheme;
   className?: string;
 }) {
   const tone = PREVIEWS[theme];
@@ -50,11 +41,11 @@ function Pane({
   );
 }
 
-function ThemePreview({ theme }: { theme: "system" | "light" | "dark" }) {
+function ThemePreview({ theme }: { theme: ThemeChoiceName }) {
   return (
     <span
       aria-hidden="true"
-      className="border-border mb-1.5 grid h-[78px] overflow-hidden rounded-[7px] border"
+      className="border-border mb-1.5 grid h-[78px] overflow-hidden rounded-inset border"
     >
       {theme === "system" ? (
         // Half of each, as it follows the OS.
@@ -69,84 +60,85 @@ function ThemePreview({ theme }: { theme: "system" | "light" | "dark" }) {
   );
 }
 
-const THEMES = [
+// The choices lib/preferences.ts allows, in the order Settings offers them.
+const THEMES: readonly { value: ThemeChoiceName; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
-] as const;
+];
 
 const CARD =
-  "border-border has-[:checked]:border-primary/65 has-[:checked]:ring-primary/15 block min-w-0 cursor-pointer rounded-[10px] border p-1.5 text-[13px] has-[:checked]:ring-[3px] has-[:disabled]:cursor-default";
+  "border-border has-checked:border-primary/65 has-checked:ring-primary/15 block min-w-0 cursor-pointer rounded-lg border p-1.5 text-ui has-checked:ring-3 has-disabled:cursor-default";
 const OPTION =
-  "border-border has-[:checked]:border-primary/65 flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[13px] has-[:disabled]:cursor-default";
+  "border-border has-checked:border-primary/65 flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-ui has-disabled:cursor-default";
 
-// PRD-Studio SE-03: presentation only, stored in this browser. The page applies a saved choice before
-// paint (see app/layout.tsx), and each change here sets the same attribute on the root element.
-type Preference = "serif" | "density" | "motion" | "stream";
-const DEFAULTS: Record<Preference, string> = {
-  serif: "on",
-  density: "comfortable",
-  motion: "system",
-  stream: "on",
-};
-const ATTRIBUTE_VALUE: Record<Preference, string> = {
-  serif: "off",
-  density: "compact",
-  motion: "reduce",
-  stream: "off",
-};
-
-function read(preference: Preference): string {
-  try {
-    const stored = window.localStorage.getItem(`autobots.${preference}`);
-    return stored === ATTRIBUTE_VALUE[preference]
-      ? stored
-      : DEFAULTS[preference];
-  } catch {
-    // Unreadable storage: whatever the page shows now, which the default or this session's choice set.
-    return document.documentElement.dataset[preference] ===
-      ATTRIBUTE_VALUE[preference]
-      ? ATTRIBUTE_VALUE[preference]
-      : DEFAULTS[preference];
-  }
-}
-
-function apply(preference: Preference, value: string): void {
-  const root = document.documentElement;
-  if (value === ATTRIBUTE_VALUE[preference]) root.dataset[preference] = value;
-  else delete root.dataset[preference];
-  try {
-    if (value === DEFAULTS[preference])
-      window.localStorage.removeItem(`autobots.${preference}`);
-    else window.localStorage.setItem(`autobots.${preference}`, value);
-  } catch {
-    // Storage that can't be written keeps the choice for this page only.
-  }
-}
-
-function usePreference(
-  preference: Preference,
+// PRD-Studio SE-03: presentation only, stored in this browser through lib/preferences.ts, which the
+// before-paint script also reads. Each change sets the same attribute on the root element.
+function usePreference<P extends Preference>(
+  preference: P,
   mounted: boolean,
-): [string, (value: string) => void] {
-  const [chosen, setChosen] = useState<string | null>(null);
-  const value = chosen ?? (mounted ? read(preference) : DEFAULTS[preference]);
+): [PreferenceValue<P>, (value: PreferenceValue<P>) => void] {
+  const [chosen, setChosen] = useState<PreferenceValue<P> | null>(null);
+  const root = () => document.documentElement;
+  const storage = () => window.localStorage;
+  const value =
+    chosen ??
+    (mounted
+      ? readPreference(preference, storage, root())
+      : PRESENTATION[preference].fallback);
   return [
     value,
-    (next: string) => {
-      apply(preference, next);
+    (next) => {
+      applyPreference(preference, next, storage, root());
       setChosen(next);
     },
   ];
 }
 
+/** Density and Motion: one radio per value of a preference, fallback first. */
+function PreferenceRadioGroup<P extends "density" | "motion">({
+  preference,
+  legend,
+  labels,
+  value,
+  disabled,
+  onChange,
+}: {
+  preference: P;
+  legend: string;
+  labels: Readonly<Record<PreferenceValue<P>, string>>;
+  value: PreferenceValue<P>;
+  disabled: boolean;
+  onChange: (value: PreferenceValue<P>) => void;
+}) {
+  const { fallback, attribute } = PRESENTATION[preference];
+  const values: readonly PreferenceValue<P>[] = [fallback, attribute];
+  return (
+    <fieldset className="min-w-0">
+      <legend className="mb-2.5 text-sm font-semibold">{legend}</legend>
+      <div className="grid max-w-lg grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {values.map((option) => (
+          <label key={option} className={OPTION}>
+            <Choice
+              type="radio"
+              name={preference}
+              value={option}
+              checked={value === option}
+              disabled={disabled}
+              onChange={() => onChange(option)}
+            />
+            {labels[option]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 // The checked state depends on the browser, so it renders only after mount, and no hydration warning is hidden.
 export function AppearanceControl() {
   const { theme, setTheme } = useThemeChoice();
-  const mounted = useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
+  const mounted = useMounted();
   const current = mounted ? theme : undefined;
   const [serif, setSerif] = usePreference("serif", mounted);
   const [density, setDensity] = usePreference("density", mounted);
@@ -174,7 +166,7 @@ export function AppearanceControl() {
             </label>
           ))}
         </div>
-        <p className="text-muted-foreground mt-2 text-[12.5px]">
+        <p className="text-muted-foreground mt-2 text-meta">
           System follows this Mac&apos;s setting. Until you choose, the app is
           dark.
         </p>
@@ -202,59 +194,29 @@ export function AppearanceControl() {
         </label>
         <p
           data-field="document-sample"
-          className="font-document mt-2.5 max-w-lg text-[15px] leading-relaxed"
+          className="font-document mt-2.5 max-w-lg text-lead leading-relaxed"
         >
           A run&apos;s goal and its evidence read like this.
         </p>
       </fieldset>
 
-      <fieldset className="min-w-0">
-        <legend className="mb-2.5 text-sm font-semibold">Density</legend>
-        <div className="grid max-w-lg grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {(
-            [
-              { value: "comfortable", label: "Comfortable" },
-              { value: "compact", label: "Compact" },
-            ] as const
-          ).map(({ value, label }) => (
-            <label key={value} className={OPTION}>
-              <Choice
-                type="radio"
-                name="density"
-                value={value}
-                checked={density === value}
-                disabled={!mounted}
-                onChange={() => setDensity(value)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <PreferenceRadioGroup
+        preference="density"
+        legend="Density"
+        labels={{ comfortable: "Comfortable", compact: "Compact" }}
+        value={density}
+        disabled={!mounted}
+        onChange={setDensity}
+      />
 
-      <fieldset className="min-w-0">
-        <legend className="mb-2.5 text-sm font-semibold">Motion</legend>
-        <div className="grid max-w-lg grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {(
-            [
-              { value: "system", label: "Follow this Mac" },
-              { value: "reduce", label: "Always reduce motion" },
-            ] as const
-          ).map(({ value, label }) => (
-            <label key={value} className={OPTION}>
-              <Choice
-                type="radio"
-                name="motion"
-                value={value}
-                checked={motion === value}
-                disabled={!mounted}
-                onChange={() => setMotion(value)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <PreferenceRadioGroup
+        preference="motion"
+        legend="Motion"
+        labels={{ system: "Follow this Mac", reduce: "Always reduce motion" }}
+        value={motion}
+        disabled={!mounted}
+        onChange={setMotion}
+      />
     </div>
   );
 }
