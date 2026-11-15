@@ -16,7 +16,8 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session
-from autobots.application.goal_loop import LoopConfig, _drive
+from autobots.application.goal_loop import drive_lease
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert
@@ -48,7 +49,7 @@ async def main() -> None:
             accepted = await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text=goal,
                                        limit_micro_usd=1_000_000, policy=resolve_role_policy(), binding=binding)
             lease = await claim_run(db, accepted.run_id, worker_id='browser-arrangement')
-            await _drive(db, URL, lease, lambda: Script(items=items, seen=[], bound=[]), config)
+            await drive_lease(db, URL, lease, lambda: Script(items=items, seen=[], bound=[]), config)
             return str(accepted.run_id)
 
         waiting = await run(waiting_in, 'A plan, an artifact and a pending approval',

@@ -15,8 +15,8 @@ Conventions for every service log line (R-25, XERR-12):
   string, a key or a provider's reply.
 - Levels follow the audience. ERROR: someone has to look, such as a defect or a failed unattended
   step. WARNING: degraded, tolerated or retrying by itself. INFO: lifecycle.
-- A failure that can recur on every pass goes through `Repeated`, which logs its first occurrence
-  and then every Nth, with the count.
+- A failure that can recur on every pass goes through `Repeated` (`autobots.domain.repetition`),
+  which logs its first occurrence and then every Nth, with the count.
 - A module that STD-01 keeps from importing this one, such as the tool gateway or the API's error
   handlers, writes the same record with its own logger:
   `logger.log(level, event, extra={"fields": {...}})`.
@@ -30,10 +30,12 @@ import sys
 import traceback
 from collections import deque
 from collections.abc import MutableMapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
+# Defined in the domain, so the run lifecycle uses it without importing this layer (R-33).
+# Re-exported for this module's users.
+from autobots.domain.repetition import Repeated as Repeated
 from autobots.domain.secret_patterns import LOG_SHAPES, mask
 
 # Logs also mask a key inside a word. Shown text doesn't, so "task-specific" stays readable there.
@@ -175,22 +177,6 @@ def configure_logging(stream: TextIO | None = None) -> None:
 def log_event(logger: logging.Logger, event: str, level: int = logging.INFO, **fields: Any) -> None:
     """One line, by the conventions at the top of this module."""
     logger.log(level, event, extra={"fields": fields})
-
-
-@dataclass
-class Repeated:
-    """A failure that can recur on every pass, such as a lost connection. Its first occurrence and
-    every `every`-th are worth a line; `cleared` starts the count again once it works."""
-
-    every: int = 30
-    count: int = 0
-
-    def failed(self) -> bool:
-        self.count += 1
-        return self.count == 1 or self.count % self.every == 0
-
-    def cleared(self) -> None:
-        self.count = 0
 
 
 def forbid_remote_tracing(environ: MutableMapping[str, str]) -> None:

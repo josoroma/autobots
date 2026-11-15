@@ -74,7 +74,7 @@ An idle worker continuing to poll does not mean a completed goal is still reason
 
 Canonical terminal states are **`succeeded`, `failed`, `cancelled`**. Terminal runs cannot resume. A continuation of finished work requires a new run. Only `paused` uses the generic `resume` command; waiting states use validated input/approval decisions.
 
-Code: [`PAUSE_FOR`, `NOT_OURS` and `_finish()`](services/agent/src/autobots/application/goal_loop.py), [`STOPPING` and `REPAIRABLE`](services/agent/src/autobots/adapters/loop_middleware.py), [canonical transitions](services/agent/src/autobots/domain/runs.py). Sources: **SP-010, SP-012, US-4.7**.
+Code: [`DISPOSITION`, `PAUSE_FOR` and `NOT_OURS`](services/agent/src/autobots/domain/stops.py), [`finish()`](services/agent/src/autobots/application/run_lifecycle.py), [`STOPPING` and `REPAIRABLE`](services/agent/src/autobots/adapters/loop_middleware.py), [canonical transitions](services/agent/src/autobots/domain/runs.py). Sources: **SP-010, SP-012, US-4.7**.
 
 ## 4. What are the default limits?
 
@@ -203,7 +203,7 @@ These checks have a bounded meaning: evidence exists, publication is consistent,
 
 The canonical state machine permits `verifying → running` for bounded repair. **The current goal-run candidate handler directly succeeds or fails after verification; it does not automatically start that repair loop.** Workflow runs have a separate completion path based on settled node instances.
 
-Code: [`verify_candidate()`](services/agent/src/autobots/application/verification.py), [`_settle_candidate()`](services/agent/src/autobots/application/goal_loop.py), [`plan_view()` and evidence checks](services/agent/src/autobots/application/plans.py), [`artifacts.py`](services/agent/src/autobots/application/artifacts.py).
+Code: [`verify_candidate()`](services/agent/src/autobots/application/verification.py), [`settle_candidate()`](services/agent/src/autobots/application/goal_loop.py), [`plan_view()` and evidence checks](services/agent/src/autobots/application/plans.py), [`artifacts.py`](services/agent/src/autobots/application/artifacts.py).
 
 ## 13. What happens on pause, cancellation, browser closure or worker restart?
 

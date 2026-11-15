@@ -137,7 +137,7 @@ async def _listener(request: Request) -> AsyncConnection[Any] | None:
     return connection
 
 
-def _live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
+def live_frame(run_id: UUID, cursor: int, payload: str) -> str | None:
     """Only this run's text, re-validated as the typed delta. Sent as `live`, with no `id:`, so it
     never moves the browser's replay cursor; `sequence` names the durable event it follows."""
     try:
@@ -217,7 +217,7 @@ async def _durable_and_live(
             continue
         # Waits as the poll did, passing on this run's live text as it arrives.
         async for note in listener.notifies(timeout=POLL_SECONDS):
-            frame = _live_frame(run_id, cursor, note.payload)
+            frame = live_frame(run_id, cursor, note.payload)
             if frame is not None:
                 yield frame
                 last_sent = loop.time()

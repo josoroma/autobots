@@ -147,7 +147,9 @@ def reference_shape(reference: str) -> str:
     return "other_path" if "/" in reference else "bare_name"
 
 
-async def _evidence_exists(connection: Any, run_id: UUID, kind: str, reference: str) -> bool:
+async def evidence_exists(connection: Any, run_id: UUID, kind: str, reference: str) -> bool:
+    """Whether a task's evidence is on record for this run: an artifact as a file saved at that
+    path, anything else as a succeeded receipt with that operation id."""
     if kind == "artifact":
         sql = "select 1 from app_private.run_files where run_id = %s and path = %s limit 1"
     else:
@@ -216,7 +218,7 @@ def plan_tools(limits: RootLimits) -> tuple[ToolDefinition, ToolDefinition]:
         if not set(task.depends_on) <= done:
             raise ToolFailed(GatewayCode.TASK_DEPENDENCIES_OPEN)
         for item in arguments.evidence:
-            if not await _evidence_exists(context.connection, run_id, item.kind, item.reference):
+            if not await evidence_exists(context.connection, run_id, item.kind, item.reference):
                 detail = f"{item.kind}:{reference_shape(item.reference)}"
                 raise ToolFailed(GatewayCode.EVIDENCE_INVALID, detail=detail)
         async with context.connection.transaction():

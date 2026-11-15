@@ -19,8 +19,9 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.adapters.result_stream import CHANNEL
-from autobots.api.event_routes import _live_frame
-from autobots.application.goal_loop import LoopConfig, _drive
+from autobots.api.event_routes import live_frame
+from autobots.application.goal_loop import drive_lease
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.runs import RunEvent
@@ -70,7 +71,7 @@ async def main() -> None:
                     notes.append(payload)
 
         listening = asyncio.ensure_future(listen())
-        result = await _drive(db, URL, lease, lambda: model, config)
+        result = await drive_lease(db, URL, lease, lambda: model, config)
         await asyncio.sleep(0.5)
         listening.cancel()
 
@@ -100,12 +101,12 @@ async def main() -> None:
         check('each file the run writes streams as its own segment', 'segment 1 is the first file', first, first == 'WORKING-NOTE-NOT-A-RESULT')
         durable = (await (await db.execute("select count(*) from public.run_events where run_id = %s and payload ->> 'type' = 'result.text.delta'", (run,))).fetchone())[0]
         check('no delta is stored as a durable event', '0', durable, durable == 0)
-        frame = _live_frame(run, 3, json.dumps(notes[0])) if notes else None
+        frame = live_frame(run, 3, json.dumps(notes[0])) if notes else None
         event = RunEvent.model_validate_json(frame.split('data: ', 1)[1]) if frame else None
         check('the API sends a delta as a typed result.text.delta at schema_version 1, and only this run\'s', 'typed, other runs dropped',
-              (event.payload.type if event else None, _live_frame(uuid4(), 3, json.dumps(notes[0])) if notes else 'none'),
+              (event.payload.type if event else None, live_frame(uuid4(), 3, json.dumps(notes[0])) if notes else 'none'),
               event is not None and event.schema_version == 1 and event.payload.type == 'result.text.delta'
-              and _live_frame(uuid4(), 3, json.dumps(notes[0])) is None)
+              and live_frame(uuid4(), 3, json.dumps(notes[0])) is None)
     print(json.dumps({'cases': cases, 'browser_env': {
         'AUTOBOTS_TEST_STREAM_HELPER': str(Path(__file__).parent / 'result_stream_live.py'),
         'AUTOBOTS_TEST_STORAGE_BASE': BASE}}))

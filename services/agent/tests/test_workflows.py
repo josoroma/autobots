@@ -10,7 +10,7 @@ import pytest
 
 from autobots.application.run_projection import public_text
 from autobots.application.tool_gateway import ToolResult, ToolScope, _operation_id
-from autobots.application.workflow_runner import _run_block, _Stop, _tool
+from autobots.application.workflow_runner import InstanceStopped, _run_block, call_tool
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.domain.tools import ToolOutcome
 from autobots.domain.workflow_execution import BlockFailed, GraphShape, Step, unsettled_nodes
@@ -320,7 +320,8 @@ def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
 
     def run(outcome: ToolOutcome, code: str | None, output: dict[str, Any] | None = None) -> Any:
         gateway = Returning(ToolResult(outcome, code, output))
-        return asyncio.run(_tool(gateway, None, None, "t", {}))  # type: ignore[arg-type]
+        # A stand-in gateway, with no connection or scope, as `call_tool` only passes them on.
+        return asyncio.run(call_tool(gateway, None, None, "t", {}))  # type: ignore[arg-type]
 
     stops = (
         "approval_pending",
@@ -334,7 +335,7 @@ def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
         "run_not_found",
     )
     for code in stops:
-        with pytest.raises(_Stop) as stopped:
+        with pytest.raises(InstanceStopped) as stopped:
             run(ToolOutcome.FAILED, code)
         assert stopped.value.code == code
     for code in ("tool_failed", "output_too_large", "plan_revisions_limit", "children_limit"):

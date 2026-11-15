@@ -300,7 +300,9 @@ async def run_routine_now(
             await _record(connection, routine_id, moment, version, "blocked", refused.code)
             return "blocked", refused.code, None
         try:
-            run_id = await _admit(connection, workspace_id, routine_id, version, config, moment)
+            run_id = await admit_occurrence(
+                connection, workspace_id, routine_id, version, config, moment
+            )
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
             await _record(connection, routine_id, moment, version, "blocked", refused.code)
             return "blocked", refused.code, None
@@ -334,7 +336,7 @@ async def _record(
     )
 
 
-async def _admit(
+async def admit_occurrence(
     connection: Any,
     workspace_id: UUID,
     routine_id: UUID,
@@ -342,6 +344,9 @@ async def _admit(
     config: RoutineConfig,
     moment: datetime,
 ) -> UUID:
+    """Admits the run one occurrence starts: the workflow's execution, or the Expert's run under its
+    pinned version's bindings and tools. Its key is the routine and the occurrence time, so
+    admitting the same occurrence again returns that run (SP-014)."""
     key = f"routine:{routine_id}:{moment.isoformat()}"
     actor = routine_id
     if config.target.kind == "workflow":
@@ -462,7 +467,9 @@ async def _evaluate_one(
             await _record(connection, routine_id, latest, version, "blocked", refused.code)
             return 0
         try:
-            run_id = await _admit(connection, workspace_id, routine_id, version, config, latest)
+            run_id = await admit_occurrence(
+                connection, workspace_id, routine_id, version, config, latest
+            )
         except (RoutineRefused, WorkflowRefused, IdempotencyConflict, ExpertRefused) as refused:
             await _record(connection, routine_id, latest, version, "blocked", refused.code)
             return 0

@@ -14,12 +14,12 @@ from autobots.adapters import loop_middleware
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import LoopConfig, _drive, _settle_children
+from autobots.application.goal_loop import drive_lease
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.operations import REQUIRED_COLUMNS, database_conditions
 from autobots.application.plans import load_goal
-from autobots.application.routines import RoutineRefused
-from autobots.application.routines import _admit as routine_admit
+from autobots.application.routines import RoutineRefused, admit_occurrence
+from autobots.application.run_lifecycle import LoopConfig, settle_children
 from autobots.application.run_projection import read_inspector, read_summary, read_workspace
 from autobots.application.runs import LinkRefused, admit_run
 from autobots.application.worker_leases import claim_run
@@ -98,7 +98,7 @@ async def main() -> None:
         await db.execute("insert into app_private.assignments (id, workspace_id, parent_run_id, child_run_id, root_run_id, operation_id, depth, expert_id, expert_version) values (%s, %s, %s, %s, %s, %s, 1, %s, 1)",
                          (assignment, WORKSPACE, parent, child, parent, f'review-{assignment}', expert))
         lease = await claim_run(db, parent, worker_id='review')
-        await _settle_children(db, lease)
+        await settle_children(db, lease)
         outcome = (await (await db.execute('select outcome from app_private.assignments where id = %s', (assignment,))).fetchone())[0]
         check('a child that succeeded is recorded as having succeeded', 'succeeded', outcome, outcome == 'succeeded')
 
@@ -193,7 +193,7 @@ async def main() -> None:
             model = Aware(items=[calls(calc), calls(calc), calls(calc), calls(calc), calls(calc), say('done')], seen=[], bound=[])
             config = LoopConfig(route=route, compaction=CompactionPolicy(context_chars=200, large_tool_chars=1000, keep_recent=2), sleep=lambda _: asyncio.sleep(0))
             # This exact run, so the jobs of the suites around it stay as they are.
-            ran = await _drive(db, URL, await claim_run(db, big, worker_id='reserving'), lambda: model, config)
+            ran = await drive_lease(db, URL, await claim_run(db, big, worker_id='reserving'), lambda: model, config)
         finally:
             loop_middleware.RESERVED_PROMPT_TOKENS = assumed
         rows = await (await db.execute('select role, min(reserved_micro_usd) from app_private.model_invocations where run_id = %s group by role', (big,))).fetchall()
@@ -204,7 +204,7 @@ async def main() -> None:
         # R3-2: a request that could reach a rate nothing was reserved at isn't sent.
         tiered = await admitted('Past the tier', 1_000_000)
         model = Aware(items=[say('never')], seen=[], bound=[])
-        result = await _drive(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0)))
+        result = await drive_lease(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0)))
         check('a request that could reach a higher tier is refused before sending', 'cost_unavailable, no call', (result.code, len(model.seen)), result.code == 'cost_unavailable' and not model.seen)
 
         # US-12.1: a saved choice naming DeepSeek refuses new work, with no substitute and no rewrite.
@@ -235,7 +235,7 @@ async def main() -> None:
         routine = RoutineConfig(target=RoutineTarget(kind='expert', id=lover.id, version=1), goal='Scheduled work', trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500)
         before_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
         try:
-            await routine_admit(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC))
+            await admit_occurrence(db, WORKSPACE, uuid4(), 1, routine, datetime(2026, 1, 1, tzinfo=UTC))
             check("an occurrence on a saved Expert binding is refused", 'model_not_offered', 'admitted', False)
         except RoutineRefused as refused:
             after_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
@@ -247,7 +247,7 @@ async def main() -> None:
         model = Aware(items=[calls(('propose_plan', {'tasks': [task]})), calls(('calculate', {'operation': 'sum', 'values': [1, 2], 'note': 'x\ud83dy'})), say('after'), say('after')], seen=[], bound=[])
         odd_lease = await claim_run(db, odd, worker_id='surrogate')
         try:
-            outcome = await _drive(db, URL, odd_lease, lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000), sleep=lambda _: asyncio.sleep(0)))
+            outcome = await drive_lease(db, URL, odd_lease, lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000), sleep=lambda _: asyncio.sleep(0)))
             ended = (outcome.run_status, outcome.code)
         except Exception as raised:  # noqa: BLE001 - what the worker's loop would see.
             ended = ('raised', type(raised).__name__)

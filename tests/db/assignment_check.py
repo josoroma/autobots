@@ -13,9 +13,10 @@ import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.experts import create_expert, create_session, resolve_binding
-from autobots.application.goal_loop import LoopConfig, _finish, process_next
+from autobots.application.goal_loop import process_next
 from autobots.application.model_admission import ModelAdmission
 from autobots.application.plans import load_goal
+from autobots.application.run_lifecycle import LoopConfig, finish
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import Inheritance, admit_run, apply_command
@@ -297,7 +298,7 @@ async def main() -> None:
         version = await value('select version from public.runs where id = %s', child)
         await apply_command(db, workspace_id=WORKSPACE, run_id=child, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
         settled = await claim_run(db, child, worker_id='settle-child', lease_seconds=30)
-        await _finish(db, settled, await load_goal(db, child), 'run_not_running')
+        await finish(db, settled, await load_goal(db, child), 'run_not_running')
         child_state = await value('select status from public.runs where id = %s', child)
         invocation = await value("select id from app_private.model_invocations where run_id = %s and status = 'uncertain'", child)
         await ModelAdmission(db).reconcile(invocation, 80)

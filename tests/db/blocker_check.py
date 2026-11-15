@@ -6,10 +6,11 @@ import json
 import os
 import sys
 from typing import Any
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
-from autobots.application import assignments
+from autobots.application import assignments, tool_gateway
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
     ApprovalRefused,
@@ -19,22 +20,25 @@ from autobots.application.approvals import (
 )
 from autobots.application.compaction import CompactionPolicy, offload_large
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import LoopConfig, _finish, process_next
+from autobots.application.goal_loop import drive_lease, process_next
 from autobots.application.memory import READ_OFFLOAD
 from autobots.application.plans import load_goal
 from autobots.application.reconciliation import record_evidence
+from autobots.application.run_lifecycle import LoopConfig, finish
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
+    Call,
     ToolContext,
     ToolDefinition,
     ToolGateway,
     ToolRegistry,
     ToolScope,
-    _record,
+    record_receipt,
+    resolve,
 )
 from autobots.application.worker_leases import claim_next
-from autobots.application.workflow_runner import _Stop, _tool, run_workflow
+from autobots.application.workflow_runner import InstanceStopped, call_tool, run_workflow
 from autobots.application.workflows import create_execution, create_workflow, publish_version
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
@@ -112,11 +116,8 @@ async def pause_inside_assignment(db: Db) -> None:
         return await real_binding(*args, **kwargs)
 
     lease = await db.claim(run, worker_id='b6-assignment')
-    assignments.resolve_binding = pause_then_bind
-    try:
-        await run_workflow(db.connection, URL, lease, Script(items=[]), config)
-    finally:
-        assignments.resolve_binding = real_binding
+    with patch.object(assignments, 'resolve_binding', pause_then_bind):
+        await run_workflow(db.connection, URL, lease, Script(items=[]), config, drive=drive_lease)
     cases.check('arranged: the pause lands after the gateway admitted the assignment, before its leased read',
                 "once, on a running run whose receipt is started", seen, lambda found: found == [('running', 'started')])
     status, children = await standing()
@@ -127,11 +128,95 @@ async def pause_inside_assignment(db: Db) -> None:
     await db.command(run, RunCommand.RESUME, Actor.USER)
     lease = await db.claim(run, worker_id='b6-assignment-resume')
     model = Script(items=[say('never asked')])
-    await run_workflow(db.connection, URL, lease, model, config)
+    await run_workflow(db.connection, URL, lease, model, config, drive=drive_lease)
     status, children = await standing()
     cases.check('resumed, the step runs its assignment again and the run stays resumable',
                 'ask has no instance, one child, run paused, no model call',
                 (await ask(), children, status, len(model.seen)), lambda found: found == (None, 1, 'paused', 0))
+
+
+async def stale_writers(db: Db) -> None:
+    """B2: a stale worker can't admit an effect, and a late writer can't rewrite a receipt (SP-012).
+    Re-admission that finds a success landed since its read returns it and sends nothing."""
+    cases, connection = db.cases, db.connection
+    sends: list[str] = []
+
+    async def send(arguments: Note, _: ToolContext) -> Sent:
+        sends.append(arguments.text)
+        return Sent(delivered=True)
+
+    async def receipt(operation: str) -> tuple[Any, ...]:
+        return await db.row('select status, generation from app_private.tool_receipts where operation_id = %s', operation)
+
+    def scope_of(lease: Any, tools: dict[str, int]) -> ToolScope:
+        return ToolScope(db.workspace, lease.run_id, lease.generation, tools)
+
+    def resolved(scope: ToolScope, text: str) -> Any:
+        return resolve(gateway.registry, scope, 'send_once', {'text': text})
+
+    effect = ToolDefinition(tool_id='send_once', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE, handler=send)
+    gateway = ToolGateway(ToolRegistry())
+    gateway.registry.register(effect)
+    run = await db.admit('Blocker goal')
+    first = await db.claim(run, worker_id='w1')
+    await db.expire(run)
+    second = await db.claim(run, worker_id='w2')
+    cases.check('two workers hold two generations', 'a higher second', (first.generation, second.generation), second.generation > first.generation)
+    done = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'hello'})
+    operation = done.operation_id
+    cases.check('the current owner sends once', 'succeeded, one send', (done.outcome.value, len(sends)), done.outcome.value == 'succeeded' and len(sends) == 1)
+    # The state a worker wakes into after passing its check: straight to admission, with the call it resolved.
+    stale_scope = scope_of(first, {'send_once': 1})
+    late = await gateway.admit_effect(connection, stale_scope, resolved(stale_scope, 'hello'))
+    cases.check('a worker that stalled after its check admits nothing', 'lease_lost, still one send', (late.code, len(sends)), late.code == 'lease_lost' and len(sends) == 1)
+    fresh = await gateway.admit_effect(connection, stale_scope, resolved(stale_scope, 'another'))
+    none = await db.value('select count(*) from app_private.tool_receipts where run_id = %s and status = %s', run, 'started')
+    cases.check('and a new operation from it writes no receipt', 'lease_lost, none started, one send', (fresh.code, none, len(sends)), fresh.code == 'lease_lost' and none == 0 and len(sends) == 1)
+    stale_context = ToolContext(connection, stale_scope, operation)
+    await record_receipt(stale_context, operation, 'failed', None)
+    status, _ = await receipt(operation)
+    cases.check("a late failure can't overwrite a success", 'succeeded', status, status == 'succeeded')
+    replay = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'hello'})
+    cases.check('so the next replay reads it instead of sending again', 'replayed, one send', (replay.replayed, len(sends)), replay.replayed and len(sends) == 1)
+    # An in-flight attempt by the current owner, and a stale writer behind it.
+    operation_two = 'arranged-started'
+    await connection.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values (%s, %s, %s, 'send_once', 1, 'x', 'started', %s)", (operation_two, run, db.workspace, second.generation))
+    await record_receipt(stale_context, operation_two, 'failed', None)
+    cases.check("a late failure can't end the owner's attempt", 'started', (await receipt(operation_two))[0], lambda found: found == 'started')
+    await record_receipt(ToolContext(connection, scope_of(second, {}), operation_two), operation_two, 'unknown', None)
+    await record_evidence(connection, workspace_id=db.workspace, run_id=run, operation_id=operation_two, actor_id=db.actor, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
+    await record_receipt(stale_context, operation_two, 'succeeded', {'late': True})
+    kept = await db.value('select evidence from app_private.tool_receipts where operation_id = %s', operation_two)
+    cases.check("a real late success outranks a ruling that it didn't happen", 'succeeded, evidence kept', (await receipt(operation_two))[0], lambda found: found == 'succeeded' and kept is not None)
+    await record_receipt(stale_context, operation_two, 'failed', None)
+    cases.check("and a late failure can't undo it", 'succeeded', (await receipt(operation_two))[0], lambda found: found == 'succeeded')
+    # The review's case: a person rules it wasn't delivered, and the fresh attempt delivers.
+    ruled = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
+    await connection.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (ruled.operation_id,))
+    await record_evidence(connection, workspace_id=db.workspace, run_id=run, operation_id=ruled.operation_id, actor_id=db.actor, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
+    count = len(sends)
+    again = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
+    final = (await receipt(ruled.operation_id))[0]
+    cases.check('a fresh attempt after a ruling is recorded', 'succeeded, sent once more, receipt succeeded', (again.outcome.value, len(sends) - count, final), again.outcome.value == 'succeeded' and len(sends) - count == 1 and final == 'succeeded')
+    # Re-admission finding a success landed since its read: it returns that, and doesn't send.
+    raced = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'raced'})
+    await connection.execute("update app_private.tool_receipts set status = 'failed' where operation_id = %s", (raced.operation_id,))
+    real_replay = tool_gateway.replay_receipt
+    calls_made = 0
+
+    async def landed_after_read(context: ToolContext, call: Call) -> Any:
+        nonlocal calls_made
+        calls_made += 1
+        if calls_made == 1:
+            # The read says failed, then a late success lands before re-admission.
+            await connection.execute("update app_private.tool_receipts set status = 'succeeded', result = %s where operation_id = %s", (json.dumps({'delivered': True}), call.operation_id))
+            return None
+        return await real_replay(context, call)
+
+    count = len(sends)
+    with patch.object(tool_gateway, 'replay_receipt', landed_after_read):
+        duplicate = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'raced'})
+    cases.check("re-admission won't send over a success that landed after its read", 'replayed, no send', (duplicate.replayed, len(sends) - count), duplicate.replayed and len(sends) == count)
 
 
 async def main() -> None:
@@ -187,77 +272,11 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='b1-page')
         await gateway.execute(db, scope_of(lease, {'send_note': 1}), 'send_note', {'text': 'y' * (ARGUMENT_LIMIT + 500)})
 
-        # B2: a stale worker can't admit an effect, and a late writer can't rewrite a receipt.
-        sends: list[str] = []
-
-        async def send(arguments: Note, _: ToolContext) -> Sent:
-            sends.append(arguments.text)
-            return Sent(delivered=True)
-        effect = ToolDefinition(tool_id='send_once', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE, handler=send)
-        gateway = ToolGateway(ToolRegistry())
-        gateway.registry.register(effect)
-        run = await admit()
-        first = await claim_next(db, worker_id='w1')
-        await expire(run)
-        second = await claim_next(db, worker_id='w2')
-        check('two workers hold two generations', 'a higher second', (first.generation, second.generation), second.generation > first.generation)
-        done = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'hello'})
-        operation = done.operation_id
-        check('the current owner sends once', 'succeeded, one send', (done.outcome.value, len(sends)), done.outcome.value == 'succeeded' and len(sends) == 1)
-        # The state a worker wakes into after passing its check: straight to admission.
-        stale_scope = scope_of(first, {'send_once': 1})
-        late = await gateway._effect(db, stale_scope, effect, Note(text='hello'))
-        check('a worker that stalled after its check admits nothing', 'lease_lost, still one send', (late.code, len(sends)), late.code == 'lease_lost' and len(sends) == 1)
-        fresh = await gateway._effect(db, stale_scope, effect, Note(text='another'))
-        none = await value('select count(*) from app_private.tool_receipts where run_id = %s and status = %s', run, 'started')
-        check('and a new operation from it writes no receipt', 'lease_lost, none started, one send', (fresh.code, none, len(sends)), fresh.code == 'lease_lost' and none == 0 and len(sends) == 1)
-        stale_context = ToolContext(db, stale_scope, operation)
-        await _record(stale_context, operation, 'failed', None)
-        status, _ = await receipt(operation)
-        check("a late failure can't overwrite a success", 'succeeded', status, status == 'succeeded')
-        replay = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'hello'})
-        check('so the next replay reads it instead of sending again', 'replayed, one send', (replay.replayed, len(sends)), replay.replayed and len(sends) == 1)
-        # An in-flight attempt by the current owner, and a stale writer behind it.
-        operation_two = 'arranged-started'
-        await db.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values (%s, %s, %s, 'send_once', 1, 'x', 'started', %s)", (operation_two, run, WORKSPACE, second.generation))
-        await _record(stale_context, operation_two, 'failed', None)
-        check("a late failure can't end the owner's attempt", 'started', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'started')
-        await _record(ToolContext(db, scope_of(second, {}), operation_two), operation_two, 'unknown', None)
-        await record_evidence(db, workspace_id=WORKSPACE, run_id=run, operation_id=operation_two, actor_id=ACTOR, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
-        await _record(stale_context, operation_two, 'succeeded', {'late': True})
-        check("a real late success outranks a ruling that it didn't happen", 'succeeded, evidence kept', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'succeeded' and await value('select evidence from app_private.tool_receipts where operation_id = %s', operation_two) is not None)
-        await _record(stale_context, operation_two, 'failed', None)
-        check("and a late failure can't undo it", 'succeeded', (await receipt(operation_two))[0], (await receipt(operation_two))[0] == 'succeeded')
-        # The review's case: a person rules it wasn't delivered, and the fresh attempt delivers.
-        ruled = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
-        await db.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (ruled.operation_id,))
-        await record_evidence(db, workspace_id=WORKSPACE, run_id=run, operation_id=ruled.operation_id, actor_id=ACTOR, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
-        count = len(sends)
-        again = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
-        final = (await receipt(ruled.operation_id))[0]
-        check('a fresh attempt after a ruling is recorded', 'succeeded, sent once more, receipt succeeded', (again.outcome.value, len(sends) - count, final), again.outcome.value == 'succeeded' and len(sends) - count == 1 and final == 'succeeded')
-        # Re-admission finding a success landed since its read: it returns that, and doesn't send.
-        raced = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'raced'})
-        await db.execute("update app_private.tool_receipts set status = 'failed' where operation_id = %s", (raced.operation_id,))
-        real_replay = ToolGateway._replay
-        calls_made = 0
-
-        async def landed_after_read(self: Any, context: Any, tool: Any, parsed: Any, operation_id: str) -> Any:
-            nonlocal calls_made
-            calls_made += 1
-            if calls_made == 1:
-                # The read says failed, then a late success lands before re-admission.
-                await db.execute("update app_private.tool_receipts set status = 'succeeded', result = %s where operation_id = %s", (json.dumps({'delivered': True}), operation_id))
-                return None
-            return await real_replay(self, context, tool, parsed, operation_id)
-
-        ToolGateway._replay = landed_after_read
-        count = len(sends)
-        try:
-            duplicate = await gateway.execute(db, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'raced'})
-        finally:
-            ToolGateway._replay = real_replay
-        check("re-admission won't send over a success that landed after its read", 'replayed, no send', (duplicate.replayed, len(sends) - count), duplicate.replayed and len(sends) == count)
+        # B2 through checklib (R-38): its cases join this check's line.
+        stale = Cases()
+        with stale.scenario('stale writers'):
+            await stale_writers(Db(db, stale, WORKSPACE, ACTOR))
+        cases.extend(stale.records)
 
         # B6: a pause during a node stops it, and its result comes back from the receipt.
         run = await admit()
@@ -273,9 +292,9 @@ async def main() -> None:
         gateway = ToolGateway(ToolRegistry())
         gateway.registry.register(uploader)
         try:
-            await _tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
+            await call_tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
             stopped = 'no stop'
-        except _Stop as stop:
+        except InstanceStopped as stop:
             stopped = stop.code
         check('a pause during a node stops it without failing it', 'run_not_running', stopped, stopped == 'run_not_running')
         stored = await value('select status from app_private.tool_receipts where run_id = %s', run)
@@ -284,7 +303,7 @@ async def main() -> None:
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.RESUME, actor=Actor.USER, expected_version=version)
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
         lease = await claim_next(db, worker_id='b6-resume')
-        output = await _tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
+        output = await call_tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
         check('on resume the node gets its result without uploading again', 'delivered, one upload', (output, len(uploads)), output == {'delivered': True} and len(uploads) == 1)
 
         # B6 inside an agent step, through checklib (R-38): its cases join this check's line.
@@ -324,10 +343,10 @@ async def main() -> None:
         owner = await claim_next(db, worker_id='current-owner')
         version = await value('select version from public.runs where id = %s', run)
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
-        lost = await _finish(db, stale, await load_goal(db, run), 'budget_exceeded')
+        lost = await finish(db, stale, await load_goal(db, run), 'budget_exceeded')
         untouched = (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0])
         check('a stale worker can not settle a cancelling run', 'lease_lost, cancelling, effect still started', (lost.code, untouched), lost.code == 'lease_lost' and untouched == ('cancelling', 'started'))
-        await _finish(db, owner, await load_goal(db, run), 'budget_exceeded')
+        await finish(db, owner, await load_goal(db, run), 'budget_exceeded')
         check('the current owner can', 'cancelled, effect unknown', (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0]), await value('select status from public.runs where id = %s', run) == 'cancelled' and (await receipt('stale-open'))[0] == 'unknown')
 
         # B9: stored evidence reads back whole, in pages, through the tool a model calls.

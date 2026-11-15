@@ -15,16 +15,12 @@ import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import publish
-from autobots.application.goal_loop import (
-    LoopConfig,
-    _settle_candidate,
-    loop_registry,
-    process_next,
-    run_goal,
-)
+from autobots.application.goal_loop import process_next, run_goal, settle_candidate
+from autobots.application.loop_tools import loop_registry
 from autobots.application.model_admission import AdmissionRequest, ModelAdmission
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.recovery import classify_interrupted
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_projection import read_workspace
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import IdempotencyConflict, admit_run, apply_command
@@ -82,27 +78,27 @@ async def main() -> None:
         # What a run must deliver.
         run = await admit()
         lease = await candidate(run)
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         check('a finished plan citing a saved file is not success with nothing published', 'failed, no_published_artifact', (result.run_status, await value('select unmet from app_private.run_verifications where run_id = %s', run)), result.run_status == 'failed' and await value('select unmet from app_private.run_verifications where run_id = %s', run) == ['no_published_artifact'])
 
         run = await admit()
         lease = await candidate(run)
         await publish(db, store, scope_of(lease), operation_id=uuid4().hex, name='anything.md', media_type='text/plain', content=b'bytes')
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         checks = await value('select checks from app_private.run_verifications where run_id = %s', run)
         check('with no requirement, a published artifact passes, and says nothing was judged', 'succeeded, 0 checks', (result.run_status, checks), result.run_status == 'succeeded' and checks == 0)
 
         run = await admit(required=required)
         lease = await candidate(run)
         await publish(db, store, scope_of(lease), operation_id=uuid4().hex, name='report.md', media_type='text/plain', content=b'Total: 9')
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         judged = await value('select checks from app_private.run_verifications where run_id = %s', run)
         check('the right bytes pass', 'succeeded, 1 check', (result.run_status, judged), result.run_status == 'succeeded' and judged == 1)
 
         run = await admit(required=required)
         lease = await candidate(run)
         await publish(db, store, scope_of(lease), operation_id=uuid4().hex, name='report.md', media_type='text/plain', content=b'Total: 8')
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         check('the wrong bytes fail', 'failed', result.run_status, result.run_status == 'failed')
 
         # A superseded copy can't stand in, and a lost object fails even with a good record.
@@ -113,7 +109,7 @@ async def main() -> None:
         second = uuid4().hex
         await publish(db, store, scope_of(lease), operation_id=second, name='report.md', media_type='text/plain', content=b'Total: 9 and more')
         await store.remove(f'{WORKSPACE}/{run}/{second}-report.md')
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         unmet = await value('select unmet from app_private.run_verifications where run_id = %s', run)
         check('a lost newest copy fails, though an older good one exists', 'failed, artifact_missing', (result.run_status, unmet), result.run_status == 'failed' and 'artifact_missing:report.md' in unmet)
 
@@ -122,7 +118,7 @@ async def main() -> None:
         lease = await candidate(run)
         await publish(db, store, scope_of(lease), operation_id=uuid4().hex, name='report.md', media_type='text/plain', content=b'Total: 9')
         await db.execute("insert into app_private.tool_receipts (operation_id, run_id, workspace_id, tool_id, tool_version, argument_hash, status, generation) values (%s, %s, %s, 'x', 1, 'h', 'unknown', 1)", (uuid4().hex, run, WORKSPACE))
-        result = await _settle_candidate(db, URL, lease, config)
+        result = await settle_candidate(db, URL, lease, config)
         unmet = await value('select unmet from app_private.run_verifications where run_id = %s', run)
         check('an unknown effect blocks success', 'failed, unknown_effect', (result.run_status, unmet), result.run_status == 'failed' and unmet == ['unknown_effect'])
         view = await read_workspace(db, WORKSPACE, run)
@@ -134,13 +130,13 @@ async def main() -> None:
         await publish(db, store, scope_of(stale), operation_id=uuid4().hex, name='report.md', media_type='text/plain', content=b'Total: 8')
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
         current = await claim_next(db, worker_id='current', lease_seconds=120)
-        good = await _settle_candidate(db, URL, current, config)
+        good = await settle_candidate(db, URL, current, config)
         check('a dead verifier\'s job is claimed and settled by a replacement', 'failed for the wrong bytes', (current.run_status, good.run_status), current.run_status == 'verifying' and good.run_status == 'failed')
         before = await value('select count(*) from app_private.run_verifications where run_id = %s', run)
         reason = await value('select stop_reason from app_private.run_usage where run_id = %s', run)
         events = await value('select count(*) from public.run_events where run_id = %s', run)
         await store.put(f'{WORKSPACE}/{run}/not-known.md', b'x', 'text/plain')
-        late = await _settle_candidate(db, URL, stale, config)
+        late = await settle_candidate(db, URL, stale, config)
         after = await value('select count(*) from app_private.run_verifications where run_id = %s', run)
         check('a stale verifier\'s recovery writes nothing to a finished run', 'no new event, the object stays', (await value('select count(*) from public.run_events where run_id = %s', run) - events, await store.get(f'{WORKSPACE}/{run}/not-known.md') is not None), await value('select count(*) from public.run_events where run_id = %s', run) == events and await store.get(f'{WORKSPACE}/{run}/not-known.md') is not None)
         check('a stale verifier writes no verdict and no reason', 'lost, 1 row, reason unchanged', (late.outcome, after, await value('select stop_reason from app_private.run_usage where run_id = %s', run)), late.outcome == 'lost' and before == after == 1 and await value('select stop_reason from app_private.run_usage where run_id = %s', run) == reason)

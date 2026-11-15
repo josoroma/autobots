@@ -21,7 +21,7 @@ from autobots.application import routines as routines_module
 from autobots.application.approvals import decide, list_approvals
 from autobots.application.assignments import Delegation, assign_tool
 from autobots.application.experts import create_expert, create_session, resolve_binding
-from autobots.application.goal_loop import LoopResult, _scope_guidance
+from autobots.application.goal_loop import scope_guidance
 from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory
 from autobots.application.operations import database_conditions
 from autobots.application.plans import load_goal
@@ -37,8 +37,8 @@ from autobots.application.reconciliation import (
 )
 from autobots.application.recovery import outstanding
 from autobots.application.retention import RetentionPolicy, apply_retention, write_policy
-from autobots.application.routines import _admit as routine_admit
-from autobots.application.routines import create_routine, evaluate_routines
+from autobots.application.routines import admit_occurrence, create_routine, evaluate_routines
+from autobots.application.run_lifecycle import LoopResult
 from autobots.application.run_usage import RootLimits
 from autobots.application.runs import Inheritance, admit_run, apply_command
 from autobots.application.tool_gateway import (
@@ -50,6 +50,7 @@ from autobots.application.tool_gateway import (
     ToolGateway,
     ToolRegistry,
     ToolScope,
+    resolve,
 )
 from autobots.application.worker_leases import claim_next, claim_run, is_held
 from autobots.application.workflows import (
@@ -126,7 +127,9 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     done = await gateway.execute(db, scope_of(lease, {'send_once': 1}), 'send_once', {'text': 'first'})
     await db.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (done.operation_id,))
     count = len(sends)
-    stopped = await gateway._effect(db, scope_of(lease, {'send_once': 1}), effect, Note(text='first'))
+    # A worker that passed its checks before the cancel, straight to the effect step: the call it resolved then.
+    scope = scope_of(lease, {'send_once': 1})
+    stopped = await gateway.admit_effect(db, scope, resolve(gateway.registry, scope, 'send_once', {'text': 'first'}))
     check('a cancel during the readback stops the resend', 'run_not_running, nothing sent', (stopped.code, len(sends) - count), stopped.code == 'run_not_running' and len(sends) == count)
 
     async def hangs(_: Note, __: ToolContext) -> Sent:
@@ -275,10 +278,10 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
 
     # M7: a live model has to be told what it can reach.
     goal = await load_goal(db, parent)
-    guidance = await _scope_guidance(db, parent, goal)
+    guidance = await scope_guidance(db, parent, goal)
     check('a coordinator is told which Experts it can assign', 'the name and id', guidance[:160], str(expert.id) in guidance and expert.name in guidance)
     goal = await load_goal(db, waiting_child)
-    guidance = await _scope_guidance(db, waiting_child, goal)
+    guidance = await scope_guidance(db, waiting_child, goal)
     check('a child is told where it may write', 'its namespace', guidance[:120], 'outputs/child-1' in guidance)
     await clear()
     _ = json
@@ -519,7 +522,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     await clear()
     config = RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500, tools=['calculate'], inputs={'in': 'x'})
     routine_id = uuid4()
-    run = await routine_admit(db, WORKSPACE, routine_id, 1, config, datetime(2026, 1, 1, tzinfo=UTC))
+    run = await admit_occurrence(db, WORKSPACE, routine_id, 1, config, datetime(2026, 1, 1, tzinfo=UTC))
     limit = await value('select limit_micro_usd from public.runs where id = %s', run)
     goal = await load_goal(db, run)
     check("a routine's limit and tools reach its workflow's run", '500, no save or publish tools', (limit, sorted(goal.allowed_tools)), limit == 500 and 'calculate' in goal.allowed_tools and 'save_artifact' not in goal.allowed_tools)

@@ -36,6 +36,20 @@ class ModelProfile:
     wire_id: str
 
 
+@dataclass(frozen=True)
+class ModelRoute:
+    """A worker takes this from the run's frozen policy. `run_goal` refuses one that differs."""
+
+    role: str
+    profile: str
+    wire_id: str
+    worst_case_micro_usd: int
+    # For a request larger than the worst case already assumes. Zero where no price is known.
+    input_per_million_micro_usd: int = 0
+    # Where a higher rate starts, past the size assumed. Nothing is reserved at that rate.
+    tier_from_tokens: int | None = None
+
+
 PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
     {
         ModelProfileId.DEEPSEEK_FLASH: ModelProfile(

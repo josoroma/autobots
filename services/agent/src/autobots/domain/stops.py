@@ -87,7 +87,7 @@ class StopCode(_Code):
     ASSIGNMENT_BUSY = "assignment_busy"
     OUTCOME_UNKNOWN = "outcome_unknown"
     OUTPUT_TOO_LARGE = "output_too_large"
-    # The plan and verification's verdict (goal_loop.py).
+    # The plan and verification's verdict (run_lifecycle.finish and goal_loop.py).
     PLAN_MISSING = "plan_missing"
     PLAN_INCOMPLETE = "plan_incomplete"
     CRITERIA_UNMET = "criteria_unmet"
@@ -101,8 +101,9 @@ class StopCode(_Code):
     CHILDREN_SETTLING = "children_settling"
 
 
-# Each code's disposition, as `_finish` applies it. tests/test_stop_codes.py holds it equal to the
-# sets it replaced, so a change here is a behavior change and needs its own decision (R-29).
+# Each code's disposition, as `run_lifecycle.finish` applies it. tests/test_stop_codes.py holds it
+# equal to the sets it replaced, so a change here is a behavior change and needs its own decision
+# (R-29).
 DISPOSITION: Final[Mapping[StopCode, Disposition]] = MappingProxyType(
     {
         # Waiting can resolve these: a person adds budget or a key, or reconciles an uncertain call.

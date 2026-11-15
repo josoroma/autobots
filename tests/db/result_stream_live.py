@@ -14,7 +14,8 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.goal_loop import LoopConfig, _drive
+from autobots.application.goal_loop import drive_lease
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.application.worker_leases import claim_run
 from autobots.domain.models import resolve_role_policy
@@ -46,7 +47,7 @@ async def main() -> None:
         print(json.dumps({'run_id': str(admitted.run_id), 'content_length': len(CONTENT)}), flush=True)
         await asyncio.sleep(wait)
         model = StreamScript(items=steps, seen=[], bound=[], delay=delay, chunked=[])
-        await _drive(db, url, lease, lambda: model, config)
+        await drive_lease(db, url, lease, lambda: model, config)
         status = (await (await db.execute('select status from public.runs where id = %s', (admitted.run_id,))).fetchone())[0]
         durable = (await (await db.execute("select count(*) from public.run_events where run_id = %s and payload ->> 'type' = 'result.text.delta'",
                                            (admitted.run_id,))).fetchone())[0]

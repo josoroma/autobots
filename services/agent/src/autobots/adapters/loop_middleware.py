@@ -6,7 +6,6 @@ import logging
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -67,6 +66,10 @@ from autobots.application.model_attempts import (
 from autobots.application.run_usage import LimitReached, RootLimits, active_seconds_used, consume
 from autobots.application.tool_gateway import ToolScope, ownership_refusal
 from autobots.contracts.plans import GoalSpec
+
+# Defined in the domain, so the run lifecycle uses it without importing this adapter (R-33).
+# Re-exported for this module's users.
+from autobots.domain.models import ModelRoute as ModelRoute
 from autobots.domain.runs import INTERRUPTING
 from autobots.domain.stops import REPAIRABLE, STOPPING, StopCode, repair_limit
 from autobots.operations.logs import log_event
@@ -220,20 +223,6 @@ def _strictly_parsed(assembled: Any) -> BaseMessage:
                 )
             )
     return message.model_copy(update={"tool_calls": calls, "invalid_tool_calls": invalid})
-
-
-@dataclass(frozen=True)
-class ModelRoute:
-    """A worker takes this from the run's frozen policy. `run_goal` refuses one that differs."""
-
-    role: str
-    profile: str
-    wire_id: str
-    worst_case_micro_usd: int
-    # For a request larger than the worst case already assumes. Zero where no price is known.
-    input_per_million_micro_usd: int = 0
-    # Where a higher rate starts, past the size assumed. Nothing is reserved at that rate.
-    tier_from_tokens: int | None = None
 
 
 def request_bytes(request: Any) -> int:

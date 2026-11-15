@@ -7,6 +7,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
@@ -14,8 +15,9 @@ from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application import workflow_runner
 from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
-from autobots.application.goal_loop import LoopConfig, process_next
+from autobots.application.goal_loop import process_next
 from autobots.application.plans import load_goal
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import apply_command
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflows import (
@@ -161,14 +163,14 @@ async def main() -> None:
         rows = await value('select count(*) from public.workflow_node_instances where execution_id = %s', execution.id)
         check('a stale worker commits nothing', 'lost, 0 instances', (result.outcome, rows), result.outcome == 'lost' and rows == 0)
 
-        # _commit's own fence, with a scope whose generation has moved on.
+        # commit_instance's own fence, with a scope whose generation has moved on.
         from autobots.application.tool_gateway import LeaseLost, ToolScope
-        from autobots.application.workflow_runner import _commit
+        from autobots.application.workflow_runner import commit_instance
         from autobots.domain.workflow_execution import Step
         stale_scope = ToolScope(WORKSPACE, execution.run_id, lease.generation, {})
         step = Step('up', 'up', None, 'run', {})
         try:
-            await _commit(db, stale_scope, execution.id, step, 'succeeded', [('value', 0, 'x')])
+            await commit_instance(db, stale_scope, execution.id, step, 'succeeded', [('value', 0, 'x')])
             fenced = 'committed'
         except LeaseLost:
             fenced = 'refused'
@@ -254,22 +256,18 @@ async def main() -> None:
         version = await value('select version from public.runs where id = %s', run)
         await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
         before = await value('select status from public.runs where id = %s', run)
-        await workflow_runner._complete(db, lease, await load_goal(db, run))
+        await workflow_runner.complete_workflow(db, lease, await load_goal(db, run))
         after = await value('select status from public.runs where id = %s', run)
         check('a workflow cancelled after its last commit finishes cancelling', 'cancelling, then cancelled', (before, after), before == 'cancelling' and after == 'cancelled')
 
         # B7 in the real runner: nothing can move, but nothing has finished either.
         execution = await start('stalled', no_tools, {'in': 'x'})
-        real_pass = workflow_runner._pass
 
         async def nothing_moves(*_: Any, **__: Any) -> bool:
             return False
 
-        workflow_runner._pass = nothing_moves
-        try:
+        with patch.object(workflow_runner, 'run_pass', nothing_moves):
             result = await advance()
-        finally:
-            workflow_runner._pass = real_pass
         state = await run_state(execution)
         check('a workflow that stalls fails instead of succeeding', 'failed, workflow_stalled', (state, result.code if result else None), state == 'failed' and result is not None and result.code == 'workflow_stalled')
 

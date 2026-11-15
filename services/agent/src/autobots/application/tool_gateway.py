@@ -545,7 +545,7 @@ class ToolGateway:
         if refusal is not None:
             return _denied(refusal)
         if call.tool.operation_class in EFFECTFUL:
-            return await self._effect(connection, scope, call)
+            return await self.admit_effect(connection, scope, call)
         return await self._read(connection, scope, call)
 
     async def _read(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
@@ -577,7 +577,11 @@ class ToolGateway:
                     return _denied(refusal)
         return ToolResult(ToolOutcome.FAILED, code)
 
-    async def _effect(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
+    async def admit_effect(self, connection: Any, scope: ToolScope, call: Call) -> ToolResult:
+        """The effect step `_dispatch` takes once every check passed. The receipt commits as
+        started, under the lease, before the effect runs, so a worker that stalled after its checks
+        admits nothing (SP-012, SP-013). A database check drives it as that stalled worker;
+        everything else calls `execute`."""
         operation_id = call.operation_id
         context = ToolContext(connection, scope, operation_id)
         # Committed before the effect starts, so a crash leaves a record that it may have happened.
@@ -603,7 +607,7 @@ class ToolGateway:
                 )
                 created = await cursor.fetchone() is not None
             if not created:
-                replayed = await self._replay(context, call)
+                replayed = await replay_receipt(context, call)
                 if replayed is not None:
                     return replayed
                 # A crash during this new attempt has to be classified like any other.
@@ -621,7 +625,7 @@ class ToolGateway:
                     reopened = await cursor.fetchone() is not None
                 if not reopened:
                     # A late success or a person's ruling landed since that read. Never send again.
-                    replayed = await self._replay(context, call)
+                    replayed = await replay_receipt(context, call)
                     if replayed is not None:
                         return replayed
                     return _denied(GatewayCode.LEASE_LOST)
@@ -630,50 +634,6 @@ class ToolGateway:
         except NotRunning:
             return _denied(GatewayCode.RUN_NOT_RUNNING)
         return await self._attempt(context, call)
-
-    async def _replay(self, context: ToolContext, call: Call) -> ToolResult | None:
-        """The earlier outcome, if there is one. None means it failed for certain, so try again."""
-        tool, operation_id = call.tool, call.operation_id
-        cursor = await context.connection.execute(
-            "select status, result from app_private.tool_receipts where operation_id = %s",
-            (operation_id,),
-        )
-        status, result = await cursor.fetchone()
-        if status == "succeeded":
-            return ToolResult(
-                ToolOutcome.SUCCEEDED, output=result, operation_id=operation_id, replayed=True
-            )
-        if status == "failed":
-            return None
-        # An earlier attempt was interrupted, and this is why its outcome stays unknown.
-        detail = "interrupted"
-        if tool.reconcile is not None:
-            try:
-                found = await asyncio.wait_for(
-                    tool.reconcile(call.parsed, context), tool.timeout_seconds
-                )
-                # A readback whose output its model refuses is a failed readback.
-                visible = None if found is None else _visible(tool, found)[0]
-            except NotDelivered:
-                return None
-            except Exception as error:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
-                _log_failure("tool.operation.readback_failed", tool, operation_id, error)
-                detail = f"readback:{_diagnosis(error)}"
-                visible = None
-            if visible is not None:
-                await _record(context, operation_id, "succeeded", visible)
-                return ToolResult(
-                    ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id, replayed=True
-                )
-        if tool.safe_to_repeat:
-            return None
-        await _record(context, operation_id, "unknown", None, failure_detail=detail)
-        return ToolResult(
-            ToolOutcome.UNKNOWN,
-            GatewayCode.OUTCOME_UNKNOWN,
-            operation_id=operation_id,
-            replayed=True,
-        )
 
     async def _attempt(self, context: ToolContext, call: Call) -> ToolResult:
         """Runs the effect once and records on its receipt what is known about it."""
@@ -690,20 +650,68 @@ class ToolGateway:
         except LeaseLost:
             # The write's transaction refused it, so nothing happened. The code tells the approval
             # gate that this attempt didn't use a person's decision.
-            await _record(context, call.operation_id, "failed", None, GatewayCode.LEASE_LOST)
+            await record_receipt(context, call.operation_id, "failed", None, GatewayCode.LEASE_LOST)
             return ToolResult(
                 ToolOutcome.DENIED, GatewayCode.LEASE_LOST, operation_id=call.operation_id
             )
         except Exception as error:  # noqa: BLE001 - an unexpected failure leaves the outcome unknown for reconciliation
             return await _unexpected_failure(context, call, error)
         if too_large:
-            await _record(
+            await record_receipt(
                 context, call.operation_id, "unknown", None, failure_detail="output_too_large"
             )
             return ToolResult(
                 ToolOutcome.UNKNOWN, GatewayCode.OUTPUT_TOO_LARGE, operation_id=call.operation_id
             )
         return await _succeeded(context, call, visible)
+
+
+async def replay_receipt(context: ToolContext, call: Call) -> ToolResult | None:
+    """The earlier outcome, if there is one. None means it failed for certain, so try again.
+
+    At module level, so a database check can land a late success between two of its reads by
+    swapping it with `patch.object` (TDBC-02)."""
+    tool, operation_id = call.tool, call.operation_id
+    cursor = await context.connection.execute(
+        "select status, result from app_private.tool_receipts where operation_id = %s",
+        (operation_id,),
+    )
+    status, result = await cursor.fetchone()
+    if status == "succeeded":
+        return ToolResult(
+            ToolOutcome.SUCCEEDED, output=result, operation_id=operation_id, replayed=True
+        )
+    if status == "failed":
+        return None
+    # An earlier attempt was interrupted, and this is why its outcome stays unknown.
+    detail = "interrupted"
+    if tool.reconcile is not None:
+        try:
+            found = await asyncio.wait_for(
+                tool.reconcile(call.parsed, context), tool.timeout_seconds
+            )
+            # A readback whose output its model refuses is a failed readback.
+            visible = None if found is None else _visible(tool, found)[0]
+        except NotDelivered:
+            return None
+        except Exception as error:  # noqa: BLE001 - a failed reconcile leaves the effect unknown, never assumed
+            _log_failure("tool.operation.readback_failed", tool, operation_id, error)
+            detail = f"readback:{_diagnosis(error)}"
+            visible = None
+        if visible is not None:
+            await record_receipt(context, operation_id, "succeeded", visible)
+            return ToolResult(
+                ToolOutcome.SUCCEEDED, output=visible, operation_id=operation_id, replayed=True
+            )
+    if tool.safe_to_repeat:
+        return None
+    await record_receipt(context, operation_id, "unknown", None, failure_detail=detail)
+    return ToolResult(
+        ToolOutcome.UNKNOWN,
+        GatewayCode.OUTCOME_UNKNOWN,
+        operation_id=operation_id,
+        replayed=True,
+    )
 
 
 async def _known_failure(context: ToolContext, call: Call, error: ToolFailed) -> ToolResult:
@@ -714,7 +722,7 @@ async def _known_failure(context: ToolContext, call: Call, error: ToolFailed) ->
         # Only the gateway may say the lease refused an attempt: the approval gate trusts that code
         # to mean nothing was written (Decision 0025 V8).
         code, detail = GatewayCode.TOOL_FAILED, f"reserved_code:{code}"
-    await _record(context, call.operation_id, "failed", None, code, detail)
+    await record_receipt(context, call.operation_id, "failed", None, code, detail)
     return ToolResult(ToolOutcome.FAILED, code, operation_id=call.operation_id)
 
 
@@ -722,7 +730,9 @@ async def _unexpected_failure(context: ToolContext, call: Call, error: BaseExcep
     """A failure the tool didn't choose leaves the outcome unknown, for a readback or a person to
     settle. Its receipt keeps the diagnosis and its log line the cause (R-25, XERR-02)."""
     _log_failure("tool.operation.unknown", call.tool, call.operation_id, error)
-    await _record(context, call.operation_id, "unknown", None, failure_detail=_diagnosis(error))
+    await record_receipt(
+        context, call.operation_id, "unknown", None, failure_detail=_diagnosis(error)
+    )
     return ToolResult(
         ToolOutcome.UNKNOWN, GatewayCode.OUTCOME_UNKNOWN, operation_id=call.operation_id
     )
@@ -730,7 +740,7 @@ async def _unexpected_failure(context: ToolContext, call: Call, error: BaseExcep
 
 async def _succeeded(context: ToolContext, call: Call, visible: dict[str, Any]) -> ToolResult:
     # The effect happened, so it is recorded whoever owns the run now.
-    await _record(context, call.operation_id, "succeeded", visible)
+    await record_receipt(context, call.operation_id, "succeeded", visible)
     refusal = await ownership_refusal(context.connection, context.scope)
     if refusal is not None:
         return ToolResult(ToolOutcome.DENIED, refusal, operation_id=call.operation_id)
@@ -743,7 +753,7 @@ def _visible(tool: ToolDefinition, output: BaseModel) -> tuple[dict[str, Any], b
     return visible, len(json.dumps(visible).encode()) > tool.max_output_bytes
 
 
-async def _record(
+async def record_receipt(
     context: ToolContext,
     operation_id: str,
     status: str,

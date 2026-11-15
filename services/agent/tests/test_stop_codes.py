@@ -20,7 +20,7 @@ from uuid import uuid4
 import pytest
 from psycopg.adapt import PyFormat, Transformer
 
-from autobots.application import goal_loop
+from autobots.application import run_lifecycle
 from autobots.application.approvals import LEASE_LOST
 from autobots.application.model_admission import AdmissionRefused
 from autobots.application.model_attempts import FailureClass
@@ -76,7 +76,7 @@ OLD_PAUSE_FOR = {
     "route_not_bound",
 }
 OLD_NOT_OURS = {"lease_lost", "run_not_running", "run_not_found", "approval_pending"}
-# Every other code that reached `_finish` failed the run, these by name.
+# Every other code that reached `finish` failed the run, these by name.
 OLD_FAILS = {
     "rate_limited",
     "provider_error",
@@ -405,13 +405,16 @@ def test_every_code_the_gateway_produces_is_classified() -> None:
 
 
 def test_every_code_a_pass_stops_with_by_name_has_a_disposition() -> None:
-    """A literal or member handed to LoopStopped, a workflow `_Stop`, `_finish` or `_result`."""
+    """A literal or member handed to LoopStopped, a workflow's `InstanceStopped`, `finish` or
+    `result_of`."""
     checked = 0
     for path in sorted(SOURCE.rglob("*.py")):
         for node in ast.walk(ast.parse(path.read_text())):
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
                 continue
-            position = {"LoopStopped": 0, "_Stop": 0, "_finish": 3, "_result": 4}.get(node.func.id)
+            position = {"LoopStopped": 0, "InstanceStopped": 0, "finish": 3, "result_of": 4}.get(
+                node.func.id
+            )
             if position is None or len(node.args) <= position:
                 continue
             argument = node.args[position]
@@ -423,7 +426,8 @@ def test_every_code_a_pass_stops_with_by_name_has_a_disposition() -> None:
             elif (name := _named(argument, "StopCode")) is not None:
                 assert StopCode[name] in DISPOSITION or StopCode[name] in SETTLEMENT, where
                 checked += 1
-    # Every caller in goal_loop.py, workflow_runner.py and loop_middleware.py was reached.
+    # Every caller in goal_loop.py, workflow_runner.py, run_lifecycle.py and loop_middleware.py
+    # was reached.
     assert checked >= 24
 
 
@@ -460,7 +464,7 @@ LEASE = Lease(uuid4(), uuid4(), 3, "worker", 1, "running")
 
 
 class Connection:
-    """What `_finish` sends once its reads are replaced: the run's version and the stop reason."""
+    """What `finish` sends once its reads are replaced: the run's version and the stop reason."""
 
     def __init__(self) -> None:
         self.stop_reasons: list[object] = []
@@ -473,14 +477,17 @@ class Connection:
     async def fetchone(self) -> tuple[int]:
         return (4,)
 
+    async def fetchall(self) -> list[tuple[int]]:
+        return [(4,)]
+
     def transaction(self) -> contextlib.nullcontext[None]:
         return contextlib.nullcontext()
 
 
 def _finish(
     monkeypatch: pytest.MonkeyPatch, code: str
-) -> tuple[list[object], Connection, goal_loop.LoopResult]:
-    """`_finish` on a running run whose plan is done, with its reads and transition replaced."""
+) -> tuple[list[object], Connection, run_lifecycle.LoopResult]:
+    """`finish` on a running run whose plan is done, with its reads and transition replaced."""
     applied: list[object] = []
     reached = {RunCommand.SUSPEND: "paused", RunCommand.FAIL: "failed"}
 
@@ -499,12 +506,12 @@ def _finish(
     async def usage_view(*_: object) -> dict[str, object]:
         return {}
 
-    monkeypatch.setattr(goal_loop, "plan_view", plan_view)
-    monkeypatch.setattr(goal_loop, "_run_status", run_status)
-    monkeypatch.setattr(goal_loop, "apply_command", apply_command)
-    monkeypatch.setattr(goal_loop, "usage_view", usage_view)
+    monkeypatch.setattr(run_lifecycle, "plan_view", plan_view)
+    monkeypatch.setattr(run_lifecycle, "run_status", run_status)
+    monkeypatch.setattr(run_lifecycle, "apply_command", apply_command)
+    monkeypatch.setattr(run_lifecycle, "usage_view", usage_view)
     connection = Connection()
-    result = asyncio.run(goal_loop._finish(connection, LEASE, GOAL, code))
+    result = asyncio.run(run_lifecycle.finish(connection, LEASE, GOAL, code))
     return applied, connection, result
 
 

@@ -9,12 +9,13 @@ import asyncio
 import json
 import os
 import sys
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters.loop_middleware import ModelRoute
-from autobots.application import goal_loop
-from autobots.application.goal_loop import LoopConfig, _keep_lease
+from autobots.application import run_lifecycle
+from autobots.application.run_lifecycle import LeaseKeeper, LoopConfig
 from autobots.application.run_usage import active_seconds_used, begin_segment, discount_sleep
 from autobots.application.runs import LeaseLost, admit_run
 from autobots.application.worker_leases import WakeClock, claim_run, heartbeat, revive_lease
@@ -99,7 +100,7 @@ async def main() -> None:
         await begin_segment(db, run)
         await asyncio.sleep(0.2)
         clock = ArrangedClock()
-        keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, clock))
+        keeper = asyncio.create_task(LeaseKeeper(URL, lease, CONFIG, clock).run())
         await asyncio.sleep(0.3)
         clock.sleep_for(600)
         await db.execute("update app_private.run_usage set segment_started_at = segment_started_at - interval '600 seconds' where run_id = %s", (run,))
@@ -113,7 +114,7 @@ async def main() -> None:
         # A sleep can drop the keeper's connection, and it comes back and goes on.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='waking')
-        keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, ArrangedClock()))
+        keeper = asyncio.create_task(LeaseKeeper(URL, lease, CONFIG, ArrangedClock()).run())
         await asyncio.sleep(0.3)
         await db.execute("select pg_terminate_backend(pid) from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()")
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '5 seconds' where run_id = %s", (run,))
@@ -140,7 +141,7 @@ async def main() -> None:
         # With a long beat, only the beat forced after reconnecting can renew the lease in time.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='forced')
-        keeper = asyncio.create_task(_keep_lease(URL, lease, LoopConfig(route=ROUTE, heartbeat_seconds=3, lease_seconds=60), ArrangedClock()))
+        keeper = asyncio.create_task(LeaseKeeper(URL, lease, LoopConfig(route=ROUTE, heartbeat_seconds=3, lease_seconds=60), ArrangedClock()).run())
         await asyncio.sleep(0.3)
         await db.execute("select pg_terminate_backend(pid) from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()")
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '20 seconds' where run_id = %s", (run,))
@@ -152,7 +153,7 @@ async def main() -> None:
         # Any other failure reconnects too, and the keeper goes on.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='unusual')
-        real, raised = goal_loop.heartbeat, []
+        real, raised = run_lifecycle.heartbeat, []
 
         async def raises_once(*args: object, **options: object) -> object:
             if not raised:
@@ -160,17 +161,14 @@ async def main() -> None:
                 raise RuntimeError('arranged')
             return await real(*args, **options)
 
-        goal_loop.heartbeat = raises_once
-        try:
-            keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, ArrangedClock()))
+        with patch.object(run_lifecycle, 'heartbeat', raises_once):
+            keeper = asyncio.create_task(LeaseKeeper(URL, lease, CONFIG, ArrangedClock()).run())
             await asyncio.sleep(0.4)
             await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '5 seconds' where run_id = %s", (run,))
             await asyncio.sleep(1.5)
             left = (await (await db.execute('select extract(epoch from lease_expires_at - clock_timestamp()) from app_private.run_jobs where run_id = %s', (run,))).fetchone())[0]
             check('an unexpected error leaves the keeper running, and still beating', 'alive, the lease back near 60 seconds', (keeper.done(), round(float(left))), raised and not keeper.done() and float(left) > 40)
             keeper.cancel()
-        finally:
-            goal_loop.heartbeat = real
 
         # A worker that lost the run can't move the new owner's clock.
         run = await admitted(db)
@@ -186,7 +184,7 @@ async def main() -> None:
         # No gap between the clocks, as with SIGSTOP or a hung process: nothing changes.
         run = await admitted(db)
         lease = await claim_run(db, run, worker_id='stalled')
-        keeper = asyncio.create_task(_keep_lease(URL, lease, CONFIG, ArrangedClock()))
+        keeper = asyncio.create_task(LeaseKeeper(URL, lease, CONFIG, ArrangedClock()).run())
         await asyncio.sleep(0.2)
         await expire(db, run)
         await asyncio.sleep(0.4)

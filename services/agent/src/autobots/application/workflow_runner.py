@@ -1,10 +1,11 @@
 """Runs one bound execution under a lease, committing each instance as it finishes, PRD 7.3.
 
 Effects go through the tool gateway, so a restart replays them by operation identity and receipt.
-Emissions are insert-only, so a replay can't replace an output that was already committed.
+Emissions are insert-only, so a replay can't replace an output that was already committed. It
+builds on the shared run lifecycle and never imports the goal loop, which passes in how an agent
+step's child is driven (PPRD-02).
 """
 
-import asyncio
 import json
 from collections.abc import Callable
 from dataclasses import replace
@@ -13,18 +14,18 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from autobots.application.assignments import Delegation
-from autobots.application.bounded import stop_task
-from autobots.application.goal_loop import (
-    LoopConfig,
-    LoopResult,
-    _finish,
-    _keep_lease,
-    _result,
-    _run_status,
-    loop_registry,
-)
+from autobots.application.loop_tools import loop_registry
 from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted
+from autobots.application.run_lifecycle import (
+    Drive,
+    LoopConfig,
+    LoopResult,
+    finish,
+    lease_heartbeat,
+    result_of,
+    run_status,
+)
 from autobots.application.run_usage import ensure_usage
 from autobots.application.runs import LeaseLost, VersionConflict, apply_command
 from autobots.application.tool_gateway import (
@@ -37,6 +38,7 @@ from autobots.application.tool_gateway import (
     ownership_refusal,
 )
 from autobots.application.worker_leases import Lease
+from autobots.contracts.plans import GoalSpec
 from autobots.domain.runs import Actor, CommandRefused, RunCommand, RunStatus
 from autobots.domain.stops import STOPS, GatewayCode, PassOutcome, StopCode
 from autobots.domain.tool_catalog import ToolGroup
@@ -90,7 +92,10 @@ APPROVAL_GATE = ToolDefinition(
 )
 
 
-class _Stop(Exception):
+class InstanceStopped(Exception):
+    """A node instance stopped without failing, so it runs again once the run continues. `code`
+    is the run's stop code."""
+
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
@@ -113,7 +118,7 @@ async def _load_state(
     return statuses, emissions
 
 
-async def _commit(
+async def commit_instance(
     connection: Any,
     scope: ToolScope,
     execution_id: Any,
@@ -122,7 +127,8 @@ async def _commit(
     outputs: list[tuple[str, int, Any]],
     code: str | None = None,
 ) -> None:
-    """One transaction under the lease. An existing emission stays exactly as it was."""
+    """Commits one node instance's status and emissions in one transaction under the lease, which a
+    stale generation can't pass (SP-012). An existing emission stays exactly as it was."""
     async with connection.transaction():
         await hold_lease(connection, scope)
         for port, sequence, value in outputs:
@@ -140,7 +146,7 @@ async def _commit(
         )
 
 
-async def _tool(
+async def call_tool(
     gateway: ToolGateway, connection: Any, scope: ToolScope, name: str, arguments: dict[str, Any]
 ) -> dict[str, Any]:
     """A stop leaves the instance to run again, and any recorded effect comes back from its receipt.
@@ -149,7 +155,7 @@ async def _tool(
     instance's failure."""
     result = await gateway.execute(connection, scope, name, arguments)
     if result.code in STOPS:
-        raise _Stop(str(result.code))
+        raise InstanceStopped(str(result.code))
     if result.outcome is not ToolOutcome.SUCCEEDED:
         raise BlockFailed(str(result.code or GatewayCode.TOOL_FAILED))
     return result.output or {}
@@ -183,7 +189,7 @@ async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-0
             raise BlockFailed("foreach_over_bound")
         return [("item", index, item) for index, item in enumerate(items)]
     if block == "read":
-        output = await _tool(
+        output = await call_tool(
             gateway, connection, scope, "read_run_file", {"path": step.inputs["path"]}
         )
         return [("content", 0, output["content"])]
@@ -192,14 +198,14 @@ async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-0
         if step.iteration is not None:
             stem, dot, suffix = path.rpartition(".")
             path = f"{stem}-{step.iteration}.{suffix}" if dot else f"{path}-{step.iteration}"
-        saved = await _tool(
+        saved = await call_tool(
             gateway,
             connection,
             scope,
             "save_artifact",
             {"path": path, "content": step.inputs["content"]},
         )
-        published = await _tool(
+        published = await call_tool(
             gateway,
             connection,
             scope,
@@ -208,12 +214,12 @@ async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-0
         )
         return [("artifact_id", 0, published["artifact_id"])]
     if block == "approval":
-        released = await _tool(
+        released = await call_tool(
             gateway, connection, scope, "workflow_approval", {"node": step.key, "value": value}
         )
         return [("value", 0, released["value"])]
     if block == "agent":
-        result = await _tool(
+        result = await call_tool(
             gateway,
             connection,
             scope,
@@ -226,7 +232,7 @@ async def _run_block(  # noqa: PLR0911 - baseline 2026-11-14, shrink only (STD-0
     raise BlockFailed("unknown_block")
 
 
-async def _pass(
+async def run_pass(
     gateway: ToolGateway,
     connection: Any,
     scope: ToolScope,
@@ -241,9 +247,9 @@ async def _pass(
     for step in steps:
         refusal = await ownership_refusal(connection, scope)
         if refusal is not None:
-            raise _Stop(refusal)
+            raise InstanceStopped(refusal)
         if step.decision != "run":
-            await _commit(connection, scope, execution_id, step, step.decision, [])
+            await commit_instance(connection, scope, execution_id, step, step.decision, [])
             continue
         node = shape.nodes[step.node_id]
         await connection.execute(
@@ -253,9 +259,9 @@ async def _pass(
         try:
             outputs = await _run_block(gateway, connection, scope, node, step, inputs)
         except BlockFailed as failed:
-            await _commit(connection, scope, execution_id, step, "failed", [], failed.code)
+            await commit_instance(connection, scope, execution_id, step, "failed", [], failed.code)
             continue
-        await _commit(connection, scope, execution_id, step, "succeeded", outputs)
+        await commit_instance(connection, scope, execution_id, step, "succeeded", outputs)
         after_commit(step)
     return bool(steps)
 
@@ -267,8 +273,13 @@ async def run_workflow(
     model: Any,
     config: LoopConfig,
     *,
+    drive: Drive | None = None,
     after_commit: Callable[[Step], None] = lambda _: None,
 ) -> LoopResult:
+    """Runs what can move until nothing can, then finishes the run through `finish` or
+    `complete_workflow`. `drive` is how an agent step's child is driven: the goal loop passes its
+    own. Without one no assignment tool is registered, so an agent step fails with
+    `tool_not_registered`."""
     cursor = await connection.execute(
         "select e.id, e.inputs, v.graph from public.workflow_executions e "
         "join public.workflow_versions v on v.workflow_id = e.workflow_id "
@@ -281,7 +292,7 @@ async def run_workflow(
     if validate_graph(graph):
         # Published under older rules. Some shapes lose data, so it fails rather than running.
         await classify_interrupted(connection, lease.run_id, lease.generation)
-        return await _finish(connection, lease, goal, StopCode.WORKFLOW_INVALID)
+        return await finish(connection, lease, goal, StopCode.WORKFLOW_INVALID)
     scope = ToolScope(
         lease.workspace_id,
         lease.run_id,
@@ -290,47 +301,49 @@ async def run_workflow(
         tuple(goal.allowed_paths),
     )
 
-    async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
-        from autobots.application.goal_loop import _drive
+    delegation: Delegation | None = None
+    if drive is not None:
+        driver = drive
 
-        return await _drive(child_connection, database_url, child_lease, lambda: model, config)
+        async def drive_child(child_connection: Any, child_lease: Lease) -> LoopResult:
+            return await driver(child_connection, database_url, child_lease, lambda: model, config)
 
-    delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
+        delegation = Delegation(drive_child, config.limits, config.lease_seconds, config.sleep)
     registry = loop_registry(
         config.limits, config.object_store, delegation, (*config.tools, APPROVAL_GATE)
     )
     gateway = ToolGateway(registry)
     shape = shape_of(graph)
-    beating = asyncio.create_task(_keep_lease(database_url, lease, config))
     code: str | None = None
     try:
-        while await _pass(gateway, connection, scope, shape, execution_id, inputs, after_commit):
-            pass
-    except _Stop as stop:
+        async with lease_heartbeat(database_url, lease, config):
+            while await run_pass(
+                gateway, connection, scope, shape, execution_id, inputs, after_commit
+            ):
+                pass
+    except InstanceStopped as stop:
         code = stop.code
     except LeaseLost:
         code = StopCode.LEASE_LOST
-    finally:
-        await stop_task(beating)
     if code is not None:
-        return await _finish(connection, lease, goal, code)
+        return await finish(connection, lease, goal, code)
     statuses, _ = await _load_state(connection, execution_id)
     if any(status == "failed" for status in statuses.values()):
-        return await _finish(connection, lease, goal, StopCode.WORKFLOW_NODE_FAILED)
+        return await finish(connection, lease, goal, StopCode.WORKFLOW_NODE_FAILED)
     if unsettled_nodes(shape, statuses):
         # Nothing can move, and this isn't finished. That's a failure, never a success.
-        return await _finish(connection, lease, goal, StopCode.WORKFLOW_STALLED)
-    return await _complete(connection, lease, goal)
+        return await finish(connection, lease, goal, StopCode.WORKFLOW_STALLED)
+    return await complete_workflow(connection, lease, goal)
 
 
-async def _complete(connection: Any, lease: Lease, goal: Any) -> LoopResult:
+async def complete_workflow(connection: Any, lease: Lease, goal: GoalSpec) -> LoopResult:
     """A workflow finishes when every instance is settled, through the normal transitions.
 
     A worker can die between the two, so a run already verifying only needs the second.
     """
-    status = await _run_status(connection, lease)
+    status = await run_status(connection, lease)
     if status == RunStatus.CANCELLING.value:
-        return await _finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
+        return await finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
     commands = (
         (RunCommand.COMPLETE,)
         if status == RunStatus.VERIFYING.value
@@ -351,8 +364,8 @@ async def _complete(connection: Any, lease: Lease, goal: Any) -> LoopResult:
                 generation=lease.generation,
             )
     except LeaseLost:
-        return await _result(connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None)
+        return await result_of(connection, lease, goal, PassOutcome.LOST, StopCode.LEASE_LOST, None)
     except (CommandRefused, VersionConflict):
-        # Someone cancelled or paused after that check. `_finish` settles whichever it was.
-        return await _finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
-    return await _result(connection, lease, goal, PassOutcome.SUCCEEDED, None, result.status)
+        # Someone cancelled or paused after that check. `finish` settles whichever it was.
+        return await finish(connection, lease, goal, StopCode.RUN_NOT_RUNNING)
+    return await result_of(connection, lease, goal, PassOutcome.SUCCEEDED, None, result.status)
