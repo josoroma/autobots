@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from autobots.domain.errors import FixedRefusal
+
 
 class RunStatus(StrEnum):
     QUEUED = "queued"
@@ -78,8 +80,11 @@ class RunCommand(StrEnum):
     SUSPEND = "suspend"
 
 
-class CommandRefused(Exception):
-    """This actor can't do this in the run's current state. Nothing changes."""
+class CommandRefused(FixedRefusal):
+    """This actor can't do this in the run's current state. Nothing changes. The argument says
+    why, internally; a response shows only the code."""
+
+    code = "transition_refused"
 
 
 # Who may issue each command, and what it moves to. A completion can never come from a user.

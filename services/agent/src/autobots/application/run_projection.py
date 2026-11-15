@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from autobots.application.artifacts import list_artifacts
-from autobots.application.plans import latest_plan, load_goal
+from autobots.application.plans import GoalMissing, latest_plan, load_goal
 from autobots.application.reconciliation import unknown_operations
 from autobots.application.recovery import outstanding
 from autobots.application.runs import RunNotFound
@@ -41,6 +41,7 @@ from autobots.contracts.run_workspace import (
     VerificationSummary,
 )
 from autobots.contracts.runs import RunEvent, RunSummary
+from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.models import (
     CONTEXT_TOKENS,
     MAX_OUTPUT_TOKENS,
@@ -311,7 +312,7 @@ async def read_workspace(connection: Any, workspace_id: UUID, run_id: UUID) -> R
             CriterionView(id=name, text=public_text(text))
             for name, text in sorted(goal.criteria.items())
         ]
-    except LookupError:
+    except GoalMissing:
         objective, criteria = None, []
     cursor = await connection.execute(
         "select model_calls, tool_dispatches, repairs, plan_revisions, stop_reason "
@@ -386,8 +387,11 @@ GROUPS: dict[str, tuple[str, ...]] = {
 MAX_QUERY = 200
 
 
-class InvalidCursor(ValueError):
+class InvalidCursor(FixedRefusal, ValueError):
     """A cursor this API didn't issue."""
+
+    code = "invalid_cursor"
+    kind = RefusalKind.INVALID
 
 
 def encode_cursor(created_at: datetime, run_id: UUID) -> str:

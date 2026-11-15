@@ -5,19 +5,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
-from autobots.api.errors import ApiError
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.routines import (
-    RoutineRefused,
     add_routine_version,
     create_routine,
     get_routine,
     list_routines,
     set_enabled,
 )
-from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.routines import (
     RoutineCreate,
     RoutineEnabled,
@@ -31,18 +28,6 @@ Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=20
 Member = Annotated[UUID, Depends(current_workspace)]
 Owner = Annotated[UUID, Depends(require_owner)]
 User = Annotated[UUID, Depends(current_user)]
-
-
-def _error(error: RoutineRefused | IdempotencyConflict) -> ApiError:
-    if isinstance(error, IdempotencyConflict):
-        return ApiError(409, error.code, "This key was already used with different content.")
-    if error.code.endswith("not_found"):
-        return ApiError(404, error.code, "That is not available.")
-    if error.code == "draft_not_runnable":
-        return ApiError(422, error.code, "A routine binds a published version, not a draft.")
-    if error.code in {"routine_name_taken", "routine_version_conflict"}:
-        return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
-    return ApiError(422, error.code, "That routine isn't valid.")
 
 
 @router.get("/routines", operation_id="listRoutines", response_model=RoutineList)
@@ -61,26 +46,20 @@ async def post_routine(
     body: RoutineCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> RoutineView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await create_routine(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                idempotency_key=key,
-                name=body.name,
-                config=body.config,
-            )
-        except (RoutineRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await create_routine(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            idempotency_key=key,
+            name=body.name,
+            config=body.config,
+        )
 
 
 @router.get("/routines/{routine_id}", operation_id="getRoutine", response_model=RoutineView)
 async def read_routine(routine_id: UUID, request: Request, workspace: Member) -> RoutineView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await get_routine(connection, workspace, routine_id)
-        except RoutineRefused as error:
-            raise _error(error) from None
+        return await get_routine(connection, workspace, routine_id)
 
 
 @router.post(
@@ -98,18 +77,15 @@ async def post_version(
     user: User,
 ) -> RoutineView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await add_routine_version(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                routine_id=routine_id,
-                idempotency_key=key,
-                expected_version=body.expected_version,
-                config=body.config,
-            )
-        except (RoutineRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await add_routine_version(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            routine_id=routine_id,
+            idempotency_key=key,
+            expected_version=body.expected_version,
+            config=body.config,
+        )
 
 
 @router.post(
@@ -119,7 +95,4 @@ async def post_enabled(
     routine_id: UUID, body: RoutineEnabled, request: Request, workspace: Owner
 ) -> RoutineView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await set_enabled(connection, workspace, routine_id, body.enabled)
-        except RoutineRefused as error:
-            raise _error(error) from None
+        return await set_enabled(connection, workspace, routine_id, body.enabled)

@@ -24,12 +24,12 @@ from autobots.adapters.models.catalog import (
     ModelUnavailable,
     parse_catalog,
 )
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.store import (
     CredentialBlocked,
     CredentialMissing,
     CredentialReference,
     CredentialStorageUnavailable,
+    CredentialUnreadable,
 )
 from autobots.application.goal_loop import UNBOUND, LoopConfig
 from autobots.application.model_attempts import (
@@ -415,7 +415,7 @@ def real_attempt(
         (CredentialMissing("arranged"), FailureClass.CREDENTIALS_REQUIRED),
         (CredentialBlocked("arranged"), FailureClass.INVALID_CREDENTIAL),
         (CredentialStorageUnavailable("arranged"), FailureClass.CREDENTIAL_UNAVAILABLE),
-        (CredentialDecryptionError(), FailureClass.CREDENTIAL_UNAVAILABLE),
+        (CredentialUnreadable("arranged"), FailureClass.CREDENTIAL_UNAVAILABLE),
         (psycopg.OperationalError("arranged"), FailureClass.CREDENTIAL_UNAVAILABLE),
         (PermissionError("arranged"), FailureClass.CREDENTIAL_UNAVAILABLE),
         (UnicodeDecodeError("utf-8", b"x", 0, 1, "arranged"), FailureClass.CREDENTIAL_UNAVAILABLE),

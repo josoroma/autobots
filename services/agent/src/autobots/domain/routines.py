@@ -5,13 +5,17 @@ from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from autobots.domain.errors import Refusal, RefusalKind
+
 DEFAULT_TIMEZONE = "America/Costa_Rica"
 MAX_OCCURRENCES = 1000
 MAX_INTERVAL_MINUTES = 366 * 24 * 60
 
 
-class TriggerInvalid(ValueError):
-    pass
+class TriggerInvalid(Refusal, ValueError):
+    """A trigger or timezone a routine can't use. Its code names which part."""
+
+    kind = RefusalKind.INVALID
 
 
 def validate_trigger(trigger: Mapping[str, Any], timezone: str) -> None:

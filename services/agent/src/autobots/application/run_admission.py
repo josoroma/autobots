@@ -16,6 +16,7 @@ argument at the call site, not a missing line.
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal, Protocol, Self
 from uuid import UUID
 
@@ -27,6 +28,7 @@ from autobots.application.tool_keys import key_sources
 from autobots.contracts.plans import InputDocument, RequiredArtifact
 from autobots.contracts.run_commands import RunRequest
 from autobots.domain.budgets import require_budget
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import (
     ModelProfileId,
     ProfileNotOffered,
@@ -56,31 +58,30 @@ class Connections(Protocol):
     def connection(self) -> AbstractAsyncContextManager[Connection]: ...
 
 
-class ModelNotReady(Exception):
+class ModelNotReady(Refusal):
     """Model-backed work needs a usable OpenRouter key. `code` says what's wrong with this one."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
 
 
 class PolicyNotOffered(ProfileNotOffered):
-    """A resolved profile isn't offered for new runs. `named` when the request itself named it."""
+    """A resolved profile isn't offered for new runs. `named` when the request itself named it,
+    which makes it a bad request. Otherwise it's a saved choice to change, a conflict."""
 
     def __init__(self, reason: str, *, named: bool) -> None:
-        super().__init__(reason)
+        super().__init__(reason, kind=RefusalKind.INVALID if named else RefusalKind.CONFLICT)
         self.named = named
 
 
 RequestRefusal = Literal["session_required", "budget_conflict", "owner_required"]
 
 
-class AdmissionRefused(Exception):
+class AdmissionRefused(Refusal):
     """The request's own shape, or who sent it, refuses it, and nothing is written."""
+
+    kind = RefusalKind.INVALID
+    kinds = MappingProxyType({"owner_required": RefusalKind.FORBIDDEN})
 
     def __init__(self, code: RequestRefusal) -> None:
         super().__init__(code)
-        self.code: RequestRefusal = code
 
 
 # The gate
@@ -123,9 +124,8 @@ class WorkspacePolicy:
             try:
                 require_offered(policy.bindings.values())
             except ProfileNotOffered as refused:
-                # Named in this request it's a bad request. Otherwise it's a saved choice to change.
                 named = run_profile is not None and not is_offered(run_profile)
-                raise PolicyNotOffered(str(refused), named=named) from None
+                raise PolicyNotOffered(refused.reason, named=named) from None
         return policy
 
 

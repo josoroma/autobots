@@ -15,10 +15,10 @@ import pytest
 from pydantic import SecretStr
 
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.store import (
     CredentialReference,
     CredentialStorageUnavailable,
+    CredentialUnreadable,
     ProviderCredentialStore,
     ResolvedCredential,
 )
@@ -182,24 +182,24 @@ def test_a_401_for_a_key_replaced_mid_call_leaves_its_successor_alone() -> None:
 
 
 def test_a_key_that_wont_decrypt_reads_as_unavailable_not_an_error() -> None:
-    settings = settings_over(CredentialDecryptionError())
+    settings = settings_over(CredentialUnreadable("arranged"))
     assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
 
 
 def test_a_damaged_key_still_gives_the_version_needed_to_replace_it() -> None:
-    status = asyncio.run(settings_over(CredentialDecryptionError()).status(uuid4()))
+    status = asyncio.run(settings_over(CredentialUnreadable("arranged")).status(uuid4()))
     assert (status.auth_status, status.settings_version) == ("unavailable", 1)
 
 
 def test_rechecking_a_damaged_key_says_storage_not_an_error() -> None:
-    settings = settings_over(CredentialDecryptionError())
+    settings = settings_over(CredentialUnreadable("arranged"))
     with pytest.raises(CredentialStorageUnavailable):
         asyncio.run(settings.revalidate(uuid4()))
 
 
 def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
     rows = Rows(stored="unavailable")
-    settings = settings_over(CredentialDecryptionError(), rows, environment_key=ARRANGED_KEY)
+    settings = settings_over(CredentialUnreadable("arranged"), rows, environment_key=ARRANGED_KEY)
     assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
     rows.stored = "configured"
     assert asyncio.run(settings.run_intent(uuid4())) == "ready"

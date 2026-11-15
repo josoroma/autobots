@@ -50,6 +50,7 @@ from autobots.application.compaction import (
 from autobots.application.model_admission import (
     AdmissionRefused,
     AdmissionRequest,
+    AttemptAlreadySettled,
     ModelAdmission,
     NoInferenceSlot,
     ReplyFacts,
@@ -563,8 +564,9 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
             if limit:
                 raise LoopStopped(limit[0].code) from None
             raise LoopStopped(failure.failure.value) from None
-        except ValueError:
-            # Recovery classified this call while it was out. Its charge is late evidence.
+        except AttemptAlreadySettled:
+            # Recovery classified this call while it was out. Its charge is late evidence. Any other
+            # error is a defect and propagates (PADP-11).
             late = charged(replies[-1].result[-1]) if replies else None
             if late is not None and last_ticket:
                 await ledger.reconcile(last_ticket[-1].invocation_id, late, source="provider")

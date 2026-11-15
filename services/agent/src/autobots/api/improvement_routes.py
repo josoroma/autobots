@@ -5,12 +5,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from autobots.api.errors import ApiError
+from autobots.api.errors import reworded
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.improvements import (
-    ImprovementRefused,
     decide,
     list_candidates,
     request_replay,
@@ -32,15 +31,9 @@ from autobots.contracts.improvements import (
     ReplayRequest,
     RollbackRequest,
 )
-from autobots.domain.models import ProfileNotOffered
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Owner = Annotated[UUID, Depends(require_owner)]
-
-
-def _error(error: ImprovementRefused) -> ApiError:
-    status_code = 404 if error.code.endswith("not_found") else 409
-    return ApiError(status_code, error.code, "That can't be done to this proposal.")
 
 
 @router.get("/improvements", operation_id="listImprovements", response_model=CandidateList)
@@ -62,15 +55,12 @@ async def post_regression(
     candidate_id: UUID, body: RegressionRun, request: Request, workspace: Owner
 ) -> CandidateList:
     async with request_pool(request).connection() as connection:
-        try:
-            await run_regression(
-                connection,
-                workspace,
-                candidate_id,
-                [case.model_dump() for case in body.cases],
-            )
-        except ImprovementRefused as error:
-            raise _error(error) from None
+        await run_regression(
+            connection,
+            workspace,
+            candidate_id,
+            [case.model_dump() for case in body.cases],
+        )
         return CandidateList(
             schema_version=1, candidates=await list_candidates(connection, workspace)
         )
@@ -95,14 +85,11 @@ async def post_replay(
     try:
         await require_model_ready(settings.run_intent, workspace, needed=True)
     except ModelNotReady as refused:
-        raise ApiError(409, refused.code, "A replay needs a usable OpenRouter key.") from None
+        raise reworded(refused, "A replay needs a usable OpenRouter key.") from None
     async with request_pool(request).connection() as connection:
-        try:
-            # A held-out task names no Expert and no profile, so it resolves the workspace's saved
-            # policy alone, and a profile there that isn't offered is a saved choice to change.
-            policy = await workspace_role_policy(connection, workspace, require_offer=True)
-        except ProfileNotOffered as refused:
-            raise ApiError(409, refused.code, str(refused)) from None
+        # A held-out task names no Expert and no profile, so it resolves the workspace's saved
+        # policy alone, and a profile there that isn't offered is a saved choice to change.
+        policy = await workspace_role_policy(connection, workspace, require_offer=True)
         try:
             await request_replay(
                 connection,
@@ -114,10 +101,8 @@ async def post_replay(
                 limit_micro_usd=body.limit_micro_usd,
                 policy=policy,
             )
-        except ImprovementRefused as error:
-            raise _error(error) from None
-        except IdempotencyConflict as error:
-            raise ApiError(409, error.code, "That key was used for a different replay.") from None
+        except IdempotencyConflict as refused:
+            raise reworded(refused, "That key was used for a different replay.") from None
         return CandidateList(
             schema_version=1, candidates=await list_candidates(connection, workspace)
         )
@@ -136,10 +121,7 @@ async def post_decision(
     user: Annotated[UUID, Depends(current_user)],
 ) -> CandidateList:
     async with request_pool(request).connection() as connection:
-        try:
-            await decide(connection, workspace, candidate_id, user, body.decision)
-        except ImprovementRefused as error:
-            raise _error(error) from None
+        await decide(connection, workspace, candidate_id, user, body.decision)
         return CandidateList(
             schema_version=1, candidates=await list_candidates(connection, workspace)
         )
@@ -148,7 +130,4 @@ async def post_decision(
 @router.post("/knowledge/rollback", operation_id="rollbackKnowledge", response_model=KnowledgeHead)
 async def post_rollback(body: RollbackRequest, request: Request, workspace: Owner) -> KnowledgeHead:
     async with request_pool(request).connection() as connection:
-        try:
-            return await rollback(connection, workspace, body.kind, body.key, body.to_version)
-        except ImprovementRefused as error:
-            raise _error(error) from None
+        return await rollback(connection, workspace, body.kind, body.key, body.to_version)

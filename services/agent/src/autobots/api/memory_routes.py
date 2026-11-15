@@ -5,11 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
-from autobots.api.errors import ApiError
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
-from autobots.application.memory import MemoryRefused, search, store_memory
+from autobots.application.memory import search, store_memory
 from autobots.contracts.memory import MemoryCreate, MemoryCreated, MemorySearchView
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -39,16 +38,13 @@ async def post_memory(
 ) -> MemoryCreated:
     """A person's own note. Anything a run learned goes through review, in US-8.2."""
     async with request_pool(request).connection() as connection:
-        try:
-            memory_id = await store_memory(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                title=body.title,
-                content=body.content,
-                source={"kind": "owner_note"},
-                expert_id=body.expert_id,
-            )
-        except MemoryRefused as error:
-            raise ApiError(404, error.code, "That Expert isn't in this workspace.") from None
+        memory_id = await store_memory(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            title=body.title,
+            content=body.content,
+            source={"kind": "owner_note"},
+            expert_id=body.expert_id,
+        )
     return MemoryCreated(schema_version=1, id=str(memory_id))

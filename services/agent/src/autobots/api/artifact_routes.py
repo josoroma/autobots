@@ -10,7 +10,7 @@ from autobots.api.errors import ApiError
 from autobots.api.pool import request_pool
 from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
-from autobots.application.artifacts import ArtifactUnavailable, list_artifacts, read_artifact
+from autobots.application.artifacts import list_artifacts, read_artifact
 from autobots.contracts.artifacts import ArtifactList, ArtifactSummary
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -39,9 +39,6 @@ async def download(artifact_id: UUID, request: Request, workspace_id: Workspace)
             name, media_type, content = await read_artifact(
                 connection, store, workspace_id, artifact_id
             )
-    except ArtifactUnavailable as error:
-        status = 404 if error.code == "artifact_not_found" else 409
-        raise ApiError(status, error.code, "That artifact is not available.") from None
     except StorageUnavailable:
         raise ApiError(503, "storage_unavailable", "Artifact storage is unavailable.") from None
     return Response(

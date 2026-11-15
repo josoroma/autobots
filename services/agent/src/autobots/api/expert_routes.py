@@ -10,7 +10,6 @@ from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.experts import (
-    ExpertRefused,
     add_version,
     create_expert,
     create_session,
@@ -18,9 +17,7 @@ from autobots.application.experts import (
     get_session,
     list_experts,
 )
-from autobots.application.runs import IdempotencyConflict
 from autobots.contracts.experts import (
-    ExpertConfig,
     ExpertCreate,
     ExpertList,
     ExpertRevision,
@@ -28,38 +25,19 @@ from autobots.contracts.experts import (
     SessionCreate,
     SessionView,
 )
-from autobots.domain.models import ProfileNotOffered, require_offered
+from autobots.domain.models import require_offered
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 Member = Annotated[UUID, Depends(current_workspace)]
 Owner = Annotated[UUID, Depends(require_owner)]
 User = Annotated[UUID, Depends(current_user)]
-NOT_FOUND = {"expert_not_found", "session_not_found"}
-CONFLICT = {"expert_name_taken", "expert_version_conflict"}
-
-
-def _error(error: ExpertRefused | IdempotencyConflict) -> ApiError:
-    if isinstance(error, IdempotencyConflict):
-        return ApiError(409, error.code, "This key was already used with different content.")
-    if error.code in NOT_FOUND:
-        return ApiError(404, error.code, "That is not available.")
-    if error.code in CONFLICT:
-        return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
-    return ApiError(422, error.code, "That configuration is not allowed.")
 
 
 @router.get("/experts", operation_id="listExperts", response_model=ExpertList)
 async def get_experts(request: Request, workspace: Member) -> ExpertList:
     async with request_pool(request).connection() as connection:
         return ExpertList(schema_version=1, experts=await list_experts(connection, workspace))
-
-
-def _bindings_offered(config: ExpertConfig) -> None:
-    try:
-        require_offered(config.role_bindings.values())
-    except ProfileNotOffered as refused:
-        raise ApiError(422, refused.code, str(refused)) from None
 
 
 @router.post(
@@ -71,28 +49,23 @@ def _bindings_offered(config: ExpertConfig) -> None:
 async def post_expert(
     body: ExpertCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
-    _bindings_offered(body.config)
+    # Named in this request, a profile not offered is a bad request (ProfileNotOffered).
+    require_offered(body.config.role_bindings.values())
     async with request_pool(request).connection() as connection:
-        try:
-            return await create_expert(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                idempotency_key=key,
-                name=body.name,
-                config=body.config,
-            )
-        except (ExpertRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await create_expert(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            idempotency_key=key,
+            name=body.name,
+            config=body.config,
+        )
 
 
 @router.get("/experts/{expert_id}", operation_id="getExpert", response_model=ExpertView)
 async def read_expert(expert_id: UUID, request: Request, workspace: Member) -> ExpertView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await get_expert(connection, workspace, expert_id)
-        except ExpertRefused as error:
-            raise _error(error) from None
+        return await get_expert(connection, workspace, expert_id)
 
 
 @router.post(
@@ -104,20 +77,18 @@ async def read_expert(expert_id: UUID, request: Request, workspace: Member) -> E
 async def post_version(
     expert_id: UUID, body: ExpertRevision, request: Request, key: Key, workspace: Owner, user: User
 ) -> ExpertView:
-    _bindings_offered(body.config)
+    # Named in this request, a profile not offered is a bad request (ProfileNotOffered).
+    require_offered(body.config.role_bindings.values())
     async with request_pool(request).connection() as connection:
-        try:
-            return await add_version(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                expert_id=expert_id,
-                idempotency_key=key,
-                expected_version=body.expected_version,
-                config=body.config,
-            )
-        except (ExpertRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await add_version(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            expert_id=expert_id,
+            idempotency_key=key,
+            expected_version=body.expected_version,
+            config=body.config,
+        )
 
 
 @router.post(
@@ -136,23 +107,17 @@ async def post_session(
         # An earlier version could hold tools an owner has since removed, Decision 0011.
         raise ApiError(403, "owner_required", "Only an owner can choose an Expert version.")
     async with request_pool(request).connection() as connection:
-        try:
-            return await create_session(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                idempotency_key=key,
-                kind=body.kind,
-                experts=body.experts,
-            )
-        except (ExpertRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await create_session(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            idempotency_key=key,
+            kind=body.kind,
+            experts=body.experts,
+        )
 
 
 @router.get("/sessions/{session_id}", operation_id="getWorkSession", response_model=SessionView)
 async def read_session(session_id: UUID, request: Request, workspace: Member) -> SessionView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await get_session(connection, workspace, session_id)
-        except ExpertRefused as error:
-            raise _error(error) from None
+        return await get_session(connection, workspace, session_id)

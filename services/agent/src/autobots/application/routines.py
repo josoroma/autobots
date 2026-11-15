@@ -7,6 +7,7 @@ occurrence takes its version's frozen configuration, so an edit can't reach a ru
 import logging
 import os
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -33,6 +34,7 @@ from autobots.application.runs import (
 from autobots.application.workflows import WorkflowRefused, create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import OccurrenceView, RoutineConfig, RoutineView
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered
 from autobots.domain.routines import (
     TriggerInvalid,
@@ -47,10 +49,19 @@ from autobots.operations.logs import log_event
 logger = logging.getLogger("autobots.routines")
 
 
-class RoutineRefused(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+class RoutineRefused(Refusal):
+    """A typed reason, and nothing changes. A routine its target or trigger can't have is
+    invalid, and so is a refusal it carries over from admitting an occurrence."""
+
+    kind = RefusalKind.INVALID
+    kinds = MappingProxyType(
+        {
+            "routine_not_found": RefusalKind.NOT_FOUND,
+            "routine_target_not_found": RefusalKind.NOT_FOUND,
+            "routine_name_taken": RefusalKind.CONFLICT,
+            "routine_version_conflict": RefusalKind.CONFLICT,
+        }
+    )
 
 
 async def _expert_config(
@@ -79,7 +90,7 @@ async def _validate(connection: Any, workspace_id: UUID, config: RoutineConfig) 
     try:
         validate_trigger(config.trigger, config.timezone)
     except TriggerInvalid as invalid:
-        raise RoutineRefused(str(invalid)) from None
+        raise RoutineRefused(invalid.code) from None
     if config.target.kind == "expert":
         expert = await _expert_config(connection, workspace_id, config)
         if not config.goal.strip():

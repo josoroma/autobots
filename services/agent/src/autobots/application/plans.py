@@ -79,13 +79,18 @@ def validate_proposal(
             raise PlanRejected(GatewayCode.PLAN_CHANGES_COMPLETED)
 
 
+class GoalMissing(LookupError):
+    """No goal is stored for this run. Named, so a defect while reading one isn't taken for this
+    (refactor plan R-41, PRUN-13)."""
+
+
 async def load_goal(connection: Any, run_id: UUID) -> GoalSpec:
     cursor = await connection.execute(
         "select spec from app_private.goal_specs where run_id = %s", (run_id,)
     )
     row = await cursor.fetchone()
     if row is None:
-        raise LookupError("this run has no goal")
+        raise GoalMissing("this run has no goal")
     return GoalSpec.model_validate(row[0])
 
 

@@ -5,6 +5,7 @@ in the query, rather than anything a namespace label could claim.
 """
 
 import json
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -17,6 +18,7 @@ from autobots.contracts.memory import (
     SearchMemory,
     SearchResults,
 )
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
@@ -24,10 +26,8 @@ MAX_HITS = 10
 _HEADLINE = 'MaxFragments=2, MaxWords=25, MinWords=5, StartSel="", StopSel=""'
 
 
-class MemoryRefused(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+class MemoryRefused(Refusal):
+    kinds = MappingProxyType({"expert_not_found": RefusalKind.NOT_FOUND})
 
 
 async def store_memory(

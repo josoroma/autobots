@@ -12,7 +12,6 @@ from uuid import UUID
 from pydantic import SecretStr
 
 from autobots.adapters.models.catalog import ModelUnavailable, parse_catalog, validated_entry
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
@@ -32,6 +31,7 @@ from autobots.contracts.settings import (
     ProviderStatus,
     RouteQualification,
 )
+from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.models import PROFILES, ModelProfileId, is_offered
 
 
@@ -41,20 +41,22 @@ class KeyCheck(StrEnum):
     UNREACHABLE = "unreachable"
 
 
-class StaleVersion(Exception):
+class StaleVersion(FixedRefusal):
     code = "stale_version"
 
 
-class EnvironmentManaged(Exception):
+class EnvironmentManaged(FixedRefusal):
     code = "environment_managed"
 
 
-class InvalidKey(Exception):
+class InvalidKey(FixedRefusal):
     code = "invalid_key"
+    kind = RefusalKind.INVALID
 
 
-class ValidationUnavailable(Exception):
+class ValidationUnavailable(FixedRefusal):
     code = "validation_unavailable"
+    kind = RefusalKind.UNAVAILABLE
 
 
 class CredentialRefused(Exception):
@@ -173,7 +175,7 @@ class ProviderSettings:
             await self._store.load_active(workspace_id)
         except CredentialMissing:
             return "missing"
-        except (CredentialStorageUnavailable, CredentialDecryptionError):
+        except CredentialStorageUnavailable:
             return "unavailable"
         return auth_status
 
@@ -192,7 +194,7 @@ class ProviderSettings:
                 credential_id, credential_version = reference.credential_id, reference.version
             except CredentialMissing:
                 auth_status = "missing"
-            except (CredentialStorageUnavailable, CredentialDecryptionError):
+            except CredentialStorageUnavailable:
                 # Still answers for a damaged row, since replacing it needs this version.
                 auth_status = "unavailable"
         return ProviderStatus(
@@ -249,10 +251,8 @@ class ProviderSettings:
         if environment is not None:
             secret = SecretStr(environment.value)
         else:
-            try:
-                secret = (await self._store.load_active(workspace_id)).client_secret()
-            except CredentialDecryptionError:
-                raise CredentialStorageUnavailable("the stored key cannot be read") from None
+            # A row this key can't open raises the store's CredentialUnreadable, a storage error.
+            secret = (await self._store.load_active(workspace_id)).client_secret()
         result = await self._context.validate_key(secret)
         status = {
             KeyCheck.VALID: "configured",
@@ -274,7 +274,7 @@ class ProviderSettings:
             await self._store.load_active(workspace_id)
         except CredentialMissing:
             return "credentials_required"
-        except (CredentialStorageUnavailable, CredentialDecryptionError):
+        except CredentialStorageUnavailable:
             return "credential_unavailable"
         if stored_status == "invalid":
             return "credential_invalid"
@@ -299,7 +299,7 @@ class ProviderSettings:
         else:
             try:
                 current = (await self._store.load_active(workspace_id)).reference
-            except (CredentialMissing, CredentialStorageUnavailable, CredentialDecryptionError):
+            except (CredentialMissing, CredentialStorageUnavailable):
                 return
         if current == used:
             await self._rows.read(workspace_id)

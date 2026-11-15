@@ -5,18 +5,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
-from autobots.api.errors import ApiError, budget_error
+from autobots.api.errors import ApiError, reworded
 from autobots.api.operation_routes import require_ready
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, provider_settings, require_owner
 from autobots.application.provider_settings import ProviderSettings
 from autobots.application.run_admission import ModelNotReady, chosen_limit, require_model_ready
-from autobots.application.runs import IdempotencyConflict
 from autobots.application.workflow_overview import preview_steps, recent_executions
 from autobots.application.workflows import (
     DEFAULT_LIMIT_MICRO_USD,
-    WorkflowRefused,
     create_execution,
     create_workflow,
     discard_draft,
@@ -48,8 +46,6 @@ from autobots.contracts.workflows import (
     WorkflowValidation,
     WorkflowView,
 )
-from autobots.domain.budgets import BudgetRefused
-from autobots.domain.models import NOT_OFFERED_CODE, NOT_OFFERED_MESSAGE
 from autobots.domain.workflows import (
     BLOCKS,
     GraphError,
@@ -70,23 +66,6 @@ def _views(errors: list[GraphError]) -> list[WorkflowErrorView]:
 
 
 DRAFT_NOT_RUNNABLE = "draft_not_runnable"
-
-
-def _error(error: WorkflowRefused | IdempotencyConflict) -> ApiError:
-    if isinstance(error, IdempotencyConflict):
-        return ApiError(409, error.code, "This key was already used with different content.")
-    if error.code == "workflow_draft_not_found":
-        return ApiError(404, error.code, "This workflow has no saved draft.")
-    if error.code.endswith("not_found"):
-        return ApiError(404, error.code, "That workflow is not available.")
-    if error.code == "workflow_version_conflict":
-        return ApiError(409, error.code, "A newer version was published. Reload and try again.")
-    if error.code in {"workflow_invalid", "workflow_inputs_invalid"}:
-        codes = ", ".join(sorted({item.code for item in error.errors}))
-        return ApiError(422, error.code, f"That isn't valid: {codes}.")
-    if error.code == NOT_OFFERED_CODE:
-        return ApiError(409, error.code, getattr(error, "reason", None) or NOT_OFFERED_MESSAGE)
-    return ApiError(409, error.code, "That conflicts with what is saved. Reload and try again.")
 
 
 @router.get("/workflow-blocks", operation_id="listWorkflowBlocks", response_model=BlockCatalog)
@@ -116,10 +95,7 @@ async def get_blocks(_: Member) -> BlockCatalog:
 )
 async def get_execution(execution_id: UUID, request: Request, workspace: Member) -> ExecutionView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await read_execution(connection, workspace, execution_id)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        return await read_execution(connection, workspace, execution_id)
 
 
 @router.post(
@@ -152,17 +128,14 @@ async def post_workflow(
     body: WorkflowCreate, request: Request, key: Key, workspace: Owner, user: User
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await create_workflow(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                idempotency_key=key,
-                name=body.name,
-                description=body.description,
-            )
-        except (WorkflowRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await create_workflow(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            idempotency_key=key,
+            name=body.name,
+            description=body.description,
+        )
 
 
 @router.get(
@@ -175,10 +148,7 @@ async def get_executions(
 ) -> WorkflowExecutionList:
     """WF-04: the ten newest executions, with version, state, spend and duration."""
     async with request_pool(request).connection() as connection:
-        try:
-            await get_workflow(connection, workspace, workflow_id)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        await get_workflow(connection, workspace, workflow_id)
         executions = await recent_executions(connection, workspace, workflow_id)
     return WorkflowExecutionList(schema_version=1, executions=executions)
 
@@ -193,10 +163,7 @@ async def get_preview(
 ) -> WorkflowPreview:
     """WF-03: a published version's steps, or the draft's, with `version=draft`."""
     async with request_pool(request).connection() as connection:
-        try:
-            view = await get_workflow(connection, workspace, workflow_id)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        view = await get_workflow(connection, workspace, workflow_id)
         if version == "draft":
             if view.draft is None:
                 raise ApiError(404, "workflow_draft_not_found", "This workflow has no saved draft.")
@@ -221,10 +188,7 @@ async def put_draft(
 ) -> WorkflowView:
     """WF-02: an owner keeps one draft, replaced by each save."""
     async with request_pool(request).connection() as connection:
-        try:
-            return await save_draft(connection, workspace, user, workflow_id, body.graph)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        return await save_draft(connection, workspace, user, workflow_id, body.graph)
 
 
 @router.delete(
@@ -234,10 +198,7 @@ async def put_draft(
 )
 async def delete_draft(workflow_id: UUID, request: Request, workspace: Owner) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await discard_draft(connection, workspace, workflow_id)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        return await discard_draft(connection, workspace, workflow_id)
 
 
 @router.post(
@@ -255,17 +216,14 @@ async def post_draft_publish(
     user: User,
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await publish_draft(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                workflow_id=workflow_id,
-                idempotency_key=key,
-                expected_version=body.expected_version,
-            )
-        except (WorkflowRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await publish_draft(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            workflow_id=workflow_id,
+            idempotency_key=key,
+            expected_version=body.expected_version,
+        )
 
 
 @router.put(
@@ -277,19 +235,13 @@ async def put_description(
     workflow_id: UUID, body: WorkflowDescription, request: Request, workspace: Owner
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await set_description(connection, workspace, workflow_id, body.description)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        return await set_description(connection, workspace, workflow_id, body.description)
 
 
 @router.get("/workflows/{workflow_id}", operation_id="getWorkflow", response_model=WorkflowView)
 async def read_workflow(workflow_id: UUID, request: Request, workspace: Member) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await get_workflow(connection, workspace, workflow_id)
-        except WorkflowRefused as error:
-            raise _error(error) from None
+        return await get_workflow(connection, workspace, workflow_id)
 
 
 @router.post(
@@ -307,19 +259,16 @@ async def post_version(
     user: User,
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
-        try:
-            return await publish_version(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                workflow_id=workflow_id,
-                idempotency_key=key,
-                expected_version=body.expected_version,
-                graph=body.graph,
-                source=body.source,
-            )
-        except (WorkflowRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+        return await publish_version(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            workflow_id=workflow_id,
+            idempotency_key=key,
+            expected_version=body.expected_version,
+            graph=body.graph,
+            source=body.source,
+        )
 
 
 @router.post(
@@ -341,32 +290,25 @@ async def post_execution(
     if body.version == "draft":
         raise ApiError(409, DRAFT_NOT_RUNNABLE, "Only a published version can run.")
     async with request_pool(request).connection() as connection:
-        try:
-            # WF-05: the same budget rules as a goal run (Decision 0022 D11).
-            limit = await chosen_limit(
-                connection, workspace, body.budget_micro_usd, otherwise=DEFAULT_LIMIT_MICRO_USD
-            )
-        except BudgetRefused as refused:
-            raise budget_error(refused.code) from None
+        # WF-05: the same budget rules as a goal run (Decision 0022 D11).
+        limit = await chosen_limit(
+            connection, workspace, body.budget_micro_usd, otherwise=DEFAULT_LIMIT_MICRO_USD
+        )
         # A workflow with no agent step calls no model, so it needs no key.
         needed = await needs_model(connection, workspace, workflow_id, body.version)
         try:
             await require_model_ready(settings.run_intent, workspace, needed=needed)
         except ModelNotReady as refused:
-            message = "An agent step needs a usable OpenRouter key."
-            raise ApiError(409, refused.code, message) from None
-        try:
-            return await create_execution(
-                connection,
-                workspace_id=workspace,
-                actor_id=user,
-                started_by=user,
-                workflow_id=workflow_id,
-                idempotency_key=key,
-                version=body.version,
-                inputs=body.inputs,
-                documents=tuple(body.documents),
-                limit_micro_usd=limit,
-            )
-        except (WorkflowRefused, IdempotencyConflict) as error:
-            raise _error(error) from None
+            raise reworded(refused, "An agent step needs a usable OpenRouter key.") from None
+        return await create_execution(
+            connection,
+            workspace_id=workspace,
+            actor_id=user,
+            started_by=user,
+            workflow_id=workflow_id,
+            idempotency_key=key,
+            version=body.version,
+            inputs=body.inputs,
+            documents=tuple(body.documents),
+            limit_micro_usd=limit,
+        )

@@ -1,5 +1,6 @@
 """Precedence, encryption and secret handling, on fixtures. Real rows run in scripts/app_db.py."""
 
+import asyncio
 import json
 import logging
 import pickle
@@ -28,7 +29,13 @@ from autobots.application.credentials.precedence import (
     looks_usable,
     resolve_environment_key,
 )
-from autobots.application.credentials.store import CredentialReference, ResolvedCredential
+from autobots.application.credentials.store import (
+    CredentialReference,
+    CredentialStorageUnavailable,
+    CredentialUnreadable,
+    ProviderCredentialStore,
+    ResolvedCredential,
+)
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 CASES = json.loads((REPOSITORY / "contracts/fixtures/credential-precedence.json").read_text())
@@ -112,6 +119,36 @@ def test_master_key_creation_is_exclusive_and_private(tmp_path: Path) -> None:
         create_master_key(path)
     assert path.read_bytes() == original
     assert load_master_key(path) == original
+
+
+class OneRow:
+    """A connection whose every query answers `row`, as one stored credential."""
+
+    def __init__(self, row: tuple[object, ...]) -> None:
+        self.row = row
+
+    async def execute(self, *_: object) -> "OneRow":
+        return self
+
+    async def fetchone(self) -> tuple[object, ...]:
+        return self.row
+
+
+def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -> None:
+    """The store translates the cipher's failure itself, so its callers handle only its own
+    errors, and a missing or wrong key with encrypted rows stays an error (refactor plan R-41,
+    POPS-09, SP-007)."""
+    workspace, credential = uuid4(), uuid4()
+    path = tmp_path / "secrets/master.key"
+    create_master_key(path)
+    sealed = seal(bytes(32), PLAINTEXT, associated_data(workspace, "openrouter", credential, 1))
+    row = (credential, 1, sealed.ciphertext, sealed.nonce, sealed.tag)
+    with pytest.raises(CredentialUnreadable) as caught:
+        asyncio.run(ProviderCredentialStore(OneRow(row), path).load_active(workspace))
+    assert isinstance(caught.value, CredentialStorageUnavailable)
+    assert caught.value.code == "credential_storage_unavailable"
+    assert isinstance(caught.value.__cause__, CredentialDecryptionError)
+    assert PLAINTEXT not in str(caught.value)
 
 
 @pytest.mark.parametrize("problem", ["missing", "short", "open file", "open parent", "link"])

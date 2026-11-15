@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,6 +31,7 @@ from autobots.contracts.workflows import (
     WorkflowVersionView,
     WorkflowView,
 )
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import ProfileNotOffered, RolePolicy
 from autobots.domain.runs import TERMINAL
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS, PLAN_TOOLS
@@ -47,12 +49,22 @@ DEFAULT_LIMIT_MICRO_USD = 1_000_000
 WORKFLOW_TOOLS = {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
 
 
-class WorkflowRefused(Exception):
+class WorkflowRefused(Refusal):
+    kinds = MappingProxyType(
+        {
+            "workflow_not_found": RefusalKind.NOT_FOUND,
+            "workflow_draft_not_found": RefusalKind.NOT_FOUND,
+            "workflow_version_not_found": RefusalKind.NOT_FOUND,
+            "execution_not_found": RefusalKind.NOT_FOUND,
+            "workflow_invalid": RefusalKind.INVALID,
+            "workflow_inputs_invalid": RefusalKind.INVALID,
+        }
+    )
+
     def __init__(
         self, code: str, errors: list[GraphError] | None = None, reason: str | None = None
     ) -> None:
         super().__init__(code)
-        self.code = code
         self.errors = errors or []
         # A reason safe to show, such as which model isn't offered.
         self.reason = reason
@@ -376,7 +388,7 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
                         )
                     )
                 except ProfileNotOffered as refused:
-                    raise WorkflowRefused(refused.code, reason=str(refused)) from None
+                    raise WorkflowRefused(refused.code, reason=refused.reason) from None
             granted = (
                 WORKFLOW_TOOLS
                 if tools is None

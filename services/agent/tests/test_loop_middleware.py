@@ -30,6 +30,7 @@ from autobots.application.compaction import CompactionPolicy
 from autobots.application.model_admission import (
     AdmissionRefused,
     AdmissionRequest,
+    AttemptAlreadySettled,
     BudgetExceeded,
     ModelAdmission,
     NoInferenceSlot,
@@ -291,6 +292,42 @@ def test_without_a_guard_each_dispatch_reads_the_runs_ownership() -> None:
         asyncio.run(middleware.admitted(Request([HumanMessage("hello")]), Model(), ROUTE))
     assert caught.value.code == "run_not_found"
     assert ledger.asked == []
+
+
+class SettledMeanwhile(Ledger):
+    """Recovery settled the attempt while it was out, so settling it here is refused, or `error`
+    is raised there instead."""
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__()
+        self.error = error
+
+    async def settle(
+        self, invocation_id: UUID, charged_micro_usd: int, *, upstream_provider: str | None = None
+    ) -> None:
+        raise self.error
+
+
+def test_an_attempt_recovery_settled_stops_as_lost_and_keeps_its_late_charge() -> None:
+    """The charge the reply reported is late evidence for the attempt recovery classified."""
+    ledger = SettledMeanwhile(AttemptAlreadySettled("this attempt has already been settled"))
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(
+            loop(Usage(), ledger).admitted(Request([HumanMessage("hello")]), Model(reply()), ROUTE)
+        )
+    assert caught.value.code == "lease_lost"
+    assert ledger.events[-1] == ("reconciled", 100)
+
+
+def test_any_other_value_error_while_settling_is_a_defect_not_a_lost_lease() -> None:
+    """Only the ledger's own refusal means recovery got there first (refactor plan R-41,
+    PADP-11)."""
+    ledger = SettledMeanwhile(ValueError("arranged defect"))
+    with pytest.raises(ValueError, match="arranged defect"):
+        asyncio.run(
+            loop(Usage(), ledger).admitted(Request([HumanMessage("hello")]), Model(reply()), ROUTE)
+        )
+    assert ("reconciled", 100) not in ledger.events
 
 
 # What a reply or a failed call leaves in the ledger and the log, split from

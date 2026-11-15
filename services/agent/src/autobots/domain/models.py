@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
 
+from autobots.domain.errors import FixedRefusal, RefusalKind
+
 
 class ModelRole(StrEnum):
     COORDINATOR = "coordinator"
@@ -94,10 +96,17 @@ NOT_OFFERED_MESSAGES: Mapping[ModelProfileId, str] = MappingProxyType(
 )
 
 
-class ProfileNotOffered(Exception):
-    """A typed reason, and nothing starts. No other model is ever put in its place."""
+class ProfileNotOffered(FixedRefusal):
+    """A typed reason, and nothing starts. No other model is ever put in its place. `reason` says
+    which model and why, and is safe to show. A request that names the profile is refused as
+    invalid; where a saved choice names it, the raise passes CONFLICT (PolicyNotOffered)."""
 
     code = NOT_OFFERED_CODE
+    kind = RefusalKind.INVALID
+
+    def __init__(self, reason: str, *, kind: RefusalKind | None = None) -> None:
+        super().__init__(reason, kind=kind)
+        self.reason = reason
 
 
 def is_offered(profile: "ModelProfileId") -> bool:

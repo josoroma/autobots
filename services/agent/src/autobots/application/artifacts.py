@@ -3,6 +3,7 @@
 import hashlib
 import re
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -15,6 +16,7 @@ from autobots.application.tool_gateway import (
     hold_lease,
 )
 from autobots.contracts.artifacts import PublishArtifact, PublishedArtifact
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
 
@@ -30,12 +32,10 @@ class ObjectStore(Protocol):
     async def names(self, prefix: str) -> list[str]: ...
 
 
-class ArtifactUnavailable(Exception):
+class ArtifactUnavailable(Refusal):
     """Not this workspace's, not published, gone or altered. The caller gets no bytes."""
 
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+    kinds = MappingProxyType({"artifact_not_found": RefusalKind.NOT_FOUND})
 
 
 def object_path(workspace_id: UUID, run_id: UUID, operation_id: str, name: str) -> str:

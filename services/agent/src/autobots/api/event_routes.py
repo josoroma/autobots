@@ -19,13 +19,11 @@ from autobots.api.security import require_internal
 from autobots.api.settings_routes import current_workspace
 from autobots.application.run_projection import (
     RUN_LIST_SIZE,
-    InvalidCursor,
     read_events,
     read_inspector,
     read_run_list,
     read_workspace,
 )
-from autobots.application.runs import RunNotFound
 from autobots.application.tool_uses import list_tool_uses
 from autobots.contracts.run_workspace import (
     EventPage,
@@ -56,19 +54,13 @@ async def get_events(
     run_id: UUID, request: Request, workspace_id: Workspace, after: Cursor = 0
 ) -> EventPage:
     async with request_pool(request).connection() as connection:
-        try:
-            return await read_events(connection, workspace_id, run_id, after=after)
-        except RunNotFound:
-            raise _not_found() from None
+        return await read_events(connection, workspace_id, run_id, after=after)
 
 
 @router.get("/runs/{run_id}/workspace", operation_id="getRunWorkspace", response_model=RunWorkspace)
 async def get_workspace(run_id: UUID, request: Request, workspace_id: Workspace) -> RunWorkspace:
     async with request_pool(request).connection() as connection:
-        try:
-            return await read_workspace(connection, workspace_id, run_id)
-        except RunNotFound:
-            raise _not_found() from None
+        return await read_workspace(connection, workspace_id, run_id)
 
 
 @router.get("/runs", operation_id="listRuns", response_model=RunList)
@@ -83,27 +75,21 @@ async def get_runs(
 ) -> RunList:
     """PRD-Studio RN-01 and RN-02: status groups with server counts, filters and a keyset cursor."""
     async with request_pool(request).connection() as connection:
-        try:
-            return await read_run_list(
-                connection,
-                workspace_id,
-                limit,
-                group=group,
-                query=q,
-                profile=profile.value if profile is not None else None,
-                cursor=cursor,
-            )
-        except InvalidCursor:
-            raise ApiError(422, "invalid_cursor", "That page cursor is not valid.") from None
+        return await read_run_list(
+            connection,
+            workspace_id,
+            limit,
+            group=group,
+            query=q,
+            profile=profile.value if profile is not None else None,
+            cursor=cursor,
+        )
 
 
 @router.get("/runs/{run_id}/inspector", operation_id="getRunInspector", response_model=RunInspector)
 async def get_inspector(run_id: UUID, request: Request, workspace_id: Workspace) -> RunInspector:
     async with request_pool(request).connection() as connection:
-        try:
-            return await read_inspector(connection, workspace_id, run_id)
-        except RunNotFound:
-            raise _not_found() from None
+        return await read_inspector(connection, workspace_id, run_id)
 
 
 @router.get("/runs/{run_id}/tool-uses", operation_id="listRunToolUses", response_model=ToolUseList)
@@ -230,10 +216,7 @@ async def stream_events(
     """Authorized before the first byte, so a refusal is a status and not an empty stream."""
     pool = request_pool(request)
     async with pool.connection() as connection:
-        try:
-            await read_events(connection, workspace_id, run_id, after=after, limit=1)
-        except RunNotFound:
-            raise _not_found() from None
+        await read_events(connection, workspace_id, run_id, after=after, limit=1)
     return StreamingResponse(
         _frames(request, pool, workspace_id, run_id, after),
         media_type="text/event-stream",

@@ -1,8 +1,11 @@
 """The most one call can cost, at the stated prompt and output limits, which admission reserves
-(MP-07). Split from test_worker_inference.py by module (PTST-04)."""
+(MP-07), and the ledger's refusal of an attempt recovery settled meanwhile. Split from
+test_worker_inference.py by module (PTST-04)."""
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
@@ -12,7 +15,11 @@ from autobots.adapters.models.catalog import (
     parse_catalog,
     parse_pricing,
 )
-from autobots.application.model_admission import worst_case_cost
+from autobots.application.model_admission import (
+    AttemptAlreadySettled,
+    ModelAdmission,
+    worst_case_cost,
+)
 from autobots.domain.models import MAX_OUTPUT_TOKENS
 from fake_openrouter import catalog_payload
 
@@ -46,3 +53,39 @@ def test_the_worst_case_is_an_upper_bound_at_the_stated_limits() -> None:
 def test_a_variable_rate_is_not_hidden_by_a_fixed_one(pricing: dict[str, Any]) -> None:
     with pytest.raises(Exception, match="price is not known"):
         worst_case_cost(parse_pricing({"pricing": pricing}), 1, 1)
+
+
+class NothingOpen:
+    """A ledger connection whose every guarded update finds no row in the state it needs."""
+
+    async def execute(self, *_: object) -> "NothingOpen":
+        return self
+
+    async def fetchone(self) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    ("step", "message"),
+    [
+        ("settle", "this attempt has already been settled"),
+        ("fail_before_acceptance", "this attempt has already been settled"),
+        ("mark_uncertain", "this attempt has already been settled"),
+        ("mark_dispatched", "this attempt was closed before it was sent"),
+        ("reconcile", "this attempt is not awaiting reconciliation"),
+    ],
+)
+def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, message: str) -> None:
+    """Recovery can settle or close an attempt while it is out (refactor plan R-41, PRUN-13). The
+    refusal stays a ValueError while callers move to its name."""
+    ledger = ModelAdmission(NothingOpen())
+    arguments: dict[str, tuple[object, ...]] = {
+        "settle": (1,),
+        "fail_before_acceptance": ("other",),
+        "mark_uncertain": ("other",),
+        "mark_dispatched": (),
+        "reconcile": (1,),
+    }
+    with pytest.raises(AttemptAlreadySettled, match=message) as caught:
+        asyncio.run(getattr(ledger, step)(uuid4(), *arguments[step]))
+    assert isinstance(caught.value, ValueError)

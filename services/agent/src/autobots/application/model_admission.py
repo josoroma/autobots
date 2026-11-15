@@ -34,6 +34,12 @@ class CostUnavailable(AdmissionRefused):
     code = "cost_unavailable"
 
 
+class AttemptAlreadySettled(ValueError):
+    """Recovery settled or closed this attempt while it was out, so this step changes nothing. Also
+    a ValueError, which tests/db/admission_check.py and verification_check.py catch (refactor plan
+    R-41, PRUN-13)."""
+
+
 @dataclass(frozen=True)
 class ReplyFacts:
     """A reply's own account of itself, with no message content."""
@@ -192,17 +198,18 @@ class ModelAdmission:
             (*values, invocation_id),
         )
         if await cursor.fetchone() is None:
-            raise ValueError("this attempt has already been settled")
+            raise AttemptAlreadySettled("this attempt has already been settled")
 
     async def mark_dispatched(self, invocation_id: UUID) -> None:
-        """Raises if recovery closed this reservation meanwhile, so nothing is sent."""
+        """Raises AttemptAlreadySettled if recovery closed this reservation meanwhile, so nothing is
+        sent."""
         cursor = await self._connection.execute(
             "update app_private.model_invocations set status = 'dispatched' "
             "where id = %s and status = 'reserved' returning id",
             (invocation_id,),
         )
         if await cursor.fetchone() is None:
-            raise ValueError("this attempt was closed before it was sent")
+            raise AttemptAlreadySettled("this attempt was closed before it was sent")
 
     async def record_credential(self, invocation_id: UUID, version: int) -> None:
         """MP-06's audit. The reference is known only once the attempt has resolved its key."""
@@ -289,7 +296,7 @@ class ModelAdmission:
             (charged_micro_usd, source, invocation_id),
         )
         if await cursor.fetchone() is None:
-            raise ValueError("this attempt is not awaiting reconciliation")
+            raise AttemptAlreadySettled("this attempt is not awaiting reconciliation")
 
 
 async def remaining_daily_micro_usd(

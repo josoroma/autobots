@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from autobots.contracts.plans import GoalSpec, InputDocument, RequiredArtifact
+from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.execution import current_contract
 from autobots.domain.models import PROFILES, RolePolicy
 from autobots.domain.runs import (
@@ -22,13 +23,13 @@ from autobots.domain.runs import (
 from autobots.domain.tools import LOOP_TOOL_GRANTS, RUN_FILE_GRANTS
 
 
-class IdempotencyConflict(Exception):
+class IdempotencyConflict(FixedRefusal):
     """The same key with different content. Nothing is created or changed."""
 
     code = "idempotency_conflict"
 
 
-class VersionConflict(Exception):
+class VersionConflict(FixedRefusal):
     code = "version_conflict"
 
 
@@ -38,16 +39,17 @@ class LeaseLost(Exception):
     code = "lease_lost"
 
 
-class LinkRefused(Exception):
+class LinkRefused(FixedRefusal):
     """Only a terminal run in this workspace can be continued."""
 
     code = "run_not_continuable"
 
 
-class RunNotFound(Exception):
+class RunNotFound(FixedRefusal):
     """Also for a run in another workspace, so existence is not revealed."""
 
     code = "run_not_found"
+    kind = RefusalKind.NOT_FOUND
 
 
 @dataclass(frozen=True)

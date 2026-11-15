@@ -4,6 +4,7 @@ import json
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -17,7 +18,8 @@ from autobots.contracts.experts import (
     SessionExpert,
     SessionView,
 )
-from autobots.domain.models import approved_role
+from autobots.domain.errors import Refusal, RefusalKind
+from autobots.domain.models import UnknownModelProfile, approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
 
 
@@ -27,12 +29,21 @@ def expert_overrides(config: ExpertConfig) -> dict[str, str]:
     return {role: profile.value for role, profile in config.role_bindings.items()}
 
 
-class ExpertRefused(Exception):
-    """A typed reason, and nothing changes."""
+class ExpertRefused(Refusal):
+    """A typed reason, and nothing changes. A configuration an Expert can't have is invalid."""
 
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+    kind = RefusalKind.INVALID
+    kinds = MappingProxyType(
+        {
+            "expert_not_found": RefusalKind.NOT_FOUND,
+            "session_not_found": RefusalKind.NOT_FOUND,
+            "expert_version_not_found": RefusalKind.NOT_FOUND,
+            "expert_name_taken": RefusalKind.CONFLICT,
+            "expert_version_conflict": RefusalKind.CONFLICT,
+            "route_needs_expert": RefusalKind.CONFLICT,
+            "route_not_granted": RefusalKind.CONFLICT,
+        }
+    )
 
 
 def expand_groups(config: ExpertConfig, environ: Mapping[str, str] = os.environ) -> ExpertConfig:
@@ -75,7 +86,7 @@ def validate_config(config: ExpertConfig, environ: Mapping[str, str] = os.enviro
     try:
         for role in config.role_bindings:
             approved_role(role)
-    except Exception:  # noqa: BLE001 - any role that fails approval makes the Expert refused
+    except UnknownModelProfile:
         raise ExpertRefused("expert_role_unknown") from None
 
 

@@ -5,14 +5,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 
-from autobots.api.errors import ApiError
+from autobots.api.errors import reworded
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
 from autobots.api.settings_routes import current_workspace, require_owner
 from autobots.application.approvals import (
     ARGUMENT_LIMIT,
     DECIDED,
-    ApprovalRefused,
     approval_counts,
     decide,
     exceeds_review_limit,
@@ -144,13 +143,8 @@ async def post_decision(
                 decision=body.decision,
                 argument_hash=body.argument_hash,
             )
-        except ApprovalRefused as error:
-            status_code = 404 if error.code == "approval_not_found" else 409
-            raise ApiError(status_code, error.code, "That decision can't be applied.") from None
-        except IdempotencyConflict as error:
-            raise ApiError(
-                409, error.code, "This key was used with a different decision."
-            ) from None
+        except IdempotencyConflict as refused:
+            raise reworded(refused, "This key was used with a different decision.") from None
     return ApprovalResult(
         schema_version=1,
         approval_id=result.approval_id,

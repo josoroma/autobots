@@ -28,7 +28,6 @@ from autobots.adapters.models.factory import (
     chat_model,
     prepare_attempt,
 )
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.store import (
     CredentialBlocked,
     CredentialMissing,
@@ -246,8 +245,8 @@ class InferenceSource:
         except CredentialBlocked:
             raise ProviderFailure(FailureClass.INVALID_CREDENTIAL) from None
         except (
+            # CredentialUnreadable among them, logged by its own type (POPS-09).
             CredentialStorageUnavailable,
-            CredentialDecryptionError,
             psycopg.Error,
             # An unreadable or malformed configuration file, or a client that wouldn't build.
             OSError,

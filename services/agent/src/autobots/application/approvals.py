@@ -9,6 +9,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -22,6 +23,7 @@ from autobots.application.runs import (
     store_receipt,
 )
 from autobots.application.worker_leases import LeaseHolder, hold_lease
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.runs import RunCommand, RunStatus
 from autobots.domain.stops import GatewayCode
 
@@ -38,10 +40,8 @@ def exceeds_review_limit(arguments: str) -> bool:
     return len(arguments) > ARGUMENT_LIMIT
 
 
-class ApprovalRefused(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+class ApprovalRefused(Refusal):
+    kinds = MappingProxyType({"approval_not_found": RefusalKind.NOT_FOUND})
 
 
 @dataclass(frozen=True)

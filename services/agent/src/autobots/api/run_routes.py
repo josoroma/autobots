@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, status
 from psycopg import AsyncConnection
 
-from autobots.api.errors import ApiError, budget_error
+from autobots.api.errors import ApiError, reworded
 from autobots.api.operation_routes import require_ready
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
@@ -21,35 +21,17 @@ from autobots.application.experts import ExpertRefused
 from autobots.application.goal_loop import execution_block
 from autobots.application.model_admission import ModelAdmission, remaining_daily_micro_usd
 from autobots.application.provider_settings import ProviderSettings
-from autobots.application.reconciliation import (
-    ReconciliationRefused,
-    has_unresolvable_effect,
-    record_evidence,
-)
+from autobots.application.reconciliation import has_unresolvable_effect, record_evidence
 from autobots.application.recovery import outstanding
 from autobots.application.run_admission import (
     AdmissionInput,
-    AdmissionRefused,
-    ModelNotReady,
-    PolicyNotOffered,
-    RequestRefusal,
     admit_from_request,
     expert_overrides,
     require_model_ready,
     saved_workspace_policy,
 )
 from autobots.application.run_projection import public_text, read_summary
-from autobots.application.runs import (
-    IdempotencyConflict,
-    LinkRefused,
-    RunNotFound,
-    VersionConflict,
-    apply_command,
-    existing_receipt,
-    request_hash,
-    store_receipt,
-)
-from autobots.application.tool_catalog import ToolsUnavailable
+from autobots.application.runs import apply_command, existing_receipt, request_hash, store_receipt
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.run_commands import (
     EffectEvidence,
@@ -63,75 +45,12 @@ from autobots.contracts.run_commands import (
 )
 from autobots.contracts.runs import RunSummary
 from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
-from autobots.domain.budgets import BudgetRefused
 from autobots.domain.models import PROFILES, ModelProfileId
-from autobots.domain.runs import Actor, CommandRefused, RunCommand
+from autobots.domain.runs import Actor, RunCommand
 from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
-
-
-def as_api_error(error: Exception) -> ApiError:
-    if isinstance(error, IdempotencyConflict):
-        return ApiError(409, error.code, "This key was already used with different content.")
-    if isinstance(error, VersionConflict):
-        return ApiError(409, error.code, "The run changed. Reload and try again.")
-    if isinstance(error, LinkRefused):
-        return ApiError(
-            409,
-            error.code,
-            "Only a finished goal run of its own, in this workspace, can be continued.",
-        )
-    if isinstance(error, RunNotFound):
-        return ApiError(404, error.code, "That run is not available.")
-    if isinstance(error, CommandRefused):
-        return ApiError(
-            409, "transition_refused", "That is not allowed in the run's current state."
-        )
-    raise error
-
-
-KEY_NEEDED = "Model-backed work needs a usable OpenRouter key."
-REQUEST_REFUSALS: dict[RequestRefusal, tuple[int, str]] = {
-    "session_required": (422, "An Expert is chosen through a session."),
-    "budget_conflict": (422, "Choose a budget or a limit, not both."),
-    "owner_required": (403, "Only an owner can choose an Expert version."),
-}
-ADMISSION_REFUSALS = (
-    AdmissionRefused,
-    BudgetRefused,
-    ModelNotReady,
-    ExpertRefused,
-    ToolsUnavailable,
-    PolicyNotOffered,
-    IdempotencyConflict,
-    LinkRefused,
-)
-
-
-def admission_error(error: Exception) -> ApiError:
-    """Each refusal `admit_from_request` raises, with its status and fixed wording."""
-    if isinstance(error, AdmissionRefused):
-        status_code, message = REQUEST_REFUSALS[error.code]
-        return ApiError(status_code, error.code, message)
-    if isinstance(error, BudgetRefused):
-        return budget_error(error.code)
-    if isinstance(error, ModelNotReady):
-        return ApiError(409, error.code, KEY_NEEDED)
-    if isinstance(error, ExpertRefused):
-        status_code = 404 if error.code.endswith("not_found") else 409
-        return ApiError(status_code, error.code, "That routing isn't available.")
-    if isinstance(error, ToolsUnavailable):
-        return ApiError(
-            409,
-            error.code,
-            "A tool this Expert grants is unavailable in this install. "
-            "See Tools for what it needs.",
-        )
-    if isinstance(error, PolicyNotOffered):
-        return ApiError(422 if error.named else 409, error.code, str(error))
-    return as_api_error(error)
 
 
 PROFILE_LABELS = {
@@ -208,6 +127,7 @@ async def post_run(
     workspace_id: Annotated[UUID, Depends(current_workspace)],
     user_id: Annotated[UUID, Depends(current_user)],
 ) -> RunAccepted:
+    # The first step's refusal is the answer, in api/errors.py's wording, apart from routing's.
     try:
         result = await admit_from_request(
             AdmissionInput.of(
@@ -221,8 +141,8 @@ async def post_run(
             # `settings` dependency has already refused a missing provider context.
             environment=process_environment(request),
         )
-    except ADMISSION_REFUSALS as refused:
-        raise admission_error(refused) from None
+    except ExpertRefused as refused:
+        raise reworded(refused, "That routing isn't available.") from None
     return RunAccepted(
         schema_version=1,
         run_id=result.run_id,
@@ -262,20 +182,17 @@ async def _command(
     response: str | None = None,
 ) -> RunCommandResult:
     async with request_pool(request).connection() as connection:
-        try:
-            result = await apply_command(
-                connection,
-                workspace_id=workspace_id,
-                run_id=run_id,
-                command=command,
-                actor=Actor.USER,
-                expected_version=body.expected_version,
-                actor_id=user_id,
-                idempotency_key=key,
-                response=response,
-            )
-        except (IdempotencyConflict, VersionConflict, RunNotFound, CommandRefused) as error:
-            raise as_api_error(error) from None
+        result = await apply_command(
+            connection,
+            workspace_id=workspace_id,
+            run_id=run_id,
+            command=command,
+            actor=Actor.USER,
+            expected_version=body.expected_version,
+            actor_id=user_id,
+            idempotency_key=key,
+            response=response,
+        )
     return RunCommandResult(
         schema_version=1,
         run_id=result.run_id,
@@ -326,12 +243,9 @@ async def post_resume(
     settings: Annotated[ProviderSettings, Depends(provider_settings)],
 ) -> RunCommandResult:
     """Readiness is checked here, and again by the worker before anything is dispatched."""
-    try:
-        # Offering isn't checked again: a resumed run keeps the policy it froze at admission, as a
-        # policy change reaches future runs only (PRD-Model-Providers MP-01).
-        await require_model_ready(settings.run_intent, workspace, needed=True)
-    except ModelNotReady as refused:
-        raise ApiError(409, refused.code, KEY_NEEDED) from None
+    # Offering isn't checked again: a resumed run keeps the policy it froze at admission, as a
+    # policy change reaches future runs only (PRD-Model-Providers MP-01).
+    await require_model_ready(settings.run_intent, workspace, needed=True)
     async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
         left = await outstanding(connection, run_id)
@@ -368,23 +282,17 @@ async def post_effect_evidence(
     """An owner reports what the destination's own records show."""
     async with request_pool(request).connection() as connection:
         await _require_run(connection, workspace, run_id)
-        try:
-            await record_evidence(
-                connection,
-                workspace_id=workspace,
-                run_id=run_id,
-                operation_id=operation_id,
-                actor_id=user,
-                idempotency_key=key,
-                outcome=body.outcome,
-                evidence=public_text(body.evidence, limit=2000),
-                generation=body.generation,
-            )
-        except ReconciliationRefused as error:
-            status_code = 404 if error.code == "operation_not_found" else 409
-            raise ApiError(status_code, error.code, "That can't be recorded.") from None
-        except IdempotencyConflict as error:
-            raise as_api_error(error) from None
+        await record_evidence(
+            connection,
+            workspace_id=workspace,
+            run_id=run_id,
+            operation_id=operation_id,
+            actor_id=user,
+            idempotency_key=key,
+            outcome=body.outcome,
+            evidence=public_text(body.evidence, limit=2000),
+            generation=body.generation,
+        )
     return ReconciliationResult(schema_version=1, reconciled_calls=1)
 
 
@@ -406,29 +314,24 @@ async def post_reconcile(
         await _require_run(connection, workspace, run_id)
         scope = (workspace, user, "reconcile_model_call", str(run_id), key)
         fingerprint = request_hash({"charged": body.charged_micro_usd})
-        try:
-            async with connection.transaction():
-                existing = await existing_receipt(connection, scope, fingerprint)
-                if existing is not None:
-                    return ReconciliationResult(
-                        schema_version=1, reconciled_calls=existing["reconciled_calls"]
-                    )
-                cursor = await connection.execute(
-                    "select id from app_private.model_invocations "
-                    "where (run_id = %s or root_run_id = %s) "
-                    "and status = 'uncertain' and reconciled_at is null "
-                    "order by created_at limit 1 for update",
-                    (run_id, run_id),
+        async with connection.transaction():
+            existing = await existing_receipt(connection, scope, fingerprint)
+            if existing is not None:
+                return ReconciliationResult(
+                    schema_version=1, reconciled_calls=existing["reconciled_calls"]
                 )
-                row = await cursor.fetchone()
-                if row is not None:
-                    await ModelAdmission(connection).reconcile(row[0], body.charged_micro_usd)
-                reconciled = 0 if row is None else 1
-                await store_receipt(
-                    connection, scope, fingerprint, {"reconciled_calls": reconciled}
-                )
-        except IdempotencyConflict as error:
-            raise as_api_error(error) from None
+            cursor = await connection.execute(
+                "select id from app_private.model_invocations "
+                "where (run_id = %s or root_run_id = %s) "
+                "and status = 'uncertain' and reconciled_at is null "
+                "order by created_at limit 1 for update",
+                (run_id, run_id),
+            )
+            row = await cursor.fetchone()
+            if row is not None:
+                await ModelAdmission(connection).reconcile(row[0], body.charged_micro_usd)
+            reconciled = 0 if row is None else 1
+            await store_receipt(connection, scope, fingerprint, {"reconciled_calls": reconciled})
     return ReconciliationResult(schema_version=1, reconciled_calls=reconciled)
 
 

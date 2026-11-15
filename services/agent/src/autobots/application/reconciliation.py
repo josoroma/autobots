@@ -6,6 +6,7 @@ the destination's own records show. Nothing here treats an outcome as known with
 
 import json
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID
 
@@ -15,12 +16,11 @@ from autobots.application.runs import (
     request_hash,
     store_receipt,
 )
+from autobots.domain.errors import Refusal, RefusalKind
 
 
-class ReconciliationRefused(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+class ReconciliationRefused(Refusal):
+    kinds = MappingProxyType({"operation_not_found": RefusalKind.NOT_FOUND})
 
 
 @dataclass(frozen=True)

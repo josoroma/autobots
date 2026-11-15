@@ -7,7 +7,13 @@ from uuid import UUID, uuid4
 
 from pydantic import SecretStr
 
-from autobots.application.credentials.crypto import Sealed, associated_data, seal, unseal
+from autobots.application.credentials.crypto import (
+    CredentialDecryptionError,
+    Sealed,
+    associated_data,
+    seal,
+    unseal,
+)
 from autobots.application.credentials.master_key import (
     MasterKeyUnavailable,
     create_master_key,
@@ -17,13 +23,24 @@ from autobots.application.credentials.precedence import (
     EnvironmentCandidate,
     looks_usable,
 )
+from autobots.domain.errors import FixedRefusal, RefusalKind
 
 PROVIDER = "openrouter"
 KEY_VERSION = 1
 
 
-class CredentialStorageUnavailable(Exception):
+class CredentialStorageUnavailable(FixedRefusal):
+    """The master key is missing or unsafe, or a stored row can't be opened with it. Never a cause
+    to try another key or source (SP-007)."""
+
     code = "credential_storage_unavailable"
+    kind = RefusalKind.UNAVAILABLE
+
+
+class CredentialUnreadable(CredentialStorageUnavailable):
+    """A stored row this master key can't open: the wrong key, altered bytes or a row moved between
+    identities. Its own type, so a log that names only types tells it from a missing key (refactor
+    plan R-41, POPS-09)."""
 
 
 class CredentialBlocked(Exception):
@@ -32,7 +49,7 @@ class CredentialBlocked(Exception):
     code = "credential_invalid"
 
 
-class CredentialMissing(Exception):
+class CredentialMissing(FixedRefusal):
     code = "credential_missing"
 
 
@@ -157,7 +174,10 @@ class ProviderCredentialStore:
         except MasterKeyUnavailable as error:
             raise CredentialStorageUnavailable("the master key is unavailable") from error
         aad = associated_data(workspace_id, self._provider, row[0], row[1])
-        plaintext = unseal(key, Sealed(bytes(row[2]), bytes(row[3]), bytes(row[4])), aad)
+        try:
+            plaintext = unseal(key, Sealed(bytes(row[2]), bytes(row[3]), bytes(row[4])), aad)
+        except CredentialDecryptionError as error:
+            raise CredentialUnreadable("the stored key cannot be read") from error
         return ResolvedCredential(CredentialReference("app", row[0], row[1]), plaintext)
 
     async def installation_key_allowed(self, workspace_id: UUID) -> bool:

@@ -9,20 +9,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from autobots.api.errors import ApiError
+from autobots.api.errors import ApiError, reworded
 from autobots.api.pool import request_pool
 from autobots.api.security import current_user, require_internal
-from autobots.application.credentials.store import (
-    CredentialMissing,
-    CredentialStorageUnavailable,
-)
 from autobots.application.model_admission import remaining_daily_micro_usd
 from autobots.application.provider_settings import (
-    EnvironmentManaged,
     InvalidKey,
     ProviderSettings,
-    StaleVersion,
-    ValidationUnavailable,
     policy_overrides_json,
 )
 from autobots.application.run_admission import (
@@ -48,7 +41,6 @@ from autobots.contracts.settings import (
     budget_range,
 )
 from autobots.domain.models import (
-    ProfileNotOffered,
     UnknownModelProfile,
     approved_profile,
     require_offered,
@@ -105,35 +97,6 @@ async def provider_settings(request: Request) -> AsyncIterator[ProviderSettings]
 Settings = Annotated[ProviderSettings, Depends(provider_settings)]
 
 
-def as_api_error(error: Exception) -> ApiError:
-    """Each message is fixed, so no upstream response or submitted key can reach the client."""
-    if isinstance(error, StaleVersion):
-        return ApiError(409, error.code, "The settings changed. Reload and try again.")
-    if isinstance(error, EnvironmentManaged):
-        return ApiError(409, error.code, "The environment supplies this key. Change it there.")
-    if isinstance(error, InvalidKey):
-        return ApiError(
-            422, error.code, "That key was not accepted. The previous key is unchanged."
-        )
-    if isinstance(error, ValidationUnavailable):
-        return ApiError(503, error.code, "The key could not be checked right now. Nothing changed.")
-    if isinstance(error, CredentialStorageUnavailable):
-        return ApiError(503, error.code, "Credential storage is unavailable.")
-    if isinstance(error, CredentialMissing):
-        return ApiError(409, error.code, "No credential is configured.")
-    raise error
-
-
-HANDLED = (
-    StaleVersion,
-    EnvironmentManaged,
-    InvalidKey,
-    ValidationUnavailable,
-    CredentialStorageUnavailable,
-    CredentialMissing,
-)
-
-
 @router.get(
     "/settings/model-providers", operation_id="getModelProviders", response_model=ProviderStatus
 )
@@ -151,10 +114,7 @@ async def get_status(
 async def put_credential(
     body: CredentialDraft, settings: Settings, workspace_id: Annotated[UUID, Depends(require_owner)]
 ) -> ProviderStatus:
-    try:
-        await settings.save_credential(workspace_id, body.draft_key, body.expected_version)
-    except HANDLED as error:
-        raise as_api_error(error) from None
+    await settings.save_credential(workspace_id, body.draft_key, body.expected_version)
     return await settings.status(workspace_id)
 
 
@@ -166,10 +126,7 @@ async def put_credential(
 async def delete_credential(
     body: ExpectedVersion, settings: Settings, workspace_id: Annotated[UUID, Depends(require_owner)]
 ) -> ProviderStatus:
-    try:
-        await settings.disconnect(workspace_id, body.expected_version)
-    except HANDLED as error:
-        raise as_api_error(error) from None
+    await settings.disconnect(workspace_id, body.expected_version)
     return await settings.status(workspace_id)
 
 
@@ -181,10 +138,7 @@ async def delete_credential(
 async def validate_credential(
     settings: Settings, workspace_id: Annotated[UUID, Depends(require_owner)]
 ) -> ProviderStatus:
-    try:
-        await settings.revalidate(workspace_id)
-    except HANDLED as error:
-        raise as_api_error(error) from None
+    await settings.revalidate(workspace_id)
     return await settings.status(workspace_id)
 
 
@@ -252,11 +206,10 @@ async def put_key_or_var(
 ) -> KeysAndVars:
     try:
         await settings.save(workspace_id, name, body.value, body.expected_version)
-    except InvalidKey:
+    except InvalidKey as refused:
         # Fixed text per item, so nothing submitted is echoed back.
-        raise ApiError(422, *REFUSED_VALUE[name]) from None
-    except HANDLED as error:
-        raise as_api_error(error) from None
+        code, message = REFUSED_VALUE[name]
+        raise reworded(refused, message, code=code) from None
     return await _keys_and_vars(settings, workspace_id)
 
 
@@ -269,10 +222,7 @@ async def delete_key_or_var(
     settings: KeysAndVarsSettings,
     workspace_id: Annotated[UUID, Depends(require_owner)],
 ) -> KeysAndVars:
-    try:
-        await settings.remove(workspace_id, name, body.expected_version)
-    except HANDLED as error:
-        raise as_api_error(error) from None
+    await settings.remove(workspace_id, name, body.expected_version)
     return await _keys_and_vars(settings, workspace_id)
 
 
@@ -340,8 +290,6 @@ async def put_model_policy(
         require_offered(named)
     except UnknownModelProfile as error:
         raise ApiError(422, "unknown_model", "Choose an approved model and role.") from error
-    except ProfileNotOffered as refused:
-        raise ApiError(422, refused.code, str(refused)) from None
     pool: Any = request.app.state.pool
     if pool is None:
         raise ApiError(503, "service_unavailable", "Provider settings are unavailable.")

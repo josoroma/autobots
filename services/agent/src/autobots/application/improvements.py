@@ -6,6 +6,7 @@ policy or a model default, and the checks below refuse text that claims it can.
 
 import json
 import re
+from types import MappingProxyType
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -27,6 +28,7 @@ from autobots.contracts.improvements import (
     ReplayRunView,
     ReplayView,
 )
+from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import RolePolicy
 from autobots.domain.runs import TERMINAL, RunStatus
 from autobots.domain.tool_catalog import ToolGroup
@@ -48,10 +50,13 @@ REFERENCE_HEADER = (
 )
 
 
-class ImprovementRefused(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
+class ImprovementRefused(Refusal):
+    kinds = MappingProxyType(
+        {
+            "candidate_not_found": RefusalKind.NOT_FOUND,
+            "version_not_found": RefusalKind.NOT_FOUND,
+        }
+    )
 
 
 async def propose(

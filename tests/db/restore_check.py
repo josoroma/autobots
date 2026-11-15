@@ -13,9 +13,9 @@ from uuid import UUID
 import psycopg
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.artifacts import read_artifact
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.store import (
     CredentialStorageUnavailable,
+    CredentialUnreadable,
     ProviderCredentialStore,
 )
 from autobots.application.goal_loop import LoopConfig, process_next
@@ -66,12 +66,13 @@ async def verify(workspace: UUID, key_path: Path, manifest_path: Path, expected_
         decrypted = hashlib.sha256(resolved.client_secret().get_secret_value().encode()).hexdigest()
         check('the credential decrypts with the separately kept key, without showing it', 'the same fingerprint', decrypted == expected_sha, decrypted == expected_sha)
         # TDBC-07: only the store's own refusal counts. Anything else propagates and fails the check.
-        for label, path, refusal in (('a different key', wrong_key, CredentialDecryptionError),
+        # Judged by exact type, as a row it can't open is a subclass of a missing key (R-41, POPS-09).
+        for label, path, refusal in (('a different key', wrong_key, CredentialUnreadable),
                                      ('no key', key_path.parent / 'absent.key', CredentialStorageUnavailable)):
             try:
                 await ProviderCredentialStore(db, path).load_active(workspace)
                 outcome = 'opened'
-            except (CredentialDecryptionError, CredentialStorageUnavailable) as error:
+            except CredentialStorageUnavailable as error:
                 outcome = type(error).__name__
             check(f'the database alone cannot open it: {label}', refusal.__name__, outcome, outcome == refusal.__name__)
 

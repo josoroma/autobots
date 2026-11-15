@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from autobots.application.credentials.crypto import CredentialDecryptionError
 from autobots.application.credentials.precedence import dotenv_order, parse_dotenv
 from autobots.application.credentials.store import (
     CredentialMissing,
@@ -176,7 +175,7 @@ async def _saved_secret(
         resolved = await store.load_active(workspace_id)
     except CredentialMissing:
         return None
-    except (CredentialStorageUnavailable, CredentialDecryptionError):
+    except CredentialStorageUnavailable:
         raise ToolKeyUnavailable(item.credential) from None
     return resolved.client_secret().get_secret_value()
 

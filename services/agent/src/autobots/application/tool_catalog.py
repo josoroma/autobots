@@ -25,6 +25,7 @@ from autobots.contracts.tools import (
     ToolGuideView,
     ToolLimits,
 )
+from autobots.domain.errors import FixedRefusal
 from autobots.domain.tool_catalog import (
     GROUP_TITLES,
     PLANNED_TOOLS,
@@ -327,8 +328,9 @@ def unavailable_tools(tool_ids: list[str], environ: Mapping[str, str]) -> list[s
     ]
 
 
-class ToolsUnavailable(Exception):
-    """A grant names a tool this install can't use now. Refused before any run exists (PK-02)."""
+class ToolsUnavailable(FixedRefusal):
+    """A grant names a tool this install can't use now. Refused before any run exists (PK-02).
+    The tools stay internal detail; a response names none."""
 
     code = "tool_unavailable"
 
