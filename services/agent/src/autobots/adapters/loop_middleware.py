@@ -1,19 +1,21 @@
-"""Every model and tool dispatch inside the loop goes through the root's limits and admission."""
+"""The LangChain side of the goal loop's admission (refactor plan R-62, PADP-09, PADP-16, XTYP-11).
+
+Here are the model that answers only inside an admitted dispatch, the streamed reply, how a request
+is sized and a reply read, and a thin `LoopMiddleware` that hands each model and tool call to
+application/loop_admission.py, where the admission, budget, compaction and stop policy live.
+"""
 
 import asyncio
 import json
-import logging
-from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from datetime import UTC, datetime, timedelta
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
 
-from langchain.agents.middleware.types import AgentMiddleware
+from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
+    AnyMessage,
     BaseMessage,
     HumanMessage,
     InvalidToolCall,
@@ -25,6 +27,8 @@ from langchain_core.messages.tool import invalid_tool_call as make_invalid_tool_
 from langchain_core.messages.tool import tool_call as make_tool_call
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
+from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.types import Command
 from pydantic import ConfigDict
 
 from autobots.adapters.model_replies import (
@@ -33,111 +37,52 @@ from autobots.adapters.model_replies import (
     finished,
     retry_after,
 )
-from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS
 from autobots.adapters.result_stream import current_tap
-from autobots.application.compaction import (
-    CompactionPolicy,
-    StoredSummary,
-    latest_summary,
-    offload_large,
-    safe_split,
-    state_block,
-    store_summary,
-    summary_request,
-    summary_text,
-    total_chars,
+from autobots.adapters.tool_middleware import gateway_code
+from autobots.application.compaction import CompactionPolicy
+from autobots.application.loop_admission import (
+    ACTIVE_LOOP,
+    Guard,
+    LoopAdmission,
+    LoopSettings,
+    ModelReply,
+    PromptParts,
+    active_middleware,
+    model_call_admitted,
 )
-from autobots.application.model_admission import (
-    AdmissionRefused,
-    AdmissionRequest,
-    AttemptAlreadySettled,
-    ModelAdmission,
-    NoInferenceSlot,
-    ReplyFacts,
-)
+from autobots.application.loop_policy import LoopStopped, UnadmittedModelCall
+from autobots.application.model_admission import ModelAdmission, ReplyFacts
 from autobots.application.model_attempts import (
-    UNCERTAIN,
     FailureClass,
     ModelOutput,
     ProviderFailure,
-    RetryPolicy,
-    call_with_policy,
     classify_status,
 )
-from autobots.application.run_usage import (
-    LimitReached,
-    RootLimits,
-    active_seconds_used,
-    consume,
-    model_calls_used,
-)
-from autobots.application.runs import ancestors_running, current_status
-from autobots.application.tool_gateway import ToolScope, ownership_refusal
+from autobots.application.run_usage import RootLimits
+from autobots.application.tool_gateway import ToolScope
 from autobots.contracts.plans import GoalSpec
+from autobots.domain.models import ModelRoute
 
-# Defined in the domain, so the run lifecycle uses it without importing this adapter (R-33).
-# Re-exported for this module's users.
-from autobots.domain.models import ModelRoute as ModelRoute
-from autobots.domain.runs import INTERRUPTING
-from autobots.domain.stops import REPAIRABLE, STOPPING, StopCode, repair_limit
-from autobots.operations.logs import log_event
-
-logger = logging.getLogger("autobots.worker")
-
-CHECK_SECONDS = 1.0
-MAX_FACT_CHARS = 100
-MAX_FACT_NAMES = 20
-
-_ADMITTED: ContextVar[bool] = ContextVar("autobots_model_call_admitted", default=False)
-_INVOCATION: ContextVar[UUID | None] = ContextVar("autobots_model_invocation", default=None)
-_MIDDLEWARE: ContextVar["LoopMiddleware | None"] = ContextVar("autobots_loop", default=None)
-REPAIR_NOTE = "Your last reply was cut off, so none of it was used. Reply again, more briefly."
-# Before each dispatch: raises `LoopStopped` to refuse it, and otherwise returns the run's seconds
-# left. `LoopMiddleware`'s default reads ownership, run status and active time from the database.
-Guard = Callable[[], Awaitable[float]]
-# The settlement `tests/test_reported_charges.py` pins under this name (R-22).
+# LoopStopped, UnadmittedModelCall and ModelRoute are imported from here by the disposable checks
+# and tests/web; `_MIDDLEWARE` is the loop's ContextVar, which browse_trial.py and
+# tests/db/browse_goal_check.py set by this name; `_charged` is the settlement
+# tests/test_reported_charges.py pins under that name (R-22).
+__all__ = [
+    "MAX_FACT_CHARS",
+    "MAX_FACT_NAMES",
+    "AdmittedModel",
+    "LoopMiddleware",
+    "LoopStopped",
+    "ModelRoute",
+    "UnadmittedModelCall",
+    "reply_facts",
+    "request_bytes",
+]
+_MIDDLEWARE = ACTIVE_LOOP
 _charged = charged
 
-
-@contextmanager
-def admitted_scope() -> Iterator[None]:
-    """Model calls inside it are admitted, so `AdmittedModel` answers them. The middleware opens one
-    around each dispatch it admitted, and nothing else in production does."""
-    token = _ADMITTED.set(True)
-    try:
-        yield
-    finally:
-        _ADMITTED.reset(token)
-
-
-@contextmanager
-def active_middleware(middleware: "LoopMiddleware") -> Iterator[None]:
-    """`current_middleware` returns this loop inside it, as it does during the loop's tool calls."""
-    token = _MIDDLEWARE.set(middleware)
-    try:
-        yield
-    finally:
-        _MIDDLEWARE.reset(token)
-
-
-def current_middleware() -> "LoopMiddleware | None":
-    """The loop whose tool call is running, so a tool's own model calls go through its admission."""
-    return _MIDDLEWARE.get()
-
-
-def current_invocation() -> UUID | None:
-    """The ledger row of the attempt being dispatched, or None outside one."""
-    return _INVOCATION.get()
-
-
-class LoopStopped(Exception):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-class UnadmittedModelCall(Exception):
-    """The SDK tried to call the model on its own, such as to summarize."""
+MAX_FACT_CHARS = 100
+MAX_FACT_NAMES = 20
 
 
 class AdmittedModel(BaseChatModel):
@@ -161,7 +106,7 @@ class AdmittedModel(BaseChatModel):
     async def _agenerate(
         self, messages: Any, stop: Any = None, run_manager: Any = None, **kwargs: Any
     ) -> ChatResult:
-        if not _ADMITTED.get():
+        if not model_call_admitted():
             raise UnadmittedModelCall("this model call was not admitted")
         target = self.bound if self.bound is not None else self.delegate
         message = await _streamed(target, messages, stop=stop, **kwargs)
@@ -233,22 +178,20 @@ def _strictly_parsed(assembled: Any) -> BaseMessage:
     return message.model_copy(update={"tool_calls": calls, "invalid_tool_calls": invalid})
 
 
-def request_bytes(request: Any) -> int:
+def request_bytes(request: PromptParts) -> int:
     """An upper bound on the prompt's tokens, at about one per byte, as no tokenizer is pinned.
 
     It counts what compaction doesn't: the system prompt and the tools' schemas.
     """
     total = 0
-    for message in [getattr(request, "system_message", None), *getattr(request, "messages", ())]:
+    for message in [request.system_message, *request.messages]:
         if message is not None:
             calls = getattr(message, "tool_calls", None) or []
             total += len(
                 json.dumps([message.content, calls], default=str, ensure_ascii=False).encode()
             )
     return total + len(
-        json.dumps(
-            getattr(request, "tools", None) or [], default=_tool_text, ensure_ascii=False
-        ).encode()
+        json.dumps(list(request.tools), default=_tool_text, ensure_ascii=False).encode()
     )
 
 
@@ -259,21 +202,7 @@ def _tool_text(tool: Any) -> Any:
         return str(tool)
 
 
-def reservation_for(route: ModelRoute, prompt_bytes: int) -> int:
-    """The route's worst case, plus whatever this request has beyond the tokens that assumes."""
-    excess = max(prompt_bytes - RESERVED_PROMPT_TOKENS, 0)
-    return (
-        route.worst_case_micro_usd
-        + (excess * route.input_per_million_micro_usd + 999_999) // 1_000_000
-    )
-
-
-def past_known_price(route: ModelRoute, prompt_bytes: int) -> bool:
-    """A token takes at least a byte, so a request this short can't reach the tier."""
-    return route.tier_from_tokens is not None and prompt_bytes >= route.tier_from_tokens
-
-
-def _count(value: Any) -> int | None:
+def _count(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
@@ -295,41 +224,64 @@ def reply_facts(message: AIMessage) -> ReplyFacts:
     )
 
 
-def _type_name(error: BaseException) -> str:
-    return f"{type(error).__module__}.{type(error).__qualname__}"
+def _message(reply: ModelReply) -> AIMessage:
+    """The reply's last message. A reply arrived, so one that isn't a model's message may still
+    have been charged, and stays uncertain."""
+    message = reply.result[-1]
+    if not isinstance(message, AIMessage):
+        raise ProviderFailure(FailureClass.UNCERTAIN_ACCEPTANCE, reason="reply_not_a_model_message")
+    return message
 
 
-def uncertain_call_fields(error: BaseException) -> dict[str, Any]:
-    """Types and a status only. A message can carry a provider's reply or a connection string."""
-    fields: dict[str, Any] = {"error_type": _type_name(error)}
-    cause = error.__cause__ or error.__context__
-    if cause is not None:
-        fields["cause_type"] = _type_name(cause)
-    status = getattr(error, "status_code", None)
-    if isinstance(status, int):
-        fields["status"] = status
-    return fields
+class _Replies:
+    """How a LangChain reply and an SDK failure read, for application/loop_admission.py."""
+
+    def output(self, reply: ModelReply) -> ModelOutput:
+        message = _message(reply)
+        return ModelOutput(
+            text=str(message.content),
+            complete=finished(message),
+            charged_micro_usd=charged(message),
+        )
+
+    def facts(self, reply: ModelReply) -> ReplyFacts:
+        return reply_facts(_message(reply))
+
+    def cut_off(self, reply: ModelReply) -> bool:
+        return reply.result[-1].response_metadata.get("finish_reason") == "length"
+
+    def failure(self, error: Exception) -> ProviderFailure:
+        """Any failure of a model call, classified by its status or, without one, by whether the
+        connection ever opened (MP-08)."""
+        status = getattr(error, "status_code", None)
+        kind = classify_status(status) if isinstance(status, int) else failure_without_status(error)
+        return ProviderFailure(kind, retry_after=retry_after(error))
 
 
-def _log_uncertain(
-    invocation: UUID, run: UUID, failure: FailureClass, error: BaseException, reason: str | None
-) -> None:
-    """Why a call's outcome is unknown, so a person ruling on it has more than the class."""
-    fields = uncertain_call_fields(error)
-    if reason is not None:
-        fields["reason"] = reason
-    log_event(
-        logger,
-        "worker.call_uncertain",
-        logging.WARNING,
-        invocation=str(invocation),
-        run=str(run),
-        failure=failure.value,
-        **fields,
-    )
+_REPLIES = _Replies()
+
+
+@dataclass(frozen=True)
+class _Call[Q: PromptParts, S: ModelReply]:
+    """One framework request and the handler that sends it, as the admission sees a model call."""
+
+    request: Q
+    handler: Callable[[Q], Awaitable[S]]
+
+    def prompt_bytes(self) -> int:
+        return request_bytes(self.request)
+
+    async def send(self) -> S:
+        return await self.handler(self.request)
 
 
 class LoopMiddleware(AgentMiddleware[Any, Any]):
+    """Hands every model and tool call of a Deep Agents loop to the run's `LoopAdmission`.
+
+    List it before `GatewayMiddleware`, so it is the outer of the two: the gateway's middleware
+    answers every tool call, and its `ToolMessage` carries the gateway's code, which this reads.
+    """
+
     def __init__(  # noqa: PLR0913 - baseline 2026-11-14, shrink only (STD-06)
         self,
         connection: Any,
@@ -347,299 +299,66 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         admission: Callable[[], ModelAdmission] | None = None,
     ) -> None:
         super().__init__()
-        self._connection = connection
-        self._scope = scope
-        self._limits = limits
-        self._route = route
-        self._sleep = sleep
-        self._slot_wait_seconds = slot_wait_seconds
-        self._model_call_seconds = model_call_seconds
-        self._goal = goal
-        self._compaction = compaction or CompactionPolicy()
-        self._summary_route = summary_route
+        settings = LoopSettings(
+            sleep=sleep,
+            slot_wait_seconds=slot_wait_seconds,
+            model_call_seconds=model_call_seconds,
+            goal=goal,
+            compaction=compaction or CompactionPolicy(),
+            summary_route=summary_route,
+        )
+        # Production passes neither `guard` nor `admission`, so every dispatch checks the database
+        # and settles in the ledger. Tests pass in-memory ones (PTST-01).
+        self._loop = LoopAdmission(
+            connection, scope, limits, route, _REPLIES, settings, guard, admission
+        )
+        # The SDK may run a reply's tool calls at once, and these share one connection.
         self._lock = asyncio.Lock()
-        self._inner_stop: str | None = None
-        # Production passes neither, so every dispatch checks the database and settles in the
-        # ledger. Tests pass in-memory ones to reach these paths without a database (PTST-01).
-        self._guard: Guard = guard or self._owned_with_time_left
-        self._admission: Callable[[], ModelAdmission] = admission or (
-            lambda: ModelAdmission(connection)
-        )
 
-    async def _owned_with_time_left(self) -> float:
-        """Before each new dispatch: still the owner, still running, and time left."""
-        refusal = await ownership_refusal(self._connection, self._scope)
-        if refusal is not None:
-            raise LoopStopped(refusal)
-        parent = self._scope.parent_run_id
-        if parent is not None and not await ancestors_running(self._connection, parent):
-            raise LoopStopped(StopCode.PARENT_NOT_RUNNING)
-        remaining = self._limits.active_seconds - await active_seconds_used(
-            self._connection, self._scope.budget_run_id
-        )
-        if remaining <= 0:
-            raise LoopStopped(StopCode.ACTIVE_TIME_LIMIT)
-        return remaining
+    async def guard(self) -> float:
+        """The check each new dispatch makes: still the owner, still running, and the seconds
+        left."""
+        return await self._loop.guard()
 
-    async def _bounded(self, handler: Any, request: Any, stopped: list[str]) -> Any:
-        """A hung call can't hold a run. Ending it proves nothing about what the provider did.
-
-        Only a cancel interrupts. A pause waits for a safe boundary, and a worker that lost its
-        lease still waits, because the reply is the only evidence of what the call cost.
-        """
-        task = asyncio.ensure_future(handler(request))
-        loop = asyncio.get_running_loop()
-        started = loop.time()
-        try:
-            while True:
-                done, _ = await asyncio.wait({task}, timeout=CHECK_SECONDS)
-                if done:
-                    return task.result()
-                if loop.time() - started >= self._model_call_seconds:
-                    raise ProviderFailure(
-                        FailureClass.UNCERTAIN_ACCEPTANCE, reason="call_time_limit"
-                    )
-                if await current_status(self._connection, self._scope.run_id) in INTERRUPTING:
-                    stopped.append(StopCode.RUN_NOT_RUNNING)
-                    raise ProviderFailure(
-                        FailureClass.UNCERTAIN_ACCEPTANCE, reason="run_interrupted"
-                    )
-        finally:
-            if not task.done():
-                task.cancel()
-
-    async def _repair(self, code: str) -> None:
-        try:
-            await consume(
-                self._connection, self._scope.budget_run_id, "repairs", self._limits.repairs
-            )
-        except LimitReached:
-            raise LoopStopped(code) from None
-
-    async def _compacted(self, request: Any, handler: Any) -> Any:
-        """Only the model's view changes. Under budget, the request goes out as it came."""
-        run_id = self._scope.run_id
-        policy = self._compaction
-        view = await offload_large(self._connection, run_id, request.messages, policy)
-        if total_chars(view) <= policy.context_chars or self._goal is None:
-            return request.override(messages=view)
-        previous = await latest_summary(self._connection, run_id)
-        covered = previous.covers if previous else 0
-        block = await state_block(self._connection, run_id, self._goal)
-        recent = view[covered:]
-        lead = [HumanMessage(block), *([AIMessage(summary_text(previous))] if previous else [])]
-        if total_chars([*lead, *recent]) > policy.context_chars:
-            cut = safe_split(view, policy.keep_recent)
-            if cut > covered:
-                previous = await self._summarize(request, handler, view, previous, covered, cut)
-                recent = view[cut:]
-                lead = [HumanMessage(block), AIMessage(summary_text(previous))]
-        return request.override(messages=[*lead, *recent])
-
-    async def _summarize(
-        self,
-        request: Any,
-        handler: Any,
-        view: list[Any],
-        previous: StoredSummary | None,
-        covered: int,
-        cut: int,
-    ) -> StoredSummary:
-        """Under the run's frozen summarizer role, through admission like any other call."""
-        route = self._summary_route
-        if route is None:
-            raise LoopStopped(StopCode.ROUTE_NOT_BOUND)
-        earlier = view[covered:cut]
-        asked = request.override(
-            messages=[HumanMessage(summary_request(earlier, previous))], tools=[]
-        )
-        response, complete = await self._with_slot(asked, handler, route)
-        if not complete:
-            raise LoopStopped(StopCode.COMPACTION_FAILED)
-        text = str(response.result[-1].content)
-        return await store_summary(
-            self._connection,
-            self._scope.run_id,
-            covers=cut,
-            summary=text,
-            earlier=earlier,
-            previous=previous,
-            role=route.role,
-            profile=route.profile,
-        )
-
-    async def _admitted_call(  # noqa: PLR0915 - baseline 2026-11-14, shrink only (STD-06)
-        self, request: Any, handler: Any, remaining: float, route: ModelRoute | None = None
-    ) -> tuple[Any, bool]:
-        chosen = route or self._route
-        run_id = self._scope.run_id
-        budget = self._scope.budget_run_id
-        limit: list[LimitReached] = []
-        stopped: list[str] = []
-        replies: list[Any] = []
-        last_ticket: list[Any] = []
-
-        async def dispatch(ticket: Any) -> ModelOutput:
-            last_ticket.append(ticket)
-            # Every attempt, including a retry after its backoff. Nothing has been sent yet, so
-            # the failure closes the reservation as never accepted.
-            try:
-                await self._guard()
-            except LoopStopped as stop:
-                stopped.append(stop.code)
-                raise ProviderFailure(FailureClass.OTHER) from None
-            try:
-                await consume(self._connection, budget, "model_calls", self._limits.model_calls)
-            except LimitReached as reached:
-                limit.append(reached)
-                raise ProviderFailure(FailureClass.OTHER) from None
-            with admitted_scope():
-                invocation = _INVOCATION.set(ticket.invocation_id)
-                try:
-                    response = await self._bounded(handler, request, stopped)
-                except ProviderFailure as provider_failure:
-                    if provider_failure.failure in UNCERTAIN:
-                        _log_uncertain(
-                            ticket.invocation_id,
-                            run_id,
-                            provider_failure.failure,
-                            provider_failure,
-                            provider_failure.reason,
-                        )
-                    raise
-                except Exception as error:  # noqa: BLE001 - any failure of a model call becomes a classified ProviderFailure
-                    status = getattr(error, "status_code", None)
-                    failure = (
-                        classify_status(status)
-                        if isinstance(status, int)
-                        else failure_without_status(error)
-                    )
-                    if failure in UNCERTAIN:
-                        _log_uncertain(ticket.invocation_id, run_id, failure, error, None)
-                    raise ProviderFailure(failure, retry_after=retry_after(error)) from None
-                finally:
-                    _INVOCATION.reset(invocation)
-            message = response.result[-1]
-            replies.append(response)
-            return ModelOutput(
-                text=str(message.content),
-                complete=finished(message),
-                charged_micro_usd=charged(message),
-            )
-
-        used = await model_calls_used(self._connection, budget)
-        try:
-            prompt_bytes = request_bytes(request)
-        except UnicodeEncodeError:
-            # A lone surrogate is no text a provider can read, so nothing is reserved or sent.
-            raise LoopStopped(StopCode.REQUEST_UNENCODABLE) from None
-        if past_known_price(chosen, prompt_bytes):
-            raise LoopStopped(FailureClass.COST_UNAVAILABLE.value)
-        admission_request = AdmissionRequest(
-            workspace_id=self._scope.workspace_id,
-            root_run_id=budget,
-            run_id=run_id,
-            role=chosen.role,
-            profile=chosen.profile,
-            wire_id=chosen.wire_id,
-            attempt=used + 1,
-            worst_case_micro_usd=reservation_for(chosen, prompt_bytes),
-        )
-        policy = RetryPolicy(
-            deadline=datetime.now(UTC) + timedelta(seconds=remaining), sleep=self._sleep
-        )
-        ledger = self._admission()
-        try:
-            output = await call_with_policy(ledger, admission_request, dispatch, policy)
-        except ProviderFailure as failure:
-            if stopped:
-                raise LoopStopped(stopped[0]) from None
-            if limit:
-                raise LoopStopped(limit[0].code) from None
-            raise LoopStopped(failure.failure.value) from None
-        except AttemptAlreadySettled:
-            # Recovery classified this call while it was out. Its charge is late evidence. Any other
-            # error is a defect and propagates (PADP-11).
-            late = charged(replies[-1].result[-1]) if replies else None
-            if late is not None and last_ticket:
-                await ledger.reconcile(last_ticket[-1].invocation_id, late, source="provider")
-            raise LoopStopped(StopCode.LEASE_LOST) from None
-        # Settled by now, so this can't change what the call cost or whether it counted.
-        await ledger.record_reply(
-            last_ticket[-1].invocation_id, reply_facts(replies[-1].result[-1])
-        )
-        return replies[-1], output.complete
-
-    async def _with_slot(
-        self, request: Any, handler: Any, route: ModelRoute | None = None
-    ) -> tuple[Any, bool]:
-        """One admitted call. A busy slot is waited out, and any other refusal stops the loop."""
-        waited = 0.0
-        while True:
-            remaining = await self._guard()
-            try:
-                return await self._admitted_call(request, handler, remaining, route)
-            except NoInferenceSlot:
-                if waited >= self._slot_wait_seconds:
-                    raise LoopStopped(NoInferenceSlot.code) from None
-                waited += 1.0
-                await self._sleep(1.0)
-            except AdmissionRefused as refused:
-                raise LoopStopped(refused.code) from None
-
-    async def admitted(
-        self, request: Any, handler: Callable[[Any], Awaitable[Any]], route: ModelRoute
-    ) -> tuple[Any, bool]:
+    async def admitted[Q: PromptParts, S: ModelReply](
+        self, request: Q, handler: Callable[[Q], Awaitable[S]], route: ModelRoute
+    ) -> tuple[S, bool]:
         """One admitted call on another of the run's frozen routes, as browsing makes them.
 
         A stop here stops the loop too, once the tool call that made it returns.
         """
-        try:
-            return await self._with_slot(request, handler, route)
-        except LoopStopped as stopped:
-            self._inner_stop = stopped.code
-            raise
+        return await self._loop.nested(_Call(request, handler), route)
 
-    async def awrap_model_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
-        await self._guard()
-        try:
-            request = await self._compacted(request, handler)
-        except LimitReached as reached:
-            raise LoopStopped(reached.code) from None
-        current = request
-        while True:
-            response, complete = await self._with_slot(current, handler)
-            if complete:
-                return response
-            # Being cut off is worth one shorter try. A provider's own stop wouldn't change.
-            if response.result[-1].response_metadata.get("finish_reason") != "length":
-                raise LoopStopped(FailureClass.INCOMPLETE_OUTPUT.value)
-            await self._repair(FailureClass.INCOMPLETE_OUTPUT.value)
-            current = request.override(messages=[*request.messages, HumanMessage(REPAIR_NOTE)])
+    async def awrap_model_call(
+        self,
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[Any]]],
+    ) -> ModelResponse[Any]:
+        await self._loop.guard()
+
+        def summarize(messages: list[AnyMessage]) -> _Call[ModelRequest[Any], ModelResponse[Any]]:
+            return _Call(request.override(messages=messages, tools=[]), handler)
+
+        compacted = request.override(messages=await self._loop.compact(request.messages, summarize))
+
+        def again(note: str) -> _Call[ModelRequest[Any], ModelResponse[Any]]:
+            return _Call(
+                compacted.override(messages=[*compacted.messages, HumanMessage(note)]), handler
+            )
+
+        return await self._loop.turn(_Call(compacted, handler), again)
 
     async def awrap_tool_call(
-        self, request: Any, handler: Callable[[Any], Awaitable[Any]]
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
     ) -> ToolMessage:
-        async with self._lock:
-            await self._guard()
-            try:
-                await consume(
-                    self._connection,
-                    self._scope.budget_run_id,
-                    "tool_dispatches",
-                    self._limits.tool_dispatches,
-                )
-            except LimitReached as reached:
-                raise LoopStopped(reached.code) from None
-            self._inner_stop = None
+        async def run() -> ToolMessage:
             with active_middleware(self):
                 reply = await handler(request)
-            if self._inner_stop is not None:
-                raise LoopStopped(self._inner_stop)
-            code = json.loads(reply.content).get("code")
-            if code in STOPPING:
-                raise LoopStopped(code)
-            if code in REPAIRABLE:
-                await self._repair(repair_limit(code))
-            message: ToolMessage = reply
-            return message
+            if not isinstance(reply, ToolMessage):
+                raise TypeError("the gateway's middleware answers every tool call with a message")
+            return reply
+
+        async with self._lock:
+            return await self._loop.tool_dispatch(run, gateway_code)

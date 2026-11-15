@@ -149,3 +149,25 @@ async def test_refusals_and_a_missing_key_are_typed() -> None:
         await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
     assert str(failed.value) == "jina_key_missing"
     assert fake.seen == []
+
+
+@pytest.mark.asyncio
+async def test_a_search_reply_that_isnt_an_object_is_malformed_not_an_empty_success() -> None:
+    """A list isn't the reply's shape, so it's malformed, never an empty success (PADP-07)."""
+
+    def answer(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[{"title": "T"}])
+
+    tool = {
+        tool.tool_id: tool
+        for tool in jina_tools(httpx.MockTransport(answer), environ=KEY, resolver=resolve)
+    }["search_web"]
+    with pytest.raises(ToolFailed) as failed:
+        await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    assert str(failed.value) == "provider_reply_malformed"
+
+
+def test_each_request_fits_inside_its_tools_timeout() -> None:
+    from autobots.adapters.jina import REQUEST_SECONDS
+
+    assert all(REQUEST_SECONDS < tool.timeout_seconds for tool in tools(Fake()).values())

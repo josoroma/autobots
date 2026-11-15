@@ -4,6 +4,7 @@ import asyncio
 import importlib.util
 import json
 import sys
+from collections.abc import Awaitable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -12,14 +13,9 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from autobots.adapters.github_issues import (
-    READBACK_SETTLE_SECONDS,
-    REPOSITORY_VARIABLE,
-    TOKEN_VARIABLE,
-    UnclearReply,
-    github_issue_tool,
-    marker,
-)
+from autobots.adapters.github_connector import REPOSITORY_VARIABLE, TOKEN_VARIABLE, marker
+from autobots.adapters.github_issues import READBACK_SETTLE_SECONDS, github_issue_tool
+from autobots.adapters.provider_http import UnclearReply
 from autobots.application.tool_gateway import (
     NotDelivered,
     ToolContext,
@@ -327,7 +323,46 @@ def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
 
 
 def test_a_reviewer_sees_the_configured_repository_and_not_a_models_choice() -> None:
-    configured = github_issue_tool(environ={"GITHUB_REPOSITORY": "owner/name"})
-    assert configured.approval.resource_target(object()) == "GitHub repository owner/name"
-    unset = github_issue_tool(environ={"GITHUB_REPOSITORY": "not a repository"})
-    assert unset.approval.resource_target(object()) is None
+    """The approval records the repository resolved for the workspace, whatever a model asked
+    (Decision 0025 V7). Without a token there is nothing to approve."""
+    configured = github_issue_tool(environ={"GITHUB_REPOSITORY": "owner/name", **TOKEN_ONLY})
+    resolve = configured.approval.target_resolver
+    assert resolve is not None
+    assert settled(resolve(object(), context())) == "GitHub repository owner/name"
+    unset = github_issue_tool(environ={"GITHUB_REPOSITORY": "owner/name"}).approval
+    assert unset.target_resolver is not None
+    with pytest.raises(ToolFailed, match="connector_not_configured"):
+        settled(unset.target_resolver(object(), context()))
+    assert configured.approval.resource_target(object()) is None
+
+
+TOKEN_ONLY = {TOKEN_VARIABLE: TOKEN}
+
+
+def settled[T](awaitable: Awaitable[T]) -> T:
+    """Runs a tool's handler, readback or resolver, which are typed as plain awaitables."""
+
+    async def wait() -> T:
+        return await awaitable
+
+    return asyncio.run(wait())
+
+
+def test_a_created_issue_that_cant_be_read_stays_uncertain() -> None:
+    """GitHub answered 201, so the issue may exist. Only a readback can say."""
+
+    def created(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(201, text="not json")
+
+    with pytest.raises(UnclearReply) as unclear:
+        create(created)
+    assert unclear.value.detail == "github_unclear_201"
+
+
+def test_a_readback_that_gets_no_reply_stays_unknown_with_its_reason() -> None:
+    def lose(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError("arranged")
+
+    with pytest.raises(UnclearReply) as unclear:
+        read_back(lose)
+    assert unclear.value.detail == "github_unclear_unreachable"

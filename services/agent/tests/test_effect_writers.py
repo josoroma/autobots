@@ -37,7 +37,7 @@ APPROVAL = UUID("d0000000-0000-4000-8000-000000000004")
 ACTOR = UUID("c0000000-0000-4000-8000-000000000003")
 # Adapters hand ToolContext's connection only to tool_keys, to resolve a key for the run's
 # workspace. The count may only fall: lower it when one goes.
-HANDED_TO_KEYS = {"github_issues.py": 2, "provider_http.py": 1}
+HANDED_TO_KEYS = {"github_connector.py": 1, "provider_http.py": 1}
 
 
 def writers(pattern: str) -> list[str]:
@@ -260,10 +260,13 @@ def test_cancelling_withdraws_only_pending_requests() -> None:
 
 def test_an_expiry_never_overwrites_a_decision_or_a_withdrawal() -> None:
     """An expiry pass that read the request as pending before a person decided or the run was
-    cancelled matches no row, so it writes nothing else: no met obligation, no event, no pause."""
+    cancelled matches no row, so it writes nothing else: no met obligation, no event, no pause.
+    Only the job row lock that every transition takes first comes before it."""
     connection = Recorder({"update public.approval_requests": None})
     assert asyncio.run(approvals.expire(connection, APPROVAL, RUN, WORKSPACE)) is False
-    query, params = connection.only()
+    [(lock, locked), (query, params)] = connection.statements
+    assert lock.startswith("select 1 from app_private.run_jobs") and "for update" in lock
+    assert locked == (RUN,)
     assert "status = any(%s)" in query and "returning id" in query
     assert params == (
         ApprovalStatus.EXPIRED.value,

@@ -75,6 +75,12 @@ DEFAULT_PROFILE = ModelProfileId.TERRA
 # MP-07's initial budgets. Output is sent on every call. Context is the budget compaction works to.
 MAX_OUTPUT_TOKENS = 512
 CONTEXT_TOKENS = 8_000
+# What one call reserves for its prompt, an estimate since no tokenizer is pinned. Compaction keeps
+# messages near 24K characters, and the system prompt and tool schemas add some. Mostly Latin text
+# stays under this, but text with more than a token per character can pass it, and nothing refuses
+# that. The reported cost settles each call either way. A route's worst case assumes it, and the
+# loop reserves past it for a larger request (application/loop_policy.py).
+RESERVED_PROMPT_TOKENS = 32_000
 ROLE_POLICY_VERSION = 1
 
 

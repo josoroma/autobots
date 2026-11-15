@@ -17,8 +17,8 @@ from uuid import UUID
 import pytest
 from pydantic import BaseModel
 
-from autobots.adapters import github_pulls
-from autobots.adapters.github_issues import UnclearReply
+from autobots.adapters import github_connector, github_issues, github_pulls
+from autobots.adapters.provider_http import UnclearReply
 from autobots.application.bounded import stop_task
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
@@ -183,7 +183,7 @@ async def test_an_unclear_reply_keeps_its_category_on_the_receipt(
     lines: Callable[[], list[dict[str, object]]],
 ) -> None:
     async def unclear(_: Note, __: ToolContext) -> Saved:
-        raise UnclearReply(502)
+        raise UnclearReply("github", 502)
 
     database = Database()
     result = await call(tool(unclear), database)
@@ -193,7 +193,7 @@ async def test_an_unclear_reply_keeps_its_category_on_the_receipt(
     assert (line["event"], line["level"], line["error_type"]) == (
         "tool.operation.unknown",
         "warning",
-        "autobots.adapters.github_issues.UnclearReply",
+        "autobots.adapters.provider_http.UnclearReply",
     )
 
 
@@ -279,7 +279,7 @@ async def test_a_readback_that_cannot_tell_leaves_an_interrupted_effect_unknown(
         raise AssertionError("an interrupted effect is never sent again blindly")
 
     async def readback(_: Note, __: ToolContext) -> Saved | None:
-        raise UnclearReply(503)
+        raise UnclearReply("github", 503)
 
     database = Database(receipt=("started", None))
     result = await call(tool(never, reconcile=readback), database)
@@ -328,11 +328,19 @@ async def test_a_review_that_cannot_be_built_is_denied_and_logged(
     assert no_planted_text(line)
 
 
-def test_both_github_connectors_share_one_unclear_reply() -> None:
-    # The pull-request connector imports the class rather than defining its own.
-    assert vars(github_pulls)["UnclearReply"] is UnclearReply
+def test_every_connector_shares_one_unclear_reply() -> None:
+    # The GitHub modules raise provider_http's class rather than defining their own (PADP-04).
+    for module in (github_connector, github_issues, github_pulls):
+        own = [
+            value
+            for value in vars(module).values()
+            if isinstance(value, type)
+            and issubclass(value, OutcomeUnknown)
+            and value.__module__ == module.__name__
+        ]
+        assert own == [], module.__name__
     assert issubclass(UnclearReply, OutcomeUnknown)
-    assert UnclearReply(504).detail == "github_unclear_504"
+    assert UnclearReply("github", 504).detail == "github_unclear_504"
 
 
 @pytest.mark.asyncio

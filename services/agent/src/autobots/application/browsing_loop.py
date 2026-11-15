@@ -20,9 +20,12 @@ from urllib.parse import urlsplit, urlunsplit
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from autobots.adapters.loop_middleware import AdmittedModel, LoopMiddleware, LoopStopped, ModelRoute
+from autobots.adapters.loop_middleware import AdmittedModel
+from autobots.application.loop_admission import AdmittingLoop
+from autobots.application.loop_policy import LoopStopped
 from autobots.application.model_attempts import FailureClass
 from autobots.contracts.browsing import Stopped
+from autobots.domain.models import ModelRoute
 
 TEXT_CHARS = 6000
 MAX_LINKS = 60
@@ -294,7 +297,7 @@ class StepResponse:
     result: list[AIMessage]
 
 
-def admitted_steps(middleware: LoopMiddleware, model: Any, route: ModelRoute) -> Step:
+def admitted_steps(middleware: AdmittingLoop, model: Any, route: ModelRoute) -> Step:
     """Each step one admitted call on `route`. The model answers only inside that admission.
 
     `model` is the worker's attempt model for the route's role. Wrapped as an `AdmittedModel`,

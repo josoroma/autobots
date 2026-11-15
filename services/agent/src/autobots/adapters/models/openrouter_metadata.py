@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
+from autobots.adapters import provider_http
 from autobots.adapters.models.factory import OPENROUTER_BASE_URL
 from autobots.application.provider_settings import KeyCheck
 
@@ -13,8 +14,10 @@ TIMEOUT_SECONDS = 15.0
 
 
 def http_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        base_url=OPENROUTER_BASE_URL, timeout=TIMEOUT_SECONDS, transport=transport
+    """Through the one factory: no redirect is followed, which httpx never did here by default, and
+    the environment's proxy and certificate settings aren't read (PADP-05)."""
+    return provider_http.http_client(
+        OPENROUTER_BASE_URL, timeout=TIMEOUT_SECONDS, transport=transport
     )
 
 

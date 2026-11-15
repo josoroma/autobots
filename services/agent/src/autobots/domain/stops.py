@@ -61,7 +61,7 @@ class StopCode(_Code):
     ADMISSION_REFUSED = "admission_refused"
     BUDGET_EXCEEDED = "budget_exceeded"
     NO_INFERENCE_SLOT = "no_inference_slot"
-    # The loop's own model-call gates (goal_loop.py, loop_middleware.py).
+    # The loop's own model-call gates (goal_loop.py, application/loop_admission.py).
     UNCERTAIN_MODEL_CALL = "uncertain_model_call"
     UNADMITTED_MODEL_CALL = "unadmitted_model_call"
     REQUEST_UNENCODABLE = "request_unencodable"

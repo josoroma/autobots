@@ -1,52 +1,58 @@
 """The first consequential connector, Decision 0007: one operation on one configured repository.
 
 The repository is server configuration, so a model can't choose it, and the token is read for each
-attempt and kept nowhere. GitHub has no idempotency key for this call, so each issue has a marker
-with its operation ID, and an uncertain outcome is settled by reading the repository's issues back.
+attempt and kept nowhere (github_connector). GitHub has no idempotency key for this call, so each
+issue has a marker with its operation ID, and an uncertain outcome is settled by reading the
+repository's issues back.
 """
 
 import asyncio
 import os
-import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from functools import partial
 
 import httpx
+from pydantic import RootModel
 
-from autobots.application.approvals import ApprovedRequest
+from autobots.adapters.github_connector import (
+    API_URL,
+    GITHUB_KEY,
+    ISSUE_WRITE_REFUSED,
+    REPOSITORY_VARIABLE,
+    TOKEN_VARIABLE,
+    GithubConnector,
+    marker,
+)
+from autobots.adapters.provider_http import ProviderReply
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     NotDelivered,
-    OutcomeUnknown,
     ToolContext,
     ToolDefinition,
-    ToolFailed,
 )
 from autobots.contracts.tools import (
     CreateGithubIssueInput,
     CreateGithubIssueOutput,
     CreateGithubIssueV2Input,
 )
-from autobots.domain.tool_catalog import KeyRequirement, ToolGroup, ToolProvider
+from autobots.domain.tool_catalog import ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 
-API_URL = "https://api.github.com"
-REPOSITORY_VARIABLE = "GITHUB_REPOSITORY"
-TOKEN_VARIABLE = "GITHUB_TOKEN"
+# API_URL, REPOSITORY_VARIABLE, TOKEN_VARIABLE and marker are imported from here by tests/db,
+# tests/qualification and scripts/qualify_github_connector.py.
+__all__ = [
+    "API_URL",
+    "GITHUB_ISSUE",
+    "GITHUB_ISSUE_V2",
+    "READBACK_SETTLE_SECONDS",
+    "REPOSITORY_VARIABLE",
+    "TOKEN_VARIABLE",
+    "TOOL_ID",
+    "github_issue_tool",
+    "marker",
+]
+
 TOOL_ID = "create_github_issue"
-# Decision 0022 D6: a fine-grained token limited to the one repository, with exactly these.
-TOKEN_SCOPES = (
-    "Issues: read and write",
-    "Pull requests: read and write",
-    "Contents: read and write",
-    "Actions: read",
-    "Metadata: read",
-)
-GITHUB_KEY = KeyRequirement("github", (REPOSITORY_VARIABLE, TOKEN_VARIABLE), TOKEN_SCOPES)
-_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-# GitHub answered, and nothing was created. Anything else unclear stays uncertain.
-_REFUSED = frozenset({400, 401, 403, 404, 410, 422, 429})
-_REQUEST_SECONDS = 15.0
 _READBACK_ISSUES = 100
 # The issue list can lag a create: a live run read it at once and missed the new issue.
 # "Not delivered" lets the gateway send again, so it's only said after these waits. They stay well
@@ -54,86 +60,59 @@ _READBACK_ISSUES = 100
 # sends again.
 READBACK_SETTLE_SECONDS = (1.0, 2.0, 4.0, 8.0)
 
-
-class UnclearReply(OutcomeUnknown):
-    """GitHub's reply doesn't say whether the write happened. Both GitHub connectors raise it, and
-    the receipt keeps the status as its category (R-25, XERR-02)."""
-
-    def __init__(self, status_code: int) -> None:
-        super().__init__(f"github_unclear_{status_code}")
-        self.status_code = status_code
+IssueInput = CreateGithubIssueInput | CreateGithubIssueV2Input
 
 
-def marker(operation_id: str | None) -> str:
-    return f"<!-- autobots-operation:{operation_id} -->"
+class _Issue(ProviderReply):
+    number: int
+    html_url: str
+    body: str | None = None
+
+    def output(self) -> CreateGithubIssueOutput:
+        return CreateGithubIssueOutput(number=self.number, url=self.html_url)
 
 
-TARGET_PREFIX = "GitHub repository "
+class _Issues(RootModel[list[_Issue]]):
+    pass
 
 
-async def attempt_target(
-    context: ToolContext | None, environ: Mapping[str, str]
-) -> tuple[str, str]:
-    """This attempt's repository and token, for the run's workspace by Decision 0025's order.
-
-    A write that already has an approval uses the repository that approval recorded (V7), so
-    neither a fresh attempt nor a readback can be pointed at another repository by a changed
-    setting. The gateway refuses a fresh approved call whose repository now resolves differently,
-    and hands an approved attempt what was approved (XMOD-02).
-    """
-    from autobots.application.tool_keys import ToolKeyUnavailable, github_target
-
-    connection = context.connection if context is not None else None
-    workspace = context.scope.workspace_id if context is not None else None
-    try:
-        repository, token = await github_target(connection, workspace, environ)
-    except ToolKeyUnavailable as error:
-        raise ToolFailed(error.code) from None
-    approved = approved_repository(context.approval if context is not None else None)
-    if approved is not None:
-        repository = approved
-    if not token or not repository or not _REPOSITORY.fullmatch(repository):
-        raise ToolFailed("connector_not_configured")
-    return repository, token
+async def create_issue(
+    github: GithubConnector, arguments: IssueInput, context: ToolContext
+) -> CreateGithubIssueOutput:
+    payload: dict[str, object] = {
+        "title": arguments.title,
+        "body": f"{arguments.body}\n\n{marker(context.operation_id)}",
+    }
+    labels = arguments.labels if isinstance(arguments, CreateGithubIssueV2Input) else None
+    if labels:
+        payload["labels"] = list(labels)
+    async with github.attempt(context) as api:
+        issue = await api.create(api.repo("/issues"), payload, _Issue, ISSUE_WRITE_REFUSED)
+    return issue.output()
 
 
-def approved_repository(approved: ApprovedRequest | None) -> str | None:
-    """The repository an approval recorded, or None without one (Decision 0025 V7)."""
-    target = (approved.resource_target if approved is not None else None) or ""
-    return target.removeprefix(TARGET_PREFIX) if target.startswith(TARGET_PREFIX) else None
-
-
-async def approval_target(_arguments: Any, context: ToolContext, environ: Mapping[str, str]) -> str:
-    """What a GitHub write's approval records: the repository resolved for this workspace now."""
-    from autobots.application.tool_keys import ToolKeyUnavailable, github_target
-
-    try:
-        repository, token = await github_target(
-            context.connection, context.scope.workspace_id, environ
-        )
-    except ToolKeyUnavailable as error:
-        raise ToolFailed(error.code) from None
-    if not token or not repository:
-        raise ToolFailed("connector_not_configured")
-    return f"{TARGET_PREFIX}{repository}"
-
-
-def github_client(token: str, transport: httpx.AsyncBaseTransport | None) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        base_url=API_URL,
-        transport=transport,
-        timeout=_REQUEST_SECONDS,
-        follow_redirects=False,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
-
-
-def _output(issue: Mapping[str, Any]) -> CreateGithubIssueOutput:
-    return CreateGithubIssueOutput(number=int(issue["number"]), url=str(issue["html_url"]))
+async def find_issue(
+    github: GithubConnector,
+    settle_seconds: Sequence[float],
+    _: IssueInput,
+    context: ToolContext,
+) -> CreateGithubIssueOutput:
+    """Reads the list, which lags less than search, and gives a new issue time to appear."""
+    expected = marker(context.operation_id)
+    params: dict[str, str | int] = {
+        "state": "all",
+        "sort": "created",
+        "direction": "desc",
+        "per_page": _READBACK_ISSUES,
+    }
+    async with github.attempt(context) as api:
+        for wait in (0.0, *settle_seconds):
+            await asyncio.sleep(wait)
+            issues = await api.settle(api.repo("/issues"), _Issues, params)
+            for issue in issues.root:
+                if expected in (issue.body or ""):
+                    return issue.output()
+    raise NotDelivered
 
 
 def github_issue_tool(
@@ -144,67 +123,8 @@ def github_issue_tool(
 ) -> ToolDefinition:
     """Version 2 (PRD-Studio GH-05) adds up to 10 labels. Version 1 is unchanged and stays
     registered, so a run whose grants pinned it keeps calling it."""
-
-    def review_target(_arguments: Any) -> str | None:
-        """Server configuration only, so a reviewer sees where it goes whatever a model asked."""
-        repository = environ.get(REPOSITORY_VARIABLE, "")
-        return f"{TARGET_PREFIX}{repository}" if _REPOSITORY.fullmatch(repository) else None
-
-    async def target(context: ToolContext) -> tuple[str, str]:
-        return await attempt_target(context, environ)
-
-    async def resolve_target(arguments: Any, context: ToolContext) -> str:
-        return await approval_target(arguments, context, environ)
-
-    def client(token: str) -> httpx.AsyncClient:
-        return github_client(token, transport)
-
-    async def create(
-        arguments: CreateGithubIssueInput | CreateGithubIssueV2Input, context: ToolContext
-    ) -> CreateGithubIssueOutput:
-        repository, token = await target(context)
-        body = f"{arguments.body}\n\n{marker(context.operation_id)}"
-        labels = getattr(arguments, "labels", None)
-        payload: dict[str, Any] = {"title": arguments.title, "body": body}
-        if labels:
-            payload["labels"] = list(labels)
-        async with client(token) as http:
-            try:
-                reply = await http.post(f"/repos/{repository}/issues", json=payload)
-            except (httpx.ConnectError, httpx.ConnectTimeout):
-                # The connection never opened, so nothing reached GitHub.
-                raise ToolFailed("destination_unreachable") from None
-        if reply.status_code in _REFUSED:
-            raise ToolFailed(f"github_refused_{reply.status_code}")
-        if reply.status_code != 201:
-            raise UnclearReply(reply.status_code)
-        return _output(reply.json())
-
-    async def readback(
-        _: CreateGithubIssueInput | CreateGithubIssueV2Input, context: ToolContext
-    ) -> CreateGithubIssueOutput:
-        """Reads the list, which lags less than search, and gives a new issue time to appear."""
-        repository, token = await target(context)
-        expected = marker(context.operation_id)
-        async with client(token) as http:
-            for wait in (0.0, *settle_seconds):
-                await asyncio.sleep(wait)
-                reply = await http.get(
-                    f"/repos/{repository}/issues",
-                    params={
-                        "state": "all",
-                        "sort": "created",
-                        "direction": "desc",
-                        "per_page": _READBACK_ISSUES,
-                    },
-                )
-                if reply.status_code != 200:
-                    raise UnclearReply(reply.status_code)
-                for issue in reply.json():
-                    if expected in (issue.get("body") or ""):
-                        return _output(issue)
-        raise NotDelivered
-
+    github = GithubConnector(transport, environ)
+    labelled = version == 2
     return ToolDefinition(
         tool_id=TOOL_ID,
         title="Create GitHub issue",
@@ -212,23 +132,24 @@ def github_issue_tool(
         provider=ToolProvider.GITHUB,
         network=True,
         key_requirement=GITHUB_KEY,
-        public_input_fields=("title", "labels") if version == 2 else ("title",),
+        public_input_fields=("title", "labels") if labelled else ("title",),
         public_output_fields=("number", "url"),
         version=version,
         description=(
             "Create an issue, optionally with up to 10 labels, in the one GitHub repository this "
             "workspace configured. Each call waits for a person's approval."
-            if version == 2
+            if labelled
             else "Create an issue in the one GitHub repository this workspace configured. "
             "Each call waits for a person's approval."
         ),
-        input_model=CreateGithubIssueV2Input if version == 2 else CreateGithubIssueInput,
+        input_model=CreateGithubIssueV2Input if labelled else CreateGithubIssueInput,
         output_model=CreateGithubIssueOutput,
         operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE,
-        handler=create,
+        handler=partial(create_issue, github),
         timeout_seconds=30.0,
-        reconcile=readback,
-        approval=ApprovalPolicy(resource_target=review_target, target_resolver=resolve_target),
+        reconcile=partial(find_issue, github, settle_seconds),
+        # The approval records the repository resolved for the workspace (Decision 0025 V7).
+        approval=ApprovalPolicy(target_resolver=github.approval_label),
     )
 
 

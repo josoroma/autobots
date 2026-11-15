@@ -221,7 +221,7 @@ def test_availability_with_a_real_looking_key_makes_no_request() -> None:
 async def test_a_provider_client_reads_its_key_per_attempt_and_only_uses_its_transport() -> None:
     import httpx
 
-    from autobots.adapters.provider_http import provider_client
+    from autobots.adapters.provider_http import http_client
 
     seen: list[str] = []
 
@@ -230,10 +230,11 @@ async def test_a_provider_client_reads_its_key_per_attempt_and_only_uses_its_tra
         return httpx.Response(200, json={})
 
     key = "tvly-fixture"
-    async with provider_client(
+    async with http_client(
         "https://api.tavily.invalid",
-        {"Authorization": f"Bearer {key}"},
-        httpx.MockTransport(answer),
+        timeout=20.0,
+        headers={"Authorization": f"Bearer {key}"},
+        transport=httpx.MockTransport(answer),
     ) as client:
         reply = await client.post("/search", json={})
     assert reply.status_code == 200

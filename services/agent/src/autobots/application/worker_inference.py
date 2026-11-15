@@ -14,7 +14,6 @@ from uuid import UUID
 
 import psycopg
 
-from autobots.adapters.loop_middleware import ModelRoute, current_invocation
 from autobots.adapters.models.catalog import (
     RESERVED_PROMPT_TOKENS,
     CatalogSnapshot,
@@ -35,6 +34,7 @@ from autobots.application.credentials.store import (
     CredentialStorageUnavailable,
 )
 from autobots.application.goal_loop import UNBOUND, LoopConfig
+from autobots.application.loop_admission import current_invocation
 from autobots.application.model_admission import (
     CostUnavailable,
     ModelAdmission,
@@ -52,6 +52,7 @@ from autobots.domain.models import (
     PROFILES,
     BindingSource,
     ModelRole,
+    ModelRoute,
     RolePolicy,
     UnknownModelProfile,
     approved_profile,

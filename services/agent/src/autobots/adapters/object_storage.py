@@ -11,6 +11,8 @@ from urllib.parse import quote
 import httpx
 from pydantic import SecretStr
 
+from autobots.adapters.provider_http import http_client
+
 BUCKET = "workspace-artifacts"
 _UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _SCOPED = re.compile(rf"^{_UUID}/{_UUID}(/[A-Za-z0-9._-]+)?$")
@@ -36,12 +38,13 @@ class SupabaseObjectStore:
         self._timeout = timeout
 
     def _client(self) -> httpx.AsyncClient:
+        """Through the one factory, so neither a redirect nor the environment's proxy settings can
+        send the service key anywhere but Storage (PADP-05)."""
         secret = self._key.get_secret_value()
-        return httpx.AsyncClient(
-            base_url=self._url,
-            headers={"apikey": secret, "Authorization": f"Bearer {secret}"},
+        return http_client(
+            self._url,
             timeout=self._timeout,
-            follow_redirects=False,
+            headers={"apikey": secret, "Authorization": f"Bearer {secret}"},
             transport=self._transport,
         )
 

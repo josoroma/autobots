@@ -16,14 +16,10 @@ import uvicorn
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
-from autobots.adapters.loop_middleware import (
-    ModelRoute,
-    past_known_price,
-    request_bytes,
-    reservation_for,
-)
+from autobots.adapters.loop_middleware import request_bytes
 from autobots.adapters.models.catalog import RESERVED_PROMPT_TOKENS, parse_pricing
 from autobots.application.assignments import narrowed_tools
+from autobots.application.loop_policy import past_known_price, reservation_for
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.operations import (
     REQUIRED_COLUMNS,
@@ -33,7 +29,7 @@ from autobots.application.operations import (
 from autobots.application.tool_gateway import ToolFailed
 from autobots.application.worker_inference import AttemptModel, CatalogCache, InferenceSource
 from autobots.contracts.run_commands import RunRequest
-from autobots.domain.models import ModelRole, resolve_role_policy
+from autobots.domain.models import ModelRole, ModelRoute, resolve_role_policy
 from autobots.domain.tools import DELEGATION_TOOL
 from autobots.operations.logs import JsonFormatter, configure_logging
 from autobots.operations.worker import inference_step

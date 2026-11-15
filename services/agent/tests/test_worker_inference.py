@@ -14,10 +14,7 @@ from langchain_core.tools import tool
 from pydantic import SecretStr
 
 from autobots.adapters import model_replies
-from autobots.adapters.loop_middleware import (
-    AdmittedModel,
-    admitted_scope,
-)
+from autobots.adapters.loop_middleware import AdmittedModel
 from autobots.adapters.models.catalog import (
     CatalogEntry,
     CatalogSnapshot,
@@ -32,6 +29,7 @@ from autobots.application.credentials.store import (
     CredentialUnreadable,
 )
 from autobots.application.goal_loop import UNBOUND, LoopConfig
+from autobots.application.loop_admission import admitted_scope
 from autobots.application.model_attempts import (
     UNCERTAIN,
     FailureClass,

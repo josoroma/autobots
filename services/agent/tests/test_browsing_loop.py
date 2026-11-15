@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage, BaseMessage
 
-from autobots.adapters.loop_middleware import AdmittedModel, UnadmittedModelCall, admitted_scope
+from autobots.adapters.loop_middleware import AdmittedModel
 from autobots.application.browsing_loop import (
     ACTION_TOOLS,
     Link,
@@ -18,6 +18,8 @@ from autobots.application.browsing_loop import (
     bare,
     browse,
 )
+from autobots.application.loop_admission import admitted_scope
+from autobots.application.loop_policy import LoopStopped, UnadmittedModelCall
 
 SITE = {
     "https://example.com/": PageView(
@@ -241,8 +243,6 @@ def test_an_unadmitted_call_never_reaches_the_model() -> None:
 
 
 def test_a_cut_off_reply_stops_the_loop() -> None:
-    from autobots.adapters.loop_middleware import LoopStopped
-
     async def cut_off() -> str:
         step = admitted_steps(Middleware(complete=False), Delegate(), "route")  # type: ignore[arg-type]
         try:

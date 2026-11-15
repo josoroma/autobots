@@ -8,11 +8,11 @@ import pytest
 from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
-from autobots.adapters import loop_middleware
 from autobots.adapters.browser_page import CdpPage
-from autobots.adapters.loop_middleware import LoopStopped
 from autobots.application import browsing_tool
 from autobots.application.browsing_loop import Link, PageView
+from autobots.application.loop_admission import active_middleware
+from autobots.application.loop_policy import LoopStopped
 from autobots.application.tool_catalog import all_descriptors, catalog_registry, tool_catalog
 from autobots.application.tool_gateway import ToolContext, ToolFailed, ToolRegistry, ToolScope
 from autobots.contracts.browsing import BrowseGoalInput
@@ -232,15 +232,13 @@ def call(replies: list[Any], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Exec
     scope = ToolScope(uuid4(), uuid4(), 3, {"browse_goal": 1})
 
     async def go() -> Any:
-        token = loop_middleware._MIDDLEWARE.set(Middleware(replies))  # type: ignore[arg-type]
         try:
-            return await tool.handler(
-                BrowseGoalInput.model_validate(ARGS), ToolContext(None, scope, None)
-            )
+            with active_middleware(Middleware(replies)):
+                return await tool.handler(
+                    BrowseGoalInput.model_validate(ARGS), ToolContext(None, scope, None)
+                )
         except ToolFailed as failed:
             return str(failed)
-        finally:
-            loop_middleware._MIDDLEWARE.reset(token)
 
     return asyncio.run(go()), executor
 

@@ -206,3 +206,26 @@ def test_any_other_country_or_range_is_refused_before_a_request(
     refused = resolve(registry, scope, "inflation_rates", arguments)
     assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
     assert fake.seen == []
+
+
+@pytest.mark.parametrize(
+    "body", [{"chart": []}, {"chart": {"result": [{"timestamp": ["x"]}]}}, ["not", "a chart"]]
+)
+@pytest.mark.asyncio
+async def test_a_chart_of_the_wrong_shape_is_malformed(body: object) -> None:
+    fake = Fake({"BTC-USD": httpx.Response(200, json=body)})
+    tool = tools(fake)["market_history"]
+    with pytest.raises(ToolFailed) as failed:
+        await tool.handler(
+            tool.input_model.model_validate(
+                {"symbols": ["BTC-USD"], "period": "1mo", "interval": "1d"}
+            ),
+            CONTEXT,
+        )
+    assert str(failed.value) == "provider_reply_malformed"
+
+
+def test_each_request_fits_inside_its_tools_timeout() -> None:
+    from autobots.adapters.market_data import REQUEST_SECONDS
+
+    assert all(REQUEST_SECONDS < tool.timeout_seconds for tool in tools(Fake({})).values())

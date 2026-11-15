@@ -170,3 +170,35 @@ async def test_without_its_key_nothing_is_sent() -> None:
         await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
     assert str(failed.value) == "tavily_key_missing"
     assert fake.bodies == []
+
+
+@pytest.mark.parametrize("reply", [[], {"results": "nope"}, {"results": [], "failed_results": 5}])
+@pytest.mark.asyncio
+async def test_a_reply_of_the_wrong_shape_is_malformed_not_a_crash(reply: Any) -> None:
+    """A provider reply is validated once, where it arrives (R-62, PADP-07)."""
+    tool = tools(Fake(reply=reply))["tavily_search"]
+    with pytest.raises(ToolFailed) as failed:
+        await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    assert str(failed.value) == "provider_reply_malformed"
+
+
+@pytest.mark.asyncio
+async def test_a_score_that_isnt_a_number_reads_as_unknown_and_keeps_its_result() -> None:
+    tool = tools(Fake(reply={"results": [{"title": "T", "score": "high"}]}))["tavily_search"]
+    output = await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    assert [(result.title, result.score) for result in output.results] == [("T", None)]
+
+
+@pytest.mark.asyncio
+async def test_a_null_field_reads_as_empty_never_as_the_text_none() -> None:
+    reply = {"results": [{"title": None, "url": None, "content": None}, "not an object"]}
+    tool = tools(Fake(reply=reply))["tavily_search"]
+    output = await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    [result] = output.results
+    assert (result.title, result.url, result.content) == ("", "", "")
+
+
+def test_each_request_fits_inside_its_tools_timeout() -> None:
+    from autobots.adapters.tavily import REQUEST_SECONDS
+
+    assert all(REQUEST_SECONDS < tool.timeout_seconds for tool in tools(Fake()).values())

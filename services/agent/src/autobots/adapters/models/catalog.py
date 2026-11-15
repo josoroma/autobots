@@ -7,14 +7,13 @@ from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from typing import Any
 
 from autobots.application.model_admission import Pricing
+
+# Defined with the other budgets in domain/models.py, and imported from here by worker_inference.py
+# and the tests.
+from autobots.domain.models import RESERVED_PROMPT_TOKENS as RESERVED_PROMPT_TOKENS
 from autobots.domain.models import ModelProfile
 
 MAX_CATALOG_AGE = timedelta(minutes=5)
-# What one call reserves for its prompt, an estimate since no tokenizer is pinned. Compaction keeps
-# messages near 24K characters, and the system prompt and tool schemas add some. Mostly Latin text
-# stays under this, but text with more than a token per character can pass it, and nothing refuses
-# that. The reported cost settles each call either way.
-RESERVED_PROMPT_TOKENS = 32_000
 
 
 class ModelUnavailable(Exception):

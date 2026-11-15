@@ -65,7 +65,7 @@ from autobots.contracts.operations import RetentionSettings
 from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
-from autobots.domain.runs import Actor, RunCommand
+from autobots.domain.runs import RunCommand
 from autobots.domain.tools import DELEGATION_TOOL, OperationClass
 from autobots.operations import worker as worker_module
 from checklib import Cases, Db, OnePool, run_check
@@ -99,7 +99,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
 
     async def command(run: UUID, which: RunCommand) -> Any:
         version = await value('select version from public.runs where id = %s', run)
-        return await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=which, actor=Actor.USER, expected_version=version)
+        return await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=which, expected_version=version)
 
     def scope_of(lease: Any, tools: dict[str, int]) -> ToolScope:
         return ToolScope(WORKSPACE, lease.run_id, lease.generation, tools)
@@ -230,10 +230,10 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     lease = await claim_run(db, grandchild, worker_id='m5', lease_seconds=60)
     await db.execute("update public.runs set status = 'running' where id = %s", (grandchild,))
     guard = LoopMiddleware(db, ToolScope(WORKSPACE, grandchild, lease.generation, {'calculate': 1}, root_run_id=root, parent_run_id=child), RootLimits(), ROUTE)
-    await guard._guard()
+    await guard.guard()
     await db.execute("update public.runs set status = 'paused' where id = %s", (root,))
     try:
-        await guard._guard()
+        await guard.guard()
         outcome = 'allowed'
     except LoopStopped as stopped_error:
         outcome = str(stopped_error)
@@ -352,7 +352,7 @@ async def retention_and_readiness(db: Any, cases: Cases) -> None:
     await db.execute("update app_private.run_jobs set status = 'done' where run_id = %s", (run,))
     await db.execute("insert into app_private.run_obligations (id, run_id, kind, detail) values (%s, %s, 'input', 'x')", (uuid4(), run))
     version = await value('select version from public.runs where id = %s', run)
-    await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+    await apply_command(db, workspace_id=WORKSPACE, run_id=run, command=RunCommand.CANCEL, expected_version=version)
     open_left = await value("select count(*) from app_private.run_obligations where run_id = %s and status = 'open'", run)
     check('cancelling closes what the run was waiting on', '0', open_left, open_left == 0)
     crowd = 'deadbeef'
@@ -531,7 +531,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     await clear()
     idle = await create_execution(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
     version = await value('select version from public.runs where id = %s', idle.run_id)
-    await apply_command(db, workspace_id=WORKSPACE, run_id=idle.run_id, command=RunCommand.CANCEL, actor=Actor.USER, expected_version=version)
+    await apply_command(db, workspace_id=WORKSPACE, run_id=idle.run_id, command=RunCommand.CANCEL, expected_version=version)
     view = await read_execution(db, WORKSPACE, idle.id)
     states = {item.node_id: item.status for item in view.instances}
     check("a cancelled workflow's unreached nodes say they didn't run", 'not_run', states, set(states.values()) == {'not_run'})

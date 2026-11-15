@@ -6,27 +6,28 @@ admission_check.py)."""
 import asyncio
 import json
 import logging
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
 import openrouter
 import pytest
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolCall, ToolMessage
+from langgraph.prebuilt.tool_node import ToolCallRequest, ToolRuntime
 
 from autobots.adapters.loop_middleware import (
     MAX_FACT_CHARS,
     MAX_FACT_NAMES,
-    REPAIR_NOTE,
     LoopMiddleware,
-    LoopStopped,
-    ModelRoute,
     reply_facts,
-    uncertain_call_fields,
 )
 from autobots.application.compaction import CompactionPolicy
+from autobots.application.loop_admission import current_middleware
+from autobots.application.loop_policy import REPAIR_NOTE, LoopStopped, uncertain_call_fields
 from autobots.application.model_admission import (
     AdmissionRefused,
     AdmissionRequest,
@@ -41,6 +42,7 @@ from autobots.application.model_attempts import FailureClass, ProviderFailure, c
 from autobots.application.run_usage import COUNTER_SQL, RootLimits
 from autobots.application.tool_gateway import ToolScope
 from autobots.contracts.plans import GoalSpec
+from autobots.domain.models import ModelRoute
 from autobots.operations.logs import JsonFormatter, redact
 from fake_openrouter import DEEPSEEK, TERRA, invoke, model_over
 
@@ -138,27 +140,9 @@ class Ledger(ModelAdmission):
         self.events.append(("reply", facts.finish_reason))
 
 
-@dataclass(frozen=True)
-class Request:
-    """The parts of the SDK's model request the middleware reads and overrides."""
-
-    messages: list[BaseMessage]
-    tools: list[object] = field(default_factory=list)
-    system_message: SystemMessage | None = None
-
-    def override(
-        self, *, messages: list[BaseMessage] | None = None, tools: list[object] | None = None
-    ) -> "Request":
-        return Request(
-            self.messages if messages is None else messages,
-            self.tools if tools is None else tools,
-            self.system_message,
-        )
-
-
-@dataclass(frozen=True)
-class Response:
-    result: list[AIMessage]
+def request(messages: list[AnyMessage]) -> ModelRequest[Any]:
+    """The SDK's model request, holding only what the middleware reads and overrides."""
+    return ModelRequest(model=GenericFakeChatModel(messages=iter([])), messages=messages)
 
 
 class Model:
@@ -166,20 +150,20 @@ class Model:
 
     def __init__(self, *replies: AIMessage) -> None:
         self.replies = list(replies)
-        self.requests: list[Request] = []
+        self.requests: list[ModelRequest[Any]] = []
 
-    async def __call__(self, request: Request) -> Response:
+    async def __call__(self, request: ModelRequest[Any]) -> ModelResponse[Any]:
         self.requests.append(request)
-        return Response([self.replies.pop(0)])
+        return ModelResponse(result=[self.replies.pop(0)])
 
 
 def reply(text: str = "done", finish: str = "stop") -> AIMessage:
     return AIMessage(content=text, response_metadata={"finish_reason": finish, "cost": 0.0001})
 
 
-def history() -> Request:
+def history() -> ModelRequest[Any]:
     """More than TIGHT holds, so the first two turns are summarized before the call."""
-    return Request([HumanMessage("a" * 150), AIMessage("b" * 150), HumanMessage("c" * 150)])
+    return request([HumanMessage("a" * 150), AIMessage("b" * 150), HumanMessage("c" * 150)])
 
 
 def loop(
@@ -245,7 +229,7 @@ def test_only_a_cut_off_reply_is_worth_a_repair(finish: str, repairs: int) -> No
     usage, model = Usage(), Model(reply("", finish))
     middleware = loop(usage, Ledger(), limits=RootLimits(repairs=0))
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.awrap_model_call(Request([HumanMessage("hello")]), model))
+        asyncio.run(middleware.awrap_model_call(request([HumanMessage("hello")]), model))
     assert caught.value.code == "incomplete_output"
     assert usage.consumed.count("repairs") == repairs
 
@@ -254,7 +238,7 @@ def test_a_cut_off_reply_is_asked_once_more_briefly() -> None:
     usage, ledger = Usage(), Ledger()
     model = Model(reply("", "length"), reply("short"))
     response = asyncio.run(
-        loop(usage, ledger).awrap_model_call(Request([HumanMessage("hello")]), model)
+        loop(usage, ledger).awrap_model_call(request([HumanMessage("hello")]), model)
     )
     assert response.result[-1].content == "short"
     assert model.requests[1].messages[-1].content == REPAIR_NOTE
@@ -277,9 +261,9 @@ def test_running_out_of_model_calls_while_compacting_stops_cleanly() -> None:
 def test_an_unencodable_request_stops_before_anything_is_reserved() -> None:
     """A lone surrogate is no text a provider can read."""
     usage, ledger, model = Usage(), Ledger(), Model()
-    request = Request([HumanMessage(b"before \\ud83d after".decode("unicode_escape"))])
+    unencodable = request([HumanMessage(b"before \\ud83d after".decode("unicode_escape"))])
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(loop(usage, ledger).admitted(request, model, ROUTE))
+        asyncio.run(loop(usage, ledger).admitted(unencodable, model, ROUTE))
     assert caught.value.code == "request_unencodable"
     assert ledger.asked == [] and model.requests == []
 
@@ -289,7 +273,7 @@ def test_without_a_guard_each_dispatch_reads_the_runs_ownership() -> None:
     ledger = Ledger()
     middleware = LoopMiddleware(Usage(), SCOPE, RootLimits(), ROUTE, admission=lambda: ledger)
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.admitted(Request([HumanMessage("hello")]), Model(), ROUTE))
+        asyncio.run(middleware.admitted(request([HumanMessage("hello")]), Model(), ROUTE))
     assert caught.value.code == "run_not_found"
     assert ledger.asked == []
 
@@ -313,7 +297,7 @@ def test_an_attempt_recovery_settled_stops_as_lost_and_keeps_its_late_charge() -
     ledger = SettledMeanwhile(AttemptAlreadySettled("this attempt has already been settled"))
     with pytest.raises(LoopStopped) as caught:
         asyncio.run(
-            loop(Usage(), ledger).admitted(Request([HumanMessage("hello")]), Model(reply()), ROUTE)
+            loop(Usage(), ledger).admitted(request([HumanMessage("hello")]), Model(reply()), ROUTE)
         )
     assert caught.value.code == "lease_lost"
     assert ledger.events[-1] == ("reconciled", 100)
@@ -325,7 +309,7 @@ def test_any_other_value_error_while_settling_is_a_defect_not_a_lost_lease() -> 
     ledger = SettledMeanwhile(ValueError("arranged defect"))
     with pytest.raises(ValueError, match="arranged defect"):
         asyncio.run(
-            loop(Usage(), ledger).admitted(Request([HumanMessage("hello")]), Model(reply()), ROUTE)
+            loop(Usage(), ledger).admitted(request([HumanMessage("hello")]), Model(reply()), ROUTE)
         )
     assert ("reconciled", 100) not in ledger.events
 
@@ -458,3 +442,89 @@ def test_reply_facts_hold_no_content_and_stay_bounded() -> None:
         empty.tool_names,
         empty.invalid_tool_calls,
     ) == (None, None, (), 0)
+
+
+# The tool-call path: a dispatch is counted, and the gateway's code, which GatewayMiddleware puts in
+# the reply's artifact, stops the loop or spends a repair (PADP-16).
+
+
+def tool_request() -> ToolCallRequest:
+    call = ToolCall(name="save_note", args={}, id="call-1", type="tool_call")
+    # The middleware reads only the call; the runtime is the graph's, absent outside one.
+    return ToolCallRequest(tool_call=call, tool=None, state={}, runtime=cast(ToolRuntime, None))
+
+
+def answered(code: str | None) -> Callable[[ToolCallRequest], Awaitable[ToolMessage]]:
+    async def gateway(_: ToolCallRequest) -> ToolMessage:
+        return ToolMessage(
+            content="{}", artifact={"outcome": "failed", "code": code}, tool_call_id="call-1"
+        )
+
+    return gateway
+
+
+@pytest.mark.parametrize(
+    ("code", "stops", "repairs"),
+    [(None, None, 0), ("lease_lost", "lease_lost", 0), ("invalid_arguments", None, 1)],
+)
+def test_the_gateways_code_decides_whether_the_loop_goes_on(
+    code: str | None, stops: str | None, repairs: int
+) -> None:
+    usage = Usage()
+    middleware = loop(usage, Ledger())
+    if stops is None:
+        reply = asyncio.run(middleware.awrap_tool_call(tool_request(), answered(code)))
+        assert reply.artifact["code"] == code
+    else:
+        with pytest.raises(LoopStopped) as caught:
+            asyncio.run(middleware.awrap_tool_call(tool_request(), answered(code)))
+        assert caught.value.code == stops
+    assert usage.consumed.count("tool_dispatches") == 1
+    assert usage.consumed.count("repairs") == repairs
+
+
+def test_a_tool_call_past_the_dispatch_limit_never_reaches_the_gateway() -> None:
+    async def never(_: ToolCallRequest) -> ToolMessage:
+        raise AssertionError("dispatched past the limit")
+
+    middleware = loop(Usage(), Ledger(), limits=RootLimits(tool_dispatches=0))
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.awrap_tool_call(tool_request(), never))
+    assert caught.value.code == "tool_dispatches_limit"
+
+
+def test_a_stop_a_tools_own_model_call_met_stops_the_loop_after_it() -> None:
+    """Browsing's model calls go through this loop's admission; a stop there ends the loop too."""
+    ledger = Ledger(BudgetExceeded("arranged"))
+    middleware = loop(Usage(), ledger)
+
+    async def browsing(_: ToolCallRequest) -> ToolMessage:
+        nested = current_middleware()
+        assert nested is middleware
+        with pytest.raises(LoopStopped):
+            await nested.admitted(request([HumanMessage("step")]), Model(reply()), ROUTE)
+        return await answered(None)(tool_request())
+
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.awrap_tool_call(tool_request(), browsing))
+    assert caught.value.code == "budget_exceeded"
+
+
+def test_a_guard_that_refuses_at_dispatch_closes_the_reservation_as_never_sent() -> None:
+    """A stop met after admission, before sending, is the loop's stop, not the failure class."""
+    checks: list[int] = []
+
+    async def owned_once() -> float:
+        checks.append(1)
+        if len(checks) > 1:
+            raise LoopStopped("run_not_running")
+        return 60.0
+
+    ledger, model = Ledger(), Model(reply())
+    middleware = LoopMiddleware(
+        Usage(), SCOPE, RootLimits(), ROUTE, guard=owned_once, admission=lambda: ledger
+    )
+    with pytest.raises(LoopStopped) as caught:
+        asyncio.run(middleware.admitted(request([HumanMessage("hello")]), model, ROUTE))
+    assert caught.value.code == "run_not_running"
+    assert ledger.events[-1] == ("failed", "other") and model.requests == []

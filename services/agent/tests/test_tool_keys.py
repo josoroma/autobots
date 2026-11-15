@@ -270,7 +270,7 @@ def test_an_approved_write_runs_only_against_its_recorded_target(
 def test_a_write_uses_the_repository_its_approval_recorded() -> None:
     """The gateway hands the attempt what was approved, and the adapter reads its repository from
     there, never from the database (XMOD-02)."""
-    from autobots.adapters.github_issues import attempt_target
+    from autobots.adapters.github_connector import attempt_credentials
     from autobots.application.approvals import ApprovedRequest
 
     class Recorded(Approvals):
@@ -288,7 +288,7 @@ def test_a_write_uses_the_repository_its_approval_recorded() -> None:
     approval = ApprovedRequest("GitHub repository owner/approved", None)
     context = ToolContext(Recorded(None, None), scope, "op", approval)
     environ = {"GITHUB_REPOSITORY": "owner/now", "GITHUB_TOKEN": "github_pat_fixture0001"}
-    assert asyncio.run(attempt_target(context, environ)) == (
+    assert asyncio.run(attempt_credentials(context, environ)) == (
         "owner/approved",
         "github_pat_fixture0001",
     )

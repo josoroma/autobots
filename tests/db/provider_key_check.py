@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
-from autobots.adapters.provider_http import provider_client
+from autobots.adapters.provider_http import http_client
 from autobots.adapters.tool_middleware import GatewayMiddleware, visible_tools
 from autobots.application.experts import create_expert, create_session
 from autobots.application.runs import admit_run
@@ -93,7 +93,7 @@ def fixture_key(environ: Mapping[str, str]) -> str:
 async def search(arguments: Query, _: ToolContext) -> Found:
     """The shape every provider adapter takes: the key read in this attempt, for this client only."""
     key = fixture_key(os.environ)
-    async with provider_client('https://provider.invalid', {'Authorization': f'Bearer {key}'}, httpx.MockTransport(answer)) as client:
+    async with http_client('https://provider.invalid', timeout=20.0, headers={'Authorization': f'Bearer {key}'}, transport=httpx.MockTransport(answer)) as client:
         reply = await client.post('/search', json={'query': arguments.query})
     return Found(titles=[item['title'] for item in reply.json()['results']])
 

@@ -1,21 +1,28 @@
 """Four read-only GitHub tools on the one configured repository, PRD-Studio GH-01 to GH-04.
 
 Like the issue connector (Decision 0007, widened by Decision 0022 D6), the repository is server
-configuration and the token is read for each attempt. No input names a repository, and the issue
-search is pinned to it. Nothing here writes, so a call needs no approval and has no receipt.
+configuration and the token is read for each attempt, once for the whole call (github_connector).
+No input names a repository, and the issue search is pinned to it. Nothing here writes, so a call
+needs no approval and has no receipt.
 """
 
-import base64
-import binascii
 import os
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from functools import partial
+from typing import Annotated, TypedDict
 from urllib.parse import quote
 
 import httpx
+from pydantic import RootModel
 
-from autobots.adapters.github_issues import GITHUB_KEY, attempt_target, github_client
+from autobots.adapters.github_connector import (
+    GITHUB_KEY,
+    ContentReply,
+    GithubConnector,
+    file_text,
+)
+from autobots.adapters.provider_http import Objects, ProviderReply, Text
 from autobots.application.tool_gateway import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.tools import (
     GithubFailingJob,
@@ -31,17 +38,78 @@ from autobots.contracts.tools import (
     GithubSearchIssuesOutput,
     GithubWorkflowRun,
 )
-from autobots.domain.tool_catalog import ToolGroup, ToolProvider
+from autobots.domain.tool_catalog import KeyRequirement, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 
 MAX_FILE_BYTES = 1_048_576
 # Each failed run's jobs are one more request, so only the newest few are read.
 FAILED_RUNS_WITH_JOBS = 10
-_REFUSED = frozenset({401, 403, 404, 410, 422, 429})
 
 
-def _labels(item: Mapping[str, Any]) -> list[str]:
-    return [str(label.get("name")) for label in item.get("labels") or () if label.get("name")]
+class _Label(ProviderReply):
+    name: Text = ""
+
+
+class _User(ProviderReply):
+    login: str | None = None
+
+
+class _Labelled(ProviderReply):
+    labels: Annotated[list[_Label] | None, Objects] = None
+
+    def label_names(self) -> list[str]:
+        return [label.name for label in self.labels or () if label.name]
+
+
+class _Pull(_Labelled):
+    number: int
+    title: Text = ""
+    user: _User | None = None
+    merged_at: str | None = None
+    updated_at: str | None = None
+    html_url: Text = ""
+
+
+class _Pulls(RootModel[list[_Pull]]):
+    pass
+
+
+class _Run(ProviderReply):
+    id: int
+    conclusion: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    head_sha: Text = ""
+
+
+class _Runs(ProviderReply):
+    workflow_runs: list[_Run] | None = None
+
+
+class _Step(ProviderReply):
+    name: Text = ""
+    conclusion: str | None = None
+
+
+class _Job(ProviderReply):
+    name: Text = ""
+    conclusion: str | None = None
+    steps: list[_Step] | None = None
+
+
+class _Jobs(ProviderReply):
+    jobs: list[_Job] | None = None
+
+
+class _Issue(_Labelled):
+    number: int
+    title: Text = ""
+    state: Text = ""
+    html_url: Text = ""
+
+
+class _Search(ProviderReply):
+    items: list[_Issue] | None = None
 
 
 def _after(value: str | None, since: datetime | None) -> bool:
@@ -50,167 +118,160 @@ def _after(value: str | None, since: datetime | None) -> bool:
     return datetime.fromisoformat(value.replace("Z", "+00:00")) >= since
 
 
-def _checked(reply: httpx.Response) -> Any:
-    if reply.status_code in _REFUSED:
-        raise ToolFailed(f"github_refused_{reply.status_code}")
-    if reply.status_code != 200:
-        raise ToolFailed("github_unavailable")
-    return reply.json()
-
-
-def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
-    transport: httpx.AsyncBaseTransport | None = None,
-    environ: Mapping[str, str] = os.environ,
-) -> tuple[ToolDefinition, ...]:
-    async def get(context: ToolContext, path: str, params: Mapping[str, Any] | None = None) -> Any:
-        repository, token = await attempt_target(context, environ)
-        async with github_client(token, transport) as http:
-            try:
-                reply = await http.get(path.format(repository=repository), params=params)
-            except httpx.HTTPError:
-                raise ToolFailed("destination_unreachable") from None
-        return _checked(reply)
-
-    async def pull_requests(
-        arguments: GithubListPullRequestsInput, context: ToolContext
-    ) -> GithubListPullRequestsOutput:
-        # GitHub's own states are open and closed. Merged is a closed one with a merge time.
-        params: dict[str, Any] = {
-            "state": "closed" if arguments.state == "merged" else arguments.state,
-            "sort": "updated",
-            "direction": "desc",
-            "per_page": arguments.limit,
-        }
-        if arguments.base is not None:
-            params["base"] = arguments.base
-        found = await get(context, "/repos/{repository}/pulls", params)
-        listed = [
-            GithubPullRequest(
-                number=int(item["number"]),
-                title=str(item.get("title") or ""),
-                author=(item.get("user") or {}).get("login"),
-                merged_at=item.get("merged_at"),
-                labels=_labels(item),
-                url=str(item.get("html_url") or ""),
-            )
-            for item in found
-            if (arguments.state != "merged" or item.get("merged_at"))
-            and _after(item.get("updated_at"), arguments.since)
-        ]
-        return GithubListPullRequestsOutput(pull_requests=listed[: arguments.limit])
-
-    async def workflow_runs(
-        arguments: GithubListWorkflowRunsInput, context: ToolContext
-    ) -> GithubListWorkflowRunsOutput:
-        params: dict[str, Any] = {"per_page": arguments.limit}
-        if arguments.branch is not None:
-            params["branch"] = arguments.branch
-        if arguments.status is not None:
-            params["status"] = arguments.status
-        if arguments.since is not None:
-            params["created"] = f">={arguments.since.date().isoformat()}"
-        path = (
-            f"/repos/{{repository}}/actions/workflows/{quote(arguments.workflow)}/runs"
-            if arguments.workflow is not None
-            else "/repos/{repository}/actions/runs"
+async def list_pull_requests(
+    github: GithubConnector, arguments: GithubListPullRequestsInput, context: ToolContext
+) -> GithubListPullRequestsOutput:
+    # GitHub's own states are open and closed. Merged is a closed one with a merge time.
+    params: dict[str, str | int] = {
+        "state": "closed" if arguments.state == "merged" else arguments.state,
+        "sort": "updated",
+        "direction": "desc",
+        "per_page": arguments.limit,
+    }
+    if arguments.base is not None:
+        params["base"] = arguments.base
+    async with github.attempt(context) as api:
+        found = await api.read(api.repo("/pulls"), _Pulls, params)
+    listed = [
+        GithubPullRequest(
+            number=item.number,
+            title=item.title,
+            author=item.user.login if item.user is not None else None,
+            merged_at=item.merged_at,
+            labels=item.label_names(),
+            url=item.html_url,
         )
-        found = (await get(context, path, params)).get("workflow_runs") or []
-        runs = []
+        for item in found.root
+        if (arguments.state != "merged" or item.merged_at)
+        and _after(item.updated_at, arguments.since)
+    ]
+    return GithubListPullRequestsOutput(pull_requests=listed[: arguments.limit])
+
+
+def _failing(jobs: _Jobs) -> list[GithubFailingJob]:
+    return [
+        GithubFailingJob(
+            name=job.name,
+            failed_steps=[step.name for step in job.steps or () if step.conclusion == "failure"],
+        )
+        for job in jobs.jobs or ()
+        if job.conclusion == "failure"
+    ]
+
+
+async def list_workflow_runs(
+    github: GithubConnector, arguments: GithubListWorkflowRunsInput, context: ToolContext
+) -> GithubListWorkflowRunsOutput:
+    params: dict[str, str | int] = {"per_page": arguments.limit}
+    if arguments.branch is not None:
+        params["branch"] = arguments.branch
+    if arguments.status is not None:
+        params["status"] = arguments.status
+    if arguments.since is not None:
+        params["created"] = f">={arguments.since.date().isoformat()}"
+    path = (
+        f"/actions/workflows/{quote(arguments.workflow)}/runs"
+        if arguments.workflow is not None
+        else "/actions/runs"
+    )
+    runs = []
+    # Every request of the call goes to the one repository resolved for it (PADP-06).
+    async with github.attempt(context) as api:
+        found = (await api.read(api.repo(path), _Runs, params)).workflow_runs or []
         with_jobs = 0
         for item in found[: arguments.limit]:
             failing: list[GithubFailingJob] = []
-            if item.get("conclusion") == "failure" and with_jobs < FAILED_RUNS_WITH_JOBS:
+            if item.conclusion == "failure" and with_jobs < FAILED_RUNS_WITH_JOBS:
                 with_jobs += 1
-                jobs = (
-                    await get(context, f"/repos/{{repository}}/actions/runs/{int(item['id'])}/jobs")
-                ).get("jobs") or []
-                failing = [
-                    GithubFailingJob(
-                        name=str(job.get("name") or ""),
-                        failed_steps=[
-                            str(step.get("name") or "")
-                            for step in job.get("steps") or ()
-                            if step.get("conclusion") == "failure"
-                        ],
-                    )
-                    for job in jobs
-                    if job.get("conclusion") == "failure"
-                ]
+                failing = _failing(await api.read(api.repo(f"/actions/runs/{item.id}/jobs"), _Jobs))
             runs.append(
                 GithubWorkflowRun(
-                    id=int(item["id"]),
-                    conclusion=item.get("conclusion"),
-                    created_at=item.get("created_at"),
-                    updated_at=item.get("updated_at"),
-                    head_sha=str(item.get("head_sha") or ""),
+                    id=item.id,
+                    conclusion=item.conclusion,
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    head_sha=item.head_sha,
                     failing_jobs=failing,
                 )
             )
-        return GithubListWorkflowRunsOutput(runs=runs)
+    return GithubListWorkflowRunsOutput(runs=runs)
 
-    async def search_issues(
-        arguments: GithubSearchIssuesInput, context: ToolContext
-    ) -> GithubSearchIssuesOutput:
-        repository, _token = await attempt_target(context, environ)
+
+async def search_issues(
+    github: GithubConnector, arguments: GithubSearchIssuesInput, context: ToolContext
+) -> GithubSearchIssuesOutput:
+    async with github.attempt(context) as api:
         # The repository is added here, after the model's text, which can't name another one.
-        qualifiers = [f"repo:{repository}", "is:issue"]
+        qualifiers = [f"repo:{api.repository}", "is:issue"]
         if arguments.state is not None:
             qualifiers.append(f"state:{arguments.state}")
-        found = await get(
-            context,
+        found = await api.read(
             "/search/issues",
+            _Search,
             {"q": f"{arguments.query} {' '.join(qualifiers)}", "per_page": 50},
         )
-        return GithubSearchIssuesOutput(
-            issues=[
-                GithubIssue(
-                    number=int(item["number"]),
-                    title=str(item.get("title") or ""),
-                    state=str(item.get("state") or ""),
-                    labels=_labels(item),
-                    url=str(item.get("html_url") or ""),
-                )
-                for item in found.get("items") or ()
-            ]
-        )
+    return GithubSearchIssuesOutput(
+        issues=[
+            GithubIssue(
+                number=item.number,
+                title=item.title,
+                state=item.state,
+                labels=item.label_names(),
+                url=item.html_url,
+            )
+            for item in found.items or ()
+        ]
+    )
 
-    async def read_file(
-        arguments: GithubReadFileInput, context: ToolContext
-    ) -> GithubReadFileOutput:
-        params = {"ref": arguments.ref} if arguments.ref is not None else None
-        found = await get(
-            context, f"/repos/{{repository}}/contents/{quote(arguments.path)}", params
-        )
-        if not isinstance(found, dict) or found.get("type") != "file":
-            raise ToolFailed("github_path_not_a_file")
-        size = int(found.get("size") or 0)
-        if size > MAX_FILE_BYTES:
-            raise ToolFailed("github_file_too_large")
-        try:
-            raw = base64.b64decode(str(found.get("content") or ""), validate=False)
-            content = raw.decode("utf-8")
-        except (binascii.Error, UnicodeDecodeError):
-            raise ToolFailed("github_file_not_text") from None
-        if len(raw) > MAX_FILE_BYTES:
-            raise ToolFailed("github_file_too_large")
-        return GithubReadFileOutput(
-            path=arguments.path,
-            ref=arguments.ref,
-            sha=str(found.get("sha") or ""),
-            size=size,
-            content=content,
-        )
 
-    common: dict[str, Any] = {
-        "group": ToolGroup.CONNECTORS,
-        "provider": ToolProvider.GITHUB,
-        "network": True,
-        "key_requirement": GITHUB_KEY,
-        "operation_class": OperationClass.READ_ONLY,
-        "timeout_seconds": 30.0,
-        "retries": 1,
-        "version": 1,
-    }
+async def read_file(
+    github: GithubConnector, arguments: GithubReadFileInput, context: ToolContext
+) -> GithubReadFileOutput:
+    params = {"ref": arguments.ref} if arguments.ref is not None else None
+    async with github.attempt(context) as api:
+        found = await api.read(api.repo(f"/contents/{quote(arguments.path)}"), ContentReply, params)
+    entry = found.file()
+    size = entry.size or 0
+    if size > MAX_FILE_BYTES:
+        raise ToolFailed("github_file_too_large")
+    raw, content = file_text(entry)
+    if len(raw) > MAX_FILE_BYTES:
+        raise ToolFailed("github_file_too_large")
+    return GithubReadFileOutput(
+        path=arguments.path, ref=arguments.ref, sha=entry.sha, size=size, content=content
+    )
+
+
+class _ReadTraits(TypedDict):
+    """What the four read tools share. Typed, so each definition is checked field by field."""
+
+    group: ToolGroup
+    provider: ToolProvider
+    network: bool
+    key_requirement: KeyRequirement
+    operation_class: OperationClass
+    timeout_seconds: float
+    retries: int
+    version: int
+
+
+_READS = _ReadTraits(
+    group=ToolGroup.CONNECTORS,
+    provider=ToolProvider.GITHUB,
+    network=True,
+    key_requirement=GITHUB_KEY,
+    operation_class=OperationClass.READ_ONLY,
+    timeout_seconds=30.0,
+    retries=1,
+    version=1,
+)
+
+
+def github_read_tools(
+    transport: httpx.AsyncBaseTransport | None = None,
+    environ: Mapping[str, str] = os.environ,
+) -> tuple[ToolDefinition, ...]:
+    github = GithubConnector(transport, environ)
     return (
         ToolDefinition(
             tool_id="github_list_pull_requests",
@@ -221,10 +282,10 @@ def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
             ),
             input_model=GithubListPullRequestsInput,
             output_model=GithubListPullRequestsOutput,
-            handler=pull_requests,
+            handler=partial(list_pull_requests, github),
             public_input_fields=("state", "base", "since", "limit"),
             public_output_fields=("pull_requests",),
-            **common,
+            **_READS,
         ),
         ToolDefinition(
             tool_id="github_list_workflow_runs",
@@ -235,10 +296,10 @@ def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
             ),
             input_model=GithubListWorkflowRunsInput,
             output_model=GithubListWorkflowRunsOutput,
-            handler=workflow_runs,
+            handler=partial(list_workflow_runs, github),
             public_input_fields=("workflow", "branch", "status", "since", "limit"),
             public_output_fields=("runs",),
-            **common,
+            **_READS,
         ),
         ToolDefinition(
             tool_id="github_search_issues",
@@ -248,10 +309,10 @@ def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
             ),
             input_model=GithubSearchIssuesInput,
             output_model=GithubSearchIssuesOutput,
-            handler=search_issues,
+            handler=partial(search_issues, github),
             public_input_fields=("query", "state"),
             public_output_fields=("issues",),
-            **common,
+            **_READS,
         ),
         ToolDefinition(
             tool_id="github_read_file",
@@ -262,12 +323,12 @@ def github_read_tools(  # noqa: C901 - baseline 2026-11-14, shrink only (STD-06)
             ),
             input_model=GithubReadFileInput,
             output_model=GithubReadFileOutput,
-            handler=read_file,
+            handler=partial(read_file, github),
             max_output_bytes=MAX_FILE_BYTES + 100_000,
             public_input_fields=("path", "ref"),
             # Content stays private: a tool use keeps its SHA and size, and the output's digest.
             public_output_fields=("path", "ref", "sha", "size"),
-            **common,
+            **_READS,
         ),
     )
 

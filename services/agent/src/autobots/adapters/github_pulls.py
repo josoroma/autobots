@@ -8,24 +8,28 @@ reads the branch and its open pull request back first, so a lost reply never ope
 Merging is not offered.
 """
 
-import base64
 import difflib
 import os
 from collections.abc import Mapping
-from typing import Any
+from functools import partial
 from urllib.parse import quote
 
 import httpx
+from pydantic import RootModel
 
-from autobots.adapters.github_issues import (
+from autobots.adapters.github_connector import (
+    GIT_WRITE_REFUSED,
     GITHUB_KEY,
-    TARGET_PREFIX,
-    UnclearReply,
-    approval_target,
-    attempt_target,
-    github_client,
+    PULL_WRITE_REFUSED,
+    ContentReply,
+    GithubApi,
+    GithubConnector,
+    RefReply,
+    Sha,
+    file_text,
     marker,
 )
+from autobots.adapters.provider_http import ProviderReply, Text, UnclearReply
 from autobots.application.tool_gateway import (
     ApprovalPolicy,
     NotDelivered,
@@ -42,7 +46,25 @@ from autobots.domain.tools import OperationClass
 
 TOOL_ID = "github_open_pull_request"
 BRANCH_PREFIX = "autobots/"
-_REFUSED = frozenset({400, 401, 403, 404, 409, 410, 422, 429})
+
+
+class _Commit(ProviderReply):
+    tree: Sha
+
+
+class _Head(ProviderReply):
+    ref: Text = ""
+    sha: Text = ""
+
+
+class _Pull(ProviderReply):
+    number: int
+    html_url: str
+    head: _Head = _Head()
+
+
+class _Pulls(RootModel[list[_Pull]]):
+    pass
 
 
 def branch_for(operation_id: str | None) -> str:
@@ -61,182 +83,155 @@ def _unified(path: str, before: str | None, after: str) -> tuple[str, str]:
     return ("added" if before is None else "modified"), "".join(lines)
 
 
-def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shrink only (STD-06)
-    transport: httpx.AsyncBaseTransport | None = None,
-    environ: Mapping[str, str] = os.environ,
-) -> ToolDefinition:
-    async def read(http: httpx.AsyncClient, path: str, params: Any = None) -> httpx.Response:
-        try:
-            return await http.get(path, params=params)
-        except httpx.HTTPError:
-            raise ToolFailed("destination_unreachable") from None
+async def head_of(api: GithubApi, branch: str) -> str | None:
+    """The branch's head commit, or None when there is no such branch."""
+    found = await api.find(api.repo(f"/git/ref/heads/{quote(branch)}"), RefReply)
+    return None if found is None else found.target.sha
 
-    async def head_of(http: httpx.AsyncClient, repository: str, branch: str) -> str | None:
-        reply = await read(http, f"/repos/{repository}/git/ref/heads/{quote(branch)}")
-        if reply.status_code == 404:
-            return None
-        if reply.status_code != 200:
-            raise ToolFailed(f"github_refused_{reply.status_code}")
-        return str(reply.json()["object"]["sha"])
 
-    async def content_at(
-        http: httpx.AsyncClient, repository: str, path: str, sha: str
-    ) -> str | None:
-        reply = await read(http, f"/repos/{repository}/contents/{quote(path)}", {"ref": sha})
-        if reply.status_code == 404:
-            return None
-        if reply.status_code != 200:
-            raise ToolFailed(f"github_refused_{reply.status_code}")
-        found = reply.json()
-        if not isinstance(found, dict) or found.get("type") != "file":
-            raise ToolFailed("github_path_not_a_file")
-        try:
-            return base64.b64decode(str(found.get("content") or "")).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
-            raise ToolFailed("github_file_not_text") from None
+async def content_at(api: GithubApi, path: str, sha: str) -> str | None:
+    """A file's text at a commit, or None when the path isn't there."""
+    found = await api.find(api.repo(f"/contents/{quote(path)}"), ContentReply, {"ref": sha})
+    return None if found is None else file_text(found.file())[1]
 
-    async def detail_against(
-        http: httpx.AsyncClient, repository: str, arguments: GithubOpenPullRequestInput
-    ) -> dict[str, Any]:
-        base_sha = await head_of(http, repository, arguments.base)
-        if base_sha is None:
-            raise ToolFailed("github_base_not_found")
-        files = []
-        for item in arguments.files:
-            change, diff = _unified(
-                item.path, await content_at(http, repository, item.path, base_sha), item.content
+
+async def detail_against(
+    api: GithubApi, arguments: GithubOpenPullRequestInput
+) -> dict[str, object]:
+    """What a reviewer approves: each file's diff against the base branch's head."""
+    base_sha = await head_of(api, arguments.base)
+    if base_sha is None:
+        raise ToolFailed("github_base_not_found")
+    files = []
+    for item in arguments.files:
+        change, diff = _unified(item.path, await content_at(api, item.path, base_sha), item.content)
+        files.append({"path": item.path, "change": change, "diff": diff})
+    return {"base_branch": arguments.base, "base_sha": base_sha, "files": files}
+
+
+async def review_detail(
+    github: GithubConnector, arguments: GithubOpenPullRequestInput, context: ToolContext
+) -> dict[str, object]:
+    """Before any approval: reads only, so nothing is written for an unapproved call."""
+    async with github.attempt(context) as api:
+        return await detail_against(api, arguments)
+
+
+def approved_base(context: ToolContext) -> tuple[str, str]:
+    """This attempt's operation and the base head its approval bound (PRD-Studio GH-06), as the
+    gateway handed them over (XMOD-02)."""
+    operation_id, approved = context.operation_id, context.approval
+    if operation_id is None or approved is None or approved.review_detail is None:
+        raise ToolFailed("review_detail_missing")
+    return operation_id, str(approved.review_detail["base_sha"])
+
+
+async def open_pull(api: GithubApi, branch: str) -> GithubOpenPullRequestOutput | None:
+    """The open pull request from `branch`, if one exists. A reply that doesn't say stays unknown,
+    since it decides whether one is opened."""
+    owner = api.repository.split("/")[0]
+    found = await api.settle(
+        api.repo("/pulls"), _Pulls, {"head": f"{owner}:{branch}", "state": "open"}
+    )
+    for pull in found.root:
+        if pull.head.ref == branch:
+            return GithubOpenPullRequestOutput(
+                number=pull.number, url=pull.html_url, branch=branch, head_sha=pull.head.sha
             )
-            files.append({"path": item.path, "change": change, "diff": diff})
-        return {"base_branch": arguments.base, "base_sha": base_sha, "files": files}
+    return None
 
-    async def review(arguments: GithubOpenPullRequestInput, context: ToolContext) -> dict[str, Any]:
-        """Before any approval: reads only, so nothing is written for an unapproved call."""
-        repository, token = await attempt_target(context, environ)
-        async with github_client(token, transport) as http:
-            return await detail_against(http, repository, arguments)
 
-    def approved_detail(context: ToolContext) -> tuple[str, dict[str, Any]]:
-        """This attempt's operation and the diffs its approval bound (PRD-Studio GH-06), as the
-        gateway handed them over (XMOD-02)."""
-        operation_id, approved = context.operation_id, context.approval
-        if operation_id is None or approved is None or approved.review_detail is None:
-            raise ToolFailed("review_detail_missing")
-        return operation_id, approved.review_detail
+async def commit_files(
+    api: GithubApi, arguments: GithubOpenPullRequestInput, base: str, branch: str
+) -> str:
+    """The named files committed on `base` and pushed as `branch`: a tree, a commit, then the ref.
+    A refused write fails before the next, and an unclear one stays unknown."""
+    base_commit = await api.read(api.repo(f"/git/commits/{base}"), _Commit)
+    tree = await api.create(
+        api.repo("/git/trees"),
+        {
+            "base_tree": base_commit.tree.sha,
+            "tree": [
+                {"path": item.path, "mode": "100644", "type": "blob", "content": item.content}
+                for item in arguments.files
+            ],
+        },
+        Sha,
+        GIT_WRITE_REFUSED,
+    )
+    made = await api.create(
+        api.repo("/git/commits"),
+        {"message": arguments.title, "tree": tree.sha, "parents": [base]},
+        Sha,
+        GIT_WRITE_REFUSED,
+    )
+    await api.create_only(
+        api.repo("/git/refs"), {"ref": f"refs/heads/{branch}", "sha": made.sha}, GIT_WRITE_REFUSED
+    )
+    return made.sha
 
-    async def existing(
-        http: httpx.AsyncClient, repository: str, branch: str
-    ) -> GithubOpenPullRequestOutput | None:
-        owner = repository.split("/")[0]
-        reply = await read(
-            http, f"/repos/{repository}/pulls", {"head": f"{owner}:{branch}", "state": "open"}
-        )
-        if reply.status_code != 200:
-            raise UnclearReply(reply.status_code)
-        for pull in reply.json():
-            if (pull.get("head") or {}).get("ref") == branch:
-                return GithubOpenPullRequestOutput(
-                    number=int(pull["number"]),
-                    url=str(pull["html_url"]),
-                    branch=branch,
-                    head_sha=str((pull.get("head") or {}).get("sha") or ""),
-                )
-        return None
 
-    async def write(http: httpx.AsyncClient, path: str, payload: dict[str, Any]) -> Any:
+async def open_pull_request(
+    github: GithubConnector, arguments: GithubOpenPullRequestInput, context: ToolContext
+) -> GithubOpenPullRequestOutput:
+    operation_id, approved_sha = approved_base(context)
+    branch = branch_for(operation_id)
+    async with github.attempt(context) as api:
+        head = await head_of(api, arguments.base)
+        if head != approved_sha:
+            if head is not None:
+                # A person approves again, against the new head (Decision 0022 D15). The run
+                # keeps running and waits once the call is tried again (Decision 0028 E1).
+                await context.return_to_review(TOOL_ID, await detail_against(api, arguments))
+            raise ToolFailed("base_moved")
+        commit = await head_of(api, branch)
+        if commit is None:
+            commit = await commit_files(api, arguments, head, branch)
+        found = await open_pull(api, branch)
+        if found is not None:
+            return found
         try:
-            reply = await http.post(path, json=payload)
-        except (httpx.ConnectError, httpx.ConnectTimeout):
-            raise ToolFailed("destination_unreachable") from None
-        if reply.status_code in _REFUSED:
-            raise ToolFailed(f"github_refused_{reply.status_code}")
-        if reply.status_code != 201:
-            raise UnclearReply(reply.status_code)
-        return reply.json()
-
-    async def open_pull_request(
-        arguments: GithubOpenPullRequestInput, context: ToolContext
-    ) -> GithubOpenPullRequestOutput:
-        repository, token = await attempt_target(context, environ)
-        operation_id, approved = approved_detail(context)
-        branch = branch_for(operation_id)
-        async with github_client(token, transport) as http:
-            head = await head_of(http, repository, arguments.base)
-            if head != approved["base_sha"]:
-                if head is not None:
-                    # A person approves again, against the new head (Decision 0022 D15). The run
-                    # keeps running and waits once the call is tried again (Decision 0028 E1).
-                    await context.return_to_review(
-                        TOOL_ID, await detail_against(http, repository, arguments)
-                    )
-                raise ToolFailed("base_moved")
-            commit = await head_of(http, repository, branch)
-            if commit is None:
-                base_commit = await read(http, f"/repos/{repository}/git/commits/{head}")
-                if base_commit.status_code != 200:
-                    raise ToolFailed(f"github_refused_{base_commit.status_code}")
-                tree = await write(
-                    http,
-                    f"/repos/{repository}/git/trees",
-                    {
-                        "base_tree": base_commit.json()["tree"]["sha"],
-                        "tree": [
-                            {
-                                "path": item.path,
-                                "mode": "100644",
-                                "type": "blob",
-                                "content": item.content,
-                            }
-                            for item in arguments.files
-                        ],
-                    },
-                )
-                made = await write(
-                    http,
-                    f"/repos/{repository}/git/commits",
-                    {"message": arguments.title, "tree": tree["sha"], "parents": [head]},
-                )
-                commit = str(made["sha"])
-                await write(
-                    http,
-                    f"/repos/{repository}/git/refs",
-                    {"ref": f"refs/heads/{branch}", "sha": commit},
-                )
-            found = await existing(http, repository, branch)
-            if found is not None:
-                return found
-            pull = await write(
-                http,
-                f"/repos/{repository}/pulls",
+            pull = await api.create(
+                api.repo("/pulls"),
                 {
                     "title": arguments.title,
                     "head": branch,
                     "base": arguments.base,
                     "body": f"{arguments.body}\n\n{marker(context.operation_id)}",
                 },
+                _Pull,
+                PULL_WRITE_REFUSED,
             )
-        return GithubOpenPullRequestOutput(
-            number=int(pull["number"]), url=str(pull["html_url"]), branch=branch, head_sha=commit
-        )
+        except UnclearReply as unclear:
+            # GitHub answers 422 when this branch's pull request already exists, so it is read
+            # back. One that doesn't show yet leaves the outcome unknown for the readback.
+            if unclear.status_code != 422:
+                raise
+            existing = await open_pull(api, branch)
+            if existing is None:
+                raise
+            return existing
+    return GithubOpenPullRequestOutput(
+        number=pull.number, url=pull.html_url, branch=branch, head_sha=commit
+    )
 
-    async def readback(
-        _: GithubOpenPullRequestInput, context: ToolContext
-    ) -> GithubOpenPullRequestOutput:
-        """The branch, then any open pull request from it. Neither means nothing was opened."""
-        repository, token = await attempt_target(context, environ)
-        branch = branch_for(context.operation_id)
-        async with github_client(token, transport) as http:
-            found = await existing(http, repository, branch)
-        if found is not None:
-            return found
-        raise NotDelivered
 
-    def review_target(_arguments: Any) -> str | None:
-        repository = environ.get("GITHUB_REPOSITORY", "")
-        return f"{TARGET_PREFIX}{repository}" if repository else None
+async def find_pull_request(
+    github: GithubConnector, _: GithubOpenPullRequestInput, context: ToolContext
+) -> GithubOpenPullRequestOutput:
+    """The branch's open pull request. None open means nothing was opened."""
+    async with github.attempt(context) as api:
+        found = await open_pull(api, branch_for(context.operation_id))
+    if found is not None:
+        return found
+    raise NotDelivered
 
-    async def resolve_target(arguments: Any, context: ToolContext) -> str:
-        return await approval_target(arguments, context, environ)
 
+def github_pull_request_tool(
+    transport: httpx.AsyncBaseTransport | None = None,
+    environ: Mapping[str, str] = os.environ,
+) -> ToolDefinition:
+    github = GithubConnector(transport, environ)
     return ToolDefinition(
         tool_id=TOOL_ID,
         version=1,
@@ -253,10 +248,11 @@ def github_pull_request_tool(  # noqa: C901, PLR0915 - baseline 2026-11-14, shri
         operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE,
         input_model=GithubOpenPullRequestInput,
         output_model=GithubOpenPullRequestOutput,
-        handler=open_pull_request,
-        reconcile=readback,
+        handler=partial(open_pull_request, github),
+        reconcile=partial(find_pull_request, github),
+        # The approval records the repository resolved for the workspace (Decision 0025 V7).
         approval=ApprovalPolicy(
-            review_detail=review, resource_target=review_target, target_resolver=resolve_target
+            review_detail=partial(review_detail, github), target_resolver=github.approval_label
         ),
         timeout_seconds=60.0,
         max_output_bytes=10_000,
