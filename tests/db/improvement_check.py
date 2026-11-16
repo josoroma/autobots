@@ -21,7 +21,7 @@ from autobots.application.improvements import (
     rollback,
     run_regression,
 )
-from autobots.application.memory import search
+from autobots.application.memory import search_memory
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import admit_run
 from autobots.contracts.experts import ExpertConfig, SessionExpert
@@ -100,7 +100,7 @@ async def main() -> None:
 
         # Nothing reads a proposal until it's promoted.
         candidate = await propose(db, WORKSPACE, proposal('deploy-window', 'Deploys happen on Thursdays at noon.'), {'kind': 'run', 'run_id': str(PROPOSING_RUN)})
-        found = await search(db, WORKSPACE, 'Thursdays')
+        found = await search_memory(db, WORKSPACE, 'Thursdays')
         check('a proposal alone changes nothing a run can read', 'no hits', [hit.title for hit in found], found == [])
         try:
             await decide(db, WORKSPACE, candidate, ACTOR, 'promote')
@@ -109,7 +109,7 @@ async def main() -> None:
             check('promotion needs regression first', 'regression_required', error.code, error.code == 'regression_required')
         results = await reviewed(candidate)
         check('regression checks evidence, cases and claims', 'no failures', results, results['failures'] == [])
-        found = await search(db, WORKSPACE, 'Thursdays')
+        found = await search_memory(db, WORKSPACE, 'Thursdays')
         check('passing regression still changes nothing', 'no hits', len(found), found == [])
 
         # Refuse without a passing replay: none was run, so the reviewer's text checks can't pass it alone.
@@ -133,12 +133,12 @@ async def main() -> None:
         hits = searched(model)[-1]['output']['hits']
         check('the replay run finds the proposal, as if promoted', 'a proposal hit with its text', [hit['source'] for hit in hits],
               any(hit['source'].get('kind') == 'proposal' and 'Thursdays' in hit['snippet'] for hit in hits))
-        outside = await search(db, WORKSPACE, 'Thursdays', for_run=True)
+        outside = await search_memory(db, WORKSPACE, 'Thursdays', for_run=True)
         check('and nothing outside the replay does', 'no hits', len(outside), outside == [])
         state = await replay_state(db, candidate)
         check('every held-out run succeeded, so the replay passed', 'passed, 1 run succeeded', state, state is not None and state.state == 'passed' and [item.status for item in state.runs] == ['succeeded'])
         outcome = await decide(db, WORKSPACE, candidate, ACTOR, 'promote')
-        found = await search(db, WORKSPACE, 'Thursdays')
+        found = await search_memory(db, WORKSPACE, 'Thursdays')
         check('a review promotes it as a new version', 'promoted, found', (outcome, [hit.source.get('version') for hit in found]), outcome == 'promoted' and found[0].source['version'] == 1)
         provenance = await value("select provenance from public.knowledge_versions where candidate_id = %s", candidate)
         check('with provenance back to its evidence, reviewer and replay', 'the run, the reviewer, the replay', provenance, provenance['evidence'][0]['id'] == str(run) and provenance['reviewed_by'] == str(ACTOR) and provenance['source']['run_id'] == str(PROPOSING_RUN) and provenance['replay_id'] == str(state.id))
@@ -153,23 +153,23 @@ async def main() -> None:
               any('Mondays' in hit['snippet'] for hit in hits) and not any('Thursdays' in hit['snippet'] for hit in hits))
         state = await replay_state(db, second)
         code = await refused(second)
-        active = (len(await search(db, WORKSPACE, 'Thursdays')), len(await search(db, WORKSPACE, 'Mondays')))
+        active = (len(await search_memory(db, WORKSPACE, 'Thursdays')), len(await search_memory(db, WORKSPACE, 'Mondays')))
         check('a failed replay refuses promotion with its reason', 'replay_failed, a run failed', (code, state.state if state else None, [item.status for item in state.runs] if state else None),
               code == 'replay_failed' and state is not None and state.state == 'failed' and state.runs[0].status == 'failed')
         check('and the active version is unchanged', 'Thursdays still found, Mondays not', active, active == (1, 0))
         undone = await rollback(db, WORKSPACE, 'memory', 'deploy-window', 0)
         restored = await rollback(db, WORKSPACE, 'memory', 'deploy-window', 1)
-        check('and rollback still works', 'none, then version 1 again', (undone.active_version, restored.active_version, len(await search(db, WORKSPACE, 'Thursdays'))),
-              undone.active_version is None and restored.active_version == 1 and len(await search(db, WORKSPACE, 'Thursdays')) == 1)
+        check('and rollback still works', 'none, then version 1 again', (undone.active_version, restored.active_version, len(await search_memory(db, WORKSPACE, 'Thursdays'))),
+              undone.active_version is None and restored.active_version == 1 and len(await search_memory(db, WORKSPACE, 'Thursdays')) == 1)
         await replayed(second)
         await decide(db, WORKSPACE, second, ACTOR, 'promote')
-        now_found = await search(db, WORKSPACE, 'Mondays')
-        old_found = await search(db, WORKSPACE, 'Thursdays')
+        now_found = await search_memory(db, WORKSPACE, 'Mondays')
+        old_found = await search_memory(db, WORKSPACE, 'Thursdays')
         check('a new version replaces what later runs find', 'Mondays found, Thursdays not', (len(now_found), len(old_found)), len(now_found) == 1 and old_found == [])
         versions = await value("select count(*) from public.knowledge_versions where key = 'deploy-window' and workspace_id = %s", WORKSPACE)
         check('and the earlier version is kept', '2 versions', versions, versions == 2)
         head = await rollback(db, WORKSPACE, 'memory', 'deploy-window', 1)
-        check('rollback restores an earlier version', 'version 1, Thursdays again', (head.active_version, len(await search(db, WORKSPACE, 'Thursdays')), len(await search(db, WORKSPACE, 'Mondays'))), head.active_version == 1 and len(await search(db, WORKSPACE, 'Thursdays')) == 1 and await search(db, WORKSPACE, 'Mondays') == [])
+        check('rollback restores an earlier version', 'version 1, Thursdays again', (head.active_version, len(await search_memory(db, WORKSPACE, 'Thursdays')), len(await search_memory(db, WORKSPACE, 'Mondays'))), head.active_version == 1 and len(await search_memory(db, WORKSPACE, 'Thursdays')) == 1 and await search_memory(db, WORKSPACE, 'Mondays') == [])
         versions = await value("select count(*) from public.knowledge_versions where key = 'deploy-window' and workspace_id = %s", WORKSPACE)
         check('and removes nothing', 'still 2 versions', versions, versions == 2)
         try:
@@ -283,9 +283,9 @@ async def main() -> None:
         await reviewed(first_time, [{'must_contain': UNDO_WORD}])
         await replayed(first_time)
         await decide(db, WORKSPACE, first_time, ACTOR, 'promote')
-        found = await search(db, WORKSPACE, UNDO_WORD)
+        found = await search_memory(db, WORKSPACE, UNDO_WORD)
         head = await rollback(db, WORKSPACE, 'memory', 'undo-first', 0)
-        after_undo = await search(db, WORKSPACE, UNDO_WORD)
+        after_undo = await search_memory(db, WORKSPACE, UNDO_WORD)
         check('a bad first promotion can be undone', 'found, then nothing active', (len(found), head.active_version, len(after_undo)), len(found) >= 1 and head.active_version is None and not after_undo)
     print(json.dumps({'cases': cases}))
 

@@ -4,10 +4,11 @@ A trigger is parsed once into a typed schedule, from a request or from what a sa
 and occurrences are computed from that (refactor plan R-52, XTYP-08).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
-from typing import Any
+from typing import Any, Literal, NamedTuple
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from autobots.domain.errors import Refusal, RefusalKind
@@ -161,3 +162,47 @@ def occurrences_dropped(saved: SavedTrigger, after: datetime, until: datetime, l
         epoch = datetime(2000, 1, 1, tzinfo=UTC)
         return max(0, (until - epoch) // step - (after - epoch) // step - listed)
     return max(0, (until - after).days - listed)
+
+
+class OccurrenceOutcome(NamedTuple):
+    """What admitting one occurrence recorded: admitted with its run, skipped while an earlier run
+    is active, or blocked with why (Decision 0026 C6). Unpacks as `(status, reason, run_id)`."""
+
+    status: Literal["admitted", "skipped_overlap", "blocked"]
+    reason: str | None = None
+    run_id: UUID | None = None
+
+    @classmethod
+    def admitted(cls, run_id: UUID) -> "OccurrenceOutcome":
+        return cls("admitted", None, run_id)
+
+    @classmethod
+    def skipped(cls) -> "OccurrenceOutcome":
+        return cls("skipped_overlap", "run_active")
+
+    @classmethod
+    def blocked(cls, code: str) -> "OccurrenceOutcome":
+        return cls("blocked", code)
+
+
+@dataclass(frozen=True)
+class CatchUp:
+    """The occurrences recorded as missed, each with its reason, and the latest, which runs."""
+
+    missed: tuple[tuple[datetime, str], ...]
+    latest: datetime
+
+
+def catch_up(due: Sequence[datetime], dropped: int) -> CatchUp | None:
+    """After time away, every due occurrence but the latest is missed, the first noting how many
+    earlier ones `occurrences` didn't list, and only the latest is admitted (PRD 10.4)."""
+    if not due:
+        return None
+    missed = tuple(
+        (
+            moment,
+            f"host_away, {dropped} earlier not listed" if dropped and not index else "host_away",
+        )
+        for index, moment in enumerate(due[:-1])
+    )
+    return CatchUp(missed, due[-1])

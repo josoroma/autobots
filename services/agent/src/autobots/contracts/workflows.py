@@ -220,7 +220,8 @@ class InstanceView(BaseModel):
     node_id: str
     iteration: int | None
     # A saved instance's status, which workflow_node_instances' check constraint holds, or one the
-    # view gives a node not yet saved, such as `waiting` or `not_run` (application/workflows.py).
+    # view gives a node not yet saved, such as `waiting` or `not_run`
+    # (domain/workflow_execution.py UnsavedStatus).
     status: str
     error_code: str | None
 

@@ -12,23 +12,25 @@ used.
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
 from autobots.adapters.tool_registry import catalog
-from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.assignment_tool import assign_tool
+from autobots.application.assignments import Delegation
 from autobots.application.experts import RunBinding
 from autobots.application.improvements import request_replay
 from autobots.application.routines import admit_occurrence, routine_record
+from autobots.application.run_lifecycle import LoopResult
 from autobots.application.run_usage import RootLimits
 from autobots.application.tool_definitions import ToolContext, ToolScope
 from autobots.application.worker_leases import Lease
-from autobots.application.workflows import create_execution
+from autobots.application.workflow_executions import create_execution
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.contracts.improvements import HeldOutTask
 from autobots.contracts.routines import CronjobSchedule, RoutineConfig, RoutineTarget
+from autobots.domain.runs import RunStatus
 from autobots.domain.stops import PassOutcome
 from autobots.domain.tools import DELEGATION_TOOL, LOOP_TOOL_GRANTS
 from fake_api import WORKSPACE, ApiClient, FakeConnection, FakeDatabase
@@ -150,7 +152,7 @@ def test_a_routines_expert_occurrence_admits_with_the_golden_fingerprint() -> No
     assert digest == FINGERPRINTS["routine_expert"]
 
 
-# application/workflows.py
+# application/workflow_executions.py
 
 
 def test_a_workflow_execution_admits_with_the_golden_fingerprint() -> None:
@@ -223,14 +225,17 @@ def test_a_held_out_replay_admits_its_task_with_the_golden_fingerprint() -> None
 # application/assignments.py
 
 
-async def finished(_connection: object, _lease: Lease) -> SimpleNamespace:
+async def finished(_connection: object, _lease: Lease) -> LoopResult:
     """The child's pass, faked: it ends verified with nothing left."""
-    return SimpleNamespace(
-        run_status="succeeded",
-        outcome=PassOutcome.SUCCEEDED.value,
+    return LoopResult(
+        outcome=PassOutcome.SUCCEEDED,
         code=None,
+        run_status=RunStatus.SUCCEEDED,
+        plan_version=None,
         completed=(),
         remaining=(),
+        uncovered_criteria=(),
+        usage={},
     )
 
 

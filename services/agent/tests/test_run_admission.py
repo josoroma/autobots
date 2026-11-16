@@ -150,7 +150,7 @@ def caller_shapes() -> dict[str, dict[str, Any]]:
                 tools={**PLAN, "calculate": 1},
             ),
         },
-        # application/workflows.py create_execution.
+        # application/workflow_executions.py create_execution.
         "workflow": {
             "actor_id": PERSON,
             "started_by": PERSON,

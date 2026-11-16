@@ -147,10 +147,10 @@ async def main() -> None:
 
         # A disabled routine stays quiet, and doesn't catch up when turned back on.
         quiet = await routine('Quiet')
-        await set_enabled(db, WORKSPACE, quiet.id, False)
+        await set_enabled(db, WORKSPACE, quiet.id, enabled=False)
         due = await evaluate_routines(db, ready, START + timedelta(hours=5), catalog=tool_registry.catalog())
         check('a disabled routine admits nothing', '0, no rows', (due, await history(quiet.id)), due == 0 and await history(quiet.id) == [])
-        await set_enabled(db, WORKSPACE, quiet.id, True)
+        await set_enabled(db, WORKSPACE, quiet.id, enabled=True)
         moved = await value('select evaluated_until from public.routines where id = %s', quiet.id)
         check('turning it on starts counting from then', 'later than its start', moved > START, moved > START)
 

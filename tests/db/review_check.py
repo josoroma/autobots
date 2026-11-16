@@ -23,9 +23,9 @@ from autobots.application.run_lifecycle import LoopConfig, settle_children
 from autobots.application.run_projection import read_inspector, read_summary, read_workspace
 from autobots.application.runs import LinkRefused, admit_run
 from autobots.application.worker_leases import claim_run
+from autobots.application.workflow_executions import create_execution
 from autobots.application.workflows import (
     WorkflowRefused,
-    create_execution,
     create_workflow,
     publish_version,
 )

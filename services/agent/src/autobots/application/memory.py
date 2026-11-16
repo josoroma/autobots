@@ -10,19 +10,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from autobots.application.run_projection import public_text
-from autobots.application.sql import SqlConnection, all_rows, optional_row
-from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
-from autobots.contracts.memory import (
-    OffloadContent,
-    ReadOffload,
-    SearchHit,
-    SearchMemory,
-    SearchResults,
-)
+from autobots.application.sql import SqlConnection, all_rows
+from autobots.contracts.memory import SearchHit
 from autobots.domain.errors import Refusal, RefusalKind
-from autobots.domain.tool_catalog import ToolGroup
-from autobots.domain.tools import OperationClass
-from autobots.persistence.rows import FileHitRow, MemoryHitRow, OffloadRow, ReplayProposalRow
+from autobots.persistence.rows import FileHitRow, MemoryHitRow
 
 MAX_HITS = 10
 _HEADLINE = 'MaxFragments=2, MaxWords=25, MinWords=5, StartSel="", StopSel=""'
@@ -58,7 +49,7 @@ async def store_memory(
     return memory_id
 
 
-async def search(
+async def search_memory(
     connection: SqlConnection,
     workspace_id: UUID,
     query: str,
@@ -143,92 +134,3 @@ def file_hit(row: FileHitRow) -> SearchHit:
             "stored_at": row.created_at.isoformat(),
         },
     )
-
-
-async def _search_tool(arguments: SearchMemory, context: ToolContext) -> SearchResults:
-    # A run reaches its own files only: its grant covers those, not every run's in the workspace.
-    cursor = await context.connection.execute(
-        "select expert_id from public.runs where id = %s", (context.scope.run_id,)
-    )
-    expert = await cursor.fetchone()
-    # A run of a memory proposal's held-out replay finds the proposal in place of the active key.
-    replay = await optional_row(
-        context.connection,
-        ReplayProposalRow,
-        "select c.id, c.key, c.content from app_private.improvement_replay_runs rr "
-        "join app_private.improvement_replays r on r.id = rr.replay_id "
-        "join public.improvement_candidates c on c.id = r.candidate_id "
-        "where rr.run_id = %s and c.kind = 'memory'",
-        (context.scope.run_id,),
-    )
-    hits = await search(
-        context.connection,
-        context.scope.workspace_id,
-        arguments.query,
-        run_id=context.scope.run_id,
-        expert_id=expert[0] if expert else None,
-        for_run=True,
-        replay=(replay.id, replay.key, replay.content) if replay else None,
-    )
-    return SearchResults(hits=hits)
-
-
-async def _read_offload(arguments: ReadOffload, context: ToolContext) -> OffloadContent:
-    try:
-        offload_id = UUID(arguments.offload_id)
-    except ValueError:
-        raise ToolFailed("offload_not_found") from None
-    row = await optional_row(
-        context.connection,
-        OffloadRow,
-        "select tool_name, content, sha256 from app_private.run_offloads "
-        "where id = %s and run_id = %s",
-        (offload_id, context.scope.run_id),
-    )
-    if row is None:
-        raise ToolFailed("offload_not_found")
-    content = row.content
-    end = arguments.offset + arguments.limit
-    return OffloadContent(
-        tool_name=row.tool_name,
-        content=content[arguments.offset : end],
-        sha256=row.sha256,
-        total_chars=len(content),
-        next_offset=end if end < len(content) else None,
-    )
-
-
-SEARCH_MEMORY = ToolDefinition(
-    tool_id="search_memory",
-    title="Search memory",
-    group=ToolGroup.GENERAL,
-    public_input_fields=("query",),
-    public_output_fields=(),
-    version=1,
-    description="Search this workspace's memory and saved evidence by keyword.",
-    input_model=SearchMemory,
-    output_model=SearchResults,
-    operation_class=OperationClass.READ_ONLY,
-    handler=_search_tool,
-    timeout_seconds=5.0,
-    retries=1,
-)
-READ_OFFLOAD = ToolDefinition(
-    tool_id="read_offload",
-    title="Read offloaded result",
-    group=ToolGroup.GENERAL,
-    public_input_fields=("offload_id", "offset", "limit"),
-    public_output_fields=("tool_name", "sha256", "total_chars", "next_offset"),
-    version=1,
-    description=(
-        "Read back a long tool result stored outside the conversation, a page at a time. "
-        "Keep passing next_offset as offset until it is null."
-    ),
-    input_model=ReadOffload,
-    output_model=OffloadContent,
-    operation_class=OperationClass.READ_ONLY,
-    handler=_read_offload,
-    timeout_seconds=5.0,
-    retries=1,
-    max_output_bytes=2_000_000,
-)

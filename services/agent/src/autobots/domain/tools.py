@@ -4,7 +4,7 @@ The grant tables are read-only, as domain/models.py's are: they decide what a ru
 importer can widen them (PDOM-20).
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
@@ -79,10 +79,29 @@ EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
 LOOP_TOOL_GRANTS: Final[Mapping[str, int]] = MappingProxyType({**PLAN_TOOLS, **GENERAL_TOOLS})
 # Only a coordinator session's runs get this, and an Expert's own configuration can't name it.
 DELEGATION_TOOL = "assign_specialist"
+# The tools a workflow's own blocks call by name (application/workflow_runner.py TOOL_BLOCKS).
+READ_RUN_FILE_TOOL = "read_run_file"
+SAVE_ARTIFACT_TOOL = "save_artifact"
+PUBLISH_ARTIFACT_TOOL = "publish_artifact"
+WORKFLOW_APPROVAL_TOOL = "workflow_approval"
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
 WORKFLOW_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
-    {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, "workflow_approval": 1}
+    {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, WORKFLOW_APPROVAL_TOOL: 1}
 )
+
+
+def workflow_grant(requested: Collection[str] | None) -> Mapping[str, int]:
+    """What a workflow execution's run may call: every workflow tool, or only the requested ones,
+    always with the plan tools and the approval step, in WORKFLOW_TOOLS' order (PRD 7.3)."""
+    if requested is None:
+        return WORKFLOW_TOOLS
+    return {
+        tool: version
+        for tool, version in WORKFLOW_TOOLS.items()
+        if tool in requested or tool in PLAN_TOOLS or tool == WORKFLOW_APPROVAL_TOOL
+    }
+
+
 RUN_FILE_GRANTS = ("inputs", "outputs")
 
 # Only these leave an effect, so only these get an operation identity and a receipt.

@@ -33,8 +33,8 @@ from autobots.application.run_admission import (
 )
 from autobots.application.runs import Inheritance, Inherited, RunAdmission, admit
 from autobots.application.tool_catalog import ToolsUnavailable
+from autobots.application.workflow_executions import create_execution
 from autobots.application.workflow_overview import preview_steps
-from autobots.application.workflows import create_execution
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import CronjobSchedule, RoutineConfig, RoutineTarget
 from autobots.domain.budgets import BudgetRefused
@@ -489,9 +489,14 @@ def test_the_workflow_preview_names_the_model_its_agent_steps_child_will_use() -
         "select id, name, latest_version from public.experts",
         {"id": EXPERT, "name": "Researcher", "latest_version": 1},
     )
-    database.answer("from public.expert_versions where expert_id", (1, expert))
-    database.answer("count(*), max(created_at) from public.runs", (0, None))
-    database.answer("select e.name, v.config from public.experts e", ("Researcher", expert))
+    database.answer(
+        "from public.expert_versions where expert_id",
+        {"expert_id": EXPERT, "version": 1, "config": expert},
+    )
+    database.answer(
+        "select e.id as expert_id, v.version, e.name, v.config from public.experts e",
+        {"expert_id": EXPERT, "version": 1, "name": "Researcher", "config": expert},
+    )
     database.answer(
         "select kind, experts from public.sessions",
         ("coordinator", [{"expert_id": str(EXPERT), "version": 1}]),

@@ -289,8 +289,11 @@ def routine_database(stored: object) -> FakeDatabase:
         "from public.routines where id",
         {"id": ROUTINE, "name": "Fixture", "enabled": True, "latest_version": 1},
     )
-    database.answer("select latest_version from public.routines", (1,))
-    database.answer("select config from public.routine_versions", (stored,))
+    database.answer('select latest_version from "public"."routines"', (1,))
+    database.answer(
+        "select v.routine_id, v.config from public.routine_versions",
+        {"routine_id": ROUTINE, "config": stored},
+    )
     return database
 
 

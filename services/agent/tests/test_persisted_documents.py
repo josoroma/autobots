@@ -36,6 +36,7 @@ from autobots.application import (
     run_projection,
     runs,
     tool_uses,
+    workflow_executions,
     workflows,
 )
 from autobots.application.run_projection import events as run_events
@@ -335,7 +336,7 @@ def creating_an_expert(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) 
 
 def versioning_an_expert(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
     monkeypatch.setattr(experts, "get_expert", shown)
-    database.answer("select latest_version from public.experts", (1,))
+    database.answer('select latest_version from "public"."experts"', (1,))
     return run(
         experts.add_version(
             FakeConnection(database),
@@ -355,7 +356,13 @@ def opening_a_session(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(experts, "get_expert", shown)
     monkeypatch.setattr(experts, "get_session", shown)
     database.answer(
-        "select e.name, v.config from public.experts e", ("Billing", EXPERT_CONFIG.model_dump())
+        "select e.id as expert_id, v.version, e.name, v.config from public.experts e",
+        {
+            "expert_id": EXPERT,
+            "version": 1,
+            "name": "Billing",
+            "config": EXPERT_CONFIG.model_dump(),
+        },
     )
     return run(
         experts.create_session(
@@ -385,7 +392,7 @@ def creating_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch)
 
 def publishing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
     monkeypatch.setattr(workflows, "get_workflow", shown)
-    database.answer("select latest_version from public.workflows", (1,))
+    database.answer('select latest_version from "public"."workflows"', (1,))
     return run(
         workflows.publish_version(
             FakeConnection(database),
@@ -401,7 +408,8 @@ def publishing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatc
 
 
 def executing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
-    monkeypatch.setattr(workflows, "uuid4", lambda: EXECUTION)
+    """Under the workspace's saved policy, which this database has none of, so the default."""
+    monkeypatch.setattr(workflow_executions, "uuid4", lambda: EXECUTION)
     monkeypatch.setattr(runs, "uuid4", lambda: RUN)
     database.answer(
         "select v.graph, v.graph_hash",
@@ -414,7 +422,7 @@ def executing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch
     )
     database.answer("event_sequence = event_sequence + 1", (1,))
     binding = run(
-        workflows.create_execution(
+        workflow_executions.create_execution(
             FakeConnection(database),
             workspace_id=WORKSPACE,
             actor_id=ACTOR,
@@ -422,7 +430,6 @@ def executing_a_workflow(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch
             idempotency_key="fixture",
             version=2,
             inputs={"in": "x"},
-            policy=resolve_role_policy(),
         )
     )
     return (binding.id, binding.run_id)
@@ -452,7 +459,7 @@ def creating_a_routine(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) 
 
 def editing_a_routine(database: FakeDatabase, monkeypatch: pytest.MonkeyPatch) -> object:
     routine_target(database, monkeypatch)
-    database.answer("select latest_version from public.routines", (1,))
+    database.answer('select latest_version from "public"."routines"', (1,))
     return run(
         routines.add_routine_version(
             FakeConnection(database),
@@ -911,6 +918,29 @@ RECEIPT_BYTES = {
     "replay_candidate": "26830c8c5d7ceeb8dd2e88ff991ef314271ee0c90ba0cbe60183c46e3d889635",
     "run_command": "676dd7a734c66efdcbccedd2faf73495a7c6d9087043480d368d7f6b9c3e20cf",
 }
+# The advisory lock key each writer takes, in order, captured before R-63's receipt helper: a
+# concurrent retry from before the change waits on the same lock.
+LOCK_KEYS: dict[str, list[str]] = {
+    "add_expert_version": [f"{WORKSPACE}|{ACTOR}|add_expert_version|{EXPERT}|fixture"],
+    "admit_run": [f"{WORKSPACE}|{ACTOR}|admit_run|{WORKSPACE}|fixture"],
+    "create_execution": [
+        f"{WORKSPACE}|{ACTOR}|create_execution|{FLOW}|fixture",
+        f"{WORKSPACE}|{ACTOR}|admit_run|{WORKSPACE}|workflow:{EXECUTION}",
+    ],
+    "create_expert": [f"{WORKSPACE}|{ACTOR}|create_expert|{WORKSPACE}|fixture"],
+    "create_routine": [f"{WORKSPACE}|{ACTOR}|create_routine|{WORKSPACE}|fixture"],
+    "create_session": [f"{WORKSPACE}|{ACTOR}|create_session|{WORKSPACE}|fixture"],
+    "create_workflow": [f"{WORKSPACE}|{ACTOR}|create_workflow|{WORKSPACE}|fixture"],
+    "decide_approval": [f"{WORKSPACE}|{ACTOR}|decide_approval|{APPROVAL}|fixture"],
+    "edit_routine": [f"{WORKSPACE}|{ACTOR}|edit_routine|{ROUTINE}|fixture"],
+    "publish_workflow": [f"{WORKSPACE}|{ACTOR}|publish_workflow|{FLOW}|fixture"],
+    "reconcile_effect": [f"{WORKSPACE}|{ACTOR}|reconcile_effect|op-1|fixture"],
+    "replay_candidate": [
+        f"{WORKSPACE}|{ACTOR}|replay_candidate|{CANDIDATE}|fixture",
+        f"{WORKSPACE}|{ACTOR}|admit_run|{WORKSPACE}|replay:{REPLAY}:0",
+    ],
+    "run_command": [f"{WORKSPACE}|{ACTOR}|pause|{RUN}|fixture"],
+}
 # What each replay answers its caller: what the first call answered.
 REPLAYS: dict[str, object] = {
     "admit_run": (RUN, 1, "queued", True),
@@ -956,6 +986,20 @@ def test_each_operation_stores_its_receipt_in_the_bytes_it_always_did(
     ]
     assert (row[5], row[6]) == (FINGERPRINTS[name], json.dumps(STORED_RECEIPTS[name]))
     assert hashlib.sha256(str(row[6]).encode()).hexdigest() == RECEIPT_BYTES[name]
+
+
+@pytest.mark.parametrize("name", sorted(RECEIPT_WRITERS))
+def test_each_operation_locks_its_key_as_it_always_did(
+    name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database = FakeDatabase([])
+    RECEIPT_WRITERS[name](database, monkeypatch)
+    locked = [
+        values
+        for text, values in database.statements
+        if text == "select pg_advisory_xact_lock(hashtextextended(%s, 0))"
+    ]
+    assert locked == [(key,) for key in LOCK_KEYS[name]]
 
 
 @pytest.mark.parametrize("name", sorted(RECEIPT_WRITERS))

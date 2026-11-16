@@ -4,11 +4,10 @@ The tool catalog is the same for every workspace on this install."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
 from autobots.application.sql import SqlConnection, all_rows
-from autobots.application.tool_catalog import Catalog
+from autobots.application.tool_catalog import Catalog, latest
 from autobots.contracts.search import SearchKind
 from autobots.persistence.rows import RunHitRow
 
@@ -24,11 +23,12 @@ class Hit:
 
 
 def _pattern(text: str) -> str:
+    """`text` matched anywhere by ILIKE, its wildcards and escape character taken literally."""
     escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
 
-async def search(
+async def search_workspace(
     connection: SqlConnection,
     workspace_id: UUID,
     query: str,
@@ -59,14 +59,11 @@ async def search(
         )
         hits += [Hit(kind, str(row[0]), str(row[1]), None) for row in await cursor.fetchall()]
     needle = query.casefold()
-    newest: dict[str, Any] = {}
-    for item in catalog.descriptors(environ):
-        if item.tool_id not in newest or item.version > newest[item.tool_id].version:
-            newest[item.tool_id] = item
+    # Each tool's newest version, as the catalog lists it (PPRD-18).
     tools = sorted(
         (
             item
-            for item in newest.values()
+            for item in latest(catalog.descriptors(environ))
             if needle in item.title.casefold() or needle in item.tool_id.casefold()
         ),
         key=lambda item: (item.title.casefold(), item.tool_id),

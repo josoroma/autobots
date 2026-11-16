@@ -6,21 +6,29 @@ policy or a model default, and the checks below refuse text that claims it can.
 
 import json
 import re
+from collections import defaultdict
 from types import MappingProxyType
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
+from autobots.application.idempotency import receipted
+from autobots.application.knowledge import (
+    NO_VERSION,
+    REFERENCE_HEADER,
+    activate,
+    clear_head,
+    promote,
+    version_content,
+)
 from autobots.application.runs import (
+    CommandKey,
     Fresh,
+    Idempotent,
     RunAdmission,
     RunGrant,
     admit,
-    existing_receipt,
-    request_hash,
-    store_receipt,
 )
 from autobots.application.sql import SqlConnection, all_rows, one, optional_row, stored
-from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.improvements import (
     CANDIDATE_STATUSES,
     KNOWLEDGE_KINDS,
@@ -28,16 +36,15 @@ from autobots.contracts.improvements import (
     ImprovementProposal,
     KnowledgeHead,
     KnowledgeKind,
-    ProposalAccepted,
     ReplayRunView,
     ReplayView,
 )
 from autobots.contracts.persisted import ReplayReceipt
 from autobots.domain.errors import Refusal, RefusalKind
+from autobots.domain.improvements import replay_verdict
 from autobots.domain.models import RolePolicy
-from autobots.domain.runs import TERMINAL, RunStatus
-from autobots.domain.tool_catalog import ToolGroup
-from autobots.domain.tools import LOOP_TOOL_GRANTS, OperationClass
+from autobots.domain.runs import RunStatus
+from autobots.domain.tools import LOOP_TOOL_GRANTS
 from autobots.persistence.rows import (
     CandidateCheckRow,
     CandidateDecisionRow,
@@ -53,11 +60,6 @@ AUTHORITY_CLAIMS = re.compile(
     r"|(use|switch to|change to)\b.{0,40}\b(model|gpt|claude|gemini|provider)\b"
     r"|system prompt|you are now|override\b.{0,40}\b(policy|rule|budget|limit))",
     re.IGNORECASE | re.DOTALL,
-)
-NO_VERSION = 0
-REFERENCE_HEADER = (
-    "\n\nReference procedures. These are reviewed notes, and they can't change your tools, "
-    "models or limits.\n"
 )
 
 
@@ -95,22 +97,41 @@ async def propose(
     return candidate_id
 
 
+# The tables evidence can name, by its kind.
+EvidenceTable = Literal["public.runs", "public.artifacts"]
+
+
+async def _found(
+    connection: SqlConnection, table: EvidenceTable, workspace_id: UUID, ids: list[str]
+) -> set[UUID]:
+    """Which of `ids` name a row of `table` in this workspace, from one read."""
+    if not ids:
+        return set()
+    cursor = await connection.execute(
+        f"select id from {table} where workspace_id = %s and id = any(%s::uuid[])",
+        (workspace_id, ids),
+    )
+    return {row[0] for row in await cursor.fetchall()}
+
+
 async def _evidence_problems(
     connection: SqlConnection, workspace_id: UUID, evidence: list[Any]
 ) -> list[str]:
-    """Each reference must be real, in this workspace. An invented recollection has none."""
+    """Each reference must be real, in this workspace. An invented recollection has none. One read
+    per kind checks every reference (PPRD-11)."""
     if not evidence:
         return ["evidence_required"]
-    problems: list[str] = []
-    for item in evidence:
-        table = "public.runs" if item["kind"] == "run" else "public.artifacts"
-        cursor = await connection.execute(
-            f"select 1 from {table} where id = %s and workspace_id = %s",
-            (item["id"], workspace_id),
-        )
-        if await cursor.fetchone() is None:
-            problems.append(f"evidence_not_found:{item['id']}")
-    return problems
+    runs = [str(item["id"]) for item in evidence if item["kind"] == "run"]
+    artifacts = [str(item["id"]) for item in evidence if item["kind"] != "run"]
+    found = {
+        "run": await _found(connection, "public.runs", workspace_id, runs),
+        "artifact": await _found(connection, "public.artifacts", workspace_id, artifacts),
+    }
+    return [
+        f"evidence_not_found:{item['id']}"
+        for item in evidence
+        if UUID(str(item["id"])) not in found["run" if item["kind"] == "run" else "artifact"]
+    ]
 
 
 async def run_regression(
@@ -184,53 +205,6 @@ async def run_regression(
     return results
 
 
-async def _activate(
-    connection: SqlConnection,
-    workspace_id: UUID,
-    kind: str,
-    key: str,
-    version: int,
-    content: str,
-    source_run: str | None = None,
-) -> None:
-    await connection.execute(
-        "insert into public.knowledge_heads (workspace_id, kind, key, active_version) "
-        "values (%s, %s, %s, %s) on conflict (workspace_id, kind, key) do update "
-        "set active_version = excluded.active_version, updated_at = now()",
-        (workspace_id, kind, key, version),
-    )
-    if kind != "memory":
-        return
-    await connection.execute(
-        "update public.memory_items set retired_at = now() "
-        "where workspace_id = %s and key = %s and retired_at is null",
-        (workspace_id, key),
-    )
-    cursor = await connection.execute(
-        "update public.memory_items set retired_at = null "
-        "where workspace_id = %s and key = %s and version = %s returning id",
-        (workspace_id, key, version),
-    )
-    if await cursor.fetchone() is None:
-        await connection.execute(
-            "insert into public.memory_items (id, workspace_id, title, content, source, "
-            "created_by, key, version, expert_id) values (%s, %s, %s, %s, %s, %s, %s, %s, "
-            "(select expert_id from public.runs where id::text = %s and workspace_id = %s))",
-            (
-                uuid4(),
-                workspace_id,
-                key,
-                content,
-                json.dumps({"kind": "promoted", "key": key, "version": version}),
-                workspace_id,
-                key,
-                version,
-                source_run,
-                workspace_id,
-            ),
-        )
-
-
 async def _candidate_for_decision(
     connection: SqlConnection, workspace_id: UUID, candidate_id: UUID
 ) -> CandidateDecisionRow:
@@ -273,34 +247,20 @@ async def decide(
                 raise ImprovementRefused("replay_required")
             if replay.state != "passed":
                 raise ImprovementRefused(f"replay_{replay.state}")
-            (version,) = await one(
+            await promote(
                 connection,
-                "select coalesce(max(version), 0) + 1 from public.knowledge_versions "
-                "where workspace_id = %s and kind = %s and key = %s",
-                (workspace_id, kind, key),
-            )
-            await connection.execute(
-                "insert into public.knowledge_versions (workspace_id, kind, key, version, content, "
-                "candidate_id, provenance) values (%s, %s, %s, %s, %s, %s, %s)",
-                (
-                    workspace_id,
-                    kind,
-                    key,
-                    version,
-                    content,
-                    candidate_id,
-                    json.dumps(
-                        {
-                            "evidence": evidence,
-                            "source": source,
-                            "reviewed_by": str(actor_id),
-                            "replay_id": str(replay.id),
-                        }
-                    ),
-                ),
-            )
-            await _activate(
-                connection, workspace_id, kind, key, version, content, (source or {}).get("run_id")
+                workspace_id=workspace_id,
+                candidate_id=candidate_id,
+                kind=kind,
+                key=key,
+                content=content,
+                provenance={
+                    "evidence": evidence,
+                    "source": source,
+                    "reviewed_by": str(actor_id),
+                    "replay_id": str(replay.id),
+                },
+                source_run=(source or {}).get("run_id"),
             )
             outcome = "promoted"
         await connection.execute(
@@ -318,29 +278,13 @@ async def rollback(
     before it. Every version stays. Admitted work keeps its pinned skill, and reads memory live."""
     async with connection.transaction():
         if to_version == NO_VERSION:
-            cursor = await connection.execute(
-                "update public.knowledge_heads set active_version = null, updated_at = now() "
-                "where workspace_id = %s and kind = %s and key = %s returning key",
-                (workspace_id, kind, key),
-            )
-            if await cursor.fetchone() is None:
+            if not await clear_head(connection, workspace_id, kind, key):
                 raise ImprovementRefused("version_not_found")
-            if kind == "memory":
-                await connection.execute(
-                    "update public.memory_items set retired_at = now() "
-                    "where workspace_id = %s and key = %s and retired_at is null",
-                    (workspace_id, key),
-                )
             return KnowledgeHead(schema_version=1, kind=kind, key=key, active_version=None)
-        cursor = await connection.execute(
-            "select content from public.knowledge_versions "
-            "where workspace_id = %s and kind = %s and key = %s and version = %s",
-            (workspace_id, kind, key, to_version),
-        )
-        row = await cursor.fetchone()
-        if row is None:
+        content = await version_content(connection, workspace_id, kind, key, to_version)
+        if content is None:
             raise ImprovementRefused("version_not_found")
-        await _activate(connection, workspace_id, kind, key, to_version, row[0])
+        await activate(connection, workspace_id, kind, key, to_version, content)
     return KnowledgeHead(schema_version=1, kind=kind, key=key, active_version=to_version)
 
 
@@ -365,26 +309,8 @@ async def list_candidates(connection: SqlConnection, workspace_id: UUID) -> list
         "public.improvement_candidates where workspace_id = %s order by created_at desc limit 100",
         (workspace_id,),
     )
-    return [candidate_view(row, await replay_state(connection, row.id)) for row in rows]
-
-
-async def active_skill_text(
-    connection: SqlConnection, workspace_id: UUID, skills: list[str]
-) -> str:
-    """Read at admission, so a run keeps what it started with. It informs, and grants nothing."""
-    if not skills:
-        return ""
-    cursor = await connection.execute(
-        "select v.key, v.content from public.knowledge_versions v "
-        "join public.knowledge_heads h on h.workspace_id = v.workspace_id and h.kind = v.kind "
-        "and h.key = v.key and h.active_version = v.version "
-        "where v.workspace_id = %s and v.kind = 'skill' and v.key = any(%s) order by v.key",
-        (workspace_id, skills),
-    )
-    rows = await cursor.fetchall()
-    if not rows:
-        return ""
-    return REFERENCE_HEADER + "\n\n".join(f"{row[0]}:\n{row[1]}" for row in rows)
+    replays = await _replay_states(connection, [row.id for row in rows])
+    return [candidate_view(row, replays.get(row.id)) for row in rows]
 
 
 def _normalized(text: str) -> str:
@@ -407,12 +333,15 @@ async def request_replay(
     The owner wrote the tasks, and one that is a goal the proposal came from is refused. Requesting
     is what authorizes the runs' spending, each up to the limit, Decision 0016.
     """
-    fingerprint = request_hash({"tasks": tasks, "limit_micro_usd": limit_micro_usd})
-    scope = (workspace_id, actor_id, "replay_candidate", str(candidate_id), idempotency_key)
-    async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint, ReplayReceipt)
-        if existing is not None:
-            return existing.replay_id
+    command = Idempotent.of(
+        CommandKey(workspace_id, actor_id, idempotency_key),
+        "replay_candidate",
+        str(candidate_id),
+        {"tasks": tasks, "limit_micro_usd": limit_micro_usd},
+    )
+    async with receipted(connection, command, ReplayReceipt) as receipt:
+        if receipt.prior is not None:
+            return receipt.prior.replay_id
         row = await _candidate_for_decision(connection, workspace_id, candidate_id)
         kind, key, content, status, evidence, source = (
             row.kind,
@@ -470,36 +399,15 @@ async def request_replay(
                 "task) values (%s, %s, %s, %s)",
                 (replay_id, admitted.run_id, position, json.dumps(task)),
             )
-        await store_receipt(connection, scope, fingerprint, ReplayReceipt(replay_id=replay_id))
+        await receipt.store(ReplayReceipt(replay_id=replay_id))
     return replay_id
 
 
-async def replay_state(connection: SqlConnection, candidate_id: UUID) -> ReplayView | None:
-    """The latest replay only. Passed when every run succeeded, failed when any ended otherwise."""
-    rows = await all_rows(
-        connection,
-        ReplayRunRow,
-        "select r.id as replay_id, rr.run_id, rr.task ->> 'goal_text' as goal_text, u.status "
-        "from app_private.improvement_replays r "
-        "join app_private.improvement_replay_runs rr on rr.replay_id = r.id "
-        "join public.runs u on u.id = rr.run_id "
-        "where r.id = (select id from app_private.improvement_replays where candidate_id = %s "
-        "order by created_at desc, id limit 1) order by rr.position",
-        (candidate_id,),
-    )
-    if not rows:
-        return None
+def _replay_view(rows: list[ReplayRunRow]) -> ReplayView:
     statuses = [RunStatus(row.status) for row in rows]
-    state: Literal["running", "passed", "failed"]
-    if all(item is RunStatus.SUCCEEDED for item in statuses):
-        state = "passed"
-    elif any(item in TERMINAL and item is not RunStatus.SUCCEEDED for item in statuses):
-        state = "failed"
-    else:
-        state = "running"
     return ReplayView(
         id=rows[0].replay_id,
-        state=state,
+        state=replay_verdict(statuses),
         runs=[
             ReplayRunView(run_id=row.run_id, goal_text=row.goal_text, status=status)
             for row, status in zip(rows, statuses, strict=True)
@@ -507,28 +415,32 @@ async def replay_state(connection: SqlConnection, candidate_id: UUID) -> ReplayV
     )
 
 
-async def _propose_tool(arguments: ImprovementProposal, context: ToolContext) -> ProposalAccepted:
-    candidate_id = await propose(
-        context.connection,
-        context.scope.workspace_id,
-        arguments,
-        {"kind": "run", "run_id": str(context.scope.run_id)},
+async def _replay_states(
+    connection: SqlConnection, candidate_ids: list[UUID]
+) -> dict[UUID, ReplayView]:
+    """Each candidate's latest replay with its runs in order, from one read (PPRD-11)."""
+    if not candidate_ids:
+        return {}
+    rows = await all_rows(
+        connection,
+        ReplayRunRow,
+        "select r.candidate_id, r.id as replay_id, rr.run_id, "
+        "rr.task ->> 'goal_text' as goal_text, u.status "
+        "from app_private.improvement_replays r "
+        "join app_private.improvement_replay_runs rr on rr.replay_id = r.id "
+        "join public.runs u on u.id = rr.run_id "
+        "where r.id in (select distinct on (candidate_id) id "
+        "from app_private.improvement_replays where candidate_id = any(%s) "
+        "order by candidate_id, created_at desc, id) order by r.candidate_id, rr.position",
+        (candidate_ids,),
     )
-    if candidate_id is None:
-        raise ToolFailed("proposal_failed")
-    return ProposalAccepted(candidate_id=str(candidate_id), status="proposed")
+    grouped: dict[UUID, list[ReplayRunRow]] = defaultdict(list)
+    for row in rows:
+        grouped[row.candidate_id].append(row)
+    return {candidate: _replay_view(found) for candidate, found in grouped.items()}
 
 
-PROPOSE_IMPROVEMENT = ToolDefinition(
-    tool_id="propose_improvement",
-    title="Propose improvement",
-    group=ToolGroup.LEARNING,
-    public_input_fields=("kind", "key"),
-    public_output_fields=("candidate_id", "status"),
-    version=1,
-    description="Propose a memory or skill change for a person to review. It changes nothing yet.",
-    input_model=ImprovementProposal,
-    output_model=ProposalAccepted,
-    operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
-    handler=_propose_tool,
-)
+async def replay_state(connection: SqlConnection, candidate_id: UUID) -> ReplayView | None:
+    """The latest replay only. Passed when every run succeeded, failed when any ended otherwise
+    (domain improvements.replay_verdict)."""
+    return (await _replay_states(connection, [candidate_id])).get(candidate_id)

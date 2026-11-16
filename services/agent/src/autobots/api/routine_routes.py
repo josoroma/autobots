@@ -99,4 +99,4 @@ async def post_enabled(
     routine_id: UUID, body: RoutineEnabled, request: Request, workspace_id: OwnerWorkspace
 ) -> RoutineView:
     async with request_pool(request).connection() as connection:
-        return await set_enabled(connection, workspace_id, routine_id, body.enabled)
+        return await set_enabled(connection, workspace_id, routine_id, enabled=body.enabled)

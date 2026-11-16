@@ -15,7 +15,8 @@ from autobots.application.experts import create_expert, create_session, resolve_
 from autobots.application.provider_settings import KeyCheck, ProviderSettings
 from autobots.application.runs import admit_run, apply_command, apply_worker_command
 from autobots.application.worker_leases import claim_run
-from autobots.application.workflows import create_execution, create_workflow, publish_version
+from autobots.application.workflow_executions import create_execution
+from autobots.application.workflows import create_workflow, publish_version
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.plans import RequiredArtifact
 from autobots.contracts.workflows import WorkflowGraph

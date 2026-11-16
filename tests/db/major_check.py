@@ -20,10 +20,12 @@ from autobots.adapters.loop_middleware import LoopMiddleware, LoopStopped
 from autobots.application import operations as operations_module
 from autobots.application import routines as routines_module
 from autobots.application.approvals import decide, list_approvals
-from autobots.application.assignments import Delegation, assign_tool
+from autobots.application.assignment_tool import assign_tool
+from autobots.application.assignments import Delegation
 from autobots.application.experts import create_expert, create_session, resolve_binding
 from autobots.application.loop_prompts import scope_guidance
-from autobots.application.memory import SEARCH_MEMORY, MemoryRefused, search, store_memory
+from autobots.application.memory import MemoryRefused, search_memory, store_memory
+from autobots.application.memory_tools import SEARCH_MEMORY
 from autobots.application.operations import database_conditions
 from autobots.application.plans import load_goal
 from autobots.application.readiness import (
@@ -53,12 +55,8 @@ from autobots.application.tool_definitions import (
 )
 from autobots.application.tool_gateway import ToolGateway, resolve
 from autobots.application.worker_leases import claim_next, claim_run, is_held
-from autobots.application.workflows import (
-    create_execution,
-    create_workflow,
-    publish_version,
-    read_execution,
-)
+from autobots.application.workflow_executions import create_execution, read_execution
+from autobots.application.workflows import create_workflow, publish_version
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.operations import RetentionSettings
@@ -599,7 +597,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
         with_foreign_expert = error.code
     check('memory can only name an Expert in its own workspace', 'expert_not_found', with_foreign_expert, with_foreign_expert == 'expert_not_found')
     check("and another Expert's memory stays hidden", 'the shared item only', memories, len(memories) == 1 and 'shared' in memories[0])
-    wide = await search(db, WORKSPACE, word)
+    wide = await search_memory(db, WORKSPACE, word)
     check("an owner's own search still sees everything in the workspace", 'both files and both items', len(wide), len(wide) == 4)
     await clear()
 

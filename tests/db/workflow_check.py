@@ -9,9 +9,9 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
+from autobots.application.workflow_executions import create_execution
 from autobots.application.workflows import (
     WorkflowRefused,
-    create_execution,
     create_workflow,
     publish_version,
 )

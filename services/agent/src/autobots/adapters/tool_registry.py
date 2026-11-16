@@ -18,12 +18,12 @@ from autobots.adapters.market_data import MARKET_TOOLS
 from autobots.adapters.remote_files import STORE_REMOTE_FILE
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.application import browsing_tool
-from autobots.application.artifacts import publish_tool
-from autobots.application.assignments import assign_tool
+from autobots.application.artifact_tool import publish_tool
+from autobots.application.assignment_tool import assign_tool
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.cronjob_tool import cronjob_tool
-from autobots.application.improvements import PROPOSE_IMPROVEMENT
-from autobots.application.memory import READ_OFFLOAD, SEARCH_MEMORY
+from autobots.application.improvement_tool import PROPOSE_IMPROVEMENT
+from autobots.application.memory_tools import READ_OFFLOAD, SEARCH_MEMORY
 from autobots.application.plans import plan_tools
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_definitions import (
@@ -39,7 +39,7 @@ from autobots.application.tools import (
     READ_RUN_FILE_V2,
     SAVE_ARTIFACT,
 )
-from autobots.application.workflow_runner import APPROVAL_GATE
+from autobots.application.workflow_approval import APPROVAL_GATE
 
 
 def tool_definitions(

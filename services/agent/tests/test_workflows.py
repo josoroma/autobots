@@ -11,16 +11,25 @@ import pytest
 from autobots.application.run_projection import public_text
 from autobots.application.tool_definitions import ToolResult, ToolScope
 from autobots.application.tool_gateway import _operation_id
-from autobots.application.workflow_runner import InstanceStopped, _run_block, call_tool
+from autobots.application.workflow_runner import (
+    BlockExecution,
+    InstanceStopped,
+    call_tool,
+    run_block,
+)
 from autobots.contracts.assignments import AssignSpecialist
 from autobots.domain.tools import ToolOutcome
 from autobots.domain.workflow_execution import BlockFailed, GraphShape, Step, unsettled_nodes
 from autobots.domain.workflows import (
     MAX_FOREACH_ITEMS,
+    Block,
+    Node,
+    PlainConfig,
     _iteration_errors,
     block_versions,
     graph_hash,
     input_errors,
+    parse_node,
     validate_graph,
 )
 
@@ -279,12 +288,13 @@ def test_two_foreach_regions_cannot_feed_one_join() -> None:
 
 
 def test_a_workflow_nothing_can_move_is_not_finished() -> None:
+    plain = PlainConfig()
     shape = GraphShape(
         nodes={
-            "each": {"block": "foreach"},
-            "body": {"block": "transform"},
-            "gather": {"block": "join"},
-            "end": {"block": "output"},
+            "each": Node("each", Block.FOREACH, 1, plain),
+            "body": Node("body", Block.TRANSFORM, 1, plain),
+            "gather": Node("gather", Block.JOIN, 1, plain),
+            "end": Node("end", Block.OUTPUT, 1, plain),
         },
         links_to={},
         order=["each", "body", "gather", "end"],
@@ -401,14 +411,15 @@ def test_equal_foreach_items_are_separate_operations() -> None:
             return ToolResult(ToolOutcome.SUCCEEDED, output={"outcome": "succeeded"})
 
     scope = ToolScope(workspace_id=uuid4(), run_id=uuid4(), generation=1, tools={})
-    agent = node("a", "agent", expert_id=str(uuid4()))
+    agent = parse_node(node("a", "agent", expert_id=str(uuid4())))
+    execution = BlockExecution(Recording(), None, scope, {})  # type: ignore[arg-type]  # a stand-in gateway and no connection: the agent block only passes them on
     for iteration in (0, 1):
         step = Step(f"a#{iteration}", "a", iteration, "run", {"goal": "x"})
-        asyncio.run(_run_block(Recording(), None, scope, agent, step, {}))  # type: ignore[arg-type]
+        asyncio.run(run_block(execution, agent, step))
     assert seen == ["a#0", "a#1"]
     tool = SimpleNamespace(tool_id="t", version=1)
     arguments = AssignSpecialist(expert_id=str(uuid4()), goal="x")
-    ids = {_operation_id(replace(scope, instance=key), tool, arguments) for key in seen}  # type: ignore[arg-type]
+    ids = {_operation_id(replace(scope, instance=key), tool, arguments) for key in seen}  # type: ignore[arg-type]  # a stand-in tool with only the id and version the operation id reads
     assert len(ids) == 2
 
 

@@ -8,7 +8,7 @@ it by key or saves over it (R-56, SQLI-13, Decision 0029 F3).
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +18,7 @@ import pytest
 
 from autobots.application import workflows
 from autobots.application.sql import SqlParams
+from autobots.application.workflow_overview import RowFacts
 from autobots.application.workflows import (
     WorkflowRefused,
     discard_draft,
@@ -55,13 +56,17 @@ class Workflows:
                 [(item, name, 0, None) for item, name in found],
                 ("id", "name", "latest_version", "description"),
             )
-        if sql.startswith("select version, graph_hash"):
+        if sql.startswith("select workflow_id, version, graph_hash"):
             return ScriptedRows()
-        if sql.startswith("select graph, saved_at from public.workflow_drafts"):
-            draft = self.drafts.get(values[0])
-            return ScriptedRows([] if draft is None else [(draft, SAVED_AT)])
-        if sql.startswith("select workspace_id from public.workflows"):
-            return ScriptedRows([(WORKSPACE,)])
+        if sql.startswith("select workflow_id, graph, saved_at from public.workflow_drafts"):
+            asked: list[UUID] = values[0] if "any(%s)" in sql else [values[0]]
+            return ScriptedRows(
+                [(item, self.drafts[item], SAVED_AT) for item in asked if item in self.drafts],
+                ("workflow_id", "graph", "saved_at"),
+            )
+        if sql.startswith("select 1 from public.workflows where id = %s and workspace_id = %s"):
+            owned = values[0] in self.names and values[1] == WORKSPACE
+            return ScriptedRows([(1,)] if owned else [])
         if sql.startswith(DISCARD):
             gone = self.drafts.pop(values[0], None) if values[1] == WORKSPACE else None
             return ScriptedRows([] if gone is None else [(values[0],)])
@@ -76,15 +81,12 @@ class Workflows:
 def _no_overview(monkeypatch: pytest.MonkeyPatch) -> None:
     """The row facts read executions and Experts, which these cases don't concern."""
 
-    async def nothing(*_args: object, **_kwargs: object) -> list[object]:
-        return []
+    async def nothing(
+        _connection: object, _workspace_id: UUID, latest: Mapping[UUID, object]
+    ) -> dict[UUID, RowFacts]:
+        return {item: RowFacts([], 0, None, 0) for item in latest}
 
-    async def none(*_args: object, **_kwargs: object) -> int:
-        return 0
-
-    monkeypatch.setattr(workflows, "recent_executions", nothing)
-    monkeypatch.setattr(workflows, "expert_chain", nothing)
-    monkeypatch.setattr(workflows, "run_count", none)
+    monkeypatch.setattr(workflows, "row_facts", nothing)
 
 
 def test_an_unreadable_draft_reads_as_absent_and_is_logged(

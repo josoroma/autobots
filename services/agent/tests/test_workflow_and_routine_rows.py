@@ -14,7 +14,8 @@ import pytest
 
 from autobots.application.routines import occurrence_view
 from autobots.application.sql import UnknownStoredValue
-from autobots.application.workflows import emission_view, instance_view, version_view
+from autobots.application.workflow_executions import emission_view, instance_state, instance_view
+from autobots.application.workflows import version_view
 from autobots.persistence.rows import (
     EmissionRow,
     NodeInstanceRow,
@@ -28,6 +29,7 @@ RUN = UUID(int=9)
 
 def test_a_published_version_takes_each_field_from_its_own_column() -> None:
     row = WorkflowVersionRow(
+        workflow_id=RUN,
         version=3,
         graph_hash="h" * 64,
         source="model_proposal",
@@ -48,8 +50,10 @@ def test_a_published_version_takes_each_field_from_its_own_column() -> None:
 
 def test_an_instance_and_an_emission_take_their_own_columns() -> None:
     instance = instance_view(
-        NodeInstanceRow(
-            instance_key="each#2", node_id="each", iteration=2, status="failed", error_code="e1"
+        instance_state(
+            NodeInstanceRow(
+                instance_key="each#2", node_id="each", iteration=2, status="failed", error_code="e1"
+            )
         )
     )
     assert (instance.key, instance.node_id, instance.iteration) == ("each#2", "each", 2)

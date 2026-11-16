@@ -1,6 +1,7 @@
 """What Workflows shows beside each workflow, PRD-Studio WF-01, WF-03 and WF-04. Read only."""
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC
 from typing import Any
 from uuid import UUID
@@ -14,9 +15,14 @@ from autobots.contracts.workflows import (
 )
 from autobots.domain.models import PROFILES, ModelRole
 from autobots.domain.runs import TERMINAL, RunStatus
-from autobots.domain.workflows import AgentConfig, block_config, step_order
+from autobots.domain.workflows import agent_expert_ids, agent_expert_of, step_order
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
-from autobots.persistence.rows import ExecutionSummaryRow, ExpertConfigRow
+from autobots.persistence.rows import (
+    ExecutionSummaryRow,
+    ExpertConfigRow,
+    LatestExecutionRow,
+    WorkflowRunCountRow,
+)
 
 # One execution per row, with the root run's ledger, as the run list and admission count it (RN-01,
 # Decision 0029 F10).
@@ -62,14 +68,46 @@ async def recent_executions(
     return [execution_summary(row) for row in rows]
 
 
-async def run_count(connection: SqlConnection, workspace_id: UUID, workflow_id: UUID) -> int:
-    cursor = await connection.execute(
-        "select count(*) from public.workflow_executions where workflow_id = %s "
-        "and workspace_id = %s",
-        (workflow_id, workspace_id),
+# Each workflow's latest execution, with its root run's ledger as _EXECUTIONS reads it, picked as
+# _EXECUTIONS orders them, from one statement for every workflow listed (PPRD-11).
+_LATEST = (
+    "select w.workflow_id, x.id, x.run_id, x.workflow_version, r.status, "
+    "x.created_at as started_at, r.updated_at as run_updated_at, "
+    f"r.created_at as run_created_at, {spend_columns('r')}, {unreported_column('r')} "
+    "as unreported "
+    "from unnest(%(workflows)s::uuid[]) as w(workflow_id) "
+    "cross join lateral (select e.id, e.run_id, e.workflow_version, e.created_at "
+    "from public.workflow_executions e join public.runs u on u.id = e.run_id "
+    "and u.workspace_id = e.workspace_id "
+    "where e.workflow_id = w.workflow_id and e.workspace_id = %(workspace)s "
+    "order by e.created_at desc, e.id limit 1) x "
+    "join public.runs r on r.id = x.run_id"
+)
+
+
+async def _latest_executions(
+    connection: SqlConnection, workspace_id: UUID, workflow_ids: list[UUID]
+) -> dict[UUID, WorkflowExecutionSummary]:
+    rows = await all_rows(
+        connection,
+        LatestExecutionRow,
+        _LATEST,
+        {"workflows": workflow_ids, "workspace": workspace_id, **LEDGER_PARAMS},
     )
-    row = await cursor.fetchone()
-    return int(row[0]) if row else 0
+    return {row.workflow_id: execution_summary(row) for row in rows}
+
+
+async def _run_counts(
+    connection: SqlConnection, workspace_id: UUID, workflow_ids: list[UUID]
+) -> dict[UUID, int]:
+    rows = await all_rows(
+        connection,
+        WorkflowRunCountRow,
+        "select workflow_id, count(*) as runs from public.workflow_executions "
+        "where workflow_id = any(%s) and workspace_id = %s group by workflow_id",
+        (workflow_ids, workspace_id),
+    )
+    return {row.workflow_id: int(row.runs) for row in rows}
 
 
 async def _experts(
@@ -89,36 +127,48 @@ async def _experts(
     return {row.id: (str(row.name), read_expert_config(row.config)) for row in rows}
 
 
-def _agent_expert(node: Mapping[str, Any]) -> str | None:
-    """The Expert an agent step names, or None for any other step, or one that names none. Only an
-    agent step's configuration is read, so another step's draft value can't fail a preview."""
-    if node["block"] != "agent":
-        return None
-    config = block_config(node)
-    return config.expert_id if isinstance(config, AgentConfig) else None
-
-
-def _agent_experts(graph: Mapping[str, Any]) -> list[str]:
-    nodes = {node["id"]: node for node in graph.get("nodes", [])}
-    named = (_agent_expert(nodes[name]) for name in step_order(graph))
-    return [expert_id for expert_id in named if expert_id is not None]
-
-
-async def expert_chain(
-    connection: SqlConnection, workspace_id: UUID, graph: Mapping[str, Any] | None
-) -> list[str]:
+def _chain(ordered: list[str], known: Mapping[str, tuple[str, ExpertConfigRecord]]) -> list[str]:
     """WF-01: the Experts its agent steps use, in step order, such as Research analyst then
     Brief writer. An Expert used twice in a row is named once."""
-    if graph is None:
-        return []
-    ordered = _agent_experts(graph)
-    known = await _experts(connection, workspace_id, sorted(set(ordered)))
     chain: list[str] = []
     for expert_id in ordered:
-        name = known.get(expert_id, ("Unavailable Expert", None))[0]
+        name = known[expert_id][0] if expert_id in known else "Unavailable Expert"
         if not chain or chain[-1] != name:
             chain.append(name)
     return chain
+
+
+@dataclass(frozen=True)
+class RowFacts:
+    """WF-01's facts beside one workflow, from its latest published version and its executions."""
+
+    experts: list[str]
+    step_count: int
+    last_execution: WorkflowExecutionSummary | None
+    run_count: int
+
+
+async def row_facts(
+    connection: SqlConnection, workspace_id: UUID, latest: Mapping[UUID, Mapping[str, Any] | None]
+) -> dict[UUID, RowFacts]:
+    """Each workflow's row facts, keyed as `latest`, which holds its latest published graph or
+    None. One read of each kind serves every workflow listed (PPRD-11)."""
+    ids = list(latest)
+    last = await _latest_executions(connection, workspace_id, ids)
+    counts = await _run_counts(connection, workspace_id, ids)
+    ordered = {key: agent_expert_ids(graph) if graph else [] for key, graph in latest.items()}
+    known = await _experts(
+        connection, workspace_id, sorted({item for named in ordered.values() for item in named})
+    )
+    return {
+        key: RowFacts(
+            experts=_chain(ordered[key], known),
+            step_count=len(graph["nodes"]) if graph else 0,
+            last_execution=last.get(key),
+            run_count=counts.get(key, 0),
+        )
+        for key, graph in latest.items()
+    }
 
 
 async def preview_steps(
@@ -128,7 +178,7 @@ async def preview_steps(
     use if the workflow started now, and the Expert's tools. An approval step is marked as the
     gate."""
     nodes = {node["id"]: node for node in graph.get("nodes", [])}
-    known = await _experts(connection, workspace_id, sorted(set(_agent_experts(graph))))
+    known = await _experts(connection, workspace_id, sorted(set(agent_expert_ids(graph))))
     saved = await saved_workspace_policy(connection, workspace_id)
     # An agent step's child inherits the workflow run's frozen policy, which creating the execution
     # resolves with no Expert's role bindings, so each step shows that policy's executor, not its
@@ -141,7 +191,7 @@ async def preview_steps(
     steps = []
     for name in step_order(graph):
         node = nodes[name]
-        expert_id = _agent_expert(node)
+        expert_id = agent_expert_of(node)
         found = known.get(expert_id) if expert_id is not None else None
         steps.append(
             WorkflowStepView(

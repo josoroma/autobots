@@ -157,7 +157,9 @@ def cronjob_tool(
                     )
                 case "pause" | "resume":
                     routine = _required(arguments.routine_id)
-                    view = await set_enabled(connection, workspace, routine, action == "resume")
+                    view = await set_enabled(
+                        connection, workspace, routine, enabled=action == "resume"
+                    )
                     status = "resumed" if view.enabled else "paused"
                     return CronjobOutput(action=action, status=status, routine_id=routine)
                 case "remove":

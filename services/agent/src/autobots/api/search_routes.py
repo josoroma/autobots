@@ -8,7 +8,7 @@ from autobots.api.dependencies import MemberWorkspace, catalog_of, process_envir
 from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
 from autobots.application.run_projection import public_text
-from autobots.application.search import search
+from autobots.application.search import search_workspace
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.search import SearchResult, SearchResults
 
@@ -27,7 +27,7 @@ async def get_search(
         return SearchResults(schema_version=1, query="", results=[])
     async with request_pool(request).connection() as connection:
         keys = await key_sources(connection, workspace_id, process_environment(request))
-        hits = await search(connection, workspace_id, query, keys, catalog_of(request))
+        hits = await search_workspace(connection, workspace_id, query, keys, catalog_of(request))
     return SearchResults(
         schema_version=1,
         query=query,

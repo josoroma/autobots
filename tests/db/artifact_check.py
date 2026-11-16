@@ -14,10 +14,10 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore
+from autobots.application.artifact_tool import publish_tool
 from autobots.application.artifacts import (
     ArtifactUnavailable,
     publish,
-    publish_tool,
     read_artifact,
     reconcile_run,
 )

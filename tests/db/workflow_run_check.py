@@ -20,8 +20,8 @@ from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import apply_command
 from autobots.application.worker_leases import claim_next
+from autobots.application.workflow_executions import create_execution
 from autobots.application.workflows import (
-    create_execution,
     create_workflow,
     publish_version,
     set_description,

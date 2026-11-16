@@ -2,15 +2,23 @@
 
 import json
 import os
+from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
-from autobots.application.improvements import active_skill_text
-from autobots.application.runs import existing_receipt, request_hash, store_receipt
-from autobots.application.sql import SqlConnection, all_rows, one, optional_row
+from autobots.application.idempotency import (
+    ExpectedVersionStale,
+    VersionedRowMissing,
+    next_version,
+    receipted,
+    set_latest,
+)
+from autobots.application.knowledge import active_skill_text
+from autobots.application.runs import CommandKey, Idempotent
+from autobots.application.sql import SqlConnection, all_rows, optional_row
 from autobots.application.tool_catalog import Catalog
 from autobots.application.tool_keys import key_sources
 from autobots.contracts.experts import (
@@ -31,7 +39,7 @@ from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import UnknownModelProfile, approved_role
 from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
-from autobots.persistence.rows import ExpertRow
+from autobots.persistence.rows import ExpertRow, ExpertRunsRow, ExpertVersionRow, RouteOptionRow
 
 
 def expert_overrides(config: ExpertConfigRecord) -> dict[str, str]:
@@ -123,30 +131,46 @@ def validate_config(config: ExpertConfig, catalog: Catalog, environ: Mapping[str
         raise ExpertRefused("expert_role_unknown") from None
 
 
-async def _view(connection: SqlConnection, expert: ExpertRow) -> ExpertView:
-    expert_id = expert.id
-    cursor = await connection.execute(
-        "select version, config from public.expert_versions where expert_id = %s order by version",
-        (expert_id,),
-    )
-    versions = [
-        ExpertVersionView(version=row[0], config=expert_view_config(read_expert_config(row[1])))
-        for row in await cursor.fetchall()
-    ]
-    run_count, last_run_at = await one(
+async def _views(connection: SqlConnection, experts: list[ExpertRow]) -> list[ExpertView]:
+    """Each Expert's view, from one read of its versions and one of its runs for all of them
+    (PPRD-11)."""
+    if not experts:
+        return []
+    ids = [expert.id for expert in experts]
+    rows = await all_rows(
         connection,
-        "select count(*), max(created_at) from public.runs where expert_id = %s",
-        (expert_id,),
+        ExpertVersionRow,
+        "select expert_id, version, config from public.expert_versions "
+        "where expert_id = any(%s) order by expert_id, version",
+        (ids,),
     )
-    return ExpertView(
-        schema_version=1,
-        id=expert_id,
-        name=expert.name,
-        latest_version=expert.latest_version,
-        versions=versions,
-        run_count=int(run_count),
-        last_run_at=last_run_at,
+    versions: dict[UUID, list[ExpertVersionView]] = defaultdict(list)
+    for row in rows:
+        versions[row.expert_id].append(
+            ExpertVersionView(
+                version=row.version, config=expert_view_config(read_expert_config(row.config))
+            )
+        )
+    runs = await all_rows(
+        connection,
+        ExpertRunsRow,
+        "select expert_id, count(*) as run_count, max(created_at) as last_run_at "
+        "from public.runs where expert_id = any(%s) group by expert_id",
+        (ids,),
     )
+    ran = {row.expert_id: row for row in runs}
+    return [
+        ExpertView(
+            schema_version=1,
+            id=expert.id,
+            name=expert.name,
+            latest_version=expert.latest_version,
+            versions=versions[expert.id],
+            run_count=int(ran[expert.id].run_count) if expert.id in ran else 0,
+            last_run_at=ran[expert.id].last_run_at if expert.id in ran else None,
+        )
+        for expert in experts
+    ]
 
 
 async def list_experts(connection: SqlConnection, workspace_id: UUID) -> list[ExpertView]:
@@ -156,7 +180,7 @@ async def list_experts(connection: SqlConnection, workspace_id: UUID) -> list[Ex
         "select id, name, latest_version from public.experts where workspace_id = %s order by name",
         (workspace_id,),
     )
-    return [await _view(connection, row) for row in rows]
+    return await _views(connection, rows)
 
 
 async def get_expert(connection: SqlConnection, workspace_id: UUID, expert_id: UUID) -> ExpertView:
@@ -168,7 +192,8 @@ async def get_expert(connection: SqlConnection, workspace_id: UUID, expert_id: U
     )
     if row is None:
         raise ExpertRefused("expert_not_found")
-    return await _view(connection, row)
+    (view,) = await _views(connection, [row])
+    return view
 
 
 async def create_expert(
@@ -181,15 +206,19 @@ async def create_expert(
     config: ExpertConfig,
     catalog: Catalog,
 ) -> ExpertView:
-    fingerprint = request_hash({"name": name, "config": config.model_dump(mode="json")})
+    # Over the request as sent, before its groups expand.
+    command = Idempotent.of(
+        CommandKey(workspace_id, actor_id, idempotency_key),
+        "create_expert",
+        str(workspace_id),
+        {"name": name, "config": config.model_dump(mode="json")},
+    )
     keys = await _workspace_keys(connection, workspace_id)
     config = expand_groups(config, catalog, keys)
     validate_config(config, catalog, keys)
-    scope = (workspace_id, actor_id, "create_expert", str(workspace_id), idempotency_key)
-    async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint, ExpertCreatedReceipt)
-        if existing is not None:
-            return await get_expert(connection, workspace_id, existing.expert_id)
+    async with receipted(connection, command, ExpertCreatedReceipt) as receipt:
+        if receipt.prior is not None:
+            return await get_expert(connection, workspace_id, receipt.prior.expert_id)
         cursor = await connection.execute(
             "select 1 from public.experts where workspace_id = %s and name = %s",
             (workspace_id, name),
@@ -206,9 +235,7 @@ async def create_expert(
             "values (%s, 1, %s, %s)",
             (expert_id, expert_record(config).stored(), actor_id),
         )
-        await store_receipt(
-            connection, scope, fingerprint, ExpertCreatedReceipt(expert_id=expert_id)
-        )
+        await receipt.store(ExpertCreatedReceipt(expert_id=expert_id))
     return await get_expert(connection, workspace_id, expert_id)
 
 
@@ -224,60 +251,69 @@ async def add_version(
     catalog: Catalog,
 ) -> ExpertView:
     """A new revision. Earlier ones never change, so work holding them is unaffected."""
-    fingerprint = request_hash(
-        {"expected": expected_version, "config": config.model_dump(mode="json")}
+    command = Idempotent.of(
+        CommandKey(workspace_id, actor_id, idempotency_key),
+        "add_expert_version",
+        str(expert_id),
+        {"expected": expected_version, "config": config.model_dump(mode="json")},
     )
     keys = await _workspace_keys(connection, workspace_id)
     config = expand_groups(config, catalog, keys)
     validate_config(config, catalog, keys)
-    scope = (workspace_id, actor_id, "add_expert_version", str(expert_id), idempotency_key)
-    async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint, ExpertVersionReceipt)
-        if existing is not None:
+    async with receipted(connection, command, ExpertVersionReceipt) as receipt:
+        if receipt.prior is not None:
             return await get_expert(connection, workspace_id, expert_id)
-        cursor = await connection.execute(
-            "select latest_version from public.experts "
-            "where id = %s and workspace_id = %s for update",
-            (expert_id, workspace_id),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            raise ExpertRefused("expert_not_found")
-        if row[0] != expected_version:
-            raise ExpertRefused("expert_version_conflict")
-        version = row[0] + 1
+        try:
+            version = await next_version(
+                connection, "experts", expert_id, workspace_id, expected_version
+            )
+        except VersionedRowMissing:
+            raise ExpertRefused("expert_not_found") from None
+        except ExpectedVersionStale:
+            raise ExpertRefused("expert_version_conflict") from None
         await connection.execute(
             "insert into public.expert_versions (expert_id, version, config, created_by) "
             "values (%s, %s, %s, %s)",
             (expert_id, version, expert_record(config).stored(), actor_id),
         )
-        await connection.execute(
-            "update public.experts set latest_version = %s where id = %s", (version, expert_id)
-        )
-        await store_receipt(connection, scope, fingerprint, ExpertVersionReceipt(version=version))
+        await set_latest(connection, "experts", expert_id, version)
+        await receipt.store(ExpertVersionReceipt(version=version))
     return await get_expert(connection, workspace_id, expert_id)
 
 
-async def _option(
-    connection: SqlConnection, workspace_id: UUID, expert_id: UUID, version: int
-) -> RouteOption:
-    cursor = await connection.execute(
-        "select e.name, v.config from public.experts e join public.expert_versions v "
-        "on v.expert_id = e.id where e.id = %s and e.workspace_id = %s and v.version = %s",
-        (expert_id, workspace_id, version),
-    )
-    row = await cursor.fetchone()
-    if row is None:
-        raise ExpertRefused("expert_not_found")
-    config = read_expert_config(row[1])
+def _route_option(row: RouteOptionRow) -> RouteOption:
+    config = read_expert_config(row.config)
     return RouteOption(
-        expert_id=expert_id,
-        name=row[0],
-        version=version,
+        expert_id=row.expert_id,
+        name=row.name,
+        version=row.version,
         purpose=config.purpose,
         tools=list(config.tools),
         role_bindings=expert_overrides(config),
     )
+
+
+async def _options(
+    connection: SqlConnection, workspace_id: UUID, pinned: list[tuple[UUID, int]]
+) -> list[RouteOption]:
+    """Each pinned Expert version as a route option, in the order pinned, from one read. One this
+    workspace doesn't have is refused as not found (PPRD-11)."""
+    if not pinned:
+        return []
+    rows = await all_rows(
+        connection,
+        RouteOptionRow,
+        "select e.id as expert_id, v.version, e.name, v.config from public.experts e "
+        "join public.expert_versions v on v.expert_id = e.id "
+        "join unnest(%s::uuid[], %s::int[]) as p(expert_id, version) "
+        "on p.expert_id = e.id and p.version = v.version where e.workspace_id = %s",
+        ([expert for expert, _ in pinned], [version for _, version in pinned], workspace_id),
+    )
+    found = {(row.expert_id, row.version): row for row in rows}
+    missing = [item for item in pinned if item not in found]
+    if missing:
+        raise ExpertRefused("expert_not_found")
+    return [_route_option(found[item]) for item in pinned]
 
 
 async def latest_version_config(
@@ -307,6 +343,36 @@ async def saved_version(
     return None if row is None else read_expert_config(row[0])
 
 
+async def _pinned(
+    connection: SqlConnection, workspace_id: UUID, experts: list[SessionExpert]
+) -> list[dict[str, Any]]:
+    """The version a session pins for each Expert: the one asked for, or its latest, checked to
+    be this workspace's."""
+    pinned: list[dict[str, Any]] = []
+    for item in experts:
+        expert = await get_expert(connection, workspace_id, item.expert_id)
+        version = item.version if item.version is not None else expert.latest_version
+        await _options(connection, workspace_id, [(item.expert_id, version)])
+        pinned.append({"expert_id": str(item.expert_id), "version": version})
+    return pinned
+
+
+async def _insert_session(
+    connection: SqlConnection,
+    workspace_id: UUID,
+    actor_id: UUID,
+    kind: str,
+    pinned: list[dict[str, Any]],
+) -> UUID:
+    session_id = uuid4()
+    await connection.execute(
+        "insert into public.sessions (id, workspace_id, kind, experts, created_by) "
+        "values (%s, %s, %s, %s, %s)",
+        (session_id, workspace_id, kind, json.dumps(pinned), actor_id),
+    )
+    return session_id
+
+
 async def create_session(
     connection: SqlConnection,
     *,
@@ -316,31 +382,38 @@ async def create_session(
     kind: str,
     experts: list[SessionExpert],
 ) -> SessionView:
-    """Pins the revisions, and for a coordinator, the only Experts it may route to."""
+    """Pins the revisions, and for a coordinator, the only Experts it may route to. Its receipt
+    fingerprints the versions it pinned, as it always has, so stored receipts keep matching."""
     if kind == "direct" and len(experts) != 1:
         raise ExpertRefused("session_needs_one_expert")
-    pinned: list[dict[str, Any]] = []
-    for item in experts:
-        expert = await get_expert(connection, workspace_id, item.expert_id)
-        version = item.version if item.version is not None else expert.latest_version
-        await _option(connection, workspace_id, item.expert_id, version)
-        pinned.append({"expert_id": str(item.expert_id), "version": version})
-    fingerprint = request_hash({"kind": kind, "experts": pinned})
-    scope = (workspace_id, actor_id, "create_session", str(workspace_id), idempotency_key)
-    async with connection.transaction():
-        existing = await existing_receipt(connection, scope, fingerprint, SessionCreatedReceipt)
-        if existing is not None:
-            return await get_session(connection, workspace_id, existing.session_id)
-        session_id = uuid4()
-        await connection.execute(
-            "insert into public.sessions (id, workspace_id, kind, experts, created_by) "
-            "values (%s, %s, %s, %s, %s)",
-            (session_id, workspace_id, kind, json.dumps(pinned), actor_id),
-        )
-        await store_receipt(
-            connection, scope, fingerprint, SessionCreatedReceipt(session_id=session_id)
-        )
+    pinned = await _pinned(connection, workspace_id, experts)
+    command = Idempotent.of(
+        CommandKey(workspace_id, actor_id, idempotency_key),
+        "create_session",
+        str(workspace_id),
+        {"kind": kind, "experts": pinned},
+    )
+    async with receipted(connection, command, SessionCreatedReceipt) as receipt:
+        if receipt.prior is not None:
+            return await get_session(connection, workspace_id, receipt.prior.session_id)
+        session_id = await _insert_session(connection, workspace_id, actor_id, kind, pinned)
+        await receipt.store(SessionCreatedReceipt(session_id=session_id))
     return await get_session(connection, workspace_id, session_id)
+
+
+async def open_session(
+    connection: SqlConnection,
+    *,
+    workspace_id: UUID,
+    actor_id: UUID,
+    kind: str,
+    experts: list[SessionExpert],
+) -> UUID:
+    """A session no person asked for, such as a workflow execution's for its agent steps. It
+    pins and checks its Experts as `create_session` does, and stores no receipt, since no retry
+    can name it again (PPRD-04)."""
+    pinned = await _pinned(connection, workspace_id, experts)
+    return await _insert_session(connection, workspace_id, actor_id, kind, pinned)
 
 
 async def get_session(
@@ -353,10 +426,8 @@ async def get_session(
     row = await cursor.fetchone()
     if row is None:
         raise ExpertRefused("session_not_found")
-    options = [
-        await _option(connection, workspace_id, UUID(item["expert_id"]), item["version"])
-        for item in row[1]
-    ]
+    pinned = [(UUID(item["expert_id"]), item["version"]) for item in row[1]]
+    options = await _options(connection, workspace_id, pinned)
     return SessionView(schema_version=1, id=session_id, kind=row[0], options=options)
 
 

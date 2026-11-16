@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from autobots.api.dependencies import CurrentUser, MemberWorkspace, OwnerWorkspace
 from autobots.api.resources import request_pool
 from autobots.api.security import require_internal
-from autobots.application.memory import search, store_memory
+from autobots.application.memory import search_memory, store_memory
 from autobots.contracts.memory import MemoryCreate, MemoryCreated, MemorySearchView
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -20,7 +20,9 @@ async def get_search(
     q: Annotated[str, Query(min_length=1, max_length=500)],
 ) -> MemorySearchView:
     async with request_pool(request).connection() as connection:
-        return MemorySearchView(schema_version=1, hits=await search(connection, workspace_id, q))
+        return MemorySearchView(
+            schema_version=1, hits=await search_memory(connection, workspace_id, q)
+        )
 
 
 @router.post(

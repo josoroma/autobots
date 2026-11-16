@@ -19,7 +19,7 @@ from autobots.application.compaction import (
     state_block,
 )
 from autobots.application.goal_loop import run_goal
-from autobots.application.memory import search, store_memory
+from autobots.application.memory import search_memory, store_memory
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.run_usage import RootLimits
@@ -139,22 +139,22 @@ async def main() -> None:
         # Lexical search, scoped to the workspace.
         await store_memory(db, workspace_id=WORKSPACE, actor_id=ACTOR, title='Shipping note', content='The zanzibar route ships on Tuesdays.', source={'kind': 'user'})
         await store_memory(db, workspace_id=OTHER, actor_id=ACTOR, title='Secret of the other workspace', content='The zanzibar password is hidden.', source={'kind': 'user'})
-        hits = await search(db, WORKSPACE, 'zanzibar')
+        hits = await search_memory(db, WORKSPACE, 'zanzibar')
         memory = [hit for hit in hits if hit.kind == 'memory']
         evidence = [hit for hit in hits if hit.kind == 'evidence']
         check('a keyword finds memory, with its provenance', 'Shipping note, a source', (memory[0].title if memory else None), len(memory) == 1 and memory[0].title == 'Shipping note' and memory[0].source['kind'] == 'user')
         check('and saved evidence, with its path and hash', 'inputs/long.md', evidence[0].source if evidence else None, bool(evidence) and evidence[0].source['path'] == 'inputs/long.md' and len(evidence[0].source['sha256']) == 64)
         check('another workspace\'s memory never appears', 'absent', any('other workspace' in hit.title for hit in hits), not any('other workspace' in hit.title or 'password' in hit.snippet for hit in hits))
-        other_hits = await search(db, OTHER, 'zanzibar')
+        other_hits = await search_memory(db, OTHER, 'zanzibar')
         check('and that workspace doesn\'t see this one', 'only its own', [hit.title for hit in other_hits], [hit.title for hit in other_hits] == ['Secret of the other workspace'])
-        check('nonsense query text is harmless', 'no hits, no error', await search(db, WORKSPACE, "'; drop table x; --"), await search(db, WORKSPACE, "'; drop table x; --") == [])
+        check('nonsense query text is harmless', 'no hits, no error', await search_memory(db, WORKSPACE, "'; drop table x; --"), await search_memory(db, WORKSPACE, "'; drop table x; --") == [])
         run5 = await admit(documents=())
         lease = await claim_next(db, worker_id='searcher', lease_seconds=120)
         tool_scope = ToolScope(WORKSPACE, run5, lease.generation, {'search_memory': 1})
         found = await gateway.execute(db, tool_scope, 'search_memory', {'query': 'zanzibar'})
         check('the search tool goes through the gateway with its scope', 'hits, none foreign', len(found.output['hits']), found.outcome.value == 'succeeded' and all('other workspace' not in hit['title'] for hit in found.output['hits']))
         await db.execute("insert into app_private.run_files (run_id, path, version, content, sha256, media_type, operation_id) values (%s, 'outputs/k.md', 1, 'zanzibar sk-or-leakedkeyvalue', 'h', 'text/plain', %s)", (run2, str(uuid4())))
-        redacted = await search(db, WORKSPACE, 'zanzibar')
+        redacted = await search_memory(db, WORKSPACE, 'zanzibar')
         check('a key-like value is masked in snippets', 'no key', any('sk-or-leaked' in hit.snippet for hit in redacted), not any('sk-or-leaked' in hit.snippet for hit in redacted))
 
         # No extra inference endpoint exists.

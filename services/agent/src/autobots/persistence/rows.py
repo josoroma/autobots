@@ -256,7 +256,7 @@ class ApprovalListRow:
     review_detail: dict[str, Any] | None
 
 
-# Workflows (application/workflows.py)
+# Workflows (application/workflows.py, application/workflow_executions.py)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -269,11 +269,21 @@ class WorkflowRow:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WorkflowVersionRow:
+    workflow_id: UUID
     version: int
     graph_hash: str
     source: str
     graph: dict[str, Any]
     block_versions: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DraftRow:
+    """A saved draft. Its graph is whatever JSON object the draft table's check admitted."""
+
+    workflow_id: UUID
+    graph: object
+    saved_at: datetime
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -286,14 +296,19 @@ class PublishedVersionRow:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ExecutionRow:
+    """An execution with its run's status, the instance in progress and whether a person's
+    approval is pending, read in one statement so they agree."""
+
     workflow_id: UUID
     workflow_version: int
     graph_hash: str
     block_versions: dict[str, str]
     run_id: UUID
-    status: str
+    run_status: str
     stop_reason: str | None
     graph: dict[str, Any]
+    current_instance: str | None
+    approval_pending: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -303,13 +318,6 @@ class NodeInstanceRow:
     iteration: int | None
     status: str
     error_code: str | None
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class ExecutionProgressRow:
-    current_instance: str | None
-    run_status: str
-    approval_pending: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -338,6 +346,19 @@ class OccurrenceRow:
     status: str
     reason: str | None
     run_id: UUID | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RoutineOccurrenceRow(OccurrenceRow):
+    """An occurrence read with others of several routines at once."""
+
+    routine_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RoutineConfigRow:
+    routine_id: UUID
+    config: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -402,6 +423,7 @@ class CandidateRow:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ReplayRunRow:
+    candidate_id: UUID
     replay_id: UUID
     run_id: UUID
     goal_text: str
@@ -433,6 +455,30 @@ class ExpertRow:
     id: UUID
     name: str
     latest_version: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExpertVersionRow:
+    expert_id: UUID
+    version: int
+    config: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExpertRunsRow:
+    expert_id: UUID
+    run_count: int
+    last_run_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RouteOptionRow:
+    """A pinned Expert version a session may route to, with its Expert's name."""
+
+    expert_id: UUID
+    version: int
+    name: str
+    config: dict[str, Any]
 
 
 # Provider settings (application/provider_settings.py)
@@ -529,7 +575,7 @@ class ToolUseRow:
     instance_key: str | None
 
 
-# Artifacts (application/artifacts.py)
+# Artifacts (application/artifacts.py, application/artifact_tool.py)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -676,13 +722,26 @@ class ExecutionSummaryRow:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class LatestExecutionRow(ExecutionSummaryRow):
+    """A workflow's latest execution, read with others of several workflows at once."""
+
+    workflow_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class WorkflowRunCountRow:
+    workflow_id: UUID
+    runs: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExpertConfigRow:
     id: str
     name: str
     config: dict[str, Any]
 
 
-# Memory (application/memory.py)
+# Memory (application/memory.py, application/memory_tools.py)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

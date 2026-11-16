@@ -20,7 +20,8 @@ from autobots.application.tool_definitions import ToolScope
 from autobots.application.tool_gateway import ToolGateway
 from autobots.application.tool_uses import list_tool_uses
 from autobots.application.worker_leases import claim_next
-from autobots.application.workflows import create_execution, create_workflow, publish_version
+from autobots.application.workflow_executions import create_execution
+from autobots.application.workflows import create_workflow, publish_version
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy

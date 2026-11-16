@@ -1,10 +1,15 @@
-"""Readiness and emission identity as pure functions, run to completion over golden graphs."""
+"""Readiness and emission identity as pure functions, run to completion over golden graphs.
+
+The golden runs use the runner's own pure block rules (domain PURE_BLOCKS), so a change to a port,
+an emission's position or the foreach bound shows here too (PTST-10).
+"""
 
 from typing import Any
 
 import pytest
 
 from autobots.domain.workflow_execution import (
+    PURE_BLOCKS,
     BlockFailed,
     next_steps,
     run_predicate,
@@ -27,7 +32,7 @@ def link(source: str, source_port: str, target: str, target_port: str) -> dict[s
 
 
 def run(graph: dict[str, Any], inputs: dict[str, Any]) -> tuple[dict[str, str], dict[Any, Any]]:
-    """The same decisions the runner makes, over plain dictionaries."""
+    """The runner's decisions and pure block rules, with emissions kept in plain dictionaries."""
     shape = shape_of(graph)
     statuses: dict[str, str] = {}
     emissions: dict[Any, Any] = {}
@@ -40,26 +45,14 @@ def run(graph: dict[str, Any], inputs: dict[str, Any]) -> tuple[dict[str, str], 
                 statuses[step.key] = step.decision
                 continue
             data = shape.nodes[step.node_id]
-            block, config = data["block"], data.get("config", {})
-            value = step.inputs.get("value")
             try:
-                if block == "input":
-                    emissions[(step.key, "value", 0)] = inputs[step.node_id]
-                elif block == "output":
-                    emissions[(step.key, "value", 0)] = value
-                elif block == "transform":
-                    emissions[(step.key, "value", 0)] = run_transform(config["operation"], value)
-                elif block == "condition":
-                    taken = run_predicate(config["predicate"], value, config["operand"])
-                    emissions[(step.key, "true" if taken else "false", 0)] = value
-                elif block == "foreach":
-                    for index, item in enumerate(step.inputs["items"]):
-                        emissions[(step.key, "item", index)] = item
-                elif block == "join":
-                    emissions[(step.key, "items", 0)] = value
-                statuses[step.key] = "succeeded"
+                emitted = PURE_BLOCKS[data.block](data.config, step, inputs)
             except BlockFailed:
                 statuses[step.key] = "failed"
+                continue
+            for port, sequence, value in emitted:
+                emissions[(step.key, port, sequence)] = value
+            statuses[step.key] = "succeeded"
     raise AssertionError("did not settle")
 
 
@@ -149,6 +142,20 @@ def test_a_filter_inside_an_iteration_skips_only_that_iteration() -> None:
     statuses, emissions = run(graph, {"in": [1, 3, 2, 5]})
     assert emissions[("out", "value", 0)] == [3, 5]
     assert statuses["all"] == "succeeded"
+
+
+def test_a_list_over_the_foreach_bound_fails_it_and_blocks_what_follows() -> None:
+    graph = upper_loop()
+    graph["nodes"][1]["config"]["max_items"] = 2
+    statuses, emissions = run(graph, {"in": ["a", "b", "c"]})
+    assert statuses == {
+        "in": "succeeded",
+        "each": "failed",
+        "up": "blocked",
+        "all": "blocked",
+        "out": "blocked",
+    }
+    assert not any(key == "each" for key, _, _ in emissions)
 
 
 def test_a_failed_iteration_blocks_the_join() -> None:
