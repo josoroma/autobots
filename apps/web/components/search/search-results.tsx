@@ -51,12 +51,26 @@ export function SearchResults({
             index === active && "bg-accent text-accent-foreground",
           )}
         >
-          <span className="text-muted-foreground w-16 shrink-0 text-caption">
+          {/* Muted text on the highlighted option's accent falls below DS-03's 4.5:1 in light, so it
+              takes the foreground at three quarters there. */}
+          <span
+            className={cn(
+              "w-16 shrink-0 text-caption",
+              index === active ? "text-foreground/75" : "text-muted-foreground",
+            )}
+          >
             {KIND[result.kind]}
           </span>
           <span className="min-w-0 flex-1 truncate">{result.title}</span>
           {result.detail === null ? null : (
-            <span className="text-muted-foreground shrink-0 font-mono text-tag">
+            <span
+              className={cn(
+                "shrink-0 font-mono text-tag",
+                index === active
+                  ? "text-foreground/75"
+                  : "text-muted-foreground",
+              )}
+            >
               {result.detail.replaceAll("_", " ")}
             </span>
           )}
