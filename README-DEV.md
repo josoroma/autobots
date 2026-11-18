@@ -813,17 +813,16 @@ So when you edit, run the profile the change needs, usually `harness` or `fast`,
 
 ```mermaid
 flowchart LR
-    select["select<br/>Status: IN PROGRESS"] --> propose["propose<br/>proposal, specs, tasks"]
-    propose --> implement["implement"]
-    implement --> verify["verify<br/>score each scenario"]
-    verify -->|"MISMATCH or NOT VERIFIED"| implement
+    propose["propose<br/>proposal, specs, tasks<br/>Status: IN PROGRESS"] --> apply["apply<br/>tick tasks"]
+    apply --> verify["verify<br/>score each scenario"]
+    verify -->|"CRITICAL: new unticked task"| apply
     verify --> archive["archive<br/>after harness passes"]
     archive --> done["mark-done<br/>Status: DONE, render, promote, validate"]
     done --> commit["one commit per story"]
 ```
 
-- **The record:** the archived OpenSpec change, in [openspec/changes/archive/](openspec/changes/archive), is the story's record.
-- **Verify:** this step scores every scenario from what was actually run. A scenario never counts as passing without being observed.
+- **The record:** the archived OpenSpec change, in [openspec/changes/archive/](openspec/changes/archive), is the story's record. `tasks.md` is its only progress tracker.
+- **Verify:** this step scores every scenario from what was actually run, and writes no file. A scenario never counts as passing without being observed; one that isn't observed becomes a task, which sends the change back to `apply`.
 - **Order:** a story waiting only on another story's delivery is a matter of order. Deliver the prerequisite first. Never hand-edit a story to `READY`.
 - **The runbook:** [docs/engineering/runbooks/ohmyorch-delivery.md](docs/engineering/runbooks/ohmyorch-delivery.md) covers install, stop, resume and recovery.
 
@@ -901,7 +900,7 @@ These hold across the system. A change that breaks one needs a decision first.
 
 | Topic | Decisions |
 |---|---|
-| How work is delivered | [0001](docs/engineering/decisions/0001-ohmyorch-adaptation.md), [0002](docs/engineering/decisions/0002-ohmyorch-delivery-loop.md), [0003](docs/engineering/decisions/0003-openspec-only-delivery.md), [0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md) |
+| How work is delivered | [0001](docs/engineering/decisions/0001-ohmyorch-adaptation.md), [0002](docs/engineering/decisions/0002-ohmyorch-delivery-loop.md), [0003](docs/engineering/decisions/0003-openspec-only-delivery.md), [0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md), [0030](docs/engineering/decisions/0030-ohmyorch-0-1-0-delivery.md) |
 | Models | [0004](docs/engineering/decisions/0004-terra-replaces-astra.md), [0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md), [0006](docs/engineering/decisions/0006-terra-is-the-default.md), [0019](docs/engineering/decisions/0019-sol-profile-and-browser-use.md) |
 | Release scope and limits | [0008](docs/engineering/decisions/0008-us-10-1-limits-accepted.md), [0009](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md), [0011](docs/engineering/decisions/0011-review-dispositions.md), [0013](docs/engineering/decisions/0013-release-closure.md), [0014](docs/engineering/decisions/0014-release-limits-accepted.md) |
 | Approvals, learning and accessibility | [0010](docs/engineering/decisions/0010-contrast-pass-line.md), [0015](docs/engineering/decisions/0015-approval-request-fields.md), [0016](docs/engineering/decisions/0016-held-out-replay.md) |

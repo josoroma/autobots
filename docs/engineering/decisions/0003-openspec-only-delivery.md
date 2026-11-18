@@ -1,5 +1,7 @@
 # Decision 0003: OpenSpec-only delivery
 
+**Superseded in part by [Decision 0030](0030-ohmyorch-0-1-0-delivery.md)** for the plugin pin and the `verification.md` record. The lifecycle and record described below are those of the `openspec-only` build.
+
 **Date:** 2026-11-05. **Authority:** explicit user request in this session, because delivery was taking far too long: "stick to what open spec most do, get rid of extra stuff but respect open spec, specialist agents and the review rounds added that are not part of open spec get rid of them." **Supersedes:** the delivery gates, roles and records in [Decision 0002](0002-ohmyorch-delivery-loop.md), for `/ohmyorch:deliver`. Its commit policy, user decisions on provider SDKs, Node and pnpm, and its boundaries stand.
 
 ## Decision

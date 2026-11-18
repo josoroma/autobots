@@ -12,8 +12,8 @@ The project hooks run local deterministic scripts. They do not configure an assi
 Use the installed plugin's /ohmyorch:doctor and /ohmyorch:deliver commands.
 Project intent: PRD-LangChain-Deep-Agents.md. Backlog: SPECS.md.
 Current-state evidence: CODEBASE.md (generate it only through analysis).
-Delegate implementation, review and testing independently. Specialists persist
-their own verdicts; the main session derives resumption from project artifacts.
+Each READY story is one OpenSpec change: propose, apply, verify, archive.
+The next action is derived from project artifacts, never from chat memory.
 Generic rules are bundled in the plugin; updates never copy executable code here.
 
 <!-- OHMYORCH:END project -->

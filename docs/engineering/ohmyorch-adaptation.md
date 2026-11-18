@@ -2,7 +2,7 @@
 
 This page covers the spec-ingestor adaptation from Decision 0001. Epic delivery now uses the real plugin; [Decision 0002](decisions/0002-ohmyorch-delivery-loop.md) supersedes the plugin, OpenSpec and continuation exclusions below and lists how the two systems are bridged.
 
-Source: [josoroma/OhMyOrch spec-ingestor](https://github.com/josoroma/OhMyOrch/blob/fddfbf53c8c10d45782796cc9a7edf95bc8d3a07/plugins/ohmyorch/agents/spec-ingestor.md). The requested repository was shallow-cloned to `research/upstream/OhMyOrch` and pinned to commit `fddfbf53c8c10d45782796cc9a7edf95bc8d3a07`. The checkout is ignored by Git. The ingestion adaptation does not execute its code; since Decision 0002 the delivery plugin runs from it.
+Source: [josoroma/OhMyOrch spec-ingestor](https://github.com/josoroma/OhMyOrch/blob/fddfbf53c8c10d45782796cc9a7edf95bc8d3a07/plugins/ohmyorch/agents/spec-ingestor.md). The requested repository was shallow-cloned to `research/upstream/OhMyOrch` and pinned to commit `fddfbf53c8c10d45782796cc9a7edf95bc8d3a07`. The checkout is ignored by Git. The ingestion adaptation does not execute its code. Decision 0002 installed the delivery plugin from it; [Decision 0030](decisions/0030-ohmyorch-0-1-0-delivery.md) moves delivery to OhMyOrch 0.1.0 from the sibling checkout `../OhMyOrch`, and this clone stays as the ingestor's provenance.
 
 ## Preserved behavior
 

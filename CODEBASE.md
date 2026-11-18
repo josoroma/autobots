@@ -40,7 +40,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `contracts/fixtures/`: shared cases.
 - **Tooling:** `scripts/` (27 tracked files), `Makefile` (wraps the persistent install), and `.claude/` (7 agents, 13 skills, 9 rules, `hooks/dispatch.py`, `settings.json`, `ohmyorch/`).
 - **Operator guides:** `README-SETUP-RUN.md` (set up, start, stop) and `README-QA.md` (runtime Q&A, which describes revision `ecb34900e46c`).
-- **Delivery records:** `openspec/` (105 archived changes, 74 specs, `delivery/goal.md`), `SPEC-LOGS/`, `.claude/ohmyorch/project.json`.
+- **Delivery records:** `openspec/` (105 archived changes, 74 specs, `delivery/goal.md`), `.claude/ohmyorch/project.json`. The empty `SPEC-LOGS/` scaffold was removed after the analyzed revision (Decision 0030).
 - **Engineering records:** `docs/engineering/` holds:
   - `decisions/`: 0001–0022;
   - `runbooks/`: 9;
@@ -382,7 +382,7 @@ Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/
 ## Conventions
 
 - Stable `SP-*`, `EPIC-*`, `US-*` and requirement IDs. Code comments cite their source IDs, such as `PRD-Studio ST-01` and `Decision 0022 D5`.
-- Routine delivery follows the OpenSpec lifecycle, and the archived change is the record ([Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md)). Each `verification.md` ends with a "Not established" line.
+- Routine delivery follows the OpenSpec lifecycle, and the archived change is the record ([Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md)). Each archived `verification.md` ends with a "Not established" line. Since Decision 0030, after the analyzed revision, OhMyOrch 0.1.0's verify writes no file and `tasks.md` is a change's only tracker.
 - Money is integer micro-USD. Errors reach clients as typed codes. Logs carry exception type names, never messages, with identifiers cut to 8 characters.
 - Pydantic owns the public contracts and SQL owns the schema. Generated files aren't hand-edited. Migrations and seeds are separate.
 - Versioned tools keep the old version registered beside the new one (`read_run_file`, `create_github_issue`).
@@ -416,7 +416,7 @@ Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering
 
 ## Upstream evidence and local constraints
 
-- `.claude/autobots.json` pins OhMyOrch at `fddfbf53…` for the spec-ingestor and `9f384fa9…` (branch `openspec-only`) for the delivery plugin. The ignored clone's HEAD is `9f384fa`, and the plugin reports version 0.0.1.
+- `.claude/autobots.json` pins OhMyOrch at `fddfbf53…` for the spec-ingestor and, since Decision 0030 after the analyzed revision, `2bae070c…` (branch `main`, version 0.1.0, the sibling checkout `../OhMyOrch`) for the delivery plugin. The ignored clone at `research/upstream/OhMyOrch` stays at `9f384fa` (0.0.1, branch `openspec-only`) as the ingestor's provenance and the rollback source.
 - The same file records assistant event delivery as `not_tested`, and the plugin's as `not_qualified_one_pretooluse_event_observed`.
 - No local model runtime is part of the application. The `research/` material is historical.
 
