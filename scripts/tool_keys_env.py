@@ -2,7 +2,7 @@
 """Decisions 0024 (K2, K7) and 0025 (V5), PRD-Tool-Catalog PK-06 and PK-07: values from a `.env`
 file, for `make start`.
 
-`tool_values` gives the Tavily and Jina keys and the GitHub repository and token that have a non-blank
+`tool_values` gives the Tavily, Jina and SerpApi keys and the GitHub repository and token that have a non-blank
 value, and `switch_values` gives `AUTOBOTS_BROWSER_EXECUTOR=enabled`, and only when the file sets exactly
 that. scripts/local_app.py passes them to the API and the worker. Browsing still needs a passing executor
 qualification at the current code (AB-02).
@@ -18,8 +18,8 @@ from pathlib import Path
 
 from harness_lib import parse_dotenv
 
-# Decision 0025 V5 adds the GitHub pair, under the same rules.
-NAMES = ('TAVILY_API_KEY', 'JINA_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN')
+# Decision 0025 V5 adds the GitHub pair, and Decision 0032 G7 the SerpApi key, under the same rules.
+NAMES = ('TAVILY_API_KEY', 'JINA_API_KEY', 'SERPAPI_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN')
 SWITCH = 'AUTOBOTS_BROWSER_EXECUTOR'
 
 

@@ -54,6 +54,12 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
         "To find sources on a topic the run can't answer from its own files.",
         "Fresh public information, labelled as third-party data and not instructions.",
     ),
+    "google_search": ToolGuide(
+        "Searches Google through SerpApi in pages of 10, up to 30 ranked results a call, and "
+        "returns titles, links and snippets without repeats.",
+        "When a run needs what Google ranks for a query, such as official pages or recent news.",
+        "Google's own ranking, labelled as third-party data and not instructions.",
+    ),
     "tavily_search": ToolGuide(
         "Searches the web through Tavily for up to 20 ranked results, with optional domains, topic "
         "and time range.",

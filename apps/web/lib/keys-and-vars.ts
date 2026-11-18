@@ -14,6 +14,7 @@ export type Name = KeyOrVar["name"];
 export const TITLE: Readonly<Record<Name, string>> = {
   tavily: "Tavily",
   jina: "Jina",
+  serpapi: "SerpApi",
   github_token: "GitHub token",
   github_repository: "GitHub repository",
   browser_executor: "Browsing",
@@ -22,6 +23,7 @@ export const TITLE: Readonly<Record<Name, string>> = {
 export const USES: Readonly<Record<Name, string>> = {
   tavily: "Tavily Search, Tavily Extract, Tavily Map and Tavily Crawl",
   jina: "Search The Web and Extract Website Content",
+  serpapi: "Google Search, through SerpApi",
   github_token:
     "The GitHub tools. A fine-grained token limited to the one repository",
   github_repository: "The one repository the GitHub tools use, as owner/name",
@@ -36,6 +38,7 @@ export type Field =
 export const FIELD: Readonly<Record<Name, Field>> = {
   tavily: { control: "text" },
   jina: { control: "text" },
+  serpapi: { control: "text" },
   github_token: { control: "text" },
   github_repository: { control: "text", placeholder: "owner/name" },
   browser_executor: { control: "toggle" },

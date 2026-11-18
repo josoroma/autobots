@@ -84,16 +84,17 @@ Tool providers are data services the worker calls as tools, not inference provid
 ```sh
 TAVILY_API_KEY=<for tavily_search, tavily_extract, tavily_map and tavily_crawl>
 JINA_API_KEY=<for search_web and extract_website_content>
+SERPAPI_API_KEY=<for google_search, Google through SerpApi (Decision 0032)>
 ```
 
-Set them for both the worker and the API, since the API reports availability from its own environment, then restart both. On the persistent install, `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to both. It parses the file as data, never sources it, and takes nothing else from it.
+Set them for both the worker and the API, since the API reports availability from its own environment, then restart both. On the persistent install, `make start` passes `TAVILY_API_KEY`, `JINA_API_KEY` and `SERPAPI_API_KEY` from the repository's `.env` to both. It parses the file as data, never sources it, and takes nothing else from it.
 
-By [Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys can also be saved per workspace at Settings → Keys & vars (Settings → Tool keys until [Decision 0025](../decisions/0025-keys-and-vars.md)). The order, highest first:
+By [Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys, and the SerpApi key by [Decision 0032](../decisions/0032-google-search-through-serpapi.md), can also be saved per workspace at Settings → Keys & vars (Settings → Tool keys until [Decision 0025](../decisions/0025-keys-and-vars.md)). The order, highest first:
 1. The workspace's key saved in Settings, sealed with the master key like the OpenRouter key.
 2. The process environment.
 3. The `.env` files under `AUTOBOTS_CONFIG_ROOT`, in MP-03's order.
 
-The first non-blank value wins, and each call resolves its key, so a saved key applies from the next call with no restart. Only the owner can save or remove a key. Saving checks its shape only and calls no provider. Removing it falls back to the environment, and nothing edits `.env`. Saving needs migration 51 (`20261108000051_tool_provider_keys.sql`). On an install that predates it, run `make migrate`, then `make stop && make start`.
+The first non-blank value wins, and each call resolves its key, so a saved key applies from the next call with no restart. Only the owner can save or remove a key. Saving checks its shape only and calls no provider. Removing it falls back to the environment, and nothing edits `.env`. Saving needs migration 51 (`20261108000051_tool_provider_keys.sql`), and saving the SerpApi key needs migration 63 (`20261118000063_serpapi_provider.sql`). On an install that predates either, run `make migrate`, then `make stop && make start`.
 
 Nothing checks a key against its provider automatically, because that costs a request: tests use fake transports even with a key present, and a live check is a separate task an owner authorizes and caps. A root run tree may make 20 metered tool calls; the next is denied `tool_budget_exceeded` before any request.
 

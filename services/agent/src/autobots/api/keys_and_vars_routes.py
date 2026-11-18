@@ -23,6 +23,7 @@ _KEY_REFUSED = ("invalid_key", "That key was not accepted. The previous key is u
 REFUSED_VALUE: dict[str, tuple[str, str]] = {
     "tavily": _KEY_REFUSED,
     "jina": _KEY_REFUSED,
+    "serpapi": _KEY_REFUSED,
     "github_token": _KEY_REFUSED,
     "github_repository": ("invalid_value", "Use owner/name. The previous value is unchanged."),
     "browser_executor": (

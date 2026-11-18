@@ -84,7 +84,7 @@ async def main() -> None:
               planned.availability == 'disabled_by_policy' and planned.availability_reason == 'isolated_executor_not_qualified'
               and planned.provider == 'autobots' and not planned.registered and tool_registry.catalog_registry().get('browse_goal', 1) is None
               and 'expert_tool_unavailable' in refused
-              and providers <= {'autobots', 'tavily', 'jina', 'yahoo_finance', 'world_bank', 'github'})
+              and providers <= {'autobots', 'tavily', 'jina', 'serpapi', 'yahoo_finance', 'world_bank', 'github'})
 
         os.environ[browsing_tool.ENABLE] = 'enabled'
         check('the executor is qualified on this Mac, and the owner turned browsing on', 'ready', browsing_tool.executor_ready(),

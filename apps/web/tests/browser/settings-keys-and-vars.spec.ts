@@ -94,6 +94,7 @@ test("Keys & vars replaces Tool keys, and the owner saves and removes keys and v
     expect(listed.map((entry) => [entry.name, entry.kind])).toEqual([
       ["tavily", "secret"],
       ["jina", "secret"],
+      ["serpapi", "secret"],
       ["github_token", "secret"],
       ["github_repository", "value"],
       ["browser_executor", "value"],

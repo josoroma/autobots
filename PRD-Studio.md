@@ -168,7 +168,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 
 ## Seed
 
-**SD-01. Concept Experts and workflows.** A repeatable seed creates five Experts and six workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager and Code maintainer. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, and Vendor due diligence. A workflow whose tools are unavailable is seeded as a draft.
+**SD-01. Concept Experts and workflows.** A repeatable seed creates six Experts and six workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer and, by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, and Vendor due diligence. A workflow whose tools are unavailable is seeded as a draft.
 
 **SD-02. Seed definitions.** Drafted by the coordinator from the concepts for the owner's review (Decision 0022 D17). Role bindings follow the workspace policy unless named.
 
@@ -179,6 +179,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Brief writer | Turns findings into a short brief with a recommendation, a comparison table and numbered sources | `read_run_file`, `save_artifact`, `publish_artifact` |
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
 | Code maintainer | Reads the repository, edits copies in the run's files, and proposes a pull request that waits for you | `github_read_file`, `search_files`, `read_code_file`, `patch_code_file`, `write_code_file`, `github_open_pull_request` |
+| Google bot | Searches Google through SerpApi for up to 30 ranked results, reads the most relevant pages and cites each source (Decision 0032 G8) | `google_search`, `extract_website_content`, `save_artifact`, `publish_artifact` |
 
 | Workflow | Steps (agent steps name their Expert) | Seeded as |
 |---|---|---|

@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.21 |
+| Target | US-14.22 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.21 | us-14-21-search-tools-page-batches | READY | Search tools page in batches of 10, at most 3 pages a call |
+| 1 | US-14.22 | us-14-22-google-search-through-serpapi | READY | Google search through SerpApi, and a Google bot Expert |
 
 ## Next Action
 
 Action: propose
-Story: US-14.21
-Change: us-14-21-search-tools-page-batches
-Command: /ohmyorch:opsx-propose us-14-21-search-tools-page-batches for US-14.21; then set US-14.21 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-14.21 is READY and has no OpenSpec change
+Story: US-14.22
+Change: us-14-22-google-search-through-serpapi
+Command: /ohmyorch:opsx-propose us-14-22-google-search-through-serpapi for US-14.22; then set US-14.22 to IN PROGRESS with a Change: line in SPECS.md
+Reason: US-14.22 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

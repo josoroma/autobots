@@ -151,7 +151,7 @@ async def main() -> None:
               'github_repository environment owner/environment, github_token environment and no value', (before['github_repository'], before['github_token']),
               before['github_repository'][:2] == ('environment', 'owner/environment') and before['github_token'][:2] == ('environment', None))
         bare = {**environ, 'GITHUB_REPOSITORY': ' '}
-        dotenv_only = (await ToolKeySettings(db, key_file, bare).status(WORKSPACE_A))[3]
+        dotenv_only = next(item for item in await ToolKeySettings(db, key_file, bare).status(WORKSPACE_A) if item.name == 'github_repository')
         check('a blank process value falls through to the configuration root .env',
               'github_repository environment owner/dotenv', (dotenv_only.source, dotenv_only.value),
               (dotenv_only.source, dotenv_only.value) == ('environment', 'owner/dotenv'))

@@ -52,6 +52,8 @@ class ToolProvider(StrEnum):
     AUTOBOTS = "autobots"
     TAVILY = "tavily"
     JINA = "jina"
+    # Google search through SerpApi (Decision 0032 G1).
+    SERPAPI = "serpapi"
     YAHOO_FINANCE = "yahoo_finance"
     WORLD_BANK = "world_bank"
     GITHUB = "github"

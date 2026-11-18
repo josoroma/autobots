@@ -16,13 +16,14 @@ from autobots.operations.concept_seed import (
 GITHUB = {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "fake-token-for-tests"}
 
 
-def test_the_five_experts_and_six_workflows_are_sd_02s() -> None:
+def test_the_six_experts_and_six_workflows_are_sd_02s() -> None:
     assert [expert.name for expert in EXPERTS] == [
         "Market watcher",
         "Research analyst",
         "Brief writer",
         "Issue triager",
         "Code maintainer",
+        "Google bot",
     ]
     assert [workflow.name for workflow in WORKFLOWS] == [
         "Weekly competitor brief",

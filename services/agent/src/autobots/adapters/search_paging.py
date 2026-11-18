@@ -61,6 +61,17 @@ def pages_for(max_results: int) -> int:
 
 
 @dataclass(frozen=True)
+class Page[T]:
+    """One page's results, each with the URL it is de-duplicated by, and whether the provider says
+    another page exists. When it doesn't say (`more` is None), a page shorter than the page size
+    means there is none. SerpApi says, because a Google page often holds fewer than 10 ordinary
+    results while more exist (Decision 0032 G3)."""
+
+    items: Sequence[tuple[str, T]]
+    more: bool | None = None
+
+
+@dataclass(frozen=True)
 class Gathered[T]:
     """A call's results in rank order, and how its paging went."""
 
@@ -72,27 +83,29 @@ class Gathered[T]:
 
 
 async def gather[T](
-    # One page's results, each with the URL it is de-duplicated by. An empty URL never repeats.
-    fetch: Callable[[int], Awaitable[Sequence[tuple[str, T]]]],
+    # One page's results, as a `Page` or a plain sequence. An empty URL never repeats.
+    fetch: Callable[[int], Awaitable[Page[T] | Sequence[tuple[str, T]]]],
     max_results: int,
     *,
     page_size: int = PAGE_SIZE,
     planned: int | None = None,
 ) -> Gathered[T]:
     """Pages 1 to `planned`, by default `pages_for(max_results)`, in order, until a stop rule
-    holds. A page longer than `page_size` is cut to it, and one shorter means the provider has no
-    more."""
+    holds. A page longer than `page_size` is cut to it. One shorter means the provider has no more,
+    unless the page says itself whether more exist."""
     plan = pages_for(max_results) if planned is None else min(planned, MAX_PAGES)
     kept: list[T] = []
     seen: set[str] = set()
     removed = 0
     for page in range(1, plan + 1):
         try:
-            found = list(await fetch(page))
+            fetched = await fetch(page)
         except ToolFailed as error:
             if page == 1:
                 raise
             return Gathered(kept, page, "provider_error", removed, str(error) or "tool_failed")
+        answer = fetched if isinstance(fetched, Page) else Page(fetched)
+        found = list(answer.items)
         added = 0
         for url, item in found[:page_size]:
             if len(kept) >= max_results:
@@ -107,6 +120,7 @@ async def gather[T](
             added += 1
         if len(kept) >= max_results:
             return Gathered(kept, page, "enough", removed)
-        if len(found) < page_size or added == 0:
+        short = len(found) < page_size if answer.more is None else not answer.more
+        if short or added == 0:
             return Gathered(kept, page, "no_more", removed)
     return Gathered(kept, plan, "page_limit", removed)

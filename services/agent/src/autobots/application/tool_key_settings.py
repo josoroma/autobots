@@ -1,7 +1,7 @@
 """Settings → Keys & vars, Decisions 0024 (K3, K4, K6) and 0025 (V1 to V4), PRD-Tool-Catalog PK-07.
 
-The owner saves, replaces or removes each of a workspace's five items with an expected version.
-- Secrets (the Tavily key, the Jina key and the GitHub token) get a shape check only, and are
+The owner saves, replaces or removes each of a workspace's six items with an expected version.
+- Secrets (the Tavily, Jina and SerpApi keys and the GitHub token) get a shape check only, and are
   sealed with the master key, like the OpenRouter key.
 - Values (the GitHub repository and the browsing switch) are checked against their form, and kept
   as they are, since they aren't secret.

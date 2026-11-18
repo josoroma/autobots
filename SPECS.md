@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 on 2026-11-18. The sections its Codebase Context cites, Integration points and Tests and Quality Gates, were checked against the search adapters at `05bdb6f`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 and US-14.22 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 
@@ -105,6 +105,7 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-14.19: The cronjob tool manages the workspace's routines](#us-1419-the-cronjob-tool-manages-the-workspaces-routines)
   - [US-14.20: Tool guide, shown in a modal on the Tools page](#us-1420-tool-guide-shown-in-a-modal-on-the-tools-page)
   - [US-14.21: Search tools page in batches of 10, at most 3 pages a call](#us-1421-search-tools-page-in-batches-of-10-at-most-3-pages-a-call)
+  - [US-14.22: Google search through SerpApi, and a Google bot Expert](#us-1422-google-search-through-serpapi-and-a-google-bot-expert)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -490,6 +491,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-14.21#3 | Give new grants version 2 in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, record both changes as compatible, and pin version 2's schema digests. Update the guides for both tools. | DONE | US-14.21 |
 | US-14.21#4 | Cover the scenarios with fake-transport unit tests and a disposable database check through the gateway, with no live provider call. | DONE | US-14.21 |
 | US-14.21#5 | Update `CODEBASE.md`. | DONE | US-14.21 |
+| US-14.22 | Google search through SerpApi, and a Google bot Expert | DONE | EPIC-14 |
+| US-14.22#1 | Add migration 63, which adds `serpapi` to the provider lists of `app_private.provider_credentials` and `app_private.tool_key_settings`. Ship it in the readiness record and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`. | DONE | US-14.22 |
+| US-14.22#2 | Add the `serpapi` Keys & vars secret to the Python items, the settings contract, the routes and the web labels. Regenerate OpenAPI and the TypeScript client. Have `make start` pass `SERPAPI_API_KEY`, and name it in `.env.example` and the operations runbook. | DONE | US-14.22 |
+| US-14.22#3 | Register `google_search` v1 with provider `serpapi`: pages through the shared pager using SerpApi's next-page signal, Decision 0032's errors, metering and public fields, a guide, version and schema-digest pins, and a web label. | DONE | US-14.22 |
+| US-14.22#4 | Add Google bot to the concept seed and its checks. | DONE | US-14.22 |
+| US-14.22#5 | Cover the scenarios with fake-transport unit tests, harness tests and disposable database and browser checks, with no SerpApi search and no model call. | DONE | US-14.22 |
+| US-14.22#6 | Update `CODEBASE.md`. | DONE | US-14.22 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -754,6 +762,7 @@ flowchart TD
     US_14_19["US-14.19: The cronjob tool manages the workspace&#x27;s routines"]
     US_14_20["US-14.20: Tool guide, shown in a modal on the Tools page"]
     US_14_21["US-14.21: Search tools page in batches of 10, at most 3 pages a call"]
+    US_14_22["US-14.22: Google search through SerpApi, and a Google bot Expert"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -1036,6 +1045,9 @@ flowchart TD
   US_14_6 -.-> US_14_21
   US_14_7 -.-> US_14_21
   US_14_17 -.-> US_14_21
+  US_14_21 -.-> US_14_22
+  US_14_18 -.-> US_14_22
+  US_15_25 -.-> US_14_22
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1782,6 +1794,19 @@ flowchart TD
     US_14_21 --> T_14_21_4
     T_14_21_5["US-14.21#5: Update `CODEBASE.md`."]
     US_14_21 --> T_14_21_5
+    US_14_22["US-14.22: Google search through SerpApi, and a Google bot Expert"]
+    T_14_22_1["US-14.22#1: Add migration 63, which adds `serpapi` to the provider lists of `app_private.provider_credentials` and `app_private.tool_key_settings`. Ship it in the readiness record and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner&#x27;s `make migrate`."]
+    US_14_22 --> T_14_22_1
+    T_14_22_2["US-14.22#2: Add the `serpapi` Keys &amp; vars secret to the Python items, the settings contract, the routes and the web labels. Regenerate OpenAPI and the TypeScript client. Have `make start` pass `SERPAPI_API_KEY`, and name it in `.env.example` and the operations runbook."]
+    US_14_22 --> T_14_22_2
+    T_14_22_3["US-14.22#3: Register `google_search` v1 with provider `serpapi`: pages through the shared pager using SerpApi&#x27;s next-page signal, Decision 0032&#x27;s errors, metering and public fields, a guide, version and schema-digest pins, and a web label."]
+    US_14_22 --> T_14_22_3
+    T_14_22_4["US-14.22#4: Add Google bot to the concept seed and its checks."]
+    US_14_22 --> T_14_22_4
+    T_14_22_5["US-14.22#5: Cover the scenarios with fake-transport unit tests, harness tests and disposable database and browser checks, with no SerpApi search and no model call."]
+    US_14_22 --> T_14_22_5
+    T_14_22_6["US-14.22#6: Update `CODEBASE.md`."]
+    US_14_22 --> T_14_22_6
   end
 ```
 
@@ -6632,6 +6657,103 @@ Tasks:
 - [x] Register `search_web` v2 (Jina, `num` 10 and `page` n per page, `max_results` 1 to 30, a 70-second timeout) and `tavily_search` v2 (one request, `max_results` 1 to 20) with Decision 0031 S8's output and public fields. Keep version 1 of each registered and unchanged.
 - [x] Give new grants version 2 in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, record both changes as compatible, and pin version 2's schema digests. Update the guides for both tools.
 - [x] Cover the scenarios with fake-transport unit tests and a disposable database check through the gateway, with no live provider call.
+- [x] Update `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.22: Google search through SerpApi, and a Google bot Expert
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-14-22-google-search-through-serpapi/`
+
+As an Expert author whose runs research the web
+I want a `google_search` tool that searches Google through SerpApi with the key the reference really uses, set in Settings → Keys & vars or `.env`, and a seeded Google bot Expert that uses it
+So that a run can search Google in pages of 10, up to 30 results, with its key handled like every other tool key and nothing parsed from Google's own pages.
+
+Source:
+- [Decision 0032, G1 to G8](docs/engineering/decisions/0032-google-search-through-serpapi.md#decision)
+- [Decision 0032, SerpApi's Google search](docs/engineering/decisions/0032-google-search-through-serpapi.md#serpapis-google-search-read-2026-11-18)
+- [Decision 0032, what this doesn't establish](docs/engineering/decisions/0032-google-search-through-serpapi.md#what-this-doesnt-establish)
+- [Google search, GS-01 to GS-04](PRD-Tool-Catalog.md#google-search)
+- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
+- [Provider keys, PK-01 and PK-04 to PK-07](PRD-Tool-Catalog.md#provider-keys)
+- [Catalog contract, TC-02 and TC-03](PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
+- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
+- [Decision 0031, S1 to S9](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#decision)
+- [Decision 0017, C1, C2 and C5](docs/engineering/decisions/0017-tool-catalog.md#decision)
+- [Decision 0024, K1 to K7](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#decision)
+- [Decision 0025, V1 to V9](docs/engineering/decisions/0025-keys-and-vars.md#decision)
+- [Seed, SD-01 and SD-02](PRD-Studio.md#seed)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): the Tavily and Jina keys resolve per attempt by Keys & vars' order (`application/tool_keys.py`), and `make start` passes them through `scripts/tool_keys_env.py`. `adapters/search_paging.py` pages `search_web` v2. Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): migration 52 lists the providers `app_private.provider_credentials` and `app_private.tool_key_settings` allow, and readiness compares `SHIPPED_MIGRATIONS` with the applied migrations.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: google_search is a web search tool from SerpApi
+  Given the registry the catalog and the worker are built from, and a workspace with no SerpApi key in any source
+  When the catalog lists the group web_search and the schema-version pin test runs
+  Then google_search v1 appears once with provider serpapi, operation class read_only, cost class metered_provider and key requirement SERPAPI_API_KEY, its schemas are pinned, new grants take version 1, and it is key_missing with a repair that names Settings → Keys & vars and SERPAPI_API_KEY
+
+Scenario: google_search asks SerpApi for pages of 10
+  Given google_search over a fake SerpApi transport that serves three pages of 10 organic results, each reply naming a next page
+  When it is called with max_results 30
+  Then it sends three GET requests to serpapi.com/search.json with engine google, the query, start 0, 10 and 20, hl en and gl us, returns 30 results ranked 1 to 30 with title, url and snippet, and reports pages 3 and stopped enough
+
+Scenario: SerpApi's next-page signal decides when there are no more
+  Given a fake SerpApi transport whose first page holds 8 organic results and names a next page, and whose second holds 10 and names none, and another whose second page is a Fully empty reply
+  When google_search is called with max_results 30 over each
+  Then the first sends two requests, returns 18 results and stops no_more, and the second returns the first page's results, stops no_more and reports no page_error
+
+Scenario: SerpApi's failures are typed, and the key stays out of every output
+  Given fake SerpApi replies of 401 on the first page, 429 on the second page, and 200 with another error on the first page, and a workspace with no SerpApi key
+  When google_search is called over each, with a distinctive fake key where one is set
+  Then the first fails serpapi_key_refused, the second keeps the first page's results with stopped provider_error and page_error rate_limited, the third fails serpapi_search_failed, the last fails serpapi_key_missing before any request, and no output holds the key or provider text
+
+Scenario: The SerpApi key in Settings → Keys & vars
+  Given a disposable stack with an owner and a member in one workspace, another workspace, and SERPAPI_API_KEY unset in the API's environment
+  When the owner saves a fake SerpApi key, the member reads Keys & vars, the catalog is read in both workspaces, and the owner removes the key
+  Then serpapi is listed as a secret after jina, the saved key is sealed and never returned, google_search is available from settings in the first workspace and key_missing in the other, and after removal its source falls back to none
+
+Scenario: make start passes SERPAPI_API_KEY
+  Given a .env file with SERPAPI_API_KEY set and an unrelated variable
+  When scripts/tool_keys_env.py reads it
+  Then SERPAPI_API_KEY is exported, quoted, and the unrelated variable is not
+
+Scenario: Migration 63 allows the serpapi provider
+  Given a disposable database migrated through migration 62
+  When migration 63 is applied
+  Then app_private.provider_credentials and app_private.tool_key_settings accept serpapi and still refuse an unknown provider, readiness ships 63 migrations, and the schema snapshot matches
+
+Scenario: One metered call per Google search, with its pages recorded
+  Given a disposable database, a run whose scope grants google_search, and a fake SerpApi transport that serves three pages
+  When the run's gateway executes one google_search call with max_results 30
+  Then exactly one tool use is recorded and counted once against the metered limit, its public output holds result_count 30, pages 3, stopped enough, duplicates_removed 0, page_error null and truncated, and neither a result's text nor the key appears in the record
+
+Scenario: The concept seed adds Google bot
+  Given a disposable stack, a fresh workspace and no SerpApi, Jina or GitHub variable
+  When the concept seed runs twice
+  Then six Experts exist once each, Google bot among them, granted save_artifact and publish_artifact, saved without google_search and extract_website_content, and its purpose says so
+```
+
+Dependencies:
+- US-14.21
+- US-14.18
+- US-15.25
+
+Tasks:
+- [x] Add migration 63, which adds `serpapi` to the provider lists of `app_private.provider_credentials` and `app_private.tool_key_settings`. Ship it in the readiness record and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`.
+- [x] Add the `serpapi` Keys & vars secret to the Python items, the settings contract, the routes and the web labels. Regenerate OpenAPI and the TypeScript client. Have `make start` pass `SERPAPI_API_KEY`, and name it in `.env.example` and the operations runbook.
+- [x] Register `google_search` v1 with provider `serpapi`: pages through the shared pager using SerpApi's next-page signal, Decision 0032's errors, metering and public fields, a guide, version and schema-digest pins, and a web label.
+- [x] Add Google bot to the concept seed and its checks.
+- [x] Cover the scenarios with fake-transport unit tests, harness tests and disposable database and browser checks, with no SerpApi search and no model call.
 - [x] Update `CODEBASE.md`.
 
 Open Questions:

@@ -553,7 +553,7 @@ CREATE TABLE app_private.provider_credentials (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT provider_credentials_key_version_check CHECK ((key_version >= 1)),
     CONSTRAINT provider_credentials_nonce_check CHECK ((octet_length(nonce) = 12)),
-    CONSTRAINT provider_credentials_provider_check CHECK ((provider = ANY (ARRAY['openrouter'::text, 'tavily'::text, 'jina'::text, 'github'::text]))),
+    CONSTRAINT provider_credentials_provider_check CHECK ((provider = ANY (ARRAY['openrouter'::text, 'tavily'::text, 'jina'::text, 'github'::text, 'serpapi'::text]))),
     CONSTRAINT provider_credentials_status_check CHECK ((status = ANY (ARRAY['active'::text, 'superseded'::text, 'deleted'::text]))),
     CONSTRAINT provider_credentials_tag_check CHECK ((octet_length(tag) = 16)),
     CONSTRAINT provider_credentials_version_check CHECK ((version >= 1))
@@ -723,7 +723,7 @@ CREATE TABLE app_private.tool_key_settings (
     provider text NOT NULL,
     version integer DEFAULT 0 NOT NULL,
     value text,
-    CONSTRAINT tool_key_settings_provider_check CHECK ((provider = ANY (ARRAY['tavily'::text, 'jina'::text, 'github_token'::text, 'github_repository'::text, 'browser_executor'::text]))),
+    CONSTRAINT tool_key_settings_provider_check CHECK ((provider = ANY (ARRAY['tavily'::text, 'jina'::text, 'serpapi'::text, 'github_token'::text, 'github_repository'::text, 'browser_executor'::text]))),
     CONSTRAINT tool_key_settings_value_check CHECK (((value IS NULL) OR ((provider = 'github_repository'::text) AND (value ~ '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'::text)) OR ((provider = 'browser_executor'::text) AND (value = ANY (ARRAY['enabled'::text, 'disabled'::text]))))),
     CONSTRAINT tool_key_settings_version_check CHECK ((version >= 0))
 );

@@ -7,6 +7,7 @@ import pytest
 from autobots.adapters.search_paging import (
     MAX_PAGES,
     PAGE_SIZE,
+    Page,
     canonical_url,
     gather,
     pages_for,
@@ -162,3 +163,44 @@ async def test_one_request_for_the_whole_target_when_a_provider_cant_page() -> N
     short = Pages(page(0, count=7))
     found = await gather(short, 20, page_size=20, planned=1)
     assert (len(found.items), found.stopped) == (7, "no_more")
+
+
+class Signalled:
+    """Pages that say whether another exists, as SerpApi's do (Decision 0032 G3)."""
+
+    def __init__(self, *pages: Page[str]) -> None:
+        self.pages = pages
+        self.asked: list[int] = []
+
+    async def __call__(self, number: int) -> Page[str]:
+        self.asked.append(number)
+        return self.pages[number - 1]
+
+
+@pytest.mark.asyncio
+async def test_a_short_page_that_says_more_exist_keeps_the_paging() -> None:
+    pages = Signalled(Page(page(0, count=8), more=True), Page(page(10), more=False), Page(page(20)))
+    found = await gather(pages, 30)
+    assert pages.asked == [1, 2]
+    assert len(found.items) == 18
+    assert (found.pages, found.stopped) == (2, "no_more")
+
+
+@pytest.mark.asyncio
+async def test_a_full_page_that_says_none_remain_stops_the_paging() -> None:
+    pages = Signalled(Page(page(0), more=False), Page(page(10), more=True))
+    found = await gather(pages, 30)
+    assert pages.asked == [1]
+    assert (len(found.items), found.stopped) == (10, "no_more")
+
+
+@pytest.mark.asyncio
+async def test_an_empty_page_that_says_none_remain_is_no_more_not_an_error() -> None:
+    pages = Signalled(Page(page(0), more=True), Page([], more=False))
+    found = await gather(pages, 30)
+    assert (len(found.items), found.pages, found.stopped, found.page_error) == (
+        10,
+        2,
+        "no_more",
+        None,
+    )

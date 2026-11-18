@@ -50,6 +50,7 @@ test("every contract value has its label", () => {
     autobots: "Autobots, on this Mac",
     tavily: "Tavily",
     jina: "Jina",
+    serpapi: "SerpApi (Google)",
     yahoo_finance: "Yahoo Finance",
     world_bank: "World Bank",
     github: "GitHub",
@@ -148,6 +149,19 @@ test("a missing key that Settings can hold says to save it there or in .env", ()
       }),
     ),
     "Save a Jina key in Settings → Keys & vars, or set JINA_API_KEY in .env, then restart the worker and the API.",
+  );
+  // Decision 0032 G7: google_search's key is saved the same way.
+  assert.equal(
+    repairText(
+      tool({
+        availability: "key_missing",
+        key_requirement: requirement({
+          credential: "serpapi",
+          variables: ["SERPAPI_API_KEY"],
+        }),
+      }),
+    ),
+    "Save a SerpApi key in Settings → Keys & vars, or set SERPAPI_API_KEY in .env, then restart the worker and the API.",
   );
 });
 

@@ -201,3 +201,11 @@ class ExtractWebsiteOutput(WebOutput):
     content_markdown: str
     links: list[str]
     link_count: int
+
+
+class GoogleSearchInput(SearchWebV2Input):
+    """Decision 0032 G2: google_search's inputs, search_web v2's under Google's own name."""
+
+
+class GoogleSearchOutput(SearchWebV2Output):
+    """Decision 0032 G2: ranked results, as search_web v2 gives them."""

@@ -18,6 +18,7 @@ import psycopg
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.market_data import market_tools
 from autobots.adapters.remote_files import store_remote_file_tool
+from autobots.adapters.serpapi import google_search_tool
 from autobots.adapters.tavily import tavily_tools
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.runs import admit_run
@@ -59,6 +60,15 @@ def jina(request: httpx.Request) -> httpx.Response:
                                               'links': {'One': 'https://example.com/1'}}})
 
 
+def serpapi(request: httpx.Request) -> httpx.Response:
+    """US-14.22: SerpApi's Google search, ten distinct results a page, each reply naming a next page."""
+    start = int(request.url.params.get('start', '0'))
+    requests.append(f'serpapi:start{start}')
+    results = [{'position': n - start + 1, 'title': f'Colón {n}', 'link': f'https://example.com/g{n}', 'snippet': 'google result text ' * 300}
+               for n in range(start, start + 10)]
+    return httpx.Response(200, json={'organic_results': results, 'serpapi_pagination': {'next': 'https://serpapi.com/search.json'}})
+
+
 def markets(request: httpx.Request) -> httpx.Response:
     requests.append(f'market:{request.url.host}')
     if request.url.host == 'api.worldbank.org':
@@ -83,6 +93,7 @@ def gateway_over_fakes() -> ToolGateway:
         registry.register(tool)
     for tool in jina_tools(httpx.MockTransport(jina), environ={'JINA_API_KEY': 'jina_fixtureDB0123456'}, resolver=resolve):
         registry.register(tool)
+    registry.register(google_search_tool(httpx.MockTransport(serpapi), environ={'SERPAPI_API_KEY': 'serpapi_fixtureDB0123456'}))
     for tool in CODE_TOOLS:
         registry.register(tool)
     for tool in market_tools(httpx.MockTransport(markets)):
@@ -194,6 +205,37 @@ async def paged_search_is_one_metered_use(ctx: Tools) -> None:
                                                   'page_error': None, 'truncated': True}
           and uses[0].input_public == {'query': 'colones', 'max_results': 30}
           and 'paged result text' not in record and 'jina_' not in record)
+
+
+async def google_search_is_one_metered_use(ctx: Tools) -> None:
+    """US-14.22: a three-page google_search call is one metered tool use that records its pages."""
+    check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
+    await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+    admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='google search', limit_micro_usd=1000, policy=resolve_role_policy())
+    lease = await claim_next(db, worker_id='google-search', lease_seconds=120)
+    assert lease is not None
+    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'google_search': 1}, ('outputs',))
+    requests.clear()
+    found = await gateway.execute(db, scope, 'google_search', {'query': 'colones', 'max_results': 30})
+    out = found.output or {}
+    ranks = [item.get('rank') for item in out.get('results', [])]
+    pages = [entry for entry in requests if entry.startswith('serpapi:')]
+    check('a three-page Google search returns 30 ranked results from start 0, 10 and 20', 'succeeded, ranks 1-30, start0-start20',
+          (found.outcome.value, ranks[:1] + ranks[-1:], pages),
+          found.outcome.value == 'succeeded' and ranks == list(range(1, 31)) and pages == ['serpapi:start0', 'serpapi:start10', 'serpapi:start20'])
+    listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
+    uses = listed.uses if listed else []
+    metered = await (await db.execute('select metered from app_private.tool_uses where run_id = %s order by id', (admitted.run_id,))).fetchall()
+    check('the Google search is one tool use, counted once against the metered limit', 'one google_search v1 use, metered once',
+          ([(use.tool_id, use.tool_version, use.outcome, use.provider) for use in uses], [row[0] for row in metered]),
+          [(use.tool_id, use.tool_version, use.outcome, use.provider) for use in uses] == [('google_search', 1, 'succeeded', 'serpapi')]
+          and [row[0] for row in metered] == [True])
+    record = uses[0].model_dump_json() if uses else ''
+    check('the Google search record holds the paging counts, and no result text or key', '30 results, 3 pages, enough, none removed, no error, cut',
+          uses[0].output_public if uses else None,
+          bool(uses) and uses[0].output_public == {'result_count': 30, 'pages': 3, 'stopped': 'enough', 'duplicates_removed': 0,
+                                                  'page_error': None, 'truncated': True}
+          and 'google result text' not in record and 'serpapi_fixture' not in record)
 
 
 async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
@@ -357,6 +399,7 @@ SCENARIOS = (
     tavily_calls_are_bounded_and_recorded,
     jina_calls_are_bounded_and_recorded,
     paged_search_is_one_metered_use,
+    google_search_is_one_metered_use,
     file_tools_read_inputs_and_guard_stores,
     market_data_counts_against_the_tree,
     code_tools_stay_in_the_runs_files,

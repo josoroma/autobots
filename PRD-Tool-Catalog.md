@@ -13,7 +13,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`, or `by_action` for a tool whose actions differ, Decision 0026 C9), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
 
-**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, and `automation` (Decision 0026). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`.
+**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, and `automation` (Decision 0026). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, and `serpapi` by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md).
 
 **TC-04. Availability.** `available`, `key_missing`, `disabled_by_policy` or `not_qualified`, computed per request from the worker-facing configuration and never stored. It shows whether a key is set, never its value, prefix, length or hash.
 
@@ -63,17 +63,18 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 |---|---|
 | `TAVILY_API_KEY` | `tavily_search`, `tavily_extract`, `tavily_map`, `tavily_crawl` |
 | `JINA_API_KEY` | `search_web`, `extract_website_content` |
+| `SERPAPI_API_KEY` | `google_search` (Decision 0032) |
 | `GITHUB_REPOSITORY`, `GITHUB_TOKEN` | `create_github_issue` and the GitHub tools of PRD-Studio (Decision 0007, names by the owner's rename; PK-07 for Settings) |
 
 **PK-02.** A missing key makes only that provider's tools `key_missing`. A run or Expert that grants an unavailable tool is refused at admission or save with a typed code; other runs are unaffected.
 
 **PK-03.** No live key check runs automatically. Tests use fake transports even when a real key is present.
 
-**PK-04.** By [Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
+**PK-04.** By [Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys, and the SerpApi key by Decision 0032 G7, resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
 
 **PK-05.** Settings → Tool keys (since PK-07, Settings → Keys & vars) lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
 
-**PK-06.** `make start` passes `TAVILY_API_KEY` and `JINA_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it, except that it also passes `AUTOBOTS_BROWSER_EXECUTOR=enabled` when the file sets exactly that value (Decision 0024 K7).
+**PK-06.** `make start` passes `TAVILY_API_KEY`, `JINA_API_KEY` and, by Decision 0032 G7, `SERPAPI_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it, except that it also passes `AUTOBOTS_BROWSER_EXECUTOR=enabled` when the file sets exactly that value (Decision 0024 K7).
 
 **PK-07.** By [Decision 0025](docs/engineering/decisions/0025-keys-and-vars.md), Settings → Tool keys becomes **Settings → Keys & vars**.
 - **What it holds.** It adds the GitHub token as a third secret. It also holds two values that aren't secret: the GitHub repository (`owner/name`) and the browsing switch (`enabled` or `disabled`).
@@ -99,6 +100,7 @@ All are `read_only`, `metered_provider`, use `httpx` through an injectable trans
 | `tavily_crawl` | Tavily | Map's inputs plus `extract_depth`, `limit` ≤ 20 → `results[] {url, content_markdown}` |
 | `search_web` | Jina (`s.jina.ai`) | `query`, `max_results` ≤ 10 → `results[] {title, url, snippet}` |
 | `extract_website_content` | Jina (`r.jina.ai`, reader mode) | `url` → `url`, `content_markdown`, `links[]` |
+| `google_search` | SerpApi (Google, Decision 0032) | `query`, `max_results` 1 to 30 → as `search_web` v2 (see Search paging and Google search) |
 
 Every URL passes the URL guard before it is sent. Fetched text is labelled third-party in the tool output.
 
@@ -106,7 +108,7 @@ Every URL passes the URL guard before it is sent. Fetched text is labelled third
 
 By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md). Version 1 of each search tool, in the table above, stays registered unchanged for grants that pinned it.
 
-**WS-01. Search tools.** `search_web` and `tavily_search`, the group `web_search`. No other tool pages.
+**WS-01. Search tools.** `search_web`, `tavily_search` and, by Decision 0032, `google_search`: the group `web_search`. No other tool pages.
 
 **WS-02. Batches.** A page is 10 results, and a call requests at most 3 pages, planned as `ceil(max_results / 10)`. `search_web` v2 sends `q`, `num: 10` and `page: n` to `s.jina.ai` for each page. Tavily has no next-page request, so `tavily_search` v2 asks once for up to 20 results.
 
@@ -122,6 +124,25 @@ By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-
 **WS-05. Spend.** A search call is one metered call under TU-06, admitted before its first page. Its public output records `pages`, the provider requests it made. The key is resolved once per call, and no page is retried.
 
 **WS-06. Errors.** A first-page failure fails the call with its typed code. A later page's failure keeps the earlier pages' results, with `stopped: provider_error` and the typed code as `page_error`. Provider text never reaches the model. `search_web` v2's 70-second timeout holds three 20-second requests.
+
+## Google search
+
+By [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md), G1 to G8.
+
+**GS-01.** `google_search` v1 searches Google through SerpApi only, with `SERPAPI_API_KEY`. It never fetches or parses Google's own pages.
+
+**GS-02.** Page n is one request with `engine=google`, `q`, `start = (n - 1) * 10`, `hl=en` and `gl=us`, under WS-02's plan and cap. Paging ends when a reply has no `serpapi_pagination.next`, not at a page with fewer than 10 results. A "Fully empty" reply is an empty page.
+
+**GS-03.** Failures keep WS-06's rule and these codes:
+- 401 or 403 is `serpapi_key_refused`;
+- 429 is `rate_limited`;
+- another 4xx is `provider_refused_<status>`;
+- 5xx or no answer is `provider_unavailable`;
+- another reply with `error` is `serpapi_search_failed`.
+
+The key travels only in that request's query string, and no URL or provider text is kept.
+
+**GS-04.** The SerpApi key is a Keys & vars secret by PK-04 and PK-07, and `make start` passes it by PK-06.
 
 ## File tools
 

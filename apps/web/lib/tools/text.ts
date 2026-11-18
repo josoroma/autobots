@@ -12,6 +12,7 @@ export const PROVIDER_LABEL: Readonly<
   autobots: "Autobots, on this Mac",
   tavily: "Tavily",
   jina: "Jina",
+  serpapi: "SerpApi (Google)",
   yahoo_finance: "Yahoo Finance",
   world_bank: "World Bank",
   github: "GitHub",
@@ -59,10 +60,12 @@ export const APPROVAL_TEXT: Readonly<
   never: "Not needed",
 };
 
-// Decisions 0024 and 0025: these keys can also be saved per workspace in Settings → Keys & vars.
+// Decisions 0024, 0025 and 0032 G7: these keys can also be saved per workspace in Settings → Keys &
+// vars.
 const SAVABLE_KEYS: Readonly<Record<string, string>> = {
   tavily: "Tavily",
   jina: "Jina",
+  serpapi: "SerpApi",
 };
 
 /** What the key and repair words read from a tool. */

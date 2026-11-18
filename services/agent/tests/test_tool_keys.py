@@ -356,6 +356,7 @@ async def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_pat
 USABLE = {
     "tavily": "tvly-fixtureUsable01",
     "jina": "jina_fixtureUsable001",
+    "serpapi": "serpapi_fixtureUsable01",
     "github_token": "github_pat_fixtureUse1",
     "github_repository": "owner/fixture",
     "browser_executor": "enabled",
@@ -363,6 +364,7 @@ USABLE = {
 UNUSABLE = {
     "tavily": "has a space",
     "jina": "short",
+    "serpapi": "has a space",
     "github_token": "has a space",
     "github_repository": "https://evil.example/owner/repo",
     "browser_executor": "on",
@@ -504,7 +506,7 @@ async def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch)
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query:
                 return ScriptedRows([("github_repository", "owner/saved")])
-            return ScriptedRows([("tavily",), ("jina",), ("github",)])
+            return ScriptedRows([("tavily",), ("jina",), ("serpapi",), ("github",)])
 
     view = await key_sources(Everything(), uuid4(), {})
     secrets = [item.variable for item in ITEMS.values() if item.secret]

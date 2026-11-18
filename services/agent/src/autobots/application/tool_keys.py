@@ -1,12 +1,12 @@
 """Settings → Keys & vars: where each key and value comes from, Decisions 0024 and 0025.
 
-Five items, per workspace: the Tavily key, the Jina key and the GitHub token, which are secrets, and
-the GitHub repository and the browsing switch, which aren't. Highest first: the value saved in
-Settings, the process environment, then the `.env` files under the configuration root in MP-03's
-order. The first non-blank value wins. `resolve` is the one place that order is written (PTOL-12),
-and `ITEMS` the one description of each item. A call resolves its item inside the attempt (PK-01),
-so a change applies to the next call without a restart. Availability needs only where a secret
-comes from, so it never unseals one.
+Six items, per workspace: the Tavily key, the Jina key, the SerpApi key (Decision 0032 G7) and the
+GitHub token, which are secrets, and the GitHub repository and the browsing switch, which aren't.
+Highest first: the value saved in Settings, the process environment, then the `.env` files under
+the configuration root in MP-03's order. The first non-blank value wins. `resolve` is the one place
+that order is written (PTOL-12), and `ITEMS` the one description of each item. A call resolves its
+item inside the attempt (PK-01), so a change applies to the next call without a restart.
+Availability needs only where a secret comes from, so it never unseals one.
 """
 
 import re
@@ -67,6 +67,7 @@ ITEMS: dict[str, Item] = {
     for item in (
         Item("tavily", "TAVILY_API_KEY", "tavily", looks_usable, "that key was not accepted"),
         Item("jina", "JINA_API_KEY", "jina", looks_usable, "that key was not accepted"),
+        Item("serpapi", "SERPAPI_API_KEY", "serpapi", looks_usable, "that key was not accepted"),
         Item("github_token", "GITHUB_TOKEN", "github", looks_usable, "that key was not accepted"),
         Item(
             "github_repository",

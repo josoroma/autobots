@@ -45,6 +45,8 @@ PROVIDER_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "tavily_crawl": 1,
         "search_web": 2,
         "extract_website_content": 1,
+        # Google through SerpApi (Decision 0032).
+        "google_search": 1,
         "market_history": 1,
         "inflation_rates": 1,
     }

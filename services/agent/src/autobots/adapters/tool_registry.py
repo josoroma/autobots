@@ -16,6 +16,7 @@ from autobots.adapters.github_reads import GITHUB_READ_TOOLS
 from autobots.adapters.jina import JINA_TOOLS
 from autobots.adapters.market_data import MARKET_TOOLS
 from autobots.adapters.remote_files import STORE_REMOTE_FILE
+from autobots.adapters.serpapi import GOOGLE_SEARCH
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.application import browsing_tool
 from autobots.application.artifact_tool import publish_tool
@@ -66,6 +67,7 @@ def tool_definitions(
         GITHUB_PULL_REQUEST,
         *TAVILY_TOOLS,
         *JINA_TOOLS,
+        GOOGLE_SEARCH,
         *MARKET_TOOLS,
         *CODE_TOOLS,
         cronjob_tool(CATALOG),

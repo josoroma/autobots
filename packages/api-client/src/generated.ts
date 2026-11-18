@@ -2221,6 +2221,7 @@ export const schemas = {
         "enum": [
           "tavily",
           "jina",
+          "serpapi",
           "github_token",
           "github_repository",
           "browser_executor"
@@ -6267,6 +6268,7 @@ export const schemas = {
           "autobots",
           "tavily",
           "jina",
+          "serpapi",
           "yahoo_finance",
           "world_bank",
           "github"
@@ -8345,7 +8347,7 @@ export function parseJobsChart(value: unknown): JobsChart {
 
 export interface KeyOrVar {
   kind: "secret" | "value";
-  name: "tavily" | "jina" | "github_token" | "github_repository" | "browser_executor";
+  name: "tavily" | "jina" | "serpapi" | "github_token" | "github_repository" | "browser_executor";
   source: "settings" | "environment" | null;
   value: string | null;
   variable: string;
@@ -9361,7 +9363,7 @@ export interface ToolDescriptor {
   network: boolean;
   operation_class: "pure" | "read_only" | "reversible_internal_write" | "consequential_external_write" | "arbitrary_execution";
   output_schema: Record<string, unknown>;
-  provider: "autobots" | "tavily" | "jina" | "yahoo_finance" | "world_bank" | "github";
+  provider: "autobots" | "tavily" | "jina" | "serpapi" | "yahoo_finance" | "world_bank" | "github";
   registered: boolean;
   side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
   title: string;
@@ -10060,7 +10062,7 @@ export async function validateOpenRouter(options: ClientOptions, request?: Reque
 export type ListToolsQuery = {
   group?: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | null | undefined;
   availability?: "available" | "key_missing" | "disabled_by_policy" | "not_qualified" | null | undefined;
-  provider?: "autobots" | "tavily" | "jina" | "yahoo_finance" | "world_bank" | "github" | null | undefined;
+  provider?: "autobots" | "tavily" | "jina" | "serpapi" | "yahoo_finance" | "world_bank" | "github" | null | undefined;
 };
 
 export async function listTools(options: ClientOptions, query?: ListToolsQuery, request?: RequestOptions): Promise<ToolCatalog> {

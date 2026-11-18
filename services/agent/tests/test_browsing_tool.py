@@ -18,7 +18,8 @@ from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolR
 from autobots.contracts.browsing import BrowseGoalInput
 from sql_fakes import ScriptedConnection
 
-TC_03_PROVIDERS = {"autobots", "tavily", "jina", "yahoo_finance", "world_bank", "github"}
+# PRD-Tool-Catalog TC-03, with serpapi by Decision 0032.
+TC_03_PROVIDERS = {"autobots", "tavily", "jina", "serpapi", "yahoo_finance", "world_bank", "github"}
 CATALOG = catalog()
 ARGS = {
     "task": "What is example.com for?",

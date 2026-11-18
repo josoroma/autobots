@@ -72,7 +72,9 @@ class ExpectedVersion(BaseModel):
     expected_version: int = Field(ge=0)
 
 
-KeyOrVarName = Literal["tavily", "jina", "github_token", "github_repository", "browser_executor"]
+KeyOrVarName = Literal[
+    "tavily", "jina", "serpapi", "github_token", "github_repository", "browser_executor"
+]
 
 
 class KeyOrVar(BaseModel):

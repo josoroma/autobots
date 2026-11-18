@@ -28,6 +28,7 @@ TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
         "github_open_pull_request": 1,
         "github_read_file": 1,
         "github_search_issues": 1,
+        "google_search": 1,
         "inflation_rates": 1,
         "market_history": 1,
         "patch_code_file": 1,

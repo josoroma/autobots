@@ -2220,6 +2220,7 @@
             "enum": [
               "tavily",
               "jina",
+              "serpapi",
               "github_token",
               "github_repository",
               "browser_executor"
@@ -6266,6 +6267,7 @@
               "autobots",
               "tavily",
               "jina",
+              "serpapi",
               "yahoo_finance",
               "world_bank",
               "github"
@@ -15386,6 +15388,7 @@
               "enum": [
                 "tavily",
                 "jina",
+                "serpapi",
                 "github_token",
                 "github_repository",
                 "browser_executor"
@@ -15549,6 +15552,7 @@
               "enum": [
                 "tavily",
                 "jina",
+                "serpapi",
                 "github_token",
                 "github_repository",
                 "browser_executor"
@@ -16781,6 +16785,7 @@
                     "autobots",
                     "tavily",
                     "jina",
+                    "serpapi",
                     "yahoo_finance",
                     "world_bank",
                     "github"

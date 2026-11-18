@@ -20,7 +20,7 @@ import psycopg
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = sys.argv[1]
 ROOT = Path(__file__).resolve().parents[3]
-EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer']
+EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot']
 WORKFLOWS = ['Weekly competitor brief', 'Monthly FX and inflation note', 'Nightly test triage', 'Interview synthesis',
              'Release notes from merged PRs', 'Vendor due diligence']
 DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis'}
@@ -59,7 +59,7 @@ def main() -> None:
         first, second = run_seed(), run_seed()
         experts = rows(db, 'select name, count(*) from public.experts where workspace_id = %s and name = any(%s) group by name', WORKSPACE, EXPERTS)
         flows = rows(db, 'select name, count(*) from public.workflows where workspace_id = %s and name = any(%s) group by name', WORKSPACE, WORKFLOWS)
-        check('run twice, each Expert and workflow is there once', '5 Experts and 6 workflows, once each',
+        check('run twice, each Expert and workflow is there once', '6 Experts and 6 workflows, once each',
               (sorted(experts), sorted(flows)), sorted(name for name, count in experts if count == 1) == sorted(EXPERTS)
               and sorted(name for name, count in flows if count == 1) == sorted(WORKFLOWS))
         kept = set(second['experts'].values()) | set(second['workflows'].values())
@@ -96,6 +96,12 @@ def main() -> None:
         publishing = {name: 'publish_artifact' in configs[name]['tools'] for name in ('Market watcher', 'Research analyst', 'Brief writer')}
         check('every concept Expert that saves files can also publish them', 'Market watcher, Research analyst and Brief writer publish',
               publishing, all(publishing.values()))
+        # US-14.22, Decision 0032 G8: with no SerpApi or Jina variable, Google bot keeps only what is available, and says so.
+        bot = configs.get('Google bot', {})
+        check('Google bot is saved without google_search and extract_website_content, and says so in its purpose',
+              'save_artifact and publish_artifact only; purpose names both missing tools', (bot.get('tools'), bot.get('purpose')),
+              bot.get('tools') == ['save_artifact', 'publish_artifact'] and 'Saved without' in bot.get('purpose', '')
+              and 'google_search' in bot.get('purpose', '') and 'extract_website_content' in bot.get('purpose', ''))
         labels = rows(db, "select v.graph -> 'nodes' from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
                           "where w.workspace_id = %s and w.name = 'Vendor due diligence'", WORKSPACE)
         steps = [node.get('label') for node in labels[0][0] if node.get('block') == 'agent'] if labels else []

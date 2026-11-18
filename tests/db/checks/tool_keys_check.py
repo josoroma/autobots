@@ -45,7 +45,8 @@ DOTENV_JINA = "jina_fixtureConfigRoot0001"
 SAVED_TAVILY = "tvly-fixtureSavedFirst0001"
 REPLACED_TAVILY = "tvly-fixtureSavedSecond002"
 SAVED_JINA = "jina_fixtureSavedFirst0001"
-SECRETS = (ENV_TAVILY, DOTENV_JINA, SAVED_TAVILY, REPLACED_TAVILY, SAVED_JINA)
+SAVED_SERPAPI = "serpapi_fixtureSavedFirst01"
+SECRETS = (ENV_TAVILY, DOTENV_JINA, SAVED_TAVILY, REPLACED_TAVILY, SAVED_JINA, SAVED_SERPAPI)
 seen: list[str] = []
 
 
@@ -124,7 +125,7 @@ class Keys:
         for workspace in (WORKSPACE_A, self.other):
             await self.db.execute(
                 "update app_private.provider_credentials set status = 'deleted' "
-                "where workspace_id = %s and provider in ('tavily', 'jina') and status = 'active'",
+                "where workspace_id = %s and provider in ('tavily', 'jina', 'serpapi') and status = 'active'",
                 (workspace,),
             )
         self.settings = ToolKeySettings(self.db, key_file, environ)
@@ -362,12 +363,87 @@ async def sealed_keys_stay_out_of_durable_state(ctx: Keys) -> None:
 
 
 # In order: saves_are_versioned and keys_resolve_per_attempt read the versions the scenario before them saw.
+async def serpapi_key_is_a_keys_and_vars_secret(ctx: Keys) -> None:
+    """US-14.22, Decision 0032 G7: the SerpApi key is a sixth item, a secret saved, sealed and
+    removed like the others, and google_search's availability follows it per workspace."""
+    check, config_root, db, other, settings = ctx.cases.check, ctx.config_root, ctx.db, ctx.other, ctx.settings
+    listed = await settings.status(WORKSPACE_A)
+    names = [(state.name, state.kind) for state in listed]
+    check(
+        "Keys & vars lists the SerpApi key as a secret after the Jina key",
+        "tavily, jina, serpapi as secrets, then the GitHub items",
+        names,
+        names[:4] == [("tavily", "secret"), ("jina", "secret"), ("serpapi", "secret"), ("github_token", "secret")],
+    )
+    before = {state.name: state for state in listed}["serpapi"]
+    await settings.save(WORKSPACE_A, "serpapi", SAVED_SERPAPI, before.version)
+    saved = {state.name: state for state in await settings.status(WORKSPACE_A)}["serpapi"]
+    rows = await (await db.execute(
+        "select ciphertext from app_private.provider_credentials "
+        "where workspace_id = %s and provider = 'serpapi' and status = 'active'",
+        (WORKSPACE_A,),
+    )).fetchall()
+    sealed = len(rows) == 1 and SAVED_SERPAPI.encode() not in bytes(rows[0][0])
+    check(
+        "a saved SerpApi key is sealed and never returned",
+        "source settings, no value, one sealed row",
+        (saved.source, saved.value, len(rows), sealed),
+        saved.source == "settings" and saved.value is None and sealed,
+    )
+    bare = {"AUTOBOTS_CONFIG_ROOT": str(config_root / "missing"), "NODE_ENV": "development"}
+    found_a = {
+        tool.tool_id: (tool.availability, tool.key_requirement.source if tool.key_requirement else None)
+        for tool in tool_registry.catalog().catalog(await key_sources(db, WORKSPACE_A, bare)).tools
+    }
+    found_other = {
+        tool.tool_id: tool.availability
+        for tool in tool_registry.catalog().catalog(await key_sources(db, other, bare)).tools
+    }
+    check(
+        "google_search is available from Settings in its workspace and key_missing in another",
+        "available from settings; key_missing",
+        (found_a.get("google_search"), found_other.get("google_search")),
+        found_a.get("google_search") == ("available", "settings") and found_other.get("google_search") == "key_missing",
+    )
+    # Migration 63 widened both lists to serpapi only: any other provider is still refused.
+    refused: list[str] = []
+    for statement, values in (
+        ("insert into app_private.tool_key_settings (workspace_id, provider) values (%s, 'serper')", (other,)),
+        (
+            "insert into app_private.provider_credentials (credential_id, version, workspace_id, provider, ciphertext, "
+            "nonce, tag, key_version, status) values (%s, 1, %s, 'serper', '\\x00', %s, %s, 1, 'deleted')",
+            (uuid4(), other, bytes(12), bytes(16)),
+        ),
+    ):
+        try:
+            async with db.transaction():
+                await db.execute(statement, values)
+            refused.append("accepted")
+        except psycopg.errors.CheckViolation:
+            refused.append("check_violation")
+    check(
+        "both provider lists accept serpapi and still refuse an unknown provider",
+        "serpapi saved above; serper refused by both checks",
+        refused,
+        refused == ["check_violation", "check_violation"],
+    )
+    await settings.remove(WORKSPACE_A, "serpapi", saved.version)
+    removed = {state.name: state for state in await settings.status(WORKSPACE_A)}["serpapi"]
+    check(
+        "removing the SerpApi key falls back to the next source, here none",
+        "source none",
+        removed.source,
+        removed.source is None,
+    )
+
+
 SCENARIOS = (
     settings_then_environment_then_dotenv,
     saves_are_versioned,
     keys_resolve_per_attempt,
     removing_falls_back_to_dotenv,
     availability_admission_and_save_agree,
+    serpapi_key_is_a_keys_and_vars_secret,
     sealed_keys_stay_out_of_durable_state,
 )
 

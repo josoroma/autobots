@@ -45,9 +45,11 @@ class ToolKeysEnv(unittest.TestCase):
     def test_only_the_listed_variables_are_passed_and_shell_syntax_stays_data(self):
         hostile = "tvly-fixture$(touch pwned)`touch pwned2`'\"; touch pwned3"
         env, work = self.launch_env(f"TAVILY_API_KEY='{hostile}'\nJINA_API_KEY=jina_fixtureOnly0001\nOPENROUTER_API_KEY=sk-or-fixture\nOTHER=1\n"
-                               "GITHUB_REPOSITORY=owner/throwaway\nGITHUB_TOKEN='github_pat_fixture; touch pwned4'\n")
+                               "GITHUB_REPOSITORY=owner/throwaway\nGITHUB_TOKEN='github_pat_fixture; touch pwned4'\n"
+                               "SERPAPI_API_KEY='serpapi_fixture; touch pwned5'\n")
         self.assertEqual(env.get('TAVILY_API_KEY'), hostile.strip("'"))
         self.assertEqual(env.get('JINA_API_KEY'), 'jina_fixtureOnly0001')
+        self.assertEqual(env.get('SERPAPI_API_KEY'), 'serpapi_fixture; touch pwned5')
         self.assertEqual(env.get('GITHUB_REPOSITORY'), 'owner/throwaway')
         self.assertEqual(env.get('GITHUB_TOKEN'), 'github_pat_fixture; touch pwned4')
         self.assertNotIn('OPENROUTER_API_KEY', env)
@@ -66,8 +68,8 @@ class ToolKeysEnv(unittest.TestCase):
         self.assertNotIn('OTHER', printed)
 
     def test_blank_keys_and_a_missing_file_pass_nothing(self):
-        env, _ = self.launch_env('TAVILY_API_KEY=\nJINA_API_KEY=   \nGITHUB_REPOSITORY=\nGITHUB_TOKEN= \n')
-        for name in ('TAVILY_API_KEY', 'JINA_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN'):
+        env, _ = self.launch_env('TAVILY_API_KEY=\nJINA_API_KEY=   \nSERPAPI_API_KEY=\nGITHUB_REPOSITORY=\nGITHUB_TOKEN= \n')
+        for name in ('TAVILY_API_KEY', 'JINA_API_KEY', 'SERPAPI_API_KEY', 'GITHUB_REPOSITORY', 'GITHUB_TOKEN'):
             self.assertNotIn(name, env)
         missing = run_cli([sys.executable, str(SCRIPT), '/nonexistent/.env'], text=True)
         self.assertEqual((missing.returncode, missing.stdout, missing.stderr), (0, '', ''))
