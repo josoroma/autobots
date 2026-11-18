@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | US-14.22 |
 | Kind | story |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-18 |
 | Updated | 2026-11-18 |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.22 | us-14-22-google-search-through-serpapi | READY | Google search through SerpApi, and a Google bot Expert |
+| 1 | US-14.22 | us-14-22-google-search-through-serpapi | DONE | Google search through SerpApi, and a Google bot Expert |
 
 ## Next Action
 
-Action: propose
-Story: US-14.22
-Change: us-14-22-google-search-through-serpapi
-Command: /ohmyorch:opsx-propose us-14-22-google-search-through-serpapi for US-14.22; then set US-14.22 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-14.22 is READY and has no OpenSpec change
+Action: complete
+Story: -
+Change: -
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
