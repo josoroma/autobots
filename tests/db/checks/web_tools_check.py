@@ -26,7 +26,7 @@ from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.runs import admit_run
 from autobots.application.tool_definitions import ToolRegistry, ToolScope
 from autobots.application.tool_gateway import ToolGateway
-from autobots.application.tool_uses import list_tool_uses
+from autobots.application.tool_uses import METERED_TOOL_CALLS, list_tool_uses
 from autobots.application.tools import READ_CSV, READ_RUN_FILE, READ_RUN_FILE_V2
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument
@@ -379,7 +379,7 @@ async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
 
 
 async def market_data_counts_against_the_tree(ctx: Tools) -> None:
-    """US-14.10: market data counts against the run tree's 20 metered calls."""
+    """US-14.10: market data counts against the run tree's metered calls, 40 by Decision 0034 L3."""
     check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
     await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
     admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='market data', limit_micro_usd=1000, policy=resolve_role_policy())
@@ -387,19 +387,19 @@ async def market_data_counts_against_the_tree(ctx: Tools) -> None:
     assert lease is not None
     scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'market_history': 1, 'inflation_rates': 1}, ('outputs',))
     requests.clear()
-    priced = [await gateway.execute(db, scope, 'market_history', {'symbols': ['BTC-USD']}) for _ in range(19)]
+    priced = [await gateway.execute(db, scope, 'market_history', {'symbols': ['BTC-USD']}) for _ in range(METERED_TOOL_CALLS - 1)]
     rates = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024})
     late = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['CRI'], 'start_year': 2024, 'end_year': 2024})
     wrong = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['MEX'], 'start_year': 2024, 'end_year': 2024})
     out = rates.output or {}
-    check('inflation is returned with its indicator and source, as the 20th metered call', 'EMU 2024 2.36, FP.CPI.TOTL.ZG',
+    check(f'inflation is returned with its indicator and source, as the last of {METERED_TOOL_CALLS} metered calls', 'EMU 2024 2.36, FP.CPI.TOTL.ZG',
           (rates.outcome.value, out.get('countries'), out.get('indicator')),
           all(item.outcome.value == 'succeeded' for item in priced) and rates.outcome.value == 'succeeded'
           and out.get('countries') == [{'country': 'EMU', 'name': 'Euro area', 'rows': [{'year': 2024, 'inflation_pct': 2.36}]}]
           and out.get('indicator') == 'FP.CPI.TOTL.ZG' and 'World Bank' in out.get('source', ''))
-    check('the 21st metered call is denied before any request, and another country is refused first',
-          'tool_budget_exceeded, invalid_arguments, 20 requests', (late.code, wrong.code, len(requests)),
-          late.code == 'tool_budget_exceeded' and wrong.code == 'invalid_arguments' and len(requests) == 20)
+    check('the next metered call is denied before any request, and another country is refused first',
+          f'tool_budget_exceeded, invalid_arguments, {METERED_TOOL_CALLS} requests', (late.code, wrong.code, len(requests)),
+          late.code == 'tool_budget_exceeded' and wrong.code == 'invalid_arguments' and len(requests) == METERED_TOOL_CALLS)
     listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
     last = [use for use in (listed.uses if listed else []) if use.tool_id == 'inflation_rates']
     check("the inflation call's record names its countries and source, not its values", 'countries, years, source',

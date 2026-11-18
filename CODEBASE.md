@@ -75,7 +75,7 @@ Versions as recorded in the previous refresh (2026-11-06). Neither the manifests
 Layers under `services/agent/src/autobots/`:
 
 - **`domain/`:** pure rules.
-  - `models.py`: three approved profiles, 14 roles, `BindingSource` (run override, workspace override, workspace default, built-in default), `OFFERED_FOR_NEW_RUNS = {Terra, Sol}`, and `MAX_OUTPUT_TOKENS = 512`.
+  - `models.py`: three approved profiles, 14 roles, `BindingSource` (run override, workspace override, workspace default, built-in default), `OFFERED_FOR_NEW_RUNS = {Terra, Sol}`, and `MAX_OUTPUT_TOKENS = 512`. Since Decision 0034 L1 and L4, after the analyzed revision, `MAX_OUTPUT_TOKENS` is 4,096 and `MODEL_CALL_SECONDS` is 300.
   - `budgets.py`: US$0.25–US$5.00 in US$0.25 steps.
   - Also `runs.py`, `tools.py`, `tool_catalog.py`, `workflows.py` (`ir_normalized`), `workflow_execution.py`, `routines.py`, `execution.py`.
   - `secret_patterns.py`, added after the analyzed revision: the secret shapes that both log redaction and shown text (`public_text`) mask.
@@ -100,10 +100,12 @@ Layers under `services/agent/src/autobots/`:
   - Outside the schema (`include_in_schema=False`): artifact download and `/v1/runs/{id}/events/stream`.
 - **`operations/`:** `worker.py`, `composition.py` (the provider context over the live environment, the object store and the configuration checks that `api/main.py` and the worker share), `cli.py` (exit 0, 1 `REFUSED:`, 2 `ERROR:` for a missing or malformed setting), `bootstrap_owner.py`, `route_qualification.py` with `route_fixtures.py` and the paid-call pieces in `paid/`, `reasoning_trial.py`, `browse_trial.py`, `concept_seed.py`, `fake_stream.py`, `live_key.py` (moved from `tests/db` after the analyzed revision). Since R-64, after the analyzed revision, the JSON logger is the leaf module `autobots/logs.py`.
 
+**Run-tree limits.** `application/run_usage.RootLimits` holds each root's limits, and `tool_uses.METERED_TOOL_CALLS` its metered tool calls. Since Decision 0034 L2 and L3, after the analyzed revision, they are 64 model calls, 96 tool dispatches, 8 children, 45 active minutes and 40 metered calls, with one repair, two plan revisions, two child levels and two outstanding assignments.
+
 **The model path.** `goal_loop.py` builds the graph with `create_deep_agent` around `AdmittedModel`, which refuses any call outside an admitted dispatch. For each dispatch, `LoopMiddleware` (`adapters/loop_middleware.py`, calling `application/loop_admission.py`):
 - rechecks ownership, parent status and active time;
 - consumes the root's `model_calls` limit;
-- bounds a call at 120 s and interrupts it on cancel;
+- bounds a call at 120 s, 300 s since Decision 0034 L4 after the analyzed revision, and interrupts it on cancel;
 - compacts the model's view through the same admission;
 - allows one shorter retry after a `length` cut-off;
 - reserves the route's worst case plus an amount for prompt bytes, and stops with `cost_unavailable` or `request_unencodable`;
@@ -208,7 +210,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 **External.** The variable names are in `.env.example`: `OPENROUTER_API_KEY`, `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_REPOSITORY`, `GITHUB_TOKEN`, `AUTOBOTS_BROWSER_EXECUTOR`.
 - **OpenRouter** is the only inference provider (`adapters/models/factory.py`, `openrouter_metadata.py`).
   - Profiles: `openrouter_terra`, `openrouter_sol` (`openai/gpt-6.1-sol`) and `openrouter_deepseek_flash`, in `domain/models.py`.
-  - The client is built inside each attempt from a key resolved there, with at most 512 output tokens.
+  - The client is built inside each attempt from a key resolved there, with at most 512 output tokens, 4,096 since Decision 0034 L1 after the analyzed revision.
   - Every call is streamed.
   - `/v1/models` adds the listed prices per 1M tokens, the supported parameters and `fetched_at`.
 - **GitHub, on one configured repository** (`GITHUB_REPOSITORY`):
@@ -323,7 +325,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`. Since R-56, after the analyzed revision, a draft that fails validation reads as absent with `draft_unreadable`, the list still loads, publishing it is refused, discard deletes it by key, and the editor says saving replaces it.
   - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
   - Executions accept a D11 budget.
-- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `loop_prompts.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
+- **Concept seed:** `operations/concept_seed.py` creates five Experts and six workflows through the application layer, as the owner. After the analyzed revision it creates seven of each: Google bot (Decision 0032 G8), and the Deep research writer, whose seed carries instructions, and its Deep research content writer workflow (Decision 0034 E1 to F2). `application/artifact_tool.read_tool` adds `read_artifact`, which reads a published text artifact of the run's workspace, so a workflow step can read an earlier one's work (Decision 0034 A1 to A4). Since Decision 0023 E7, after the analyzed revision, Market watcher and Research analyst also get `publish_artifact`. Since E8, `loop_prompts.SYSTEM_PROMPT`, the goal's opening and `PlanTask.criteria`'s description say a plan cites criterion IDs only.
   - It keeps anything already named.
   - It strips unavailable tools and says so in the Expert's purpose.
   - It saves the GitHub-dependent workflows (while GitHub is unavailable) and Interview synthesis as drafts.

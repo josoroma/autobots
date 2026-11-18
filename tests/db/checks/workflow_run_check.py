@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,9 +37,10 @@ from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.runs import RunCommand
 from autobots.domain.workflow_execution import Step
 from autobots.domain.workflows import block_versions, graph_hash
+from autobots.operations import concept_seed
 from autobots.operations.job_dispatch import drive_lease, process_next
 from checklib import Cases, run_check, run_scenarios, run_worker
-from goal_loop_script import ROUTE, Script, say
+from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import SecretStr
 
 URL, BASE = os.environ['AUTOBOTS_DATABASE_URL'], os.environ['AUTOBOTS_STORAGE_BASE']
@@ -367,6 +369,110 @@ async def descriptions_and_labels(ctx: Running) -> None:
           described.description == 'Added later' and described.latest_version == 0)
 
 
+# US-16.6: what the first step of the Deep research content writer publishes, as a scripted model writes it, under the
+# outputs/child-N folder a delegated step may write (application/assignments.py).
+DEEP_FILES = {
+    'outputs/child-1/research/sources.md': '## S-01\nTitle: LangChain Deep Agents\nURL: https://example.com/deep-agents\n> Deep agents plan and use subagents.\n',
+    'outputs/child-1/research/synthesis.md': 'Format: implementation guide, since the evidence is mostly how-to [S-01].\n',
+    'outputs/child-1/content.md': '# LangChain for deep agents\n\nDeep agents plan and use subagents [S-01].\n\n## References\n\n[S-01] LangChain Deep Agents, https://example.com/deep-agents\n',
+    'outputs/child-1/report.md': 'Status: degraded. Results found: 1. Pages read: 1. Sources cited: 1.\n',
+}
+UUID_TEXT = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+
+
+async def deep_research_review_reads_the_first_steps_artifacts(ctx: Running) -> None:
+    """US-16.6, Decision 0034 A4 and F1: the seeded Deep research content writer on a scripted model. Its first step
+    publishes four files, its second reads each with read_artifact from the IDs in its goal and publishes its review,
+    and the approved gate settles the output. Only the writer's keyless tools are granted, as this stack has no keys."""
+    check, db, emitted, run_state, start = ctx.cases.check, ctx.db, ctx.emitted, ctx.run_state, ctx.start
+    seeded = next(expert for expert in concept_seed.EXPERTS if expert.name == 'Deep research writer')
+    keyless = [tool for tool in seeded.tools if tool in {'google_extract', 'read_artifact', 'read_run_file', 'save_artifact', 'publish_artifact'}]
+    writer = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='wf-deep-research', name='Deep research writer',
+                                 config=ExpertConfig(purpose=seeded.purpose, instructions=seeded.instructions, tools=keyless), catalog=tool_registry.catalog())
+    flow = next(workflow for workflow in concept_seed.WORKFLOWS if workflow.name == 'Deep research content writer')
+    graph = flow.graph({'Deep research writer': writer.id})
+    execution = await start('Deep research', graph, {'in': 'langchain for deep agents'})
+    # Decision 0034 F3: the execution is granted its agent steps' Experts' tools, and a requested list narrows them.
+    granted = (await load_goal(db, execution.run_id)).allowed_tools
+    narrowed_flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='deep-narrowed', name='Deep research narrowed')
+    await publish_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=narrowed_flow.id, idempotency_key='deep-narrowed-p', expected_version=0,
+                          graph=WorkflowGraph.model_validate(graph), source='user')
+    narrowed_execution = await create_execution(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=narrowed_flow.id, idempotency_key='deep-narrowed-e',
+                                                version=1, inputs={'in': 'x'}, tools=['read_artifact'])
+    narrowed = (await load_goal(db, narrowed_execution.run_id)).allowed_tools
+    # Cancelled before any worker claims it, so only the scripted execution runs.
+    narrowed_version = await ctx.value('select version from public.runs where id = %s', narrowed_execution.run_id)
+    await apply_command(db, workspace_id=WORKSPACE, run_id=narrowed_execution.run_id, command=RunCommand.CANCEL, expected_version=narrowed_version)
+    check("an agent step's Expert's tools are granted to the execution, and a requested list narrows them",
+          'read_artifact and google_extract with the workflow tools; then read_artifact only',
+          (sorted(set(granted) - {'propose_plan', 'complete_task', 'read_offload', 'workflow_approval'}), sorted(narrowed)),
+          {'read_artifact', 'google_extract', 'assign_specialist', 'save_artifact'} <= set(granted)
+          and 'read_artifact' in narrowed and 'google_extract' not in narrowed)
+
+    model = Script(items=[], seen=[], bound=[])
+    read_ids: list[str] = []
+
+    def reads() -> Any:
+        """The reviewer finds the artifact IDs in its own goal, the first step's result as text."""
+        goal = ' '.join(str(message.content) for message in model.seen[-1])
+        listed = re.findall(r"'artifact_ids': \[([^\]]*)\]", goal)
+        read_ids.extend(UUID_TEXT.findall(listed[-1]) if listed else [])
+        return calls(*[('read_artifact', {'artifact_id': artifact_id}) for artifact_id in read_ids])
+
+    # A workflow's agent step names no criteria, so its goal is its one criterion, c1 (application/runs.py).
+    write_task = {'id': 'w', 'title': 'Research and write', 'criteria': ['c1'], 'expected_evidence': 'a published document'}
+    model.items.append(calls(('propose_plan', {'tasks': [write_task]})))
+    for path, content in DEEP_FILES.items():
+        model.items += [calls(('save_artifact', {'path': path, 'content': content})), calls(('publish_artifact', {'path': path, 'version': 1}))]
+    model.items += [calls(('complete_task', {'task_id': 'w', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/child-1/content.md'}], 'summary': 'wrote it'})), say('written')]
+    review_task = {'id': 'r', 'title': 'Check and report', 'criteria': ['c1'], 'expected_evidence': 'a published review'}
+    model.items += [calls(('propose_plan', {'tasks': [review_task]})), reads,
+                    calls(('save_artifact', {'path': 'outputs/child-2/review.md', 'content': 'Read all four. Every [S-01] resolves to a source.'})),
+                    calls(('publish_artifact', {'path': 'outputs/child-2/review.md', 'version': 1})),
+                    calls(('complete_task', {'task_id': 'r', 'evidence': [{'kind': 'artifact', 'reference': 'outputs/child-2/review.md'}], 'summary': 'reviewed'})),
+                    say('reviewed')]
+    await ctx.advance(model)
+
+    children = [row[0] for row in await (await db.execute(
+        'select child_run_id from app_private.assignments where parent_run_id = %s order by created_at', (execution.run_id,))).fetchall()]
+    published = {}
+    for child in children:
+        published[child] = dict(await (await db.execute(
+            "select name, id::text from public.artifacts where run_id = %s and status = 'published'", (child,))).fetchall())
+    first = published.get(children[0], {}) if children else {}
+    # What happened, shown only when the step didn't publish its files.
+    why = None
+    if sorted(first) != ['content.md', 'report.md', 'sources.md', 'synthesis.md']:
+        why = {'nodes': await ctx.statuses(execution),
+               'run': await (await db.execute('select r.status, u.stop_reason from public.runs r left join app_private.run_usage u on u.run_id = r.id '
+                                              'where r.id = %s', (execution.run_id,))).fetchone(),
+               'children': await (await db.execute(
+                   "select a.status, a.outcome, a.result ->> 'code', r.status, u.stop_reason, u.model_calls from app_private.assignments a "
+                   'join public.runs r on r.id = a.child_run_id left join app_private.run_usage u on u.run_id = a.child_run_id '
+                   'where a.parent_run_id = %s order by a.created_at', (execution.run_id,))).fetchall(),
+               'model_calls': len(model.seen), 'left': len(model.items),
+               'events': [await (await db.execute("select coalesce(payload ->> 'type', '') || ' ' || coalesce(payload ->> 'code', payload -> 'data' ->> 'code', '') "
+                                                  'from public.run_events where run_id = %s order by sequence desc limit 14', (child,))).fetchall() for child in children]}
+    check('the first step publishes sources, synthesis, a document and a report', 'sources.md, synthesis.md, content.md, report.md',
+          (sorted(first), why), sorted(first) == ['content.md', 'report.md', 'sources.md', 'synthesis.md'])
+    reads_done = [row[0] for row in await (await db.execute(
+        "select input_public ->> 'artifact_id' from app_private.tool_uses where run_id = %s and tool_id = 'read_artifact' and outcome = 'succeeded'",
+        (children[1] if len(children) > 1 else execution.run_id,))).fetchall()]
+    check("the second step reads each of them with read_artifact, from the IDs in its goal", 'the four artifact IDs, each read',
+          (len(read_ids), len(reads_done)), len(children) == 2 and sorted(reads_done) == sorted(first.values()) == sorted(read_ids))
+    second = published.get(children[1], {}) if len(children) > 1 else {}
+    check('and publishes its review', 'review.md', sorted(second), sorted(second) == ['review.md'])
+    check('the execution waits at its gate', 'waiting_approval', await run_state(execution), await run_state(execution) == 'waiting_approval')
+    approval = await (await db.execute('select id, argument_hash from public.approval_requests where run_id = %s', (execution.run_id,))).fetchone()
+    await decide(db, workspace_id=WORKSPACE, actor_id=ACTOR, approval_id=approval[0], idempotency_key='deep-research-gate', decision='approve',
+                 argument_hash=approval[1])
+    result = await ctx.advance()
+    output = await emitted(execution, 'out', 'value')
+    check('approving settles the output with the review step\'s result, and the execution succeeds', 'succeeded, the review step\'s result',
+          (result.outcome, (output or {}).get('outcome'), (output or {}).get('artifact_ids')),
+          result.outcome == 'succeeded' and (output or {}).get('outcome') == 'succeeded' and (output or {}).get('artifact_ids') == list(second.values()))
+
+
 SCENARIOS = (
     iteration_has_distinct_instances,
     branches_skip_fail_and_block,
@@ -380,6 +486,7 @@ SCENARIOS = (
     stalled_workflow_fails,
     version_under_older_rules_fails,
     descriptions_and_labels,
+    deep_research_review_reads_the_first_steps_artifacts,
 )
 
 

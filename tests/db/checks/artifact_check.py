@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import BUCKET, SupabaseObjectStore
-from autobots.application.artifact_tool import publish_tool
+from autobots.application.artifact_tool import publish_tool, read_tool
 from autobots.application.artifacts import (
     ArtifactUnavailable,
     publish,
@@ -228,6 +228,42 @@ async def main() -> dict[str, Any]:
         check('replaying it finishes the same operation', 'succeeded, 1 row', (out.outcome.value, again_rows), out.outcome.value == 'succeeded' and rows == 1 and again_rows == 1)
         repeat = await gateway.execute(db, scope, 'publish_artifact', arguments)
         check('and a later repeat reuses the receipt', 'replayed, same id', repeat.replayed, repeat.replayed and repeat.output['artifact_id'] == out.output['artifact_id'])
+
+        # read_artifact (Decision 0034 A1, A2): a published text artifact of the run's workspace, by its ID, through
+        # the gateway. The image is arranged: the table takes any media type, and its bytes still match their hash.
+        readers = ToolRegistry()
+        readers.register(read_tool(store))
+        reader = ToolGateway(readers)
+
+        async def read_as(workspace: UUID, artifact_id: object, **paging: int) -> Any:
+            claimed = await scope_for(workspace)
+            granted = ToolScope(claimed.workspace_id, claimed.run_id, claimed.generation, {'read_artifact': 1})
+            return await reader.execute(db, granted, 'read_artifact', {'artifact_id': str(artifact_id), **paging})
+
+        out = await read_as(WORKSPACE, published.artifact_id)
+        fields = out.output or {}
+        check('read_artifact returns a published text artifact of the run\'s workspace', 'report.md, text/markdown, its hash, size and bytes',
+              (out.outcome.value, fields.get('name'), fields.get('media_type'), fields.get('size_bytes'), fields.get('total_lines')),
+              out.outcome.value == 'succeeded' and fields.get('name') == 'report.md' and fields.get('media_type') == 'text/markdown'
+              and fields.get('content') == TEXT.decode() and fields.get('sha256') == hashlib.sha256(TEXT).hexdigest()
+              and fields.get('size_bytes') == len(TEXT) and fields.get('total_lines') == 2 and fields.get('truncated') is False)
+        out = await read_as(WORKSPACE, published.artifact_id, offset=1, limit=1)
+        check('it reads a page of lines', 'the second line, the last, so not cut', ((out.output or {}).get('content'), (out.output or {}).get('truncated')),
+              (out.output or {}).get('content') == 'bytes that really exist\n' and (out.output or {}).get('truncated') is False)
+        staged_id = await value('select id from public.artifacts where operation_id = %s', fenced)
+        picture_scope = await scope_for()
+        picture = await publish(db, store, picture_scope, operation_id='2' * 64, name='picture.md', media_type='text/plain', content=b'not text really')
+        await db.execute("update public.artifacts set media_type = 'image/png' where id = %s", (picture.artifact_id,))
+        for label, workspace, artifact_id, code in (
+            ('a staged artifact', WORKSPACE, staged_id, 'artifact_not_found'),
+            ("another workspace's run", OTHER, published.artifact_id, 'artifact_not_found'),
+            ('an unknown ID', WORKSPACE, uuid4(), 'artifact_not_found'),
+            ('a published image', WORKSPACE, picture.artifact_id, 'artifact_not_text'),
+            ('a published artifact whose bytes are gone', WORKSPACE, gone.artifact_id, 'artifact_missing'),
+        ):
+            out = await read_as(workspace, artifact_id)
+            check(f'read_artifact refuses {label} with no content', f'{code}, no content', (out.code, out.output),
+                  out.code == code and not (out.output or {}).get('content'))
 
         # The real loop publishes through the same tool.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")

@@ -70,7 +70,7 @@ from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolScope
 from autobots.application.tool_gateway import ownership_refusal
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.models import ModelRoute
+from autobots.domain.models import MODEL_CALL_SECONDS, ModelRoute
 from autobots.domain.runs import INTERRUPTING
 from autobots.domain.stops import REPAIRABLE, STOPPING, StopCode, repair_limit
 from autobots.logs import log_event
@@ -183,7 +183,7 @@ class LoopSettings:
 
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     slot_wait_seconds: float = 30.0
-    model_call_seconds: float = 120.0
+    model_call_seconds: float = MODEL_CALL_SECONDS
     goal: GoalSpec | None = None
     compaction: CompactionPolicy = field(default_factory=CompactionPolicy)
     summary_route: ModelRoute | None = None

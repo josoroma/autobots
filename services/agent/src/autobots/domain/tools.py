@@ -73,6 +73,9 @@ EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "store_remote_file": 1,
         # Reads pages directly from their sites, in the Google toolkit (Decision 0033 K3).
         "google_extract": 1,
+        # Reads a published artifact of the workspace, so a workflow step reads an earlier one's
+        # work. Only an Expert grants it, never a plain goal (Decision 0034 A3).
+        "read_artifact": 1,
         # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
         "search_files": 1,
         "read_code_file": 1,
@@ -92,6 +95,7 @@ DELEGATION_TOOL = "assign_specialist"
 READ_RUN_FILE_TOOL = "read_run_file"
 SAVE_ARTIFACT_TOOL = "save_artifact"
 PUBLISH_ARTIFACT_TOOL = "publish_artifact"
+READ_ARTIFACT_TOOL = "read_artifact"
 WORKFLOW_APPROVAL_TOOL = "workflow_approval"
 # What a workflow's own blocks reach. Its approval step is the only consequential one here.
 WORKFLOW_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
@@ -99,16 +103,30 @@ WORKFLOW_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
 )
 
 
-def workflow_grant(requested: Collection[str] | None) -> Mapping[str, int]:
+def workflow_grant(
+    requested: Collection[str] | None, agents: Mapping[str, int] | None = None
+) -> Mapping[str, int]:
     """What a workflow execution's run may call: every workflow tool, or only the requested ones,
-    always with the plan tools and the approval step, in WORKFLOW_TOOLS' order (PRD 7.3)."""
-    if requested is None:
-        return WORKFLOW_TOOLS
-    return {
+    always with the plan tools and the approval step, in WORKFLOW_TOOLS' order (PRD 7.3).
+
+    `agents` are the tools of the Experts its agent steps name. They're granted too, so each step's
+    child gets its Expert's tools, which the child's grant intersects with this one (Decision 0034
+    F3). The workflow's own blocks never call them. A requested list narrows them as well."""
+    base = (
+        WORKFLOW_TOOLS
+        if requested is None
+        else {
+            tool: version
+            for tool, version in WORKFLOW_TOOLS.items()
+            if tool in requested or tool in PLAN_TOOLS or tool == WORKFLOW_APPROVAL_TOOL
+        }
+    )
+    extra = {
         tool: version
-        for tool, version in WORKFLOW_TOOLS.items()
-        if tool in requested or tool in PLAN_TOOLS or tool == WORKFLOW_APPROVAL_TOOL
+        for tool, version in (agents or {}).items()
+        if tool not in base and (requested is None or tool in requested)
     }
+    return {**base, **extra} if extra else base
 
 
 RUN_FILE_GRANTS = ("inputs", "outputs")

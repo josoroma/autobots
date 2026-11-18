@@ -24,6 +24,7 @@
     "propose_improvement@1": "3cb76f08e649473fc2ef2aa150635e748c7df2093f0179ca3bdbb2966c33b11f",
     "propose_plan@1": "5fe08a62a5c1e61d1ae1274f47b8c84ffaa619288150683e1208bcf0cd0c6f5f",
     "publish_artifact@1": "1f54e75c5527fb98e5a5a7aebdefc1551123f5371927a06b9318fdc4203d9983",
+    "read_artifact@1": "ac09026f9e9c0d68f66361ee62261b4d31209023f8c5b6cff29d6780b9fce07f",
     "read_code_file@1": "cf7dfdec5a365c0fe7abff28534424e0262b8065d0e31a02203d9cee50210f60",
     "read_csv@1": "0136d626df7a793ae595d3edbc97e0025b4357a5968ce5d66efb3ce142298735",
     "read_offload@1": "319beb7a3b98404922defd5a06363733aed84a519438c8abe7936a527473cea7",

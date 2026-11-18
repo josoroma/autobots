@@ -26,16 +26,17 @@ COUNTER_SQL: dict[Counter, str] = {
 
 @dataclass(frozen=True)
 class RootLimits:
-    """Application limits, not measured adequacy for every task."""
+    """Application limits, not measured adequacy for every task. Decision 0034 L2 set the model
+    calls, tool dispatches, children and active time for deep research runs."""
 
-    model_calls: int = 24
-    tool_dispatches: int = 40
+    model_calls: int = 64
+    tool_dispatches: int = 96
     repairs: int = 1
     plan_revisions: int = 2
     child_levels: int = 2
-    children: int = 4
+    children: int = 8
     outstanding_assignments: int = 2
-    active_seconds: float = 900.0
+    active_seconds: float = 2_700.0
 
 
 # Each counter's stop code, named in the stop table so a search finds it (PRUN-02, R-29).

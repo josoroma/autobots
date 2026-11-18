@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.7 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 
@@ -140,6 +140,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-16.3: Workspace choice for members of several workspaces](#us-163-workspace-choice-for-members-of-several-workspaces)
   - [US-16.4: A current install with Sol's live qualification](#us-164-a-current-install-with-sols-live-qualification)
   - [US-16.5: Real examples on the install](#us-165-real-examples-on-the-install)
+  - [US-16.6: Deep research runs like Deep-Research-Content-Writer](#us-166-deep-research-runs-like-deep-research-content-writer)
+  - [US-16.7: Live deep research on the install, documented](#us-167-live-deep-research-on-the-install-documented)
 
 ## Work Item Status
 
@@ -660,6 +662,17 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-16.5#2 | Add a guarded command that runs the example goals and workflow live under the shared ledger. | DONE | US-16.5 |
 | US-16.5#3 | Tell the model that a plan cites criteria by ID, which live Expert runs got wrong. | DONE | US-16.5 |
 | US-16.5#4 | Check Runs, Experts, Workflows and Approvals show them. | DONE | US-16.5 |
+| US-16.6 | Deep research runs like Deep-Research-Content-Writer | DONE | EPIC-16 |
+| US-16.6#1 | Raise `MAX_OUTPUT_TOKENS`, `RootLimits`, `METERED_TOOL_CALLS` and the model call time to Decision 0034 L1 to L4, and update the tests that pin them. | DONE | US-16.6 |
+| US-16.6#2 | Add `read_artifact` v1 over `application/artifacts.read_artifact`: its contract, definition, registry entry, Expert grant, guide, version and pinned schema digest. Regenerate OpenAPI and the TypeScript client if a contract changes. | DONE | US-16.6 |
+| US-16.6#3 | Let an Expert seed carry instructions, and seed the Deep research writer and the Deep research content writer workflow. | DONE | US-16.6 |
+| US-16.6#4 | Grant a workflow execution its agent steps' Experts' tools (Decision 0034 F3). | DONE | US-16.6 |
+| US-16.6#5 | Cover the scenarios with unit tests and disposable database checks, including a scripted run of the workflow. | DONE | US-16.6 |
+| US-16.6#6 | Update `CODEBASE.md` and the runbooks that state the limits. | DONE | US-16.6 |
+| US-16.7 | Live deep research on the install, documented | READY | EPIC-16 |
+| US-16.7#1 | Have the owner rebuild and restart the install with inference on, and run the concept seed. | TODO | US-16.7 |
+| US-16.7#2 | Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs. | TODO | US-16.7 |
+| US-16.7#3 | Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`. | TODO | US-16.7 |
 
 ## Dependency Diagram
 
@@ -814,6 +827,8 @@ flowchart TD
     US_16_3["US-16.3: Workspace choice for members of several workspaces"]
     US_16_4["US-16.4: A current install with Sol&#x27;s live qualification"]
     US_16_5["US-16.5: Real examples on the install"]
+    US_16_6["US-16.6: Deep research runs like Deep-Research-Content-Writer"]
+    US_16_7["US-16.7: Live deep research on the install, documented"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1150,6 +1165,9 @@ flowchart TD
   US_2_4 -.-> US_15_25
   US_16_2 -.-> US_16_4
   US_16_4 -.-> US_16_5
+  US_16_5 -.-> US_16_6
+  US_14_23 -.-> US_16_6
+  US_16_6 -.-> US_16_7
 ```
 
 ```mermaid
@@ -2125,6 +2143,26 @@ flowchart TD
     US_16_5 --> T_16_5_3
     T_16_5_4["US-16.5#4: Check Runs, Experts, Workflows and Approvals show them."]
     US_16_5 --> T_16_5_4
+    US_16_6["US-16.6: Deep research runs like Deep-Research-Content-Writer"]
+    T_16_6_1["US-16.6#1: Raise `MAX_OUTPUT_TOKENS`, `RootLimits`, `METERED_TOOL_CALLS` and the model call time to Decision 0034 L1 to L4, and update the tests that pin them."]
+    US_16_6 --> T_16_6_1
+    T_16_6_2["US-16.6#2: Add `read_artifact` v1 over `application/artifacts.read_artifact`: its contract, definition, registry entry, Expert grant, guide, version and pinned schema digest. Regenerate OpenAPI and the TypeScript client if a contract changes."]
+    US_16_6 --> T_16_6_2
+    T_16_6_3["US-16.6#3: Let an Expert seed carry instructions, and seed the Deep research writer and the Deep research content writer workflow."]
+    US_16_6 --> T_16_6_3
+    T_16_6_4["US-16.6#4: Grant a workflow execution its agent steps&#x27; Experts&#x27; tools (Decision 0034 F3)."]
+    US_16_6 --> T_16_6_4
+    T_16_6_5["US-16.6#5: Cover the scenarios with unit tests and disposable database checks, including a scripted run of the workflow."]
+    US_16_6 --> T_16_6_5
+    T_16_6_6["US-16.6#6: Update `CODEBASE.md` and the runbooks that state the limits."]
+    US_16_6 --> T_16_6_6
+    US_16_7["US-16.7: Live deep research on the install, documented"]
+    T_16_7_1["US-16.7#1: Have the owner rebuild and restart the install with inference on, and run the concept seed."]
+    US_16_7 --> T_16_7_1
+    T_16_7_2["US-16.7#2: Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs."]
+    US_16_7 --> T_16_7_2
+    T_16_7_3["US-16.7#3: Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`."]
+    US_16_7 --> T_16_7_3
   end
 ```
 
@@ -8343,7 +8381,7 @@ Open Questions:
 
 # EPIC-16: A current install with real examples
 
-Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)).
+Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)). [Decision 0034](docs/engineering/decisions/0034-deep-research-like-content-writer.md) adds US-16.6 and US-16.7, deep research runs like Deep-Research-Content-Writer: raised run limits, an Expert and a workflow, then two live runs on the install that a README documents.
 
 ### US-16.1: Sober control borders
 
@@ -8584,6 +8622,138 @@ Tasks:
 - [x] Add a guarded command that runs the example goals and workflow live under the shared ledger.
 - [x] Tell the model that a plan cites criteria by ID, which live Expert runs got wrong.
 - [x] Check Runs, Experts, Workflows and Approvals show them.
+
+Open Questions:
+- None.
+
+### US-16.6: Deep research runs like Deep-Research-Content-Writer
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-16-6-deep-research-runs-like/`
+
+As a workspace owner
+I want an Expert and a workflow that research a topic and write a long, cited document, as Deep-Research-Content-Writer does
+So that a goal such as "langchain for deep agents" ends in a source-backed document I can review.
+
+Source:
+- [Decision 0034, L1 to L5](docs/engineering/decisions/0034-deep-research-like-content-writer.md#limits-for-every-run-us-166)
+- [Decision 0034, A1 to A4](docs/engineering/decisions/0034-deep-research-like-content-writer.md#reading-a-published-artifact-us-166)
+- [Decision 0034, E1 to E5](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-writer-expert-us-166)
+- [Decision 0034, F1 to F3](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-content-writer-workflow-us-166)
+- [Decision 0034, S1](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [MP-07 initial limits](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Shared initial candidate policy](docs/PRD/PRD-LangChain-Deep-Agents.md#65-provider-admission-and-budgets)
+- [Tool-use record, TU-06](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [File tools, FI-02](docs/PRD/PRD-Tool-Catalog.md#file-tools)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): `domain/models.py` sets `MAX_OUTPUT_TOKENS`, `application/run_usage.py` the `RootLimits`, `application/tool_uses.py` `METERED_TOOL_CALLS`, and `application/loop_admission.py` the call time. `operations/concept_seed.py` seeds each Expert from a purpose and tools. A workflow's agent step returns an `AssignmentResult` of references, and a run reads only its own files. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Every run gets the raised limits
+  Given the worker's defaults and a fake OpenRouter transport
+  When a run's model call is sent and its run tree's counters are consumed
+  Then the request asks for at most 4,096 output tokens and reserves its worst case at that size, a call may take 300 seconds, and the run tree allows 64 model calls, 96 tool dispatches, 8 child runs, 40 metered tool calls and 45 active minutes, refusing the next of each with its existing code
+
+Scenario: read_artifact reads a published text artifact of the run's workspace
+  Given a disposable database with a published markdown artifact in one workspace, a staged one, a published image, a published artifact whose stored bytes are gone, and a second workspace
+  When a run in the first workspace reads each, and a run in the second workspace reads the published markdown
+  Then the first read returns its name, media type, hash, size and content, the staged one and the second workspace's read return artifact_not_found, the image returns artifact_not_text, the lost one artifact_missing, and no refusal carries content
+
+Scenario: read_artifact is an Expert-only, read-only tool
+  Given the tool catalog
+  When read_artifact's descriptor and the plain goal's tools are read
+  Then read_artifact is version 1 in the Files group with a pinned schema digest, read-only, with no network, key, approval or metering, grantable to Experts, and not among a plain goal's tools
+
+Scenario: The seed adds the Deep research writer and its workflow
+  Given a disposable database with a workspace that already has the earlier concept Experts and workflows, and SerpApi available
+  When the concept seed runs twice
+  Then the first run adds the Deep research writer with its purpose, instructions and eight tools and publishes the Deep research content writer workflow, everything that existed is unchanged, and the second run adds nothing
+
+Scenario: Without SerpApi the workflow is a draft
+  Given a disposable database with no SerpApi key
+  When the concept seed runs
+  Then the Deep research writer is saved without google_search and its purpose says so, and the workflow is a draft
+
+Scenario: A workflow's agent step gets its Expert's tools
+  Given a published workflow whose agent step names an Expert granted read_artifact and google_extract
+  When an execution is created, without and then with a requested tool list naming only read_artifact
+  Then the first execution's grant holds the workflow tools, read_artifact and google_extract, and the second holds read_artifact but not google_extract
+
+Scenario: The workflow's review step reads the first step's artifacts
+  Given a disposable stack and a scripted model
+  When the Deep research content writer runs on "langchain for deep agents", its first step publishes sources, synthesis, a document and a report, and the owner approves its gate
+  Then the second step reads each of them with read_artifact and publishes its review, and the execution succeeds with the approved value as its output
+```
+
+Dependencies:
+- US-16.5
+- US-14.23
+
+Tasks:
+- [x] Raise `MAX_OUTPUT_TOKENS`, `RootLimits`, `METERED_TOOL_CALLS` and the model call time to Decision 0034 L1 to L4, and update the tests that pin them.
+- [x] Add `read_artifact` v1 over `application/artifacts.read_artifact`: its contract, definition, registry entry, Expert grant, guide, version and pinned schema digest. Regenerate OpenAPI and the TypeScript client if a contract changes.
+- [x] Let an Expert seed carry instructions, and seed the Deep research writer and the Deep research content writer workflow.
+- [x] Grant a workflow execution its agent steps' Experts' tools (Decision 0034 F3).
+- [x] Cover the scenarios with unit tests and disposable database checks, including a scripted run of the workflow.
+- [x] Update `CODEBASE.md` and the runbooks that state the limits.
+
+Open Questions:
+- None.
+
+### US-16.7: Live deep research on the install, documented
+
+Status: READY
+
+As an owner
+I want the Deep research writer and its workflow to research "langchain for deep agents" for real on my install
+So that I can see what they produce, and read how it works in a README.
+
+Source:
+- [Decision 0034, R1 and R2](docs/engineering/decisions/0034-deep-research-like-content-writer.md#live-runs-us-167)
+- [Decision 0034, E1 and F1](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-writer-expert-us-166)
+- [MP-07 initial limits](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Seed, SD-01](docs/PRD/PRD-Studio.md#seed)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): the persistent install runs this checkout through the `Makefile`, and its worker spends only when started with `INFERENCE=enabled`. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The install runs the new code and seed
+  Given the owner's persistent install, rebuilt and restarted by the owner with this code and inference on, and seeded again
+  When the Studio's Experts and Workflows pages are read
+  Then the Deep research writer and the Deep research content writer are there, and what was there before is unchanged
+
+Scenario: A live Expert run
+  Given the owner's OpenRouter and SerpApi keys
+  When the coordinator starts the Deep research writer on "langchain for deep agents" from the Studio with a US$5.00 budget
+  Then the run ends with its real outcome and published artifacts, its cost stays within US$5.00, and no key appears in its artifacts
+
+Scenario: A live workflow execution
+  Given the same keys
+  When the coordinator starts the Deep research content writer on "langchain for deep agents" with a US$5.00 budget, and the owner decides its gate
+  Then the execution ends with its real outcome, both steps' artifacts are published, and its cost stays within US$5.00
+
+Scenario: The README documents the runs
+  Given the two runs' records
+  When README-Deep-Research-Content-Writer.md is written and linked from README.md and README-DEV.md
+  Then it explains the reference, how Autobots runs it as an Expert and as a workflow, and what each run did, with counts and costs as observed, and every link resolves
+```
+
+Dependencies:
+- US-16.6
+
+Tasks:
+- [ ] Have the owner rebuild and restart the install with inference on, and run the concept seed.
+- [ ] Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs.
+- [ ] Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`.
 
 Open Questions:
 - None.

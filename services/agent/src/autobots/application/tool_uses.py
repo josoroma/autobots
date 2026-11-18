@@ -22,8 +22,8 @@ from autobots.domain.tool_catalog import CostClass
 from autobots.domain.tools import ToolOutcome
 from autobots.persistence.rows import ToolUseRow
 
-# Decision 0017 Q4: a root run tree may make this many metered tool calls.
-METERED_TOOL_CALLS = 20
+# Decision 0017 Q4: a root run tree may make this many metered tool calls, 40 by Decision 0034 L3.
+METERED_TOOL_CALLS = 40
 COMPLETE_TASK = "complete_task"
 
 

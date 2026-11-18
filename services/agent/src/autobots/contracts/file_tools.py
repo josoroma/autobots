@@ -49,6 +49,32 @@ class ReadRunFileV2Output(BaseModel):
     truncated: bool
 
 
+class ReadArtifactInput(BaseModel):
+    """Decision 0034 A1: one published artifact of the run's workspace, in pages of lines."""
+
+    model_config = TOOL_CONTRACT
+
+    artifact_id: str = Field(min_length=36, max_length=36)
+    offset: int = Field(default=0, ge=0, description="The first line to return, from 0.")
+    limit: int | None = Field(
+        default=None, ge=1, le=20_000, description="How many lines. Left out, to the end."
+    )
+
+
+class ReadArtifactOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    artifact_id: str
+    name: str
+    media_type: str
+    sha256: str
+    size_bytes: int
+    content: str
+    offset: int
+    total_lines: int
+    truncated: bool
+
+
 class ReadCsvInput(BaseModel):
     model_config = TOOL_CONTRACT
 

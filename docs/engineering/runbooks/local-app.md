@@ -65,7 +65,7 @@ Then finish it with `--user-id`.
 
 ## Seed the concept Experts and workflows (optional)
 
-This puts the five concept Experts and six workflows of PRD-Studio SD-02 into one workspace you name. It is not a migration, and it is safe to run again: anything that already has its name in that workspace is kept exactly as it is, so a second run, or your own later edits, are never overwritten. It writes no secret and starts no run.
+This puts the seven concept Experts and seven workflows of PRD-Studio SD-02 into one workspace you name. The Deep research content writer is a draft until a SerpApi key is set. It is not a migration, and it is safe to run again: anything that already has its name in that workspace is kept exactly as it is, so a second run, or your own later edits, are never overwritten. It writes no secret and starts no run.
 
 ```sh
 AUTOBOTS_DATABASE_URL=<runtime role url> PYTHONPATH=services/agent/src services/agent/.venv/bin/python -m autobots.operations.concept_seed --workspace <workspace id>

@@ -168,6 +168,7 @@ def test_a_group_expands_to_the_tools_an_expert_may_name() -> None:
     assert expanded.tools == [
         "calculate",
         "publish_artifact",
+        "read_artifact",
         "read_csv",
         "read_run_file",
         "save_artifact",

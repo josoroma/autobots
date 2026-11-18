@@ -706,6 +706,7 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
     .sort();
   expect(files).toEqual([
     "publish_artifact",
+    "read_artifact",
     "read_csv",
     "read_run_file",
     "save_artifact",

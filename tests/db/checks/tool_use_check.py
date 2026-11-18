@@ -164,17 +164,17 @@ async def main() -> None:
         requests.clear()
         results = [await gateway.execute(db, budget, 'fixture_lookup', {'query': f'q{index}', 'url': 'https://example.com/'}) for index in range(METERED_TOOL_CALLS + 1)]
         codes = [result.code for result in results]
-        check('the run tree makes 20 metered calls, and the 21st is denied before any request',
-              '20 succeeded, then tool_budget_exceeded, 20 requests', (codes[-1], len(requests)),
+        check(f'the run tree makes {METERED_TOOL_CALLS} metered calls (Decision 0034 L3), and the next is denied before any request',
+              f'{METERED_TOOL_CALLS} succeeded, then tool_budget_exceeded, {METERED_TOOL_CALLS} requests', (codes[-1], len(requests)),
               all(result.outcome.value == 'succeeded' for result in results[:-1]) and codes[-1] == 'tool_budget_exceeded' and len(requests) == METERED_TOOL_CALLS)
         free = await gateway.execute(db, budget, 'calculate', {'operation': 'sum', 'values': [1]})
         check('an unmetered tool still runs after the limit', 'succeeded', free.outcome.value, free.outcome.value == 'succeeded')
         tree = await list_tool_uses(db, WORKSPACE, budget.run_id)
-        check('a root run lists its tree', '22 uses', len(tree.uses) if tree else None, tree is not None and len(tree.uses) == METERED_TOOL_CALLS + 2)
+        check('a root run lists its tree', f'{METERED_TOOL_CALLS + 2} uses', len(tree.uses) if tree else None, tree is not None and len(tree.uses) == METERED_TOOL_CALLS + 2)
         page = await list_tool_uses(db, WORKSPACE, budget.run_id, limit=5)
         rest = await list_tool_uses(db, WORKSPACE, budget.run_id, after=page.next_cursor or 0, limit=50) if page else None
-        check('the listing pages by cursor without repeats', '5 then 17', (len(page.uses) if page else None, len(rest.uses) if rest else None),
-              page is not None and rest is not None and len(page.uses) == 5 and len(rest.uses) == 17 and page.uses[-1].id < rest.uses[0].id)
+        check('the listing pages by cursor without repeats', f'5 then {METERED_TOOL_CALLS - 3}', (len(page.uses) if page else None, len(rest.uses) if rest else None),
+              page is not None and rest is not None and len(page.uses) == 5 and len(rest.uses) == METERED_TOOL_CALLS - 3 and page.uses[-1].id < rest.uses[0].id)
         other = await list_tool_uses(db, uuid4(), budget.run_id)
         check("another workspace can't list them", 'None', other, other is None)
     print(json.dumps({'cases': cases}))

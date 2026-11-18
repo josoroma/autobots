@@ -95,7 +95,7 @@ test("The panel shows the run's state, plan, task tools and times, spend, tokens
     "0 in, 0 out",
   );
   await expect(panel.locator('[data-field="panel-metered"]')).toHaveText(
-    "3 of 20 metered tool calls",
+    "3 of 40 metered tool calls",
   );
   await expect(panel.getByRole("link", { name: "Open run" })).toHaveAttribute(
     "href",

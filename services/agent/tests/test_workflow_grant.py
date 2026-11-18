@@ -36,3 +36,16 @@ def test_an_empty_request_grants_only_what_every_execution_has() -> None:
 def test_a_request_never_widens_beyond_the_workflow_tools() -> None:
     granted = workflow_grant(["github_open_pull_request", "assign_specialist"])
     assert set(granted) == {*PLAN_TOOLS, "assign_specialist", WORKFLOW_APPROVAL_TOOL}
+
+
+def test_agent_steps_get_their_experts_tools_and_a_request_still_narrows_them() -> None:
+    """Decision 0034 F3: each agent step's child is granted its Expert's tools, which the
+    child's grant intersects with this one. A requested list narrows them like the rest."""
+    agents = {"google_search": 1, "read_artifact": 1, "save_artifact": 1}
+    granted = workflow_grant(None, agents)
+    assert {"google_search", "read_artifact"} <= set(granted)
+    assert {**WORKFLOW_TOOLS} == {tool: granted[tool] for tool in WORKFLOW_TOOLS}
+    assert workflow_grant(None, {}) is WORKFLOW_TOOLS
+    narrowed = workflow_grant(["read_artifact"], agents)
+    assert "read_artifact" in narrowed
+    assert "google_search" not in narrowed

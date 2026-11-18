@@ -43,7 +43,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TU-05. Access and retention.** The table is private: no PostgREST, Realtime or browser role. It is read by server SQL in a projection, and follows the workspace's retention. Child runs are listed under their root.
 
-**TU-06. Spend.** A root run tree may make at most 20 metered tool calls. The next is denied with `tool_budget_exceeded` before any request.
+**TU-06. Spend.** A root run tree may make at most 40 metered tool calls ([Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) L3, from 20). The next is denied with `tool_budget_exceeded` before any request.
 
 **TU-07. Listings.** `GET /v1/runs/{run_id}/tool-uses` lists a run tree's uses in order, cursor-paginated, with the plan task's title.
 
@@ -188,6 +188,8 @@ By Decision 0033, W1 to W5.
 | `store_remote_file` | `reversible_internal_write` | `url`, `path` under `outputs/` → `path`, `version`, `sha256`, `size_bytes`, `media_type`. Through the URL guard, text types only, 1 MiB |
 
 **FI-01. Agent File Input.** The goal composer attaches up to 5 text files (plain text, markdown, JSON, CSV), 1 MiB each, as run inputs under `inputs/`, with their media type. It isn't a catalog tool.
+
+**FI-02. Reading a published artifact.** `read_artifact` reads one published artifact of the run's workspace by its ID, so a workflow's next step can read an earlier step's work ([Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) A1 to A4). It reads text only (markdown, plain text and JSON), in pages of lines as `read_run_file` version 2 does. It refuses `artifact_not_found` for an unknown ID, another workspace's artifact or one that isn't published, `artifact_missing` when the stored bytes are gone or fail their hash, and `artifact_not_text` otherwise. It is read-only, needs no key or approval, isn't metered, and only an Expert grants it.
 
 ## Market data
 

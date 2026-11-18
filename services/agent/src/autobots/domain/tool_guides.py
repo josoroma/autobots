@@ -124,6 +124,11 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
         "When a saved file is the run's deliverable.",
         "Verification requires a published file, and the owner can open it later.",
     ),
+    "read_artifact": ToolGuide(
+        "Reads a published text artifact of this workspace by its ID, optionally a range of lines.",
+        "When a workflow step builds on an earlier step's published work, named by artifact IDs.",
+        "Each step reads the exact files the previous one published, checked against their hash.",
+    ),
     "store_remote_file": ToolGuide(
         "Downloads a public text file of up to 1 MiB and saves it under outputs/.",
         "When a dataset or document at a known https URL is needed as a file.",

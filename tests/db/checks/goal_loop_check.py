@@ -169,13 +169,13 @@ async def main() -> None:
         # A generic counter refuses past its limit, ready for the delegation stories.
         lease = await start()
         await ensure_usage(db, lease.run_id)
-        for _ in range(4):
+        for _ in range(RootLimits().children):
             await consume(db, lease.run_id, 'children', RootLimits().children)
         try:
             await consume(db, lease.run_id, 'children', RootLimits().children)
-            check('the child limit refuses a fifth', 'children_limit', 'allowed', False)
+            check('the child limit refuses one past it', 'children_limit', 'allowed', False)
         except LimitReached as reached:
-            check('the child limit refuses a fifth', 'children_limit', reached.code, reached.code == 'children_limit')
+            check('the child limit refuses one past it', 'children_limit', reached.code, reached.code == 'children_limit')
 
         # An SDK path calling the model on its own gets nothing.
         guarded = AdmittedModel(delegate=Script(items=[say('leak')], seen=[], bound=[]))

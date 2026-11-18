@@ -25,7 +25,7 @@ from autobots.application.run_usage import RootLimits
 from autobots.application.runs import CommandReceipt, admit_run, apply_command
 from autobots.application.tool_definitions import ToolRuntime, ToolScope
 from autobots.application.tool_gateway import ToolGateway
-from autobots.application.tool_uses import admit_metered
+from autobots.application.tool_uses import METERED_TOOL_CALLS, admit_metered
 from autobots.application.worker_leases import claim_run
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
@@ -132,9 +132,9 @@ async def main() -> None:
         check("each task lists the tools its uses served, planning tools excepted, and its wall time", "gather: calculate, save_artifact; write: save_artifact; review: none and no time",
               (tools, walls), tools == {'gather': ['calculate', 'save_artifact'], 'write': ['save_artifact'], 'review': []}
               and walls['gather'] is not None and walls['write'] is not None and walls['review'] is None)
-        check('three metered calls are counted for the root tree, of 20', '3 of 20',
+        check(f'three metered calls are counted for the root tree, of {METERED_TOOL_CALLS}', f'3 of {METERED_TOOL_CALLS}',
               (admitted_metered, view.metered_tool_calls, view.metered_tool_call_limit),
-              admitted_metered == [True, True, True] and view.metered_tool_calls == 3 and view.metered_tool_call_limit == 20)
+              admitted_metered == [True, True, True] and view.metered_tool_calls == 3 and view.metered_tool_call_limit == METERED_TOOL_CALLS)
         check('the panel run names its Expert', 'Figures analyst', view.expert.name if view.expert else None,
               view.expert is not None and view.expert.name == 'Figures analyst')
 

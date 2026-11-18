@@ -36,7 +36,7 @@ from autobots.contracts.workflows import (
 from autobots.domain import workflows as graphs
 from autobots.domain.models import ProfileNotOffered, RolePolicy
 from autobots.domain.runs import RunStatus
-from autobots.domain.tools import workflow_grant
+from autobots.domain.tools import EXPERT_TOOLS, workflow_grant
 from autobots.domain.workflow_execution import InstanceState, instance_states
 from autobots.persistence.rows import (
     EmissionRow,
@@ -79,6 +79,25 @@ async def _agent_session(
         kind="coordinator",
         experts=[SessionExpert(expert_id=UUID(expert)) for expert in experts],
     )
+
+
+async def _agent_tools(
+    connection: SqlConnection, workspace_id: UUID, graph: Mapping[str, Any]
+) -> dict[str, int]:
+    """The tools the Experts of the graph's agent steps grant, at each Expert's current version,
+    so an agent step's child gets its Expert's tools (Decision 0034 F3). Each is named at the
+    version an Expert is granted now; an unknown name is left out."""
+    experts = sorted(set(graphs.agent_expert_ids(graph)))
+    if not experts:
+        return {}
+    cursor = await connection.execute(
+        "select v.config -> 'tools' from public.experts e join public.expert_versions v "
+        "on v.expert_id = e.id and v.version = e.latest_version "
+        "where e.workspace_id = %s and e.id = any(%s)",
+        (workspace_id, [UUID(expert) for expert in experts]),
+    )
+    named = {str(tool) for (tools,) in await cursor.fetchall() for tool in (tools or [])}
+    return {tool: EXPERT_TOOLS[tool] for tool in sorted(named) if tool in EXPERT_TOOLS}
 
 
 async def _execution_policy(
@@ -163,6 +182,7 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
             return _binding(receipt.prior.execution_id, run_id, workflow_id, version, published)
         execution_id = uuid4()
         session_id = await _agent_session(connection, workspace_id, actor_id, published.graph)
+        agent_tools = await _agent_tools(connection, workspace_id, published.graph)
         policy = await _execution_policy(connection, workspace_id, published.graph)
         admitted = await admit(
             connection,
@@ -174,7 +194,11 @@ async def create_execution(  # noqa: PLR0913 - baseline 2026-11-14, shrink only 
                 limit_micro_usd=limit_micro_usd,
                 origin=Fresh(
                     policy,
-                    RunGrant(instructions="", tools=workflow_grant(tools), session_id=session_id),
+                    RunGrant(
+                        instructions="",
+                        tools=workflow_grant(tools, agent_tools),
+                        session_id=session_id,
+                    ),
                     started_by=started_by,
                 ),
                 input_documents=documents,

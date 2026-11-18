@@ -38,6 +38,7 @@ TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
         "propose_improvement": 1,
         "propose_plan": 1,
         "publish_artifact": 1,
+        "read_artifact": 1,
         "read_offload": 1,
         "read_code_file": 1,
         "read_csv": 1,

@@ -62,7 +62,7 @@ from autobots.application.run_usage import RootLimits
 from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
-from autobots.domain.models import ModelRoute
+from autobots.domain.models import MODEL_CALL_SECONDS, ModelRoute
 
 # LoopStopped, UnadmittedModelCall and ModelRoute are imported from here by the disposable checks;
 # `_MIDDLEWARE` is the loop's ContextVar, which browse_trial.py and
@@ -292,7 +292,7 @@ class LoopMiddleware(AgentMiddleware[Any, Any]):
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         slot_wait_seconds: float = 30.0,
-        model_call_seconds: float = 120.0,
+        model_call_seconds: float = MODEL_CALL_SECONDS,
         goal: GoalSpec | None = None,
         compaction: CompactionPolicy | None = None,
         summary_route: ModelRoute | None = None,

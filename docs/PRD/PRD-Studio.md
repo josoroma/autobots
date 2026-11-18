@@ -168,7 +168,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 
 ## Seed
 
-**SD-01. Concept Experts and workflows.** A repeatable seed creates six Experts and six workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer and, by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, and Vendor due diligence. A workflow whose tools are unavailable is seeded as a draft.
+**SD-01. Concept Experts and workflows.** A repeatable seed creates seven Experts and seven workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer, by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot and, by [Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) E1, Deep research writer. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and, by Decision 0034 F1, Deep research content writer. A workflow whose tools are unavailable is seeded as a draft.
 
 **SD-02. Seed definitions.** Drafted by the coordinator from the concepts for the owner's review (Decision 0022 D17). Role bindings follow the workspace policy unless named.
 
@@ -180,6 +180,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
 | Code maintainer | Reads the repository, edits copies in the run's files, and proposes a pull request that waits for you | `github_read_file`, `search_files`, `read_code_file`, `patch_code_file`, `write_code_file`, `github_open_pull_request` |
 | Google bot | Searches Google through SerpApi for up to 30 ranked results, reads the most relevant pages and cites each source (Decision 0032 G8) | `google_search`, `google_map`, `google_extract`, `google_crawl`, `save_artifact`, `publish_artifact` (Decision 0033 K8) |
+| Deep research writer | Researches a topic the way Deep-Research-Content-Writer does: up to 30 Google results, the best pages read and numbered as sources, and one cited document of 2,000 to 3,000 words with references (Decision 0034 E1, with its instructions, E3 and E4) | `google_search`, `google_extract`, `search_web`, `extract_website_content`, `read_artifact`, `read_run_file`, `save_artifact`, `publish_artifact` |
 
 | Workflow | Steps (agent steps name their Expert) | Seeded as |
 |---|---|---|
@@ -189,6 +190,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Interview synthesis | input (question) → read (attached notes) → Synthesize themes (Brief writer) → output | draft until executions can carry files |
 | Release notes from merged PRs | input (since, base branch) → Collect merged PRs (Code maintainer) → Write the notes (Brief writer) → approval → output | published when the GitHub tools are available, otherwise a draft |
 | Vendor due diligence | input (vendors, criteria) → foreach vendor: Research the vendor (Research analyst) → join → Compare and recommend (Brief writer) → approval → output | published |
+| Deep research content writer | input (topic, reader's goal) → Research and write (Deep research writer) → Check and report (Deep research writer, as its reviewer) → approval → output | published when `google_search` is available, otherwise a draft (Decision 0034 F2) |
 
 ## Search
 

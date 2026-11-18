@@ -34,7 +34,7 @@ from autobots.application.tool_definitions import (
     ToolScope,
 )
 from autobots.application.tool_gateway import ToolGateway
-from autobots.application.tool_uses import input_digest
+from autobots.application.tool_uses import METERED_TOOL_CALLS, input_digest
 from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.runs import RunCommand
 from autobots.domain.tool_catalog import CostClass
@@ -283,7 +283,11 @@ async def test_the_guards_run_in_order_before_the_effect() -> None:
         (lambda: Database(owned=False), "lease_lost", (OWNERSHIP,)),
         (lambda: Database(expert=False), "expert_grant_required", (OWNERSHIP, EXPERT)),
         (lambda: Database(request="rejected"), "approval_rejected", (OWNERSHIP, EXPERT, GATE)),
-        (lambda: Database(metered=20), "tool_budget_exceeded", (OWNERSHIP, EXPERT, GATE, BUDGET)),
+        (
+            lambda: Database(metered=METERED_TOOL_CALLS),
+            "tool_budget_exceeded",
+            (OWNERSHIP, EXPERT, GATE, BUDGET),
+        ),
     ],
     ids=["admission", "expert", "approval", "budget"],
 )

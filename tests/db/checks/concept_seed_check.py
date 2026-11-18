@@ -1,9 +1,13 @@
-"""US-15.25: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
+"""US-15.25 and US-16.6: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
 
 Migrations alone must have created none of it. Run twice, it leaves each Expert and workflow once.
-It holds no secret, leaves nothing pending, and follows SD-02: the GitHub-only workflows and Interview
-synthesis are drafts, the rest published, and Experts are saved without their unavailable tools. JSON
-cases out.
+It holds no secret, leaves nothing pending, and follows SD-02: the GitHub-only workflows, Interview
+synthesis and, with no SerpApi key, Deep research content writer are drafts, the rest published, and
+Experts are saved without their unavailable tools.
+
+A second workspace, seeded first with only the six earlier Experts and workflows as an install before
+US-16.6 was, then gets the real seed twice with a SerpApi key: it adds the Deep research writer and
+publishes its workflow, and changes nothing else (Decision 0034 S1). JSON cases out.
 """
 from __future__ import annotations
 
@@ -18,12 +22,15 @@ from typing import Any
 import psycopg
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
-WORKSPACE = sys.argv[1]
+WORKSPACE, EARLIER = sys.argv[1], sys.argv[2]
 ROOT = Path(__file__).resolve().parents[3]
-EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot']
+EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot',
+           'Deep research writer']
 WORKFLOWS = ['Weekly competitor brief', 'Monthly FX and inflation note', 'Nightly test triage', 'Interview synthesis',
-             'Release notes from merged PRs', 'Vendor due diligence']
-DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis'}
+             'Release notes from merged PRs', 'Vendor due diligence', 'Deep research content writer']
+DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis', 'Deep research content writer'}
+WRITER = 'Deep research writer'
+RESEARCH = 'Deep research content writer'
 SECRET = re.compile(r'sk-or-|sk-[A-Za-z0-9]{16,}|eyJ[A-Za-z0-9_-]{10,}|ghp_|github_pat_|Bearer |password\s*[:=]|secret\s*[:=]', re.IGNORECASE)
 cases: list[dict[str, Any]] = []
 
@@ -36,11 +43,18 @@ def rows(db: psycopg.Connection, sql: str, *values: Any) -> list[tuple[Any, ...]
     return list(db.execute(sql, values).fetchall())
 
 
-def run_seed() -> dict[str, Any]:
-    # Only what the seed needs: no GitHub or provider variable reaches it.
+# The seed as it was before US-16.6: only its first six Experts and workflows.
+EARLIER_SEED = ('import sys\nimport autobots.operations.concept_seed as seed\n'
+                'seed.EXPERTS, seed.WORKFLOWS = seed.EXPERTS[:6], seed.WORKFLOWS[:6]\n'
+                'raise SystemExit(seed.main(sys.argv[1:]))\n')
+
+
+def run_seed(workspace: str = WORKSPACE, extra: dict[str, str] | None = None, earlier: bool = False) -> dict[str, Any]:
+    # Only what the seed needs: no GitHub or provider variable reaches it, unless `extra` names one.
     env = {'PATH': os.environ.get('PATH', ''), 'AUTOBOTS_DATABASE_URL': URL, 'PYTHONPATH': os.environ.get('PYTHONPATH', ''),
-           'PYTHONDONTWRITEBYTECODE': '1'}
-    done = subprocess.run([sys.executable, '-m', 'autobots.operations.concept_seed', '--workspace', WORKSPACE],
+           'PYTHONDONTWRITEBYTECODE': '1', **(extra or {})}
+    module = ['-c', EARLIER_SEED] if earlier else ['-m', 'autobots.operations.concept_seed']
+    done = subprocess.run([sys.executable, *module, '--workspace', workspace],
                           env=env, capture_output=True, text=True, timeout=120, check=False)
     if done.returncode:
         raise SystemExit(f'the seed failed: {done.stderr[-400:]}')
@@ -59,7 +73,7 @@ def main() -> None:
         first, second = run_seed(), run_seed()
         experts = rows(db, 'select name, count(*) from public.experts where workspace_id = %s and name = any(%s) group by name', WORKSPACE, EXPERTS)
         flows = rows(db, 'select name, count(*) from public.workflows where workspace_id = %s and name = any(%s) group by name', WORKSPACE, WORKFLOWS)
-        check('run twice, each Expert and workflow is there once', '6 Experts and 6 workflows, once each',
+        check('run twice, each Expert and workflow is there once', f'{len(EXPERTS)} Experts and {len(WORKFLOWS)} workflows, once each',
               (sorted(experts), sorted(flows)), sorted(name for name, count in experts if count == 1) == sorted(EXPERTS)
               and sorted(name for name, count in flows if count == 1) == sorted(WORKFLOWS))
         kept = set(second['experts'].values()) | set(second['workflows'].values())
@@ -73,13 +87,16 @@ def main() -> None:
                 'from public.workflows w where w.workspace_id = %s', WORKSPACE)}
         drafts = sorted(name for name, (latest, drafted) in states.items() if latest == 0 and drafted)
         published = sorted(name for name, (latest, drafted) in states.items() if latest == 1 and not drafted)
-        check('with no GitHub variables, the GitHub workflows and Interview synthesis are drafts, and the other three are published',
+        check('with no GitHub or SerpApi variable, the GitHub workflows, Interview synthesis and Deep research content writer are drafts, '
+              'and the other three are published',
               f'drafts {sorted(DRAFTS)}', (drafts, published), drafts == sorted(DRAFTS) and published == sorted(set(WORKFLOWS) - DRAFTS))
         unavailable = {name: report['unavailable'] for name, report in first['workflows'].items() if isinstance(report, dict) and report.get('draft')}
         check('a draft names the unavailable tools that made it one', 'GitHub tools for the two, none for Interview synthesis', unavailable,
               unavailable.get('Interview synthesis') == [] and all(tool.startswith(('github_', 'create_github')) for tool in
                                                                   unavailable.get('Nightly test triage', []) + unavailable.get('Release notes from merged PRs', []))
               and unavailable.get('Nightly test triage') and unavailable.get('Release notes from merged PRs'))
+        check('with no SerpApi variable, Deep research content writer is a draft for want of google_search', "['google_search']",
+              unavailable.get(RESEARCH), unavailable.get(RESEARCH) == ['google_search'])
 
         configs = {name: config for name, config in rows(
             db, 'select e.name, v.config from public.experts e join public.expert_versions v on v.expert_id = e.id and v.version = e.latest_version '
@@ -104,6 +121,15 @@ def main() -> None:
               'google_extract, save_artifact and publish_artifact; purpose names the three missing tools', (bot.get('tools'), purpose),
               bot.get('tools') == ['google_extract', 'save_artifact', 'publish_artifact'] and 'Saved without' in purpose
               and all(tool in purpose for tool in ('google_search', 'google_map', 'google_crawl')))
+        # US-16.6, Decision 0034 E1 to E3: with no SerpApi or Jina variable, the Deep research writer keeps the tools that
+        # need no key, says what it was saved without, and carries its instructions.
+        writer = configs.get(WRITER, {})
+        check('the Deep research writer is saved without its keyed search tools, saying so, with its instructions',
+              'google_extract, read_artifact, read_run_file, save_artifact and publish_artifact; three named; instructions',
+              (writer.get('tools'), writer.get('purpose', '')[-160:], len(writer.get('instructions', ''))),
+              writer.get('tools') == ['google_extract', 'read_artifact', 'read_run_file', 'save_artifact', 'publish_artifact']
+              and all(tool in writer.get('purpose', '') for tool in ('google_search', 'search_web', 'extract_website_content'))
+              and '<outputs>/content.md' in writer.get('instructions', '') and 'read_artifact' in writer.get('instructions', ''))
         labels = rows(db, "select v.graph -> 'nodes' from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
                           "where w.workspace_id = %s and w.name = 'Vendor due diligence'", WORKSPACE)
         steps = [node.get('label') for node in labels[0][0] if node.get('block') == 'agent'] if labels else []
@@ -121,7 +147,45 @@ def main() -> None:
                            '(select count(*) from public.routine_occurrences o join public.routines r on r.id = o.routine_id where r.workspace_id = %s)',
                        WORKSPACE, WORKSPACE, WORKSPACE)[0]
         check('nothing is pending: no run, job or routine occurrence', '0, 0, 0', pending, pending == (0, 0, 0))
+        earlier_install(db)
     print(json.dumps({'cases': cases}))
+
+
+def earlier_install(db: psycopg.Connection) -> None:
+    """US-16.6: an install seeded before the Deep research writer existed gets it, and its workflow published once a
+    SerpApi key is set (Decision 0034 S1, F2). Everything that was there stays as it was."""
+    run_seed(EARLIER, earlier=True)
+    snapshot = 'select e.name, e.latest_version, v.config from public.experts e join public.expert_versions v on v.expert_id = e.id ' \
+               'where e.workspace_id = %s order by e.name, v.version'
+    before = rows(db, snapshot, EARLIER)
+    flows_before = rows(db, 'select name, latest_version from public.workflows where workspace_id = %s order by name', EARLIER)
+    check('the arranged install has the six earlier Experts and workflows, without the two new ones', '6 and 6, none new',
+          ([name for name, _, _ in before], [name for name, _ in flows_before]),
+          len(before) == 6 and len(flows_before) == 6 and WRITER not in [name for name, _, _ in before])
+    serpapi = {'SERPAPI_API_KEY': 'fake-serpapi-key-for-the-seed-check'}
+    first, second = run_seed(EARLIER, serpapi), run_seed(EARLIER, serpapi)
+    created = sorted(name for group in ('experts', 'workflows') for name, report in first[group].items() if report != 'kept')
+    check('the first run adds only the Deep research writer and its workflow', f'{sorted([WRITER, RESEARCH])}', created,
+          created == sorted([WRITER, RESEARCH]) and first['workflows'][RESEARCH] == {'published': 1})
+    after = [row for row in rows(db, snapshot, EARLIER) if row[0] != WRITER]
+    flows_after = [row for row in rows(db, 'select name, latest_version from public.workflows where workspace_id = %s order by name', EARLIER)
+                   if row[0] != RESEARCH]
+    check('everything that existed is unchanged', 'the same versions and configurations', 'same' if (after, flows_after) == (before, flows_before) else 'changed',
+          (after, flows_after) == (before, flows_before))
+    added = rows(db, 'select v.config from public.experts e join public.expert_versions v on v.expert_id = e.id where e.workspace_id = %s and e.name = %s',
+                 EARLIER, WRITER)
+    tools = added[0][0].get('tools') if added else None
+    check('with a SerpApi key the Deep research writer is granted google_search, and not the Jina tools whose key is absent',
+          'google_search, google_extract, read_artifact, read_run_file, save_artifact, publish_artifact', tools,
+          tools == ['google_search', 'google_extract', 'read_artifact', 'read_run_file', 'save_artifact', 'publish_artifact'])
+    flow = rows(db, "select w.latest_version, exists (select 1 from public.workflow_drafts d where d.workflow_id = w.id), "
+                    "(select v.graph from public.workflow_versions v where v.workflow_id = w.id and v.version = 1) "
+                    "from public.workflows w where w.workspace_id = %s and w.name = %s", EARLIER, RESEARCH)
+    steps = [node.get('label') for node in flow[0][2]['nodes'] if node.get('block') == 'agent'] if flow and flow[0][2] else []
+    check('the Deep research content writer is published with its two steps', 'version 1, no draft, Research and write, then Check and report',
+          (flow[0][:2] if flow else None, steps), bool(flow) and flow[0][0] == 1 and not flow[0][1] and steps == ['Research and write', 'Check and report'])
+    kept = set(second['experts'].values()) | set(second['workflows'].values())
+    check('the second run adds nothing', 'all kept', kept, kept == {'kept'})
 
 
 main()

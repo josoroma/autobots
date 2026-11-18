@@ -40,6 +40,60 @@ class ExpertSeed:
     name: str
     purpose: str
     tools: tuple[str, ...]
+    # An Expert's standing instructions. The earlier concept Experts have none (Decision 0034 S1).
+    instructions: str = ""
+
+
+# Decision 0034 E3 to E5: Deep-Research-Content-Writer's phases, and the reviewer's role when the
+# goal is a previous workflow step's result.
+DEEP_RESEARCH_INSTRUCTIONS = """\
+You research a topic and write one evidence-backed document, the way Deep-Research-Content-Writer \
+does. Save every file under your outputs folder, the outputs path this run says you may write \
+under: outputs/ in a direct run, or a folder such as outputs/child-1/ as a workflow step. Below, \
+<outputs> stands for that folder.
+
+When your goal is a topic, with or without a reader's goal, work in this order:
+
+1. Plan. Propose a plan with these steps: search, collect, synthesize, write, check, publish.
+2. Search. Call google_search with the topic and max_results 30. If it returns fewer than 20 \
+useful results, search once or twice more with close variants of the topic. If google_search \
+isn't available, use search_web the same way. Keep Google's order. Leave out duplicates, video \
+and social sites, login walls and pages that are only links.
+3. Collect. Read the best pages with google_extract, five URLs a call, aiming for 15 to 30 \
+readable pages. If google_extract isn't available, use extract_website_content. Skip a page that \
+fails or has under 200 words; one page never stops the run. Number the pages you keep S-01, S-02 \
+and so on, in Google's order. Save <outputs>/research/sources.md with one entry per source: its \
+ID, title, URL, site, word count, and three to six exact excerpts worth citing. Save it after \
+each batch, so a long page can leave your context. If a tool's output was offloaded, read the \
+parts you need with read_offload.
+4. Synthesize. Read <outputs>/research/sources.md again. Choose the document's format from the \
+topic, the reader's goal and the evidence: for example a decision brief, an implementation guide, \
+a comparison or an evidence review. Save <outputs>/research/synthesis.md with the supported \
+findings and the sources behind each, contradictions and gaps, the format and why, and an outline \
+of H2 and H3 headings.
+5. Write. Save <outputs>/content.md in one save_artifact call: 2,000 to 2,800 words, one title, a \
+linked table of contents right below it, the sections of your outline, a References section that \
+lists every cited source as "[S-NN] Title, URL", and a last section, Why this format, that \
+explains the choice with citations. Cite every claim that isn't common knowledge inline as \
+[S-NN], only from your sources file. Add a Mermaid diagram only where it explains what prose \
+can't.
+6. Check. Read <outputs>/content.md back. Every [S-NN] in the text must be in References and in \
+your sources file; fix or remove any that isn't, and save again. Count the words and the sources \
+cited.
+7. Publish. Publish <outputs>/research/sources.md, <outputs>/research/synthesis.md and \
+<outputs>/content.md. Then save and publish <outputs>/report.md: the topic, the status, the \
+results found, pages read, pages that failed, sources cited and words, and what you couldn't \
+confirm. The status is succeeded when at least 80% of the pages you tried were read and at least \
+15 sources are cited, and degraded otherwise. Then complete the task, recording each check you \
+ran.
+
+When your goal is a previous step's result instead, a JSON object with artifact_ids, you are its \
+reviewer. Don't search again. Read each artifact with read_artifact, in pages if it's long. Check \
+the document against the sources: every [S-NN] resolves to a source, each cited excerpt supports \
+its claim, and References lists exactly the cited sources. If anything is wrong, save and publish \
+a corrected <outputs>/content.md. Then save and publish <outputs>/review.md with what you \
+checked, what you changed and the final status, and complete the task.
+"""
 
 
 EXPERTS = (
@@ -107,6 +161,24 @@ EXPERTS = (
             "publish_artifact",
         ),
     ),
+    # Decision 0034 E1 to E3: a run like Deep-Research-Content-Writer.
+    ExpertSeed(
+        "Deep research writer",
+        "Researches a topic the way Deep-Research-Content-Writer does: up to 30 Google results, "
+        "the best pages read and numbered as sources, and one cited document of 2,000 to 3,000 "
+        "words with references.",
+        (
+            "google_search",
+            "google_extract",
+            "search_web",
+            "extract_website_content",
+            "read_artifact",
+            "read_run_file",
+            "save_artifact",
+            "publish_artifact",
+        ),
+        DEEP_RESEARCH_INSTRUCTIONS,
+    ),
 )
 
 
@@ -157,6 +229,7 @@ _PORTS = {
     "synth": "goal",
     "collect": "goal",
     "research": "goal",
+    "check": "goal",
 }
 
 
@@ -280,6 +353,28 @@ def _vendors(experts: Mapping[str, UUID]) -> dict[str, Any]:
     return {"ir_version": 2, "nodes": nodes, "links": links}
 
 
+def _deep_research(experts: Mapping[str, UUID]) -> dict[str, Any]:
+    """Decision 0034 F1: the second step gets the first's result, its artifact IDs among them, and
+    reviews what they name."""
+    nodes = [
+        _node("in", "input", type="string"),
+        _agent("research", "Research and write", "Deep research writer", experts),
+        _text("s1"),
+        _agent("check", "Check and report", "Deep research writer", experts),
+        _node("gate", "approval"),
+        _node("out", "output"),
+    ]
+    order = [
+        ("in", "value"),
+        ("research", "result"),
+        ("s1", "value"),
+        ("check", "result"),
+        ("gate", "value"),
+        ("out", ""),
+    ]
+    return {"ir_version": 2, "nodes": nodes, "links": _chain(order)}
+
+
 GITHUB_TRIAGE = ("github_list_workflow_runs", "github_search_issues", "create_github_issue")
 GITHUB_RELEASE = ("github_read_file", "github_open_pull_request")
 WORKFLOWS = (
@@ -329,6 +424,15 @@ WORKFLOWS = (
         (),
         False,
         _vendors,
+    ),
+    # Decision 0034 F1 and F2: a draft without SerpApi.
+    WorkflowSeed(
+        "Deep research content writer",
+        "Name the topic and the reader's goal. Google results are read and cited in one long "
+        "document, which is then checked and reported on, and the result waits for you.",
+        ("google_search",),
+        False,
+        _deep_research,
     ),
 )
 
@@ -396,7 +500,7 @@ async def _seed_experts(
             actor_id=actor,
             idempotency_key=f"concept-seed:expert:{expert.name}",
             name=expert.name,
-            config=ExpertConfig(purpose=purpose, tools=granted),
+            config=ExpertConfig(purpose=purpose, instructions=expert.instructions, tools=granted),
             catalog=tools,
         )
         experts[expert.name] = view.id

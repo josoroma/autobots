@@ -20,7 +20,7 @@ from autobots.adapters.remote_files import STORE_REMOTE_FILE
 from autobots.adapters.serpapi import GOOGLE_MAP, GOOGLE_SEARCH
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.application import browsing_tool
-from autobots.application.artifact_tool import publish_tool
+from autobots.application.artifact_tool import publish_tool, read_tool
 from autobots.application.assignment_tool import assign_tool
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.cronjob_tool import cronjob_tool
@@ -84,14 +84,14 @@ def tool_definitions(
 def _bound(runtime: ToolRuntime | None) -> tuple[ToolDefinition, ...]:
     """The definitions a pass's runtime binds. With no runtime, as the catalog builds them, each
     still describes itself and its handler refuses before any effect. A pass registers
-    `publish_artifact` only with an object store and `assign_specialist` only with a way to drive
-    its children, so its model is never shown a tool it can't use (SP-013)."""
+    `publish_artifact` and `read_artifact` only with an object store, and `assign_specialist` only
+    with a way to drive its children, so its model is never shown a tool it can't use (SP-013)."""
     if runtime is None:
-        return (*plan_tools(None), publish_tool(None), assign_tool(None))
+        return (*plan_tools(None), publish_tool(None), read_tool(None), assign_tool(None))
     store, delegation = runtime.object_store, runtime.delegation
     return (
         *plan_tools(runtime.limits),
-        *((publish_tool(store),) if store is not None else ()),
+        *((publish_tool(store), read_tool(store)) if store is not None else ()),
         *((assign_tool(delegation),) if delegation is not None else ()),
     )
 

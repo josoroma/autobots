@@ -4,6 +4,7 @@ Each reads and writes run files through run_files.py (PTOL-11)."""
 import csv
 import io
 import re
+from dataclasses import dataclass
 from typing import Literal
 
 from autobots.application import run_files
@@ -62,21 +63,35 @@ async def _save(arguments: SaveArtifactInput, context: ToolContext) -> SaveArtif
 READ_CHARACTERS = 200_000
 
 
+@dataclass(frozen=True)
+class LinePage:
+    content: str
+    total_lines: int
+    truncated: bool
+
+
+def line_page(text: str, offset: int, limit: int | None) -> LinePage:
+    """Lines `offset` to `offset + limit` of `text`, at most READ_CHARACTERS of them.
+    `read_run_file` version 2 and `read_artifact` page alike (Decision 0034 A1)."""
+    lines = text.splitlines(keepends=True)
+    end = len(lines) if limit is None else offset + limit
+    chosen = "".join(lines[offset:end])
+    cut = chosen[:READ_CHARACTERS]
+    return LinePage(cut, len(lines), end < len(lines) or len(cut) < len(chosen))
+
+
 async def _read_v2(arguments: ReadRunFileV2Input, context: ToolContext) -> ReadRunFileV2Output:
     found = await run_files.latest(context, arguments.path)
-    lines = found.content.splitlines(keepends=True)
-    end = len(lines) if arguments.limit is None else arguments.offset + arguments.limit
-    chosen = "".join(lines[arguments.offset : end])
-    cut = chosen[:READ_CHARACTERS]
+    page = line_page(found.content, arguments.offset, arguments.limit)
     return ReadRunFileV2Output(
         path=arguments.path,
         version=found.version,
         media_type=found.media_type,
         sha256=found.sha256,
-        content=cut,
+        content=page.content,
         offset=arguments.offset,
-        total_lines=len(lines),
-        truncated=end < len(lines) or len(cut) < len(chosen),
+        total_lines=page.total_lines,
+        truncated=page.truncated,
     )
 
 

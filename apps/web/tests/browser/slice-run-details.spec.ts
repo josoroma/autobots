@@ -167,7 +167,7 @@ test("the workspace shows budgets, and the inspector shows reported and estimate
     { timeout: 60_000 },
   );
   const budgets = page.locator('[data-field="budgets"]');
-  await expect(budgets).toContainText("512 output tokens per call");
+  await expect(budgets).toContainText("4096 output tokens per call");
   await expect(budgets).toContainText("8K tokens of context");
   await expect(budgets).toContainText("Spend limit: US$1.00");
 
