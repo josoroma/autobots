@@ -271,7 +271,7 @@ async def test_a_cancelled_call_stays_held_as_uncertain_and_the_cancellation_pro
 
 @pytest.mark.parametrize("given", ["absolute", "default"])
 def test_the_shared_ledger_does_not_depend_on_the_working_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, given: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, given: str, restore_logging: None
 ) -> None:
     """Decision 0009's cap is counted in one file wherever the trial starts (POPS-07)."""
     monkeypatch.chdir(tmp_path)
@@ -368,7 +368,7 @@ async def test_key_usage_keeps_only_the_three_figures() -> None:
 
 
 def test_nothing_is_sent_without_paid(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, restore_logging: None
 ) -> None:
     monkeypatch.setattr("sys.argv", ["reasoning_trial"])
     assert trial.main() == 0

@@ -29,7 +29,7 @@ from autobots.contracts.experts import ExpertConfig, SessionExpert
 from autobots.contracts.improvements import EvidenceRef, ImprovementProposal, RegressionCase
 from autobots.domain.models import resolve_role_policy
 from autobots.operations.job_dispatch import process_next
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import SecretStr
 
@@ -337,10 +337,9 @@ async def main(cases: Cases) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Improving(db, cases)
         await context.arrange()
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/qualify_identity.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

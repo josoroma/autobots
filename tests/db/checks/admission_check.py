@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import psycopg
 from autobots.application.model_admission import (
     AdmissionRequest,
+    AttemptAlreadySettled,
     BudgetExceeded,
     ModelAdmission,
     NoInferenceSlot,
@@ -131,7 +132,7 @@ async def main(cases: Cases) -> None:
             await admission.mark_dispatched(dispatched.invocation_id)
             outcomes = (await admission.cancel(reserved.invocation_id), await admission.cancel(dispatched.invocation_id))
             check('cancelling before dispatch owes nothing; after dispatch is uncertain', 'cancelled, uncertain', outcomes, outcomes == ('cancelled', 'uncertain'))
-            await cases.refused('an uncertain attempt cannot be quietly settled', None, admission.settle(dispatched.invocation_id, 1), ValueError)
+            await cases.refused('an uncertain attempt cannot be quietly settled', None, admission.settle(dispatched.invocation_id, 1), AttemptAlreadySettled)
             failed = await admit_one(request(uuid4(), 100))
             await admission.fail_before_acceptance(failed.invocation_id, 'network_before_acceptance')
             row = await (await connection.execute('select status, charged_micro_usd from app_private.model_invocations where id = %s', (failed.invocation_id,))).fetchone()

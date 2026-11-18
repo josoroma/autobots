@@ -34,7 +34,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.domain.tools import PLAN_TOOLS, OperationClass
 from autobots.operations.job_dispatch import process_next
-from checklib import Cases, Db, run_check
+from checklib import Cases, Db, run_check, run_scenarios
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import BaseModel, ConfigDict
 
@@ -406,11 +406,10 @@ SCENARIOS = (
 async def main(cases: Cases) -> dict[str, object]:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Approving(db, cases)
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
     return {'browser_env': context.env}
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/qualify_identity.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

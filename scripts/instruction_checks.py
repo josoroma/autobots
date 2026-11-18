@@ -18,12 +18,20 @@ RULE_KEYS = frozenset({'paths'})
 FRONTMATTER_KEY = re.compile(r'([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$')
 
 
-def parse_frontmatter(text: str) -> dict[str, str] | None:
-    """Top-level keys and their one-line values, or None without frontmatter. The header opens on the first line and
-    ends at the next line that is `---` by itself, never at a `---` inside a value."""
+def frontmatter_header(text: str) -> str | None:
+    """The frontmatter's text between its markers, or None without frontmatter. The header opens on the first line and
+    ends at the next line that is `---` by itself, never at a `---` inside a value. The one place a header is found,
+    for `parse_frontmatter` and `rule_globs`."""
     if not text.startswith('---\n') or '\n---\n' not in text[4:]:
         return None
-    header = text[4:].split('\n---\n', 1)[0]
+    return text[4:].split('\n---\n', 1)[0]
+
+
+def parse_frontmatter(text: str) -> dict[str, str] | None:
+    """Top-level keys and their one-line values, or None without frontmatter (frontmatter_header)."""
+    header = frontmatter_header(text)
+    if header is None:
+        return None
     found = {}
     for line in header.splitlines():
         match = FRONTMATTER_KEY.match(line)
@@ -88,8 +96,8 @@ def broken_link_errors(root: Path) -> list[str]:
 
 
 def rule_globs(text: str) -> list[str]:
-    header = text[4:].split('\n---\n', 1)[0]
-    return re.findall(r'^\s+-\s+"([^"]+)"\s*$', header, flags=re.MULTILINE)
+    """The quoted list items of a rule's frontmatter, its `paths:` globs, or none without frontmatter."""
+    return re.findall(r'^\s+-\s+"([^"]+)"\s*$', frontmatter_header(text) or '', flags=re.MULTILINE)
 
 
 def glob_matches(pattern: str, path: str) -> bool:

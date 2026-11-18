@@ -1,8 +1,6 @@
 """What a child run shows, and how its parent records it, against a real database. JSON cases.
 
-Found as N-2, N-8 and N-9 by US-11.12's review, defined in
-docs/engineering/evidence/US-11.12/review-r1-open-findings.md. Named review_check.py until refactor plan
-R-66 named it for its behavior."""
+Each part guards a behavior US-11.12's gate required, as docs/engineering/evidence/US-11.12/summary.md records."""
 from __future__ import annotations
 
 import asyncio
@@ -85,7 +83,7 @@ async def main() -> None:
 
         parent, child = await admitted('Parent'), await admitted('Child')
         await db.execute('update public.runs set root_run_id = %s, parent_run_id = %s where id = %s', (parent, parent, child))
-        # N-9: a call a child made shows on the child, though the root holds the budget.
+        # A call a child made shows on the child, though the root holds the budget (US-11.12).
         invocation = uuid4()
         await db.execute("insert into app_private.model_invocations (id, workspace_id, root_run_id, run_id, role, profile, wire_id, attempt, spend_day, reserved_micro_usd, charged_micro_usd, status) "
                          "values (%s, %s, %s, %s, 'executor', 'openrouter_terra', 'fixture/model', 1, current_date, 100, 25, 'succeeded')", (invocation, WORKSPACE, parent, child))
@@ -95,10 +93,10 @@ async def main() -> None:
         check("the root still counts it, once", '25', root.budget.spent_micro_usd, root.budget.spent_micro_usd == 25)
 
         # Decision 0029 F10: a depth-2 tree, every call carrying the top root as its children inherit it. The root shows
-        # what admission counts against it, and each child the calls it made itself (N-9). The old view formula gives the
-        # same figures for these runs, so this pins agreement and N-9; run_list_check's seeded ledger is the case that
-        # fails under the old formula. Its own workspace, finished runs with no jobs and no active call, so it holds no
-        # inference slot and leaves nothing a later check could claim.
+        # what admission counts against it, and each child the calls it made itself. The old view formula gives the
+        # same figures for these runs, so this pins agreement and each child's own spend; run_list_check's seeded ledger
+        # is the case that fails under the old formula. Its own workspace, finished runs with no jobs and no active
+        # call, so it holds no inference slot and leaves nothing a later check could claim.
         depth = uuid4()
         await db.execute('insert into public.workspaces (id, name) values (%s, %s)', (depth, f'Depth {depth.hex[:6]}'))
         top, middle, leaf = uuid4(), uuid4(), uuid4()
@@ -121,7 +119,7 @@ async def main() -> None:
         check("each child's spend is its own calls, not its subtree's and not 0 (the old formula agrees here)",
               'middle 20 and 30, leaf 5 and 40', figures, figures['middle'] == (20, 30) and figures['leaf'] == (5, 40))
 
-        # N-2: settling a finished child records how it really ended.
+        # Settling a finished child records how it really ended (US-11.12).
         expert = uuid4()
         await db.execute("insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)", (expert, WORKSPACE, f'Review {expert}'))
         await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s)", (expert, uuid4()))
@@ -134,7 +132,7 @@ async def main() -> None:
         outcome = (await (await db.execute('select outcome from app_private.assignments where id = %s', (assignment,))).fetchone())[0]
         check('a child that succeeded is recorded as having succeeded', 'succeeded', outcome, outcome == 'succeeded')
 
-        # R2-3: who supplied a reconciled charge, and whether the outcome was ever in doubt.
+        # Who supplied a reconciled charge, and whether the outcome was ever in doubt (US-11.12).
         async def uncertain(failure: str) -> tuple[UUID, UUID]:
             run = await admitted('Reconciled')
             call = uuid4()
@@ -163,7 +161,7 @@ async def main() -> None:
         seen = await shown(run)
         check('a call that worked, with only its charge missing, has a known outcome', 'entered by the owner, outcome known', (seen.reconciled, seen.outcome_unknown), seen.reconciled and not seen.outcome_unknown)
 
-        # R2-2, R2-10: continuing repeats the stored goal whole, and only for a goal run of its own.
+        # Continuing repeats the stored goal whole, and only for a goal run of its own (US-11.12).
         long_goal = 'Keep every word of this goal. ' * 40
         ended = await admitted(long_goal)
         await db.execute("update public.runs set status = 'failed' where id = %s", (ended,))
@@ -181,7 +179,7 @@ async def main() -> None:
         except LinkRefused as refusal:
             check("a child's goal can't be repeated on a budget of its own", 'refused', str(refusal)[:60], True)
 
-        # R2-10: a workflow's run has no goal of its own to repeat.
+        # A workflow's run has no goal of its own to repeat (US-11.12).
         graph = {'nodes': [{'id': 'in', 'block': 'input', 'version': 1, 'config': {'type': 'string'}}, {'id': 'out', 'block': 'output', 'version': 1, 'config': {}}],
                  'links': [{'source': 'in', 'source_port': 'value', 'target': 'out', 'target_port': 'value'}]}
         actor = uuid4()
@@ -198,14 +196,14 @@ async def main() -> None:
         except LinkRefused as refusal:
             check("a workflow's stored text can't be repeated as a goal", 'refused', str(refusal)[:60], True)
 
-        # N-8: a child shows what it froze, not what its Expert says today.
+        # A child shows what it froze, not what its Expert says today (US-11.12).
         await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 2, %s, %s)", (expert, json.dumps({'role_bindings': {'executor': 'openrouter_deepseek_flash'}}), uuid4()))
         await db.execute("update public.runs set expert_id = %s, expert_version = 2, policy_snapshot = jsonb_set(policy_snapshot, '{bindings,executor}', '\"openrouter_terra\"') where id = %s", (expert, child))
         binding = (await read_workspace(db, WORKSPACE, child)).expert
         shown_route = binding.role_bindings.get('executor') if binding else None
         check("a child's Expert card shows the model it froze", 'openrouter_terra, though the Expert names another', shown_route, shown_route == 'openrouter_terra')
 
-        # E-4, on real catalogs: a column that isn't there reads as behind, and the real ones don't.
+        # On real catalogs, a column that isn't there reads as behind, and the real ones don't (US-11.12).
         conditions = await database_conditions(OnePool(db))
         check('the columns a migration added are all present', 'no schema_behind', [item.code for item in conditions], 'schema_behind' not in [item.code for item in conditions])
         from autobots.application import operations
@@ -214,7 +212,7 @@ async def main() -> None:
         operations.REQUIRED_COLUMNS = REQUIRED_COLUMNS
         check('a column-only migration not applied reads as behind', 'schema_behind', [item.code for item in conditions], 'schema_behind' in [item.code for item in conditions])
 
-        # WI-2, R2-1: the real call sites reserve past the worst case, for work and for a summary.
+        # The real call sites reserve past the worst case, for work and for a summary (US-11.12).
         big = await admitted('Reserve for the real request', 1_000_000)
         worst = 1_000
         route = ModelRoute('executor', 'openrouter_terra', 'fixture/model', worst, 1_000_000)
@@ -233,7 +231,7 @@ async def main() -> None:
         check('a call larger than assumed reserves past the worst case', f'over {worst}', (found.get('executor'), ran.code, ran.run_status), (found.get('executor') or 0) > worst)
         check('and so does a summary', f'over {worst}', found.get('summarizer'), (found.get('summarizer') or 0) > worst)
 
-        # R3-2: a request that could reach a rate nothing was reserved at isn't sent.
+        # A request that could reach a rate nothing was reserved at isn't sent (US-11.12).
         tiered = await admitted('Past the tier', 1_000_000)
         model = Aware(items=[say('never')], seen=[], bound=[])
         result = await drive_lease(db, URL, await claim_run(db, tiered, worker_id='tiered'), lambda: model, LoopConfig(route=ModelRoute('executor', 'openrouter_terra', 'fixture/model', 1_000, 1_000_000, 1), sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry))
@@ -273,7 +271,7 @@ async def main() -> None:
             after_runs = (await (await db.execute('select count(*) from public.runs where workspace_id = %s', (WORKSPACE,))).fetchone())[0]
             check("an occurrence on a saved Expert binding is refused", 'model_not_offered, no run', (refused.code, after_runs - before_runs), refused.code == 'model_not_offered' and after_runs == before_runs)
 
-        # R5-4: a scripted model's tool arguments holding a lone surrogate, the way one could arrive.
+        # A scripted model's tool arguments holding a lone surrogate, the way one could arrive (US-11.12).
         odd = await admitted('A model that returns a lone surrogate', 1_000_000)
         task = {'id': 'a', 'title': 'T', 'criteria': ['c1'], 'expected_evidence': 'a file'}
         model = Aware(items=[calls(('propose_plan', {'tasks': [task]})), calls(('calculate', {'operation': 'sum', 'values': [1, 2], 'note': 'x\ud83dy'})), say('after'), say('after')], seen=[], bound=[])
@@ -287,7 +285,7 @@ async def main() -> None:
         status_now = (await (await db.execute('select status from public.runs where id = %s', (odd,))).fetchone())[0]
         check('a lone surrogate from a model ends the run truthfully, with nothing more reserved', 'failed, request_unencodable, and neither a reservation nor a call after it', (ended, status_now, reserved_rows[0], len(model.seen)), ended == ('failed', 'request_unencodable') and status_now == 'failed' and reserved_rows[0] == 2 and len(model.seen) == 2)
 
-        # R5-4: whether a lone surrogate can arrive. A goal can't be stored with one.
+        # Whether a lone surrogate can arrive: a goal can't be stored with one (US-11.12).
         try:
             await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='before \ud83d after', limit_micro_usd=1000, policy=resolve_role_policy())
             check('a goal holding a lone surrogate never reaches a model', 'refused on the way in', 'stored', False)

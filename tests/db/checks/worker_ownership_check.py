@@ -23,6 +23,7 @@ from autobots.application.tool_gateway import ownership_refusal
 from autobots.application.worker_leases import claim_next, heartbeat
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
+from checklib import run_worker
 from langgraph.checkpoint.postgres import PostgresSaver
 from worker_graph import build
 
@@ -197,11 +198,8 @@ async def main() -> None:
         run = await admit()
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / 'effects.log'
-            process = await asyncio.create_subprocess_exec(
-                PYTHON, str(WORKERS / 'ownership_worker.py'), URL, str(log), 'second', '2',
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-            out, err = await asyncio.wait_for(process.communicate(), 60)
-            check('the first worker was killed mid-step', 'exit -9', f'exit {process.returncode}: {err.decode()[-200:]}', process.returncode == -9 and out.decode().strip() == str(run))
+            code, out, err = await run_worker(PYTHON, str(WORKERS / 'ownership_worker.py'), URL, str(log), 'second', '2')
+            check('the first worker was killed mid-step', 'exit -9', f'exit {code}: {err.decode()[-200:]}', code == -9 and out.decode().strip() == str(run))
             lines = log.read_text().split()
             check('it did the first step and started the second', 'first, second', lines, lines == ['first', 'second'])
             live = await claim_next(db, worker_id='too-early')

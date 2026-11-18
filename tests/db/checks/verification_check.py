@@ -18,7 +18,11 @@ from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.adapters.tool_registry import build_registry
 from autobots.application.artifacts import publish
 from autobots.application.goal_loop import run_goal
-from autobots.application.model_admission import AdmissionRequest, ModelAdmission
+from autobots.application.model_admission import (
+    AdmissionRequest,
+    AttemptAlreadySettled,
+    ModelAdmission,
+)
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.recovery import classify_interrupted
 from autobots.application.run_lifecycle import LoopConfig
@@ -40,7 +44,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.logs import JsonFormatter, redact
 from autobots.operations.job_dispatch import drive_lease, process_next
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios
 from goal_loop_script import PLAN, ROUTE, SAVE, Script, calls, say
 from langchain_core.messages import AIMessage
 from pydantic import SecretStr
@@ -201,7 +205,7 @@ async def retry_after_backoff_is_fenced(ctx: Verifier) -> None:
     try:
         await ModelAdmission(db).mark_dispatched(ticket.invocation_id)
         check('a reservation recovery closed can\'t be sent', 'refused', 'sent', False)
-    except ValueError:
+    except AttemptAlreadySettled:
         check('a reservation recovery closed can\'t be sent', 'refused', 'refused', True)
 
 
@@ -440,10 +444,9 @@ async def main(cases: Cases) -> None:
     config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Verifier(db, cases, store, config)
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/qualify_identity.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

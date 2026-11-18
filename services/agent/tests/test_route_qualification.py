@@ -451,7 +451,7 @@ def test_a_missing_key_refuses(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_nothing_is_sent_without_the_paid_flag(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], restore_logging: None
 ) -> None:
     arguments = type("Args", (), {"paid": False, "out": str(tmp_path), "key_file": "absent"})()
     assert await rq._main(arguments) == 0

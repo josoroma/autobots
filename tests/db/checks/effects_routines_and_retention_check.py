@@ -2,9 +2,8 @@
 gate a person's run shares (refactor plan R-24), and workflow, routine and memory bindings, on a real database
 through the runtime role. JSON cases through checklib. No model call.
 
-Found as M1 to M27 by the review of US-5.1 to US-9.3, defined in
-docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-majors.md and review-r1.md. Named major_check.py
-until refactor plan R-66 named it for its behavior."""
+Each part cites the story whose behavior it guards. docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md
+records the defects they guard against."""
 from __future__ import annotations
 
 import asyncio
@@ -114,7 +113,8 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
         sends.append(arguments.text)
         return Sent(delivered=True)
 
-    # M1: the cancel lands during the readback, which then says not delivered.
+    # The cancel lands during the readback, which then says not delivered: an effect is admitted only while the run
+    # is running (US-5.4, SP-010).
     cancel_during_readback: list[UUID] = []
 
     async def not_delivered(_: Note, __: ToolContext) -> Sent:
@@ -151,7 +151,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     resumed = await asyncio.wait_for(gateway.execute(db, scope_of(lease, {'hang': 1}), 'hang', {'text': 'x'}), 5)
     check('a hung readback is bounded and stays unknown', 'outcome_unknown', resumed.code, resumed.code == 'outcome_unknown')
 
-    # M2: an approval lapses, and a confirmed failure uses it up.
+    # An approval lapses, and a confirmed failure uses it up (US-5.3).
     attempts: list[str] = []
 
     async def fails(arguments: Note, _: ToolContext) -> Sent:
@@ -180,7 +180,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     asked_again = await value('select status from public.approval_requests where id = %s', row.id)
     check('an unused approval past its time asks a person again', 'approval_pending, nothing attempted', (late.code, asked_again, attempts), late.code == 'approval_pending' and asked_again == 'pending' and not attempts)
 
-    # The blocker from the second review: what already happened is read back, whatever the date.
+    # An effect already sent is read from its receipt, whatever the date (US-5.3).
     delivered: list[str] = []
 
     async def delivers(arguments: Note, _: ToolContext) -> Sent:
@@ -207,7 +207,8 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     second = await gateway.execute(db, scope_of(lease, {'gated': 1}), 'gated', {'text': 'used up'})
     check('one confirmed failure uses the approval up', 'destination_refused, then approval_consumed, one attempt', (first.code, second.code, len(attempts)), first.code == 'destination_refused' and second.code == 'approval_consumed' and len(attempts) == 1)
 
-    # M4 and M5: a parent, a child and a grandchild.
+    # A parent, a child and a grandchild: unknown effects count across the tree, and pausing the root stops every
+    # descendant (US-5.2, SP-010, SP-012).
     await clear()
     expert = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Major {uuid4().hex[:6]}', config=ExpertConfig(tools=['calculate'], instructions='Work.'), catalog=tool_registry.catalog())
     session = await create_session(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), kind='coordinator', experts=[SessionExpert(expert_id=expert.id)])
@@ -244,7 +245,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
     check('pausing the root stops a grandchild whose parent is still running', 'parent_not_running', outcome, outcome == 'parent_not_running')
     await db.execute("update public.runs set status = 'cancelled' where id in (%s, %s, %s)", (root, child, grandchild))
 
-    # M3: a child waiting for a person keeps its assignment open and pauses the parent.
+    # A child waiting for a person keeps its assignment open and pauses the parent (US-5.3, US-5.4).
     await clear()
     parent = await admit(binding=binding)
     snapshot = await value('select policy_snapshot from public.runs where id = %s', parent)
@@ -280,7 +281,7 @@ async def effects_and_assignments(db: Any, cases: Cases) -> None:
         raised = str(error)
     check('a replay does not spin on a child still waiting', 'assignment_paused, no drive', (raised, drives), raised == 'assignment_paused' and drives == 0)
 
-    # M7: a live model has to be told what it can reach.
+    # A live model is told what it can reach: the Experts it can assign and where a child may write (US-5.1).
     goal = await load_goal(db, parent)
     guidance = await scope_guidance(db, parent, goal)
     check('a coordinator is told which Experts it can assign', 'the name and id', guidance[:160], str(expert.id) in guidance and expert.name in guidance)
@@ -313,7 +314,7 @@ async def retention_and_readiness(db: Any, cases: Cases) -> None:
     other_workspace = UUID(sys.argv[2])
     await write_policy(db, other_workspace, ACTOR, RetentionPolicy(run_days=30, receipt_days=30))
 
-    # M9: on a connection like the API's, rows are durable before bytes are touched.
+    # On a connection like the API's, rows are durable before bytes are touched (US-9.1).
     run = uuid4()
     await db.execute("insert into public.runs (id, workspace_id, limit_micro_usd, status, updated_at) values (%s, %s, 1, 'succeeded', now() - interval '90 days')", (run, other_workspace))
     artifact = uuid4()
@@ -333,7 +334,7 @@ async def retention_and_readiness(db: Any, cases: Cases) -> None:
     purged = await value('select content_purged_at is not null from public.runs where id = %s', run)
     check('a crash removing bytes keeps the purge on record', 'expired, purged', (state, purged), state == 'expired' and purged is True)
 
-    # M10: a key lasts as long as its run's content, and through anything unresolved.
+    # A key lasts as long as its run's content, and through anything unresolved (US-9.1, SP-014).
     run = await terminal(days=10)
     finished_late = str(uuid4())
     await db.execute("insert into app_private.idempotency_receipts (workspace_id, actor_id, operation, target, idempotency_key, request_hash, result, created_at) values (%s, %s, 'run.admit', %s, %s, 'x', '{}', now() - interval '100 days')", (WORKSPACE, ACTOR, str(run), finished_late))
@@ -351,7 +352,7 @@ async def retention_and_readiness(db: Any, cases: Cases) -> None:
         accepted = 'refused'
     check('keys can\'t expire while content is kept for good', 'refused', accepted, accepted == 'refused')
 
-    # M11: cancelling closes what the run was waiting on, and refused runs don't block the rest.
+    # Cancelling closes what the run was waiting on, and refused runs don't block the rest (US-9.1).
     run = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Waits', limit_micro_usd=1_000_000, policy=resolve_role_policy())).run_id
     await db.execute("update app_private.run_jobs set status = 'done' where run_id = %s", (run,))
     await db.execute("insert into app_private.run_obligations (id, run_id, kind, detail) values (%s, %s, 'input', 'x')", (uuid4(), run))
@@ -510,7 +511,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Major {uuid4().hex[:6]}')
     await publish_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key=str(uuid4()), expected_version=0, graph=WorkflowGraph.model_validate(graph), source='user')
 
-    # M20: an execution gets the workspace's chosen model.
+    # An execution gets the workspace's chosen model (US-6.1).
     # In a workspace of its own, so the browser suite's versioned settings start clean.
     chooser = uuid4()
     await db.execute("insert into public.workspaces (id, name) values (%s, 'Chooses Terra')", (chooser,))
@@ -522,7 +523,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     chosen = await value("select policy_snapshot -> 'bindings' ->> 'executor' from public.runs where id = %s", bound.run_id)
     check("a workflow's run gets the workspace's model", 'openrouter_terra', chosen, chosen == 'openrouter_terra')
 
-    # M22: a routine's limit and tools reach its workflow's run.
+    # A routine's limit and tools reach its workflow's run (US-7.1).
     await clear()
     config = RoutineConfig(target=RoutineTarget(kind='workflow', id=flow.id, version=1), trigger={'kind': 'interval', 'minutes': 60}, limit_micro_usd=500, tools=['calculate'], inputs={'in': 'x'})
     routine_id = uuid4()
@@ -531,7 +532,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     goal = await load_goal(db, run)
     check("a routine's limit and tools reach its workflow's run", '500, no save or publish tools', (limit, sorted(goal.allowed_tools)), limit == 500 and 'calculate' in goal.allowed_tools and 'save_artifact' not in goal.allowed_tools)
 
-    # M21: the monitor reads a run that never got there as not run.
+    # The monitor reads a node a run never got to as not run (US-6.3).
     await clear()
     idle = await create_execution(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key=str(uuid4()), version=1, inputs={'in': 'x'})
     version = await value('select version from public.runs where id = %s', idle.run_id)
@@ -545,7 +546,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     check('and the node in progress says so', 'in running, out waiting', states, states == {'in': 'running', 'out': 'waiting'})
     await db.execute("update public.runs set status = 'cancelled' where id = %s", (idle.run_id,))
 
-    # M24 and M25: time only moves forward, and one bad routine doesn't stop the rest.
+    # Time only moves forward, and one bad routine doesn't stop the rest (US-7.1).
     await clear()
     good = await create_routine(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), name=f'Good {uuid4().hex[:6]}', config=config, budget_cap=None)
     bad_config = config.model_copy(update={'trigger': config.trigger.model_copy(update={'minutes': 61})})
@@ -578,7 +579,7 @@ async def workflows_routines_memory(db: Any, cases: Cases) -> None:
     await db.execute('update public.routines set enabled = false where id = %s', (good.id,))
     await clear()
 
-    # M27: a run finds its own files, and memory bound to another Expert stays hidden.
+    # A run finds its own files, and memory bound to another Expert stays hidden (US-8.1).
     mine = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Mine', limit_micro_usd=1_000_000, policy=resolve_role_policy())).run_id
     other = (await admit_run(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key=str(uuid4()), goal_text='Other', limit_micro_usd=1_000_000, policy=resolve_role_policy())).run_id
     word = f'zebra{uuid4().hex[:8]}'

@@ -6,6 +6,7 @@ judges the value it shows, and a refusal of the wrong class fails its case (TDBC
 """
 from __future__ import annotations
 
+import ast
 import asyncio
 import contextlib
 import io
@@ -145,6 +146,94 @@ class CrashingCheck(unittest.TestCase):
             checklib.run_check(main, secrets=(SECRET,))
         self.assertNotIn(SECRET, out.getvalue())
 
+    def test_a_failing_first_scenario_stops_the_rest_and_the_cases_still_print(self) -> None:
+        ran: list[str] = []
+
+        async def first(cases: checklib.Cases) -> None:
+            ran.append('first')
+            cases.check('first observed', 'seen', 'seen', True)
+            raise LookupError('arranged')
+
+        async def second(cases: checklib.Cases) -> None:
+            ran.append('second')
+            cases.check('second observed', 'seen', 'seen', True)
+
+        async def third(cases: checklib.Cases) -> None:
+            ran.append('third')
+
+        async def main(cases: checklib.Cases) -> None:
+            await checklib.run_scenarios(cases, (first, second, third), cases)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaisesRegex(LookupError, 'arranged'):
+            checklib.run_check(main)
+        shown = printed(out.getvalue())['cases']
+        self.assertEqual(ran, ['first'])
+        self.assertEqual([(case['id'], case['passed']) for case in shown],
+                         [('first observed', True), ('first: ran to the end', False),
+                          ('second: ran to the end', False), ('third: ran to the end', False)])
+        self.assertEqual(shown[1]['observed'], 'LookupError: arranged')
+        self.assertEqual(shown[2]['observed'], 'not run, because first raised')
+
+    def test_a_check_whose_first_scenario_fails_exits_non_zero_after_printing(self) -> None:
+        """As the qualifiers run it: a script in checks/ with fixtures/ on its path."""
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder) / 'fixtures').mkdir()
+            (Path(folder) / 'checks').mkdir()
+            shutil.copy(FIXTURES / 'checklib.py', Path(folder) / 'fixtures')
+            script = Path(folder) / 'checks/stops_check.py'
+            script.write_text('from checklib import Cases, run_check, run_scenarios\n\n\n'
+                              'async def arranges(cases: Cases) -> None:\n'
+                              "    cases.check('arranged first', 'yes', 'yes', True)\n"
+                              "    raise RuntimeError('arranged crash')\n\n\n"
+                              'async def reads_it(cases: Cases) -> None:\n'
+                              "    cases.check('read what was arranged', 'yes', 'yes', True)\n\n\n"
+                              'async def main(cases: Cases) -> None:\n'
+                              '    await run_scenarios(cases, (arranges, reads_it), cases)\n\n\n'
+                              'run_check(main, parent_timeout=60)\n')
+            result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, timeout=60,
+                                    check=False, cwd=folder, env={**os.environ, 'PYTHONPATH': str(Path(folder) / 'fixtures')})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('arranged crash', result.stderr)
+        self.assertEqual([case['id'] for case in printed(result.stdout)['cases']],
+                         ['arranged first', 'arranges: ran to the end', 'reads_it: ran to the end'])
+
+    def test_a_check_past_its_limit_prints_its_cases_and_kills_its_worker(self) -> None:
+        """A parent that times out kills its child, which prints nothing, so the check stops itself sooner."""
+        held: list[asyncio.subprocess.Process] = []
+
+        async def waits_on_a_worker(cases: checklib.Cases) -> None:
+            cases.check('before the worker', 'seen', 'seen', True)
+            async with checklib.started_worker(sys.executable, '-c', 'import time; time.sleep(60)') as process:
+                held.append(process)
+                await process.communicate()
+
+        async def after_it(cases: checklib.Cases) -> None:
+            cases.check('after the worker', 'seen', 'seen', True)
+
+        async def main(cases: checklib.Cases) -> None:
+            await checklib.run_scenarios(cases, (waits_on_a_worker, after_it), cases)
+
+        out = io.StringIO()
+        with (mock.patch.object(checklib, 'STOP_MARGIN', 0.0), contextlib.redirect_stdout(out),
+              self.assertRaises(TimeoutError)):
+            checklib.run_check(main, parent_timeout=1.0)
+        shown = printed(out.getvalue())['cases']
+        self.assertEqual([(case['id'], case['passed']) for case in shown],
+                         [('before the worker', True), ('waits_on_a_worker: ran to the end', False),
+                          ('after_it: ran to the end', False), ('the check finished within its time limit', False)])
+        self.assertEqual(shown[1]['observed'], 'CancelledError')
+        self.assertEqual(held[0].returncode, checklib.KILLED)
+
+    def test_an_error_raised_inside_the_limit_is_not_called_the_limit(self) -> None:
+        async def main(cases: checklib.Cases) -> None:
+            raise TimeoutError('a worker wait of its own')
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaisesRegex(TimeoutError, 'a worker wait of its own'):
+            checklib.run_check(main, parent_timeout=60)
+        self.assertEqual(printed(out.getvalue())['cases'], [])
+
     def test_a_scenario_guard_records_its_exception_and_the_next_scenario_runs(self) -> None:
         cases = checklib.Cases()
         with cases.scenario('the first scenario'):
@@ -283,6 +372,63 @@ class Arrangements(unittest.TestCase):
         asyncio.run(checklib.killed_worker(cases, 'a worker that lives fails', lives))
         self.assertEqual(out.strip(), 'started')
         self.assertEqual([(case['expected'], case['passed']) for case in cases.records], [('exit -9', True), ('exit -9', False)])
+
+    def test_a_worker_past_its_limit_is_killed_and_the_wait_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            pid_file = Path(folder) / 'pid'
+            sleeps = [sys.executable, '-c', f'import os, time; open({str(pid_file)!r}, "w").write(str(os.getpid())); time.sleep(60)']
+            with self.assertRaises(TimeoutError):
+                asyncio.run(checklib.run_worker(*sleeps, limit_seconds=2))
+            pid = int(pid_file.read_text())
+        # Reaped, so the process no longer exists.
+        with self.assertRaises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    def test_a_worker_run_to_its_end_gives_its_exit_and_output(self) -> None:
+        code, out, err = asyncio.run(checklib.run_worker(sys.executable, '-c', "import sys; print('out'); sys.exit(3)"))
+        self.assertEqual((code, out.strip(), err), (3, b'out', b''))
+
+
+class ScenarioCheckLimits(unittest.TestCase):
+    """Each check that runs SCENARIOS stops STOP_MARGIN seconds before the timeout its parent's Child entry gives it,
+    so its cases print before the parent would kill it (checklib.run_check)."""
+
+    @staticmethod
+    def call_name(node: ast.Call) -> str | None:
+        return node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, 'attr', None)
+
+    def parent_timeouts(self) -> dict[str, list[float]]:
+        children = ast.parse((ROOT / 'scripts/qualification/children.py').read_text())
+        default = next(node.value.value for node in ast.walk(children) if isinstance(node, ast.AnnAssign)
+                       and isinstance(node.target, ast.Name) and node.target.id == 'timeout' and isinstance(node.value, ast.Constant))
+        found: dict[str, list[float]] = {}
+        for path in sorted((ROOT / 'scripts').rglob('*.py')):
+            for node in ast.walk(ast.parse(path.read_text())):
+                if isinstance(node, ast.Call) and self.call_name(node) == 'Child' and node.args \
+                        and isinstance(node.args[0], ast.Constant) and str(node.args[0].value).startswith('checks/'):
+                    given = next((keyword.value.value for keyword in node.keywords if keyword.arg == 'timeout'
+                                  and isinstance(keyword.value, ast.Constant)), default)
+                    found.setdefault(node.args[0].value.removeprefix('checks/'), []).append(given)
+        return found
+
+    def test_each_scenario_check_stops_before_its_parent_would_kill_it(self) -> None:
+        parents = self.parent_timeouts()
+        scenario_checks = 0
+        for path in sorted((ROOT / 'tests/db/checks').glob('*.py')):
+            tree = ast.parse(path.read_text())
+            declared = [keyword.value.value for node in ast.walk(tree) if isinstance(node, ast.Call)
+                        and self.call_name(node) == 'run_check' for keyword in node.keywords
+                        if keyword.arg == 'parent_timeout' and isinstance(keyword.value, ast.Constant)]
+            has_scenarios = any(isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'SCENARIOS'
+                                                                     for target in node.targets) for node in tree.body)
+            if not (declared or has_scenarios):
+                continue
+            scenario_checks += has_scenarios
+            with self.subTest(path.name):
+                self.assertIn(path.name, parents, 'no parent runs it')
+                self.assertEqual(declared, [min(parents[path.name])])
+                self.assertGreater(declared[0], checklib.STOP_MARGIN)
+        self.assertGreaterEqual(scenario_checks, 8)
 
 
 if __name__ == '__main__':

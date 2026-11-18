@@ -36,7 +36,7 @@ from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios
 
 URL = os.environ["AUTOBOTS_DATABASE_URL"]
 WORKSPACE_A = UUID(sys.argv[1])
@@ -376,11 +376,10 @@ async def main(cases: Cases) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Keys(db, cases)
         await context.arrange()
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == "__main__":
     # A fixture key that reached this output fails the check and is never printed (AGENTS.md).
-    run_check(main, secrets=SECRETS)
+    # Its parent's Child entry in scripts/app_db.py gives it 180 seconds.
+    run_check(main, secrets=SECRETS, parent_timeout=180)

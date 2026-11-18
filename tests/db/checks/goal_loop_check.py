@@ -23,6 +23,7 @@ from autobots.application.worker_leases import claim_next
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.operations.job_dispatch import drive_lease
+from checklib import run_worker
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, TASK_A, TASK_B, Script, calls, say
 from langchain_core.outputs import ChatResult
 
@@ -193,9 +194,8 @@ async def main() -> None:
         # A real worker process is killed inside a model call, and a new generation inherits everything.
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
         admitted = await admit_run(db, workspace_id=OTHER, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='Write the report', limit_micro_usd=1_000_000, policy=resolve_role_policy(), acceptance_criteria=('Has a summary', 'Has figures'))
-        process = await asyncio.create_subprocess_exec(PYTHON, str(WORKER), URL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        _, err = await asyncio.wait_for(process.communicate(), 60)
-        check('the worker process was killed mid-loop', 'exit -9', f'exit {process.returncode}: {err.decode()[-300:]}', process.returncode == -9)
+        code, _, err = await run_worker(PYTHON, str(WORKER), URL)
+        check('the worker process was killed mid-loop', 'exit -9', f'exit {code}: {err.decode()[-300:]}', code == -9)
         job = await (await db.execute('select status, generation from app_private.run_jobs where run_id = %s', (admitted.run_id,))).fetchone()
         check('its job is still claimed by a dead owner', 'claimed', job, job[0] == 'claimed')
         leftover = await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'dispatched'", admitted.run_id)

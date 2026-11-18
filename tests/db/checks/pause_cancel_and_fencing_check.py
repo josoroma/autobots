@@ -2,9 +2,11 @@
 offloaded evidence read back in pages and the improvement tool's grant, on a real database through the
 runtime role. JSON cases.
 
-Found as B1, B2, B6, B8, B9 and B10 by the review of US-5.1 to US-9.3, defined in
-docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md and review-r1.md. Named blocker_check.py
-until refactor plan R-66 named it for its behavior."""
+Each part cites the story whose behavior it guards: an approval shows what it releases (US-5.3, SP-013), a
+receipt only moves forward (US-5.4, SP-012), a pause stops a node without failing it (US-6.2), a cancel settles
+under a release that can't run the work (US-9.3), stored evidence reads back (US-8.1) and the improvement tool is
+granted per Expert (US-8.2). docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md records the defects
+they guard against."""
 from __future__ import annotations
 
 import asyncio
@@ -74,7 +76,7 @@ class Sent(BaseModel):
 
 
 async def pause_inside_assignment(db: Db) -> None:
-    """B6 inside an agent step (PPRD-03, R-29). A person's pause lands after the tool gateway admitted
+    """A pause inside an agent step (US-6.2, PPRD-03, R-29). A person's pause lands after the tool gateway admitted
     the assignment and before the assignment's leased read of its run, which then refuses with
     parent_not_running. The step must stop without failing, so the run resumes it rather than ending
     workflow_node_failed, a failure no one can resume (SP-010), and the pass lets the paused run's
@@ -147,7 +149,7 @@ async def pause_inside_assignment(db: Db) -> None:
 
 
 async def stale_writers(db: Db) -> None:
-    """B2: a stale worker can't admit an effect, and a late writer can't rewrite a receipt (SP-012).
+    """A stale worker can't admit an effect, and a late writer can't rewrite a receipt (US-5.4, SP-012).
     Re-admission that finds a success landed since its read returns it and sends nothing."""
     cases, connection = db.cases, db.connection
     sends: list[str] = []
@@ -201,7 +203,7 @@ async def stale_writers(db: Db) -> None:
     cases.check("a real late success outranks a ruling that it didn't happen", 'succeeded, evidence kept', (await receipt(operation_two))[0], lambda found: found == 'succeeded' and kept is not None)
     await record_receipt(stale_context, operation_two, 'failed', None)
     cases.check("and a late failure can't undo it", 'succeeded', (await receipt(operation_two))[0], lambda found: found == 'succeeded')
-    # The review's case: a person rules it wasn't delivered, and the fresh attempt delivers.
+    # A person rules it wasn't delivered, and the fresh attempt delivers and is recorded (US-5.4).
     ruled = await gateway.execute(connection, scope_of(second, {'send_once': 1}), 'send_once', {'text': 'ruled'})
     await connection.execute("update app_private.tool_receipts set status = 'unknown' where operation_id = %s", (ruled.operation_id,))
     await record_evidence(connection, workspace_id=db.workspace, run_id=run, operation_id=ruled.operation_id, actor_id=db.actor, idempotency_key=str(uuid4()), outcome='not_delivered', evidence='Checked the destination.')
@@ -248,7 +250,7 @@ async def main() -> None:
         def scope_of(lease: Any, tools: dict[str, int]) -> ToolScope:
             return ToolScope(WORKSPACE, lease.run_id, lease.generation, tools)
 
-        # B1: what a reviewer reads is what they approve.
+        # What a reviewer reads is what they approve (US-5.3, SP-013).
         async def needs_approval(_: Note, __: ToolContext) -> Sent:
             return Sent(delivered=True)
         approved_tool = ToolDefinition(tool_id='send_note', version=1, description='Send.', input_model=Note, output_model=Sent, operation_class=OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE, handler=needs_approval, approval=ApprovalPolicy(always=True))
@@ -283,13 +285,13 @@ async def main() -> None:
         lease = await claim_next(db, worker_id='b1-page')
         await gateway.execute(db, scope_of(lease, {'send_note': 1}), 'send_note', {'text': 'y' * (ARGUMENT_LIMIT + 500)})
 
-        # B2 through checklib (R-38): its cases join this check's line.
+        # Stale writers, through checklib (R-38): its cases join this check's line.
         stale = Cases()
         with stale.scenario('stale writers'):
             await stale_writers(Db(db, stale, WORKSPACE, ACTOR))
         cases.extend(stale.records)
 
-        # B6: a pause during a node stops it, and its result comes back from the receipt.
+        # A pause during a node stops it, and its result comes back from the receipt (US-6.2).
         run = await admit()
         lease = await claim_next(db, worker_id='b6')
         uploads: list[str] = []
@@ -317,13 +319,13 @@ async def main() -> None:
         output = await call_tool(gateway, db, scope_of(lease, {'upload': 1}), 'upload', {'text': 'bytes'})
         check('on resume the node gets its result without uploading again', 'delivered, one upload', (output, len(uploads)), output == {'delivered': True} and len(uploads) == 1)
 
-        # B6 inside an agent step, through checklib (R-38): its cases join this check's line.
+        # A pause inside an agent step, through checklib (R-38): its cases join this check's line.
         race = Cases()
         with race.scenario('a pause inside an assignment'):
             await pause_inside_assignment(Db(db, race, WORKSPACE, ACTOR))
         cases.extend(race.records)
 
-        # B8: a cancel settles even when the release can't run this work, with what it left classified.
+        # A cancel settles even when the release can't run this work, with what it left classified (US-9.3).
         run = await admit()
         lease = await claim_next(db, worker_id='old-release')
         await db.execute('update public.runs set execution_contract = %s where id = %s', (json.dumps({'graph_state': 99, 'tools': {}}), run))
@@ -360,7 +362,7 @@ async def main() -> None:
         await finish(db, owner, await load_goal(db, run), 'budget_exceeded')
         check('the current owner can', 'cancelled, effect unknown', (await value('select status from public.runs where id = %s', run), (await receipt('stale-open'))[0]), await value('select status from public.runs where id = %s', run) == 'cancelled' and (await receipt('stale-open'))[0] == 'unknown')
 
-        # B9: stored evidence reads back whole, in pages, through the tool a model calls.
+        # Stored evidence reads back whole, in pages, through the tool a model calls (US-8.1).
         run = await admit()
         lease = await claim_next(db, worker_id='b9')
         long_text = ''.join(f'line {index}\n' for index in range(3_000))
@@ -387,13 +389,13 @@ async def main() -> None:
         import hashlib
         check('its hash matches what was stored', 'equal', hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'], hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'])
 
-        # Finding 5: a long read can't resend every page.
+        # A long read can't resend every page: only the latest two stay in view (US-8.1).
         replies = [ToolMessage(content='p' * 5_000, tool_call_id=f'many-{index}', name='read_offload') for index in range(5)]
         seen = await offload_large(db, run, replies, policy)
         whole = [item.content == 'p' * 5_000 for item in seen]
         check('only the latest pages stay in view', 'the last two', whole, whole == [False, False, False, True, True])
 
-        # B10: the grant is deliberate.
+        # The improvement tool is granted per Expert, so a run with no Expert lacks it (US-8.2).
         check('a run with no Expert has no proposal tool', 'absent', LOOP_TOOL_GRANTS.get('propose_improvement'), 'propose_improvement' not in LOOP_TOOL_GRANTS)
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
     print(json.dumps({'cases': cases}))

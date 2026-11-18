@@ -37,7 +37,7 @@ from autobots.domain.runs import RunCommand
 from autobots.domain.workflow_execution import Step
 from autobots.domain.workflows import block_versions, graph_hash
 from autobots.operations.job_dispatch import drive_lease, process_next
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios, run_worker
 from goal_loop_script import ROUTE, Script, say
 from pydantic import SecretStr
 
@@ -158,9 +158,8 @@ async def replacement_keeps_committed_work(ctx: Running) -> None:
     """A real worker dies after some iterations have committed."""
     advance, check, db, emitted, start, statuses, value = ctx.advance, ctx.cases.check, ctx.db, ctx.emitted, ctx.start, ctx.statuses, ctx.value
     execution = await start('Restart', EFFECT_LOOP, {'in': ['one', 'two', 'three']})
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'workflow_worker.py'), URL, BASE, 'save#1', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=os.environ)
-    _, err = await asyncio.wait_for(process.communicate(), 60)
-    check('a worker process is killed after two iterations committed', 'exit -9, 2 committed', (f'exit {process.returncode}: {err.decode()[-200:]}', sorted(k for k in await statuses(execution) if k.startswith('save'))), process.returncode == -9 and sorted(k for k in await statuses(execution) if k.startswith('save')) == ['save#0', 'save#1'])
+    code, _, err = await run_worker(PYTHON, str(WORKERS / 'workflow_worker.py'), URL, BASE, 'save#1', env=os.environ)
+    check('a worker process is killed after two iterations committed', 'exit -9, 2 committed', (f'exit {code}: {err.decode()[-200:]}', sorted(k for k in await statuses(execution) if k.startswith('save'))), code == -9 and sorted(k for k in await statuses(execution) if k.startswith('save')) == ['save#0', 'save#1'])
     before = await (await db.execute('select instance_key, value, created_at from public.workflow_emissions where execution_id = %s order by instance_key, port, sequence', (execution.id,))).fetchall()
     artifacts_before = await value('select count(*) from public.artifacts where run_id = %s', execution.run_id)
     await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (execution.run_id,))
@@ -256,8 +255,8 @@ async def queued_cancel_does_not_run(ctx: Running) -> None:
 
 
 async def workflow_settles_after_verify_or_cancel(ctx: Running) -> None:
-    """B5, defined in docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md: a worker dies after VERIFY
-    commits, and a cancel lands after the last node commits."""
+    """A worker dies after VERIFY commits, and a cancel lands after the last node commits. Neither leaves the run
+    in verifying or cancelling (US-6.2 Restart)."""
     advance, check, db, no_tools, start, value = ctx.advance, ctx.cases.check, ctx.db, ctx.no_tools, ctx.start, ctx.value
     execution = await start('settle-verifying', no_tools, {'in': 'x'})
     run = execution.run_id
@@ -300,8 +299,8 @@ async def workflow_settles_after_verify_or_cancel(ctx: Running) -> None:
 
 
 async def stalled_workflow_fails(ctx: Running) -> None:
-    """B7, defined in docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md, in the real runner: nothing can
-    move, but nothing has finished either."""
+    """In the real runner, nothing can move, but nothing has finished either. The workflow fails as stalled rather
+    than succeeding (US-6.2)."""
     advance, check, no_tools, run_state, start = ctx.advance, ctx.cases.check, ctx.no_tools, ctx.run_state, ctx.start
     execution = await start('stalled', no_tools, {'in': 'x'})
 
@@ -315,7 +314,7 @@ async def stalled_workflow_fails(ctx: Running) -> None:
 
 
 async def version_under_older_rules_fails(ctx: Running) -> None:
-    """Finding 9: a version published under older rules doesn't run."""
+    """A version published under older rules that the rules now reject doesn't run (US-6.2)."""
     advance, check, no_tools, run_state, start, statuses = ctx.advance, ctx.cases.check, ctx.no_tools, ctx.run_state, ctx.start, ctx.statuses
     execution = await start('older-rules', no_tools, {'in': 'x'})
     real_validate = workflow_runner.validate_graph
@@ -389,10 +388,9 @@ async def main(cases: Cases) -> None:
     config = LoopConfig(route=ROUTE, object_store=store, sleep=lambda _: asyncio.sleep(0), tool_set=tool_registry.build_registry)
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Running(db, cases, config)
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/qualify_identity.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

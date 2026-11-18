@@ -27,7 +27,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.domain.tools import DELEGATION_TOOL
 from autobots.operations.job_dispatch import process_next
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios, run_worker
 from goal_loop_script import ROUTE, Script, calls, say
 from pydantic import SecretStr
 
@@ -247,12 +247,11 @@ async def parent_cancel_reaches_child(ctx: Assigning) -> None:
 
 
 async def expired_parent_waits_for_live_child(ctx: Assigning) -> None:
-    """B3: the parent's lease expires first, then a cancel. The child must not be stranded. B3 and B4 are defined in
-    docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md."""
+    """The parent's lease expires first, then a cancel. A cancelled parent stays cancelling until its child is
+    terminal, so the child is never stranded (US-5.2, SP-010)."""
     admit, check, config, db, helper, value = ctx.admit, ctx.cases.check, ctx.config, ctx.db, ctx.helper, ctx.value
     run = await admit()
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    await asyncio.wait_for(process.communicate(), 60)
+    await run_worker(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id))
     child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
     await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
     await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() + interval '1 hour' where run_id = %s", (child,))
@@ -277,12 +276,10 @@ async def expired_parent_waits_for_live_child(ctx: Assigning) -> None:
 
 
 async def cancel_reaches_every_level(ctx: Assigning) -> None:
-    """B3 at depth 2: a child that's waiting on its own child must not be recorded as finished. B3 and B4 are defined
-    in docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md."""
+    """The same at depth 2: a child that's waiting on its own child is never recorded as finished (US-5.2, SP-010)."""
     admit, check, config, db, helper, session, value = ctx.admit, ctx.cases.check, ctx.config, ctx.db, ctx.helper, ctx.session, ctx.value
     run = await admit()
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    await asyncio.wait_for(process.communicate(), 60)
+    await run_worker(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id))
     child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
     snapshot = await value('select policy_snapshot from public.runs where id = %s', child)
     binding = await resolve_binding(db, WORKSPACE, session.id, expert_id=helper.id)
@@ -335,12 +332,11 @@ async def cascade_missed_children_are_cancelled(ctx: Assigning) -> None:
 
 
 async def finished_child_read_on_replay(ctx: Assigning) -> None:
-    """B4: the child reached a terminal state, and the parent died before writing that down. B3 and B4 are defined in
-    docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-r1.md."""
+    """The child reached a terminal state, and the parent died before writing that down. A replay answers from the
+    finished child (US-5.2 "Reattach after replay", US-6.2)."""
     admit, check, config, db, helper, value = ctx.admit, ctx.cases.check, ctx.config, ctx.db, ctx.helper, ctx.value
     run = await admit()
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    await asyncio.wait_for(process.communicate(), 60)
+    await run_worker(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id))
     child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
     await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id in (%s, %s)", (run, child))
     version = await value('select version from public.runs where id = %s', child)
@@ -363,9 +359,8 @@ async def replacement_reattaches_after_kill(ctx: Assigning) -> None:
     """A real parent dies in its child's model call, and the replacement reattaches."""
     admit, check, config, db, helper, value = ctx.admit, ctx.cases.check, ctx.config, ctx.db, ctx.helper, ctx.value
     run = await admit()
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    _, err = await asyncio.wait_for(process.communicate(), 60)
-    check('the parent process was killed in its child\'s model call', 'exit -9', f'exit {process.returncode}: {err.decode()[-300:]}', process.returncode == -9)
+    code, _, err = await run_worker(PYTHON, str(WORKERS / 'assignment_worker.py'), URL, str(helper.id))
+    check('the parent process was killed in its child\'s model call', 'exit -9', f'exit {code}: {err.decode()[-300:]}', code == -9)
     child = await value('select child_run_id from app_private.assignments where parent_run_id = %s', run)
     await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id in (%s, %s)", (run, child))
     model = Script(items=[calls(PARENT_PLAN)], seen=[], bound=[])
@@ -416,10 +411,9 @@ async def main(cases: Cases) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Assigning(db, cases, store, config)
         await context.arrange_session()
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/qualify_identity.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

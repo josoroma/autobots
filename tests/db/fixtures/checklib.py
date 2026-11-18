@@ -26,7 +26,7 @@ from collections.abc import (
     Sequence,
 )
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 # The longest observation a case keeps. The parents shorten it again for their reports.
 OBSERVED_LIMIT = 900
 KILLED = -signal.SIGKILL
+# How long before its parent's timeout a check given one stops itself (run_check). The interpreter's
+# start and the imports count against the parent's timeout and not against the check's own limit.
+STOP_MARGIN = 20.0
 
 # What claim_next could take: a queued job, or a claimed one whose lease has run out
 # (autobots.application.worker_leases). A live lease, such as a run a check holds for the browser
@@ -116,12 +119,20 @@ class Cases:
 
     @contextlib.contextmanager
     def scenario(self, name: str) -> Iterator[None]:
-        """Guard one independent scenario. Its exception becomes a failed case and the check moves on,
-        so a crash cannot drop the later scenarios unnamed (TDBC-04)."""
+        """Guard one independent scenario, one that reads nothing an earlier one arranged. Its exception
+        becomes a failed case and the check moves on, so a crash cannot drop the later scenarios unnamed
+        (TDBC-04). Scenarios that share arranged state run through `run_scenarios` instead."""
         try:
             yield
         except Exception as error:  # noqa: BLE001 - recorded as this scenario's failed case, so the next one still runs
             self.check(f'{name}: ran to the end', 'no exception', f'{type(error).__name__}: {error}', False)
+
+    def stopped(self, name: str, error: BaseException, rest: Sequence[str]) -> None:
+        """Record that scenario `name` raised `error`, and each scenario in `rest` as not run."""
+        shown = f'{type(error).__name__}: {error}' if str(error) else type(error).__name__
+        self.check(f'{name}: ran to the end', 'no exception', shown, False)
+        for later in rest:
+            self.check(f'{later}: ran to the end', 'run after the scenarios before it', f'not run, because {name} raised', False)
 
     def emit(self, secrets: Iterable[str] = (), **extra: object) -> None:
         """Print the one line the parents parse. If a fixture secret reached it, print one failed case
@@ -135,18 +146,53 @@ class Cases:
         print(output, flush=True)
 
 
+async def run_scenarios[C](cases: Cases, scenarios: Sequence[Callable[[C], Awaitable[None]]], context: C) -> None:
+    """Run `scenarios` in order on one shared context. The first to raise stops the rest: a later one can
+    read what it should have arranged, such as an Expert, a proposal or a claimed run, and would only fail
+    again on its absence. It records a failed case, and each later scenario one observed as not run, as
+    the qualifiers' runner does (scripts/qualification/scenarios.py). Then the error propagates, so
+    `run_check` prints the cases so far and the check exits non-zero (TDBC-04). A cancellation at the
+    check's time limit is recorded the same way."""
+    names = [scenario.__name__ for scenario in scenarios]
+    for index, scenario in enumerate(scenarios):
+        try:
+            await scenario(context)
+        except BaseException as error:
+            cases.stopped(names[index], error, names[index + 1:])
+            raise
+
+
+async def _within(work: Coroutine[Any, Any, Mapping[str, object] | None], cases: Cases,
+                  limit: float | None) -> Mapping[str, object] | None:
+    """Await `work`, cancelling it after `limit` seconds with one failed case that names the limit."""
+    try:
+        async with asyncio.timeout(limit) as deadline:
+            return await work
+    except TimeoutError:
+        if deadline.expired():
+            cases.check('the check finished within its time limit', f'under {limit:g} seconds',
+                        f'still running after {limit:g} seconds, so it stopped', False)
+        raise
+
+
 def run_check(main: Callable[[Cases], Coroutine[Any, Any, Mapping[str, object] | None]], *,
-              secrets: Iterable[str] = ()) -> None:
+              secrets: Iterable[str] = (), parent_timeout: float | None = None) -> None:
     """Run a check and print its cases, after the fixture-secret scan, whether `main` returns or raises.
 
     What `main` returns joins the line, such as `browser_env`. A raise prints what was observed, then
     propagates, so the check still exits non-zero and its parent records the failure (TDBC-04). The
     parents copy the end of stderr into evidence, so a traceback holding a fixture secret is replaced
     by a bare exit.
+
+    `parent_timeout` is the timeout the parent's `Child` entry gives this check. A parent that times out
+    kills its child, which then prints nothing, so `main` is cancelled STOP_MARGIN seconds sooner: the
+    `finally` blocks that hold its workers kill them, and the cases so far are printed (TDBC-04).
+    tests/harness/test_db_case_protocol.py checks that each check's value matches its parent's entry.
     """
     cases, scanned = Cases(), tuple(secrets)
+    limit = None if parent_timeout is None else parent_timeout - STOP_MARGIN
     try:
-        extra = asyncio.run(main(cases)) or {}
+        extra = asyncio.run(_within(main(cases), cases, limit)) or {}
     except BaseException as error:
         cases.emit(scanned)
         if holds_secret(''.join(traceback.format_exception(error)), scanned):
@@ -283,19 +329,43 @@ class Db:
         return found
 
 
+@contextlib.asynccontextmanager
+async def started_worker(*argv: str, env: Mapping[str, str] | None = None) -> AsyncIterator[asyncio.subprocess.Process]:
+    """Start a worker whose stdout and stderr the check reads. However the block ends, by a failed case's
+    exception, a cancellation at the check's time limit or a stopped (SIGSTOP) worker left behind, one
+    still running is killed and reaped, so no worker outlives its scenario (TDBC-04)."""
+    process = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                                                   env=None if env is None else dict(env))
+    try:
+        yield process
+    finally:
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            await process.wait()
+
+
+async def run_worker(*argv: str, limit_seconds: float = 60, env: Mapping[str, str] | None = None) -> tuple[int, bytes, bytes]:
+    """Run a worker to its end: its exit code, stdout and stderr. One still running after `limit_seconds`
+    raises TimeoutError, and it is killed then, as on any other way out (started_worker)."""
+    async with started_worker(*argv, env=env) as process:
+        out, err = await asyncio.wait_for(process.communicate(), limit_seconds)
+    # communicate returns only once the worker has exited, so its code is set.
+    return cast(int, process.returncode), out, err
+
+
 async def killed_worker(cases: Cases, name: str, argv: Sequence[str], *, exit_code: int = KILLED,
                         limit_seconds: float = 60, env: Mapping[str, str] | None = None) -> str:
     """Run a worker that must die, record its exit as a case, and return what it printed. One still
     running after `limit_seconds` is killed, and fails the case (TDBC-04)."""
-    process = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-                                                   env=None if env is None else dict(env))
-    try:
-        out, err = await asyncio.wait_for(process.communicate(), limit_seconds)
-    except TimeoutError:
-        process.kill()
-        out, _ = await process.communicate()
-        cases.check(name, f'exit {exit_code}', f'still running after {limit_seconds} seconds', False)
-        return out.decode(errors='replace')
+    async with started_worker(*argv, env=env) as process:
+        try:
+            out, err = await asyncio.wait_for(process.communicate(), limit_seconds)
+        except TimeoutError:
+            process.kill()
+            out, _ = await process.communicate()
+            cases.check(name, f'exit {exit_code}', f'still running after {limit_seconds} seconds', False)
+            return out.decode(errors='replace')
     cases.check(name, f'exit {exit_code}', f'exit {process.returncode}: {err.decode(errors="replace").strip()[-200:]}',
                 process.returncode == exit_code)
     return out.decode(errors='replace')

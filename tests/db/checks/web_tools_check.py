@@ -27,7 +27,7 @@ from autobots.application.tools import READ_CSV, READ_RUN_FILE, READ_RUN_FILE_V2
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.plans import InputDocument
 from autobots.domain.models import resolve_role_policy
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
@@ -327,10 +327,9 @@ async def main(cases: Cases) -> None:
     gateway = gateway_over_fakes()
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Tools(db, cases, gateway)
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/app_db.py gives it 180 seconds.
+    run_check(main, parent_timeout=180)

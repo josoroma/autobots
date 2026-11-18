@@ -156,7 +156,7 @@ Invoke `autobots-spec-ingest` for backlog ingestion; the read-only agent propose
 
 ### Hook dispatcher behavior
 
-These are fixture-tested script behaviors in `tests/harness/test_hooks.py`, not proof of event delivery.
+These are fixture-tested script behaviors in the `tests/harness/test_hook_*.py` files, not proof of event delivery: `test_hook_process.py` for malformed, oversized and unsupported input and the deadline, `test_hook_guard.py` for the path and command policy, `test_hook_diagnostics.py` for the `PostToolUse` diagnostic and `test_hook_worktrees.py` for the session root.
 
 | Input | Behavior |
 |---|---|

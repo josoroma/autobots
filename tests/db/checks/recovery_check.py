@@ -33,7 +33,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import CommandRefused, RunCommand
 from autobots.domain.tools import OperationClass
 from autobots.operations.job_dispatch import drive_lease, process_next
-from checklib import Cases, run_check
+from checklib import Cases, run_check, run_scenarios, started_worker
 from goal_loop_script import DONE_A, PLAN, ROUTE, SAVE, Script, calls, say
 from pydantic import BaseModel
 
@@ -289,25 +289,26 @@ async def stopped_worker_is_recovered_and_fenced(ctx: Recovering) -> None:
     """Mac sleep: a real process is stopped past its lease, a replacement recovers, and it wakes."""
     admit, check, db, state_of, user, value = ctx.admit, ctx.cases.check, ctx.db, ctx.state_of, ctx.user, ctx.value
     run = await admit()
-    process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'sleeping_worker.py'), URL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    for _ in range(200):
-        if await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'dispatched'", run):
-            break
-        await asyncio.sleep(0.1)
-    process.send_signal(signal.SIGSTOP)
-    # Stopped at whichever call it had reached, so what follows compares against that.
-    calls_at_stop = await value('select model_calls from app_private.run_usage where run_id = %s', run)
-    waited = 0
-    while await value('select lease_expires_at > clock_timestamp() from app_private.run_jobs where run_id = %s', run) and waited < 100:
-        await asyncio.sleep(0.1)
-        waited += 1
-    check('a stopped worker stops renewing, so its lease runs out', 'expired', waited < 100, waited < 100)
-    dispatched = await process_next(db, URL, 'replacement', lambda: Script(items=[calls(PLAN)], seen=[], bound=[]), RESUME_ROUTE)
-    status = await value("select status from app_private.model_invocations where run_id = %s order by created_at desc limit 1", run)
-    check('recovery classifies the interrupted call before any new dispatch', 'paused, uncertain_model_call, uncertain, no new call', (dispatched.run_status, dispatched.code, status, dispatched.usage['model_calls']), dispatched.run_status == 'paused' and dispatched.code == 'uncertain_model_call' and status == 'uncertain' and dispatched.usage['model_calls'] == calls_at_stop)
-    process.send_signal(signal.SIGCONT)
-    out, err = await asyncio.wait_for(process.communicate(), 60)
-    woke = json.loads(out.decode().strip().splitlines()[-1]) if out.strip() else {'error': err.decode()[-300:]}
+    # A worker left stopped by a failure here is killed on the way out (started_worker).
+    async with started_worker(PYTHON, str(WORKERS / 'sleeping_worker.py'), URL) as process:
+        for _ in range(200):
+            if await value("select count(*) from app_private.model_invocations where run_id = %s and status = 'dispatched'", run):
+                break
+            await asyncio.sleep(0.1)
+        process.send_signal(signal.SIGSTOP)
+        # Stopped at whichever call it had reached, so what follows compares against that.
+        calls_at_stop = await value('select model_calls from app_private.run_usage where run_id = %s', run)
+        waited = 0
+        while await value('select lease_expires_at > clock_timestamp() from app_private.run_jobs where run_id = %s', run) and waited < 100:
+            await asyncio.sleep(0.1)
+            waited += 1
+        check('a stopped worker stops renewing, so its lease runs out', 'expired', waited < 100, waited < 100)
+        dispatched = await process_next(db, URL, 'replacement', lambda: Script(items=[calls(PLAN)], seen=[], bound=[]), RESUME_ROUTE)
+        status = await value("select status from app_private.model_invocations where run_id = %s order by created_at desc limit 1", run)
+        check('recovery classifies the interrupted call before any new dispatch', 'paused, uncertain_model_call, uncertain, no new call', (dispatched.run_status, dispatched.code, status, dispatched.usage['model_calls']), dispatched.run_status == 'paused' and dispatched.code == 'uncertain_model_call' and status == 'uncertain' and dispatched.usage['model_calls'] == calls_at_stop)
+        process.send_signal(signal.SIGCONT)
+        out, err = await asyncio.wait_for(process.communicate(), 60)
+        woke = json.loads(out.decode().strip().splitlines()[-1]) if out.strip() else {'error': err.decode()[-300:]}
     check('when it wakes, the old worker is fenced and writes no status', 'lost', woke, woke.get('outcome') == 'lost')
     check('the replacement\'s decision stands', 'paused', await state_of(run), await state_of(run) == 'paused')
     late = await value("select charged_micro_usd from app_private.model_invocations where run_id = %s order by created_at desc limit 1", run)
@@ -372,10 +373,9 @@ async def _cancel(run: UUID, version: int) -> None:
 async def main(cases: Cases) -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         context = Recovering(db, cases)
-        for scenario in SCENARIOS:
-            with cases.scenario(scenario.__name__):
-                await scenario(context)
+        await run_scenarios(cases, SCENARIOS, context)
 
 
 if __name__ == '__main__':
-    run_check(main)
+    # Its parent's Child entry in scripts/app_db.py gives it 240 seconds.
+    run_check(main, parent_timeout=240)

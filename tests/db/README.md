@@ -6,7 +6,10 @@ They act only on the disposable targets their invoker provides (AGENTS.md). File
 
 - `checks/`: each prints one JSON line of cases, `{"cases": [...]}`, which `scripts/qualification/children.py`
   replays into its qualifier's report (PRD-Development-Harness DH-W04). A check may add `browser_env` for the
-  browser suites. New checks use `fixtures/checklib.py` and list their scenarios in a `SCENARIOS` tuple.
+  browser suites. New checks use `fixtures/checklib.py` and list their scenarios in a `SCENARIOS` tuple, run
+  by `run_scenarios`: the first scenario to fail stops the rest, and the cases so far are still printed. Such a
+  check passes `run_check` its parent's timeout, so it stops and prints before the parent would kill it, and
+  starts its workers through `started_worker` or `run_worker`, which kill them however the scenario ends.
 - `workers/`: processes a check or qualifier starts, and often kills on purpose.
 - `arrange/`: arrangements and live actions. Each prints what its caller reads and no cases.
 - `fixtures/`: modules the others import: the case protocol, scripted models, sinks and graphs.

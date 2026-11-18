@@ -27,6 +27,7 @@ from autobots.domain.models import resolve_role_policy
 from autobots.domain.runs import RunCommand
 from autobots.domain.tools import PLAN_TOOLS
 from autobots.operations.job_dispatch import process_next
+from checklib import run_worker
 from effect_tools import tools
 from goal_loop_script import ROUTE, Script, calls, say
 from mock_sink import Sink
@@ -110,9 +111,8 @@ async def main() -> dict[str, str]:
         run = await admit()
         await advance(sink, [calls(send('send_readable', 'c')), say('never')])
         await approve(run)
-        process = await asyncio.create_subprocess_exec(PYTHON, str(WORKERS / 'effect_worker.py'), URL, str(sink.path), 'c', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        _, err = await asyncio.wait_for(process.communicate(), 60)
-        check('the worker process was killed after the effect, before its receipt', 'exit -9, 1 delivery, started', (f'exit {process.returncode}: {err.decode()[-200:]}', sink.attempts(), await value('select status from app_private.tool_receipts where run_id = %s', run)), process.returncode == -9 and sink.attempts() == 1 and await value('select status from app_private.tool_receipts where run_id = %s', run) == 'started')
+        code, _, err = await run_worker(PYTHON, str(WORKERS / 'effect_worker.py'), URL, str(sink.path), 'c')
+        check('the worker process was killed after the effect, before its receipt', 'exit -9, 1 delivery, started', (f'exit {code}: {err.decode()[-200:]}', sink.attempts(), await value('select status from app_private.tool_receipts where run_id = %s', run)), code == -9 and sink.attempts() == 1 and await value('select status from app_private.tool_receipts where run_id = %s', run) == 'started')
         await db.execute("update app_private.run_jobs set lease_expires_at = clock_timestamp() - interval '1 second' where run_id = %s", (run,))
         result, _ = await advance(sink, [say('stop')])
         status = await value('select status from app_private.tool_receipts where run_id = %s', run)
