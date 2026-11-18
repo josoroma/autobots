@@ -96,6 +96,10 @@ By [Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md), the Ta
 
 The first non-blank value wins, and each call resolves its key, so a saved key applies from the next call with no restart. Only the owner can save or remove a key. Saving checks its shape only and calls no provider. Removing it falls back to the environment, and nothing edits `.env`. Saving needs migration 51 (`20261108000051_tool_provider_keys.sql`), and saving the SerpApi key needs migration 63 (`20261118000063_serpapi_provider.sql`). On an install that predates either, run `make migrate`, then `make stop && make start`.
 
+### Turning tools off
+
+The owner can turn any tool, or a whole group such as Google, on or off for the workspace on the Tools page ([Decision 0033](../decisions/0033-google-toolkit-and-tool-switches.md)). A tool that is off is unavailable to every run and Expert in the workspace, and a run already in progress has each call to it refused `tool_turned_off`. Turning it back on applies to the next call, with no restart. Members see each switch's state but can't change it. The switches need migration 64 (`20261118000064_tool_switches.sql`). On an install that predates it, run `make migrate`, then `make stop && make start`.
+
 Nothing checks a key against its provider automatically, because that costs a request: tests use fake transports even with a key present, and a live check is a separate task an owner authorizes and caps. A root run tree may make 20 metered tool calls; the next is denied `tool_budget_exceeded` before any request.
 
 ## The browser executor

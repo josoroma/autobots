@@ -506,13 +506,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-14.23#3 | Give the seeded Google bot the toolkit. | DONE | US-14.23 |
 | US-14.23#4 | Cover the scenarios with fake-transport unit tests, the toolchain manifest test and disposable database checks, with no SerpApi search or live page read. | DONE | US-14.23 |
 | US-14.23#5 | Update `CODEBASE.md`. | DONE | US-14.23 |
-| US-14.24 | Tool switches on the Tools page | READY | EPIC-14 |
-| US-14.24#1 | Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`. | TODO | US-14.24 |
-| US-14.24#2 | Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`. | TODO | US-14.24 |
-| US-14.24#3 | Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client. | TODO | US-14.24 |
-| US-14.24#4 | Add accessible switches for tools and groups to the Tools page, owner-only, in both themes. | TODO | US-14.24 |
-| US-14.24#5 | Cover the scenarios with unit tests, disposable database checks and a browser suite. | TODO | US-14.24 |
-| US-14.24#6 | Update `CODEBASE.md` and the operations runbook. | TODO | US-14.24 |
+| US-14.24 | Tool switches on the Tools page | DONE | EPIC-14 |
+| US-14.24#1 | Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`. | DONE | US-14.24 |
+| US-14.24#2 | Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`. | DONE | US-14.24 |
+| US-14.24#3 | Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client. | DONE | US-14.24 |
+| US-14.24#4 | Add accessible switches for tools and groups to the Tools page, owner-only, in both themes. | DONE | US-14.24 |
+| US-14.24#5 | Cover the scenarios with unit tests, disposable database checks and a browser suite. | DONE | US-14.24 |
+| US-14.24#6 | Update `CODEBASE.md` and the operations runbook. | DONE | US-14.24 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -6902,7 +6902,8 @@ Open Questions:
 
 ### US-14.24: Tool switches on the Tools page
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-14-24-tool-switches-tools-page/`
 
 As a workspace owner
 I want to turn any tool, or a whole group such as Google, on or off for my workspace from the Tools page
@@ -6929,7 +6930,7 @@ Acceptance Criteria:
 Scenario: Every switchable tool and group shows its switch
   Given a disposable stack and a workspace member
   When the member reads GET /v1/tools
-  Then every Expert-grantable tool and every group carries a switch that is on at version 0, and the plan, delegation and workflow approval tools carry none
+  Then every Expert-grantable tool and every group that holds one carries a switch that is on at version 0, and the plan, delegation and workflow approval tools, and the groups that hold only them, carry none
 
 Scenario: Turning a tool off makes it unavailable in that workspace only
   Given an owner of one workspace and a second workspace
@@ -6973,12 +6974,12 @@ Dependencies:
 - US-14.2
 
 Tasks:
-- [ ] Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`.
-- [ ] Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`.
-- [ ] Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client.
-- [ ] Add accessible switches for tools and groups to the Tools page, owner-only, in both themes.
-- [ ] Cover the scenarios with unit tests, disposable database checks and a browser suite.
-- [ ] Update `CODEBASE.md` and the operations runbook.
+- [x] Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`.
+- [x] Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`.
+- [x] Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client.
+- [x] Add accessible switches for tools and groups to the Tools page, owner-only, in both themes.
+- [x] Cover the scenarios with unit tests, disposable database checks and a browser suite.
+- [x] Update `CODEBASE.md` and the operations runbook.
 
 Open Questions:
 - None.

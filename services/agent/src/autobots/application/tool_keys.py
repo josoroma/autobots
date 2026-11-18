@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 
+from autobots.application import tool_switches
 from autobots.application.credentials.precedence import dotenv_order, looks_usable, parse_dotenv
 from autobots.application.credentials.store import (
     CredentialMissing,
@@ -23,6 +24,7 @@ from autobots.application.credentials.store import (
 )
 from autobots.application.sql import SqlConnection
 from autobots.domain.tool_catalog import KeyRequirement
+from autobots.domain.tool_switches import Switches
 
 SETTINGS = "settings"
 ENVIRONMENT = "environment"
@@ -207,9 +209,11 @@ async def resolve(
 class KeySources(dict[str, str]):
     """An environment for availability only. A secret's variable holds a marker, never a value, so
     it can't reach an adapter by mistake. A value's variable holds its resolved value, which isn't
-    secret. `sources` says where each item comes from."""
+    secret. `sources` says where each item comes from, and `switches` holds the workspace's tool
+    switches (Decision 0033 W2), so availability reads both from the one view."""
 
     sources: dict[str, str]
+    switches: Switches
 
 
 async def key_sources(
@@ -219,6 +223,7 @@ async def key_sources(
     saved = await saved_items(connection, workspace_id)
     view = KeySources(environ)
     view.sources = {}
+    view.switches = await tool_switches.load(connection, workspace_id)
     for item in ITEMS.values():
         found = await resolve(item, saved, environ)
         view.pop(item.variable, None)

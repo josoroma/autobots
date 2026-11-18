@@ -85,6 +85,27 @@ class ToolGuideView(BaseModel):
     why: str = Field(min_length=1)
 
 
+class ToolSwitchView(BaseModel):
+    """Decision 0033 W5: a tool's or group's switch for this workspace. `version` is 0 until the
+    switch is first changed. `by` says which switch keeps a tool off, the group's or its own, and
+    is null while the tool is on, and for a group."""
+
+    model_config = STRICT_CONTRACT
+
+    enabled: bool
+    version: int = Field(ge=0)
+    by: Literal["tool", "group"] | None = None
+
+
+class ToolSwitchDraft(BaseModel):
+    """Decision 0033 W3: a switch change, at the version the owner last read."""
+
+    model_config = STRICT_CONTRACT
+
+    enabled: bool
+    expected_version: int = Field(ge=0)
+
+
 class ToolDescriptor(BaseModel):
     model_config = STRICT_CONTRACT
 
@@ -111,6 +132,8 @@ class ToolDescriptor(BaseModel):
     registered: bool
     availability: AvailabilityName
     availability_reason: str | None
+    # Null for a tool no switch applies to: the plan, delegation and workflow approval tools.
+    switch: ToolSwitchView | None = None
 
 
 class ToolGroupDescriptor(BaseModel):
@@ -120,6 +143,8 @@ class ToolGroupDescriptor(BaseModel):
     title: str
     description: str
     tool_ids: list[str]
+    # Null for a group that holds no switchable tool.
+    switch: ToolSwitchView | None = None
 
 
 class ToolCatalog(BaseModel):
@@ -129,6 +154,8 @@ class ToolCatalog(BaseModel):
     catalog_digest: str
     groups: list[ToolGroupDescriptor]
     tools: list[ToolDescriptor]
+    # Whether this viewer, the workspace's owner, may change the switches (W4).
+    viewer_can_switch: bool = False
 
 
 class ToolVersions(BaseModel):

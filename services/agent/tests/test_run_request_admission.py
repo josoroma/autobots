@@ -131,6 +131,7 @@ LABELS = {
     "public.expert_versions": "expert version",
     "app_private.provider_credentials": "saved keys",
     "app_private.tool_key_settings": "saved values",
+    "app_private.tool_switches": "tool switches",
     "original_request": "stored goal",
 }
 
@@ -171,6 +172,7 @@ ADMITTED_TRACE = [
     "expert version",
     "saved keys",
     "saved values",
+    "tool switches",
     "admit",
     "committed",
     "release",
@@ -413,7 +415,7 @@ def test_a_granted_tool_without_its_key_in_the_startup_environment_is_refused(
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-live-only")
     reply = post(api_client, Arranged(expert={"tools": ["tavily_search"]}))
     assert refusal(reply) == (409, "tool_unavailable", TOOL_MISSING)
-    assert trace(api_client) == [*ADMITTED_TRACE[:7], "release"]
+    assert trace(api_client) == [*ADMITTED_TRACE[:8], "release"]
 
 
 def test_a_granted_tool_with_its_key_read_at_start_is_admitted(
@@ -480,7 +482,7 @@ def test_a_key_used_with_other_content_is_refused(api_client: ApiClient) -> None
         "idempotency_conflict",
         "This key was already used with different content.",
     )
-    assert trace(api_client) == [*ADMITTED_TRACE[:7], "admit", "rolled back", "release"]
+    assert trace(api_client) == [*ADMITTED_TRACE[:8], "admit", "rolled back", "release"]
     assert api_client.database.changes() == []
 
 

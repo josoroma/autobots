@@ -23,6 +23,7 @@ import psycopg
 from autobots.adapters import tool_registry
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.tavily import tavily_tools
+from autobots.application import tool_switches
 from autobots.application.credentials.master_key import create_master_key
 from autobots.application.credentials.store import CredentialMissing
 from autobots.application.experts import ExpertRefused, create_expert
@@ -36,6 +37,7 @@ from autobots.application.tool_keys import key_sources
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
 from autobots.domain.models import resolve_role_policy
+from autobots.domain.tool_switches import SwitchKind
 from checklib import Cases, run_check, run_scenarios
 
 URL = os.environ["AUTOBOTS_DATABASE_URL"]
@@ -437,6 +439,79 @@ async def serpapi_key_is_a_keys_and_vars_secret(ctx: Keys) -> None:
     )
 
 
+async def tool_switches_follow_the_workspace(ctx: Keys) -> None:
+    """US-14.24, Decision 0033 W1 to W4: the owner's switches turn a tool, or its group, off for one workspace, for the
+    catalog, admission and Expert saves, at an expected version."""
+    check, config_root, db, other, settings = ctx.cases.check, ctx.config_root, ctx.db, ctx.other, ctx.settings
+    serpapi = {state.name: state for state in await settings.status(WORKSPACE_A)}["serpapi"]
+    await settings.save(WORKSPACE_A, "serpapi", SAVED_SERPAPI, serpapi.version)
+    bare = {"AUTOBOTS_CONFIG_ROOT": str(config_root / "missing"), "NODE_ENV": "development"}
+
+    async def tools(workspace: UUID) -> dict[str, tuple[str, str | None]]:
+        view = await key_sources(db, workspace, bare)
+        return {item.tool_id: (item.availability, item.availability_reason) for item in tool_registry.catalog().catalog(view).tools}
+
+    async def flip(kind: SwitchKind, target: str, enabled: bool) -> tool_switches.Switch:
+        """At the switch's current version, since another check may have changed it already."""
+        current = (await tool_switches.load(db, WORKSPACE_A)).get((kind, target), tool_switches.Switch())
+        return await tool_switches.change(db, WORKSPACE_A, kind, target, enabled, current.version)
+
+    before = await tools(WORKSPACE_A)
+    google = ("google_search", "google_map", "google_extract", "google_crawl")
+    check("with nothing switched, the four Google tools are available in the workspace", "all available",
+          [before.get(tool) for tool in google], all(before.get(tool) == ("available", None) for tool in google))
+    turned = await flip("tool", "google_crawl", False)
+    stale: list[str] = []
+    try:
+        await tool_switches.change(db, WORKSPACE_A, "tool", "google_crawl", True, turned.version - 1)
+        stale.append("saved")
+    except StaleVersion as refused:
+        stale.append(refused.code)
+    first, second = await tools(WORKSPACE_A), await tools(other)
+    check("turning google_crawl off disables it in its workspace only, and a stale change is refused",
+          "turned_off here; not turned off elsewhere; stale_version",
+          (turned, first.get("google_crawl"), second.get("google_crawl"), stale),
+          turned.enabled is False and first.get("google_crawl") == ("disabled_by_policy", "turned_off")
+          and (second.get("google_crawl") or ("", ""))[1] != "turned_off" and stale == ["stale_version"])
+    await flip("group", "google", False)
+    await flip("tool", "google_search", True)
+    grouped = await tools(WORKSPACE_A)
+    check("turning the Google group off turns off all four, even google_search switched on by itself", "group_turned_off x4",
+          [grouped.get(tool) for tool in google], all(grouped.get(tool) == ("disabled_by_policy", "group_turned_off") for tool in google))
+    refusals: list[str] = []
+    try:
+        tool_registry.catalog().require_available(["google_search"], await key_sources(db, WORKSPACE_A, bare))
+        refusals.append("admitted")
+    except ToolsUnavailable as refused:
+        refusals.append(refused.code)
+    try:
+        await create_expert(db, workspace_id=WORKSPACE_A, actor_id=uuid4(), idempotency_key=str(uuid4()),
+                            name=f"Google reader {uuid4().hex[:6]}", config=ExpertConfig(tools=["google_search"]),
+                            catalog=tool_registry.catalog())
+        refusals.append("saved")
+    except ExpertRefused as refused:
+        refusals.append(refused.code)
+    check("admission and an Expert save refuse a tool that is off", "['tool_unavailable', 'expert_tool_unavailable']",
+          refusals, refusals == ["tool_unavailable", "expert_tool_unavailable"])
+    await flip("group", "google", True)
+    await flip("tool", "google_crawl", True)
+    after = await tools(WORKSPACE_A)
+    check("turning the group and google_crawl back on makes all four available again", "all available",
+          [after.get(tool) for tool in google], all(after.get(tool) == ("available", None) for tool in google))
+    privileges = await (await db.execute(
+        "select has_table_privilege('anon', 'app_private.tool_switches', 'select'), "
+        "has_table_privilege('authenticated', 'app_private.tool_switches', 'select'), "
+        "has_table_privilege('autobots_runtime', 'app_private.tool_switches', 'select'), "
+        "has_table_privilege('autobots_runtime', 'app_private.tool_switches', 'insert'), "
+        "has_table_privilege('autobots_runtime', 'app_private.tool_switches', 'update'), "
+        "has_table_privilege('autobots_runtime', 'app_private.tool_switches', 'delete')"
+    )).fetchone()
+    check("the switch table is private: no anon or authenticated access, and the runtime role reads, inserts and updates only",
+          "(False, False, True, True, True, False)", privileges, tuple(privileges or ()) == (False, False, True, True, True, False))
+    removing = {state.name: state for state in await settings.status(WORKSPACE_A)}["serpapi"]
+    await settings.remove(WORKSPACE_A, "serpapi", removing.version)
+
+
 SCENARIOS = (
     settings_then_environment_then_dotenv,
     saves_are_versioned,
@@ -444,6 +519,7 @@ SCENARIOS = (
     removing_falls_back_to_dotenv,
     availability_admission_and_save_agree,
     serpapi_key_is_a_keys_and_vars_secret,
+    tool_switches_follow_the_workspace,
     sealed_keys_stay_out_of_durable_state,
 )
 

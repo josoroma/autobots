@@ -167,6 +167,7 @@ GATEWAY_OWN = {
     "approval_rejected",
     "approval_target_changed",
     "tool_budget_exceeded",
+    "tool_turned_off",
     "tool_timeout",
     "tool_failed",
     "output_too_large",

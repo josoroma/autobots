@@ -17,6 +17,7 @@ import {
   COST_LABEL,
   costText,
   grantorText,
+  groupSwitchText,
   keyOrigin,
   keySource,
   limitsText,
@@ -25,6 +26,7 @@ import {
   PROVIDER_LABEL,
   repairText,
   rowFacts,
+  switchText,
   type ToolState,
 } from "../../lib/tools/text.ts";
 
@@ -266,5 +268,44 @@ test("a field's constraints read as the schema states them, or None", () => {
   assert.equal(
     constraintText({ minimum: 0, enum: ["sum", "mean"] }),
     'minimum 0, enum ["sum","mean"]',
+  );
+});
+
+test("a switch says its state in words, and a turned-off tool how to turn it on (Decision 0033 W2, W5)", () => {
+  assert.equal(switchText({ switch: null }), null);
+  assert.equal(
+    switchText({ switch: { enabled: true, version: 0, by: null } }),
+    "On for this workspace",
+  );
+  assert.equal(
+    switchText({ switch: { enabled: false, version: 1, by: "tool" } }),
+    "Off for this workspace",
+  );
+  assert.equal(
+    switchText({ switch: { enabled: true, version: 2, by: "group" } }),
+    "Off with its group",
+  );
+  assert.equal(groupSwitchText({ switch: null }), null);
+  assert.equal(
+    groupSwitchText({ switch: { enabled: false, version: 1, by: null } }),
+    "Group off for this workspace",
+  );
+  assert.equal(
+    repairText(
+      tool({
+        availability: "disabled_by_policy",
+        availability_reason: "turned_off",
+      }),
+    ),
+    "Turned off for this workspace. The workspace owner can turn it on here in Tools.",
+  );
+  assert.equal(
+    repairText(
+      tool({
+        availability: "disabled_by_policy",
+        availability_reason: "group_turned_off",
+      }),
+    ),
+    "Its group is turned off for this workspace. The workspace owner can turn the group on here in Tools.",
   );
 });

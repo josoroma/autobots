@@ -21,6 +21,7 @@ from autobots.adapters.market_data import market_tools
 from autobots.adapters.remote_files import store_remote_file_tool
 from autobots.adapters.serpapi import google_search_tool
 from autobots.adapters.tavily import tavily_tools
+from autobots.application import tool_switches
 from autobots.application.code_tools import CODE_TOOLS
 from autobots.application.runs import admit_run
 from autobots.application.tool_definitions import ToolRegistry, ToolScope
@@ -288,6 +289,28 @@ async def google_reading_is_one_metered_use_each(ctx: Tools) -> None:
           and 'directly read page text' not in record and 'serpapi_fixture' not in record)
 
 
+async def a_run_in_progress_cannot_call_a_tool_turned_off(ctx: Tools) -> None:
+    """US-14.24, Decision 0033 W2: the gateway refuses a call to a tool turned off for the workspace, before any request,
+    and lets the next one through once it is back on."""
+    check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
+    await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+    admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='switches', limit_micro_usd=1000, policy=resolve_role_policy())
+    lease = await claim_next(db, worker_id='tool-switches', lease_seconds=120)
+    assert lease is not None
+    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'google_search': 1}, ('outputs',))
+    version = (await tool_switches.load(db, WORKSPACE)).get(('tool', 'google_search'), tool_switches.Switch()).version
+    off = await tool_switches.change(db, WORKSPACE, 'tool', 'google_search', False, version)
+    requests.clear()
+    refused = await gateway.execute(db, scope, 'google_search', {'query': 'colones', 'max_results': 10})
+    sent_while_off = [entry for entry in requests if entry.startswith('serpapi:')]
+    await tool_switches.change(db, WORKSPACE, 'tool', 'google_search', True, off.version)
+    allowed = await gateway.execute(db, scope, 'google_search', {'query': 'colones', 'max_results': 10})
+    check('a call to a tool turned off is refused tool_turned_off before any request, and the next succeeds once it is on',
+          'denied tool_turned_off with no SerpApi request, then succeeded',
+          (refused.outcome.value, refused.code, sent_while_off, allowed.outcome.value),
+          refused.outcome.value == 'denied' and refused.code == 'tool_turned_off' and sent_while_off == [] and allowed.outcome.value == 'succeeded')
+
+
 async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
     """US-14.9: attached inputs, paged reads, CSV and a guarded store."""
     check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
@@ -451,6 +474,7 @@ SCENARIOS = (
     paged_search_is_one_metered_use,
     google_search_is_one_metered_use,
     google_reading_is_one_metered_use_each,
+    a_run_in_progress_cannot_call_a_tool_turned_off,
     file_tools_read_inputs_and_guard_stores,
     market_data_counts_against_the_tree,
     code_tools_stay_in_the_runs_files,

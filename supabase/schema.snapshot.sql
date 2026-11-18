@@ -755,6 +755,22 @@ CREATE TABLE app_private.tool_receipts (
 );
 
 --
+-- Name: tool_switches; Type: TABLE; Schema: app_private; Owner: -
+--
+
+CREATE TABLE app_private.tool_switches (
+    workspace_id uuid NOT NULL,
+    kind text NOT NULL,
+    target text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tool_switches_kind_check CHECK ((kind = ANY (ARRAY['tool'::text, 'group'::text]))),
+    CONSTRAINT tool_switches_target_check CHECK ((target ~ '^[a-z][a-z0-9_]{2,63}$'::text)),
+    CONSTRAINT tool_switches_version_check CHECK ((version >= 1))
+);
+
+--
 -- Name: tool_uses; Type: TABLE; Schema: app_private; Owner: -
 --
 
@@ -1501,6 +1517,13 @@ ALTER TABLE ONLY app_private.tool_receipts
     ADD CONSTRAINT tool_receipts_pkey PRIMARY KEY (operation_id);
 
 --
+-- Name: tool_switches tool_switches_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.tool_switches
+    ADD CONSTRAINT tool_switches_pkey PRIMARY KEY (workspace_id, kind, target);
+
+--
 -- Name: tool_uses tool_uses_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
 --
 
@@ -2160,6 +2183,13 @@ ALTER TABLE ONLY app_private.tool_receipts
 
 ALTER TABLE ONLY app_private.tool_receipts
     ADD CONSTRAINT tool_receipts_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
+
+--
+-- Name: tool_switches tool_switches_workspace_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.tool_switches
+    ADD CONSTRAINT tool_switches_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
 
 --
 -- Name: tool_uses tool_uses_root_run_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
@@ -3182,6 +3212,12 @@ GRANT SELECT,INSERT,UPDATE ON TABLE app_private.tool_key_settings TO autobots_ru
 --
 
 GRANT SELECT,INSERT,UPDATE ON TABLE app_private.tool_receipts TO autobots_runtime;
+
+--
+-- Name: TABLE tool_switches; Type: ACL; Schema: app_private; Owner: -
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE app_private.tool_switches TO autobots_runtime;
 
 --
 -- Name: TABLE tool_uses; Type: ACL; Schema: app_private; Owner: -

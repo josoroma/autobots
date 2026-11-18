@@ -212,6 +212,8 @@ class GatewayCode(_Code):
     REVIEW_UNAVAILABLE = "review_unavailable"
     APPROVAL_TARGET_CHANGED = "approval_target_changed"
     TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded"
+    # The owner turned the tool, or its group, off for the workspace (Decision 0033 W2).
+    TOOL_TURNED_OFF = "tool_turned_off"
     # Run status and ownership, read fresh (tool_gateway.ownership_refusal).
     RUN_NOT_FOUND = "run_not_found"
     LEASE_LOST = "lease_lost"
@@ -303,6 +305,8 @@ ROUTING: Final[Mapping[GatewayCode, ToolRouting]] = MappingProxyType(
         GatewayCode.REVIEW_UNAVAILABLE: ToolRouting.SHOW,
         GatewayCode.APPROVAL_TARGET_CHANGED: ToolRouting.SHOW,
         GatewayCode.TOOL_BUDGET_EXCEEDED: ToolRouting.SHOW,
+        # The model sees the tool is off and plans without it (Decision 0033 W2).
+        GatewayCode.TOOL_TURNED_OFF: ToolRouting.SHOW,
         GatewayCode.APPROVAL_EXPIRED: ToolRouting.SHOW,
         GatewayCode.APPROVAL_SCOPE_CHANGED: ToolRouting.SHOW,
         GatewayCode.APPROVAL_CONSUMED: ToolRouting.SHOW,

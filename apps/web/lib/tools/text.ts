@@ -4,7 +4,7 @@
  * here until it has words (WTAP-06). Every state is said in words; a badge never stands for one
  * alone (PRD-Tool-Catalog TS-01 to TS-03). Pure and JSX-free.
  */
-import type { ToolDescriptor } from "@autobots/api-client";
+import type { ToolDescriptor, ToolGroupDescriptor } from "@autobots/api-client";
 
 export const PROVIDER_LABEL: Readonly<
   Record<ToolDescriptor["provider"], string>
@@ -113,6 +113,13 @@ export function repairText(tool: ToolState): string | null {
         : ` The token needs these permissions on that repository only: ${tool.key_requirement.scopes.join(", ")}.`;
     return `Save them in Settings → Keys & vars, or set ${names} in .env.${scopes} After a change to .env, restart the worker and the API.`;
   }
+  // Decision 0033 W2: a switch the owner turned off says how to turn it back on.
+  if (tool.availability_reason === "turned_off") {
+    return "Turned off for this workspace. The workspace owner can turn it on here in Tools.";
+  }
+  if (tool.availability_reason === "group_turned_off") {
+    return "Its group is turned off for this workspace. The workspace owner can turn the group on here in Tools.";
+  }
   if (tool.availability_reason === "isolated_executor_not_qualified") {
     return "Disabled until the isolated browser executor is qualified and browsing is turned on in Settings → Keys & vars or .env. See the operations runbook.";
   }
@@ -173,3 +180,26 @@ export function constraintText(
     .map(([key, value]) => `${key} ${JSON.stringify(value)}`)
     .join(", ");
 }
+
+/** Decision 0033 W5: a tool's switch state in words, or null for a tool no switch applies to. */
+export function switchText(
+  tool: Pick<ToolDescriptor, "switch">,
+): string | null {
+  const state = tool.switch;
+  if (!state) return null;
+  if (state.by === "group") return "Off with its group";
+  if (state.by === "tool") return "Off for this workspace";
+  return "On for this workspace";
+}
+
+/** A group's switch state in words, or null for a group no switch applies to. */
+export function groupSwitchText(
+  group: Pick<ToolGroupDescriptor, "switch">,
+): string | null {
+  if (!group.switch) return null;
+  return group.switch.enabled
+    ? "Group on for this workspace"
+    : "Group off for this workspace";
+}
+
+export const SWITCH_SAVED = "Saved. The switch applies to the next call.";

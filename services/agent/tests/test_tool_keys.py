@@ -100,6 +100,8 @@ class Saved(ScriptedConnection):
     """A connection whose workspace saved a Tavily key, and nothing else."""
 
     async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        if "tool_switches" in query:
+            return ScriptedRows([])
         if "tool_key_settings" in query:
             return ScriptedRows([])
         assert "provider_credentials" in query
@@ -241,6 +243,8 @@ class Approvals:
         self.receipt, self.recorded = receipt, recorded
 
     async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+        if "tool_switches" in query:
+            return ScriptedRows([])
         row = (
             (self.receipt,)
             if "tool_receipts" in query and self.receipt
@@ -286,6 +290,8 @@ async def test_a_write_uses_the_repository_its_approval_recorded() -> None:
 
     class Recorded(Approvals):
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+            if "tool_switches" in query:
+                return ScriptedRows([])
             if "tool_key_settings" in query or "provider_credentials" in query:
                 return ScriptedRows()
             return await super().execute(query, params)
@@ -337,6 +343,8 @@ def test_each_item_refuses_what_its_check_refuses(name: str, value: str) -> None
 async def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Path) -> None:
     class Both(ScriptedConnection):
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+            if "tool_switches" in query:
+                return ScriptedRows([])
             if "tool_key_settings" in query:
                 return ScriptedRows(
                     [("browser_executor", "disabled"), ("github_repository", "owner/saved")]
@@ -504,6 +512,8 @@ async def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch)
 
     class Everything(ScriptedConnection):
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+            if "tool_switches" in query:
+                return ScriptedRows([])
             if "tool_key_settings" in query:
                 return ScriptedRows([("github_repository", "owner/saved")])
             return ScriptedRows([("tavily",), ("jina",), ("serpapi",), ("github",)])
@@ -528,6 +538,8 @@ async def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_enviro
 
     class SavedKey(ScriptedConnection):
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
+            if "tool_switches" in query:
+                return ScriptedRows([])
             if "tool_key_settings" in query:
                 return ScriptedRows()
             return ScriptedRows([(item.credential,)])

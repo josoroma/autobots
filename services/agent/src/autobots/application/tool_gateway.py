@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from autobots.application import receipts
+from autobots.application import receipts, tool_switches
 from autobots.application.approvals import (
     ApprovalProposal,
     ApprovedRequest,
@@ -219,12 +219,18 @@ async def hold_running(connection: SqlConnection, scope: ToolScope) -> None:
 async def admission_refusal(
     connection: SqlConnection, scope: ToolScope, call: Call
 ) -> GatewayCode | None:
-    """The run is running and this worker owns it, then an Expert-only tool has an Expert behind
-    the run (AB-02). Both are read fresh, after the call resolved and before any approval."""
+    """The run is running and this worker owns it, the tool and its group are on for the
+    workspace (Decision 0033 W2), and an Expert-only tool has an Expert behind the run (AB-02).
+    Each is read fresh, after the call resolved and before any approval or metering."""
     refusal = await ownership_refusal(connection, scope)
     if refusal is not None:
         return refusal
-    if call.tool.expert_only and not await _expert_behind(connection, scope):
+    tool = call.tool
+    if await tool_switches.turned_off(
+        connection, scope.workspace_id, tool.tool_id, tool.group.value
+    ):
+        return GatewayCode.TOOL_TURNED_OFF
+    if tool.expert_only and not await _expert_behind(connection, scope):
         return GatewayCode.EXPERT_GRANT_REQUIRED
     return None
 

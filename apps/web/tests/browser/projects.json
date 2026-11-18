@@ -28,6 +28,7 @@
     "settings-sections.spec.ts",
     "settings.spec.ts",
     "stream-result.spec.ts",
+    "tool-switches.spec.ts",
     "workflow-list.spec.ts",
     "workflows.spec.ts",
     "workspace-choice.spec.ts"

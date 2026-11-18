@@ -50,6 +50,8 @@ REQUIRED_RELATIONS = (
     "public.workflow_drafts",
     "app_private.plan_task_times",
     "app_private.tool_key_settings",
+    # Migration 64: the tool switches (US-14.24).
+    "app_private.tool_switches",
 )
 # A migration can add only columns, which a relation check can't see. These are the ones the newest
 # code relies on.

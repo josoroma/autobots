@@ -6111,6 +6111,11 @@ export const schemas = {
         },
         "title": "Tools",
         "type": "array"
+      },
+      "viewer_can_switch": {
+        "default": false,
+        "title": "Viewer Can Switch",
+        "type": "boolean"
       }
     },
     "required": [
@@ -6294,6 +6299,16 @@ export const schemas = {
         "title": "Side Effects",
         "type": "string"
       },
+      "switch": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ToolSwitchView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "title": {
         "title": "Title",
         "type": "string"
@@ -6400,6 +6415,16 @@ export const schemas = {
         "title": "Group",
         "type": "string"
       },
+      "switch": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ToolSwitchView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "title": {
         "title": "Title",
         "type": "string"
@@ -6471,6 +6496,63 @@ export const schemas = {
       "max_output_bytes"
     ],
     "title": "ToolLimits",
+    "type": "object"
+  },
+  "ToolSwitchDraft": {
+    "additionalProperties": false,
+    "description": "Decision 0033 W3: a switch change, at the version the owner last read.",
+    "properties": {
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean"
+      },
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "enabled",
+      "expected_version"
+    ],
+    "title": "ToolSwitchDraft",
+    "type": "object"
+  },
+  "ToolSwitchView": {
+    "additionalProperties": false,
+    "description": "Decision 0033 W5: a tool's or group's switch for this workspace. `version` is 0 until the\nswitch is first changed. `by` says which switch keeps a tool off, the group's or its own, and\nis null while the tool is on, and for a group.",
+    "properties": {
+      "by": {
+        "anyOf": [
+          {
+            "enum": [
+              "tool",
+              "group"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "By"
+      },
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean"
+      },
+      "version": {
+        "minimum": 0.0,
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "enabled",
+      "version"
+    ],
+    "title": "ToolSwitchView",
     "type": "object"
   },
   "ToolUseCompleted": {
@@ -9345,6 +9427,7 @@ export interface ToolCatalog {
   groups: ToolGroupDescriptor[];
   schema_version: 1;
   tools: ToolDescriptor[];
+  viewer_can_switch?: boolean;
 }
 
 export function parseToolCatalog(value: unknown): ToolCatalog {
@@ -9371,6 +9454,7 @@ export interface ToolDescriptor {
   provider: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "world_bank" | "github";
   registered: boolean;
   side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
+  switch?: ToolSwitchView | null;
   title: string;
   tool_id: string;
   version: number;
@@ -9394,6 +9478,7 @@ export function parseToolGrants(value: unknown): ToolGrants {
 export interface ToolGroupDescriptor {
   description: string;
   group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google";
+  switch?: ToolSwitchView | null;
   title: string;
   tool_ids: string[];
 }
@@ -9420,6 +9505,25 @@ export interface ToolLimits {
 
 export function parseToolLimits(value: unknown): ToolLimits {
   return parseWith(schemas, "ToolLimits", value) as ToolLimits;
+}
+
+export interface ToolSwitchDraft {
+  enabled: boolean;
+  expected_version: number;
+}
+
+export function parseToolSwitchDraft(value: unknown): ToolSwitchDraft {
+  return parseWith(schemas, "ToolSwitchDraft", value) as ToolSwitchDraft;
+}
+
+export interface ToolSwitchView {
+  by?: "tool" | "group" | null;
+  enabled: boolean;
+  version: number;
+}
+
+export function parseToolSwitchView(value: unknown): ToolSwitchView {
+  return parseWith(schemas, "ToolSwitchView", value) as ToolSwitchView;
 }
 
 export interface ToolUseCompleted {
@@ -10074,12 +10178,20 @@ export async function listTools(options: ClientOptions, query?: ListToolsQuery, 
   return parseToolCatalog(await requestJson(options, "GET", `/v1/tools${queryString(query, ["group", "availability", "provider"])}`, undefined, request, parseErrorResponse));
 }
 
+export async function putToolGroupSwitch(options: ClientOptions, group: string, body: ToolSwitchDraft, request?: RequestOptions): Promise<ToolSwitchView> {
+  return parseToolSwitchView(await requestJson(options, "PUT", `/v1/tools/groups/${encodeURIComponent(group)}/switch`, body, request, parseErrorResponse));
+}
+
 export async function getToolVersions(options: ClientOptions, tool_id: string, request?: RequestOptions): Promise<ToolVersions> {
   return parseToolVersions(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}`, undefined, request, parseErrorResponse));
 }
 
 export async function getToolGrants(options: ClientOptions, tool_id: string, request?: RequestOptions): Promise<ToolGrants> {
   return parseToolGrants(await requestJson(options, "GET", `/v1/tools/${encodeURIComponent(tool_id)}/grants`, undefined, request, parseErrorResponse));
+}
+
+export async function putToolSwitch(options: ClientOptions, tool_id: string, body: ToolSwitchDraft, request?: RequestOptions): Promise<ToolSwitchView> {
+  return parseToolSwitchView(await requestJson(options, "PUT", `/v1/tools/${encodeURIComponent(tool_id)}/switch`, body, request, parseErrorResponse));
 }
 
 export async function getToolVersion(options: ClientOptions, tool_id: string, version: string, request?: RequestOptions): Promise<ToolDescriptor> {

@@ -6,6 +6,7 @@ import { CatalogToolbar } from "@/components/tools/catalog-toolbar";
 import { ToolDialog } from "@/components/tools/tool-dialog";
 import { ToolGroupSection } from "@/components/tools/tool-group-section";
 import { useCatalogFilters } from "@/components/tools/use-catalog-filters";
+import { useSwitchWrites } from "@/components/tools/use-switch-writes";
 import { LoadState } from "@/components/ui/load-state";
 import { readOf } from "@/lib/load";
 import { filterTools, groupTools } from "@/lib/tools/filters";
@@ -35,6 +36,7 @@ function opener(toolId: string): HTMLElement | null {
 export function ToolCatalogPanel() {
   const filters = useCatalogFilters();
   const { state, pending, reload } = useResource(readOf(listTools));
+  const writes = useSwitchWrites({ reload });
   if (state.kind !== "ready") {
     return (
       <LoadState
@@ -55,6 +57,9 @@ export function ToolCatalogPanel() {
         filters={filters}
         shown={shown.length}
       />
+      <p role="status" aria-live="polite" className="text-sm font-medium">
+        {writes.message}
+      </p>
       <div className="grid gap-6">
         <div className="min-w-0 space-y-5">
           {groupTools(catalog.groups, shown).map(({ group, tools }) => (
@@ -64,6 +69,10 @@ export function ToolCatalogPanel() {
               tools={tools}
               selected={selected}
               panelHref={filters.panelHref}
+              switching={{
+                canSwitch: catalog.viewer_can_switch ?? false,
+                writes,
+              }}
             />
           ))}
         </div>

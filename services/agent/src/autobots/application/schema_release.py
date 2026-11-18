@@ -3,5 +3,5 @@ count with this, and a harness check fails unless both values match `supabase/mi
 migration, then change both lines.
 """
 
-SHIPPED_MIGRATIONS = 63
-NEWEST_MIGRATION = "20261118000063_serpapi_provider.sql"
+SHIPPED_MIGRATIONS = 64
+NEWEST_MIGRATION = "20261118000064_tool_switches.sql"

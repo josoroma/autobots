@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.23 |
+| Target | US-14.24 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.23 | us-14-23-google-toolkit-that-finds | READY | A Google toolkit that finds with Google and reads pages directly |
+| 1 | US-14.24 | us-14-24-tool-switches-tools-page | READY | Tool switches on the Tools page |
 
 ## Next Action
 
 Action: propose
-Story: US-14.23
-Change: us-14-23-google-toolkit-that-finds
-Command: /ohmyorch:opsx-propose us-14-23-google-toolkit-that-finds for US-14.23; then set US-14.23 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-14.23 is READY and has no OpenSpec change
+Story: US-14.24
+Change: us-14-24-tool-switches-tools-page
+Command: /ohmyorch:opsx-propose us-14-24-tool-switches-tools-page for US-14.24; then set US-14.24 to IN PROGRESS with a Change: line in SPECS.md
+Reason: US-14.24 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

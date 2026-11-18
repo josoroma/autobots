@@ -22,6 +22,7 @@ from autobots.contracts.tool_catalog import (
     ToolGroupDescriptor,
     ToolGuideView,
     ToolLimits,
+    ToolSwitchView,
 )
 from autobots.domain.errors import FixedRefusal
 from autobots.domain.tool_catalog import (
@@ -35,6 +36,13 @@ from autobots.domain.tool_catalog import (
     key_availability,
 )
 from autobots.domain.tool_guides import TOOL_GUIDES
+from autobots.domain.tool_switches import (
+    Switches,
+    reason,
+    state,
+    switchable_tool,
+    turned_off_by,
+)
 from autobots.domain.tools import WORKFLOW_TOOLS
 
 _SCHEMA_KEYS = (
@@ -139,10 +147,29 @@ def guide_for(tool_id: str) -> ToolGuideView:
     return ToolGuideView(what=found.what, when=found.when, why=found.why)
 
 
+def switches_of(environ: Mapping[str, str]) -> Switches:
+    """The workspace's switches a `KeySources` view carries (Decision 0033 W2). A plain environment
+    has none, so every tool is on."""
+    found: Switches = getattr(environ, "switches", {})
+    return found
+
+
+def _switch(tool: ToolDefinition, switches: Switches) -> ToolSwitchView | None:
+    if not switchable_tool(tool.tool_id):
+        return None
+    own = state(switches, "tool", tool.tool_id)
+    by = turned_off_by(tool.tool_id, tool.group.value, switches)
+    return ToolSwitchView(enabled=own.enabled, version=own.version, by=by)
+
+
 def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor:
     input_schema = tool.input_model.model_json_schema()
     output_schema = tool.output_model.model_json_schema()
-    availability, reason = key_availability(tool.key_requirement, environ)
+    availability, why = key_availability(tool.key_requirement, environ)
+    switch = _switch(tool, switches_of(environ))
+    if switch is not None and switch.by is not None:
+        # The owner's switch comes first: the tool is off whatever its key says (W2).
+        availability, why = ToolAvailability.DISABLED_BY_POLICY, reason(switch.by)
     requirement = tool.key_requirement
     return ToolDescriptor(
         tool_id=tool.tool_id,
@@ -187,7 +214,8 @@ def describe(tool: ToolDefinition, environ: Mapping[str, str]) -> ToolDescriptor
         grantable_to=cast(list[GrantSiteName], grant_sites(tool.tool_id, WORKFLOW_TOOLS)),
         registered=True,
         availability=availability.value,
-        availability_reason=reason,
+        availability_reason=why,
+        switch=switch,
     )
 
 
@@ -267,12 +295,21 @@ def tool_catalog(
         and (availability is None or item.availability == availability)
         and (provider is None or item.provider == provider)
     ]
+    switches = switches_of(environ)
     groups = [
         ToolGroupDescriptor(
             group=name.value,
             title=title,
             description=text,
             tool_ids=[item.tool_id for item in current if item.group == name.value],
+            switch=(
+                ToolSwitchView(
+                    enabled=state(switches, "group", name.value).enabled,
+                    version=state(switches, "group", name.value).version,
+                )
+                if any(item.group == name.value and item.switch for item in current)
+                else None
+            ),
         )
         for name, (title, text) in GROUP_TITLES.items()
         if any(item.group == name.value for item in current)
