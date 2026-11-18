@@ -1,10 +1,10 @@
 # REFACTOR-R41-R68: refactor-plan items R-41 to R-68
 
-**Date:** 2026-11-17. **Status:** done on branch `refactor/r41-r68` at `b6e2e6f`, not merged or pushed. `db` and `operations` have not run on the final review-fix commits (see Verification). **Scope:** the owner asked to work "from R-41 to R-68" of [the code-quality review's refactor plan](../../../reviews/review-2026-11-12-09-52-30/refactor-plan.md) and to make the decisions that would otherwise wait for them. Those decisions are [Decision 0029](../../decisions/0029-refactor-decisions-delegated-r41-r68.md) F1 to F13. R-01 to R-40 are recorded in [REFACTOR-R01-R20](../REFACTOR-R01-R20/summary.md) and [REFACTOR-R21-R40](../REFACTOR-R21-R40/summary.md). This short record follows DH-W01–06, outside the OhMyOrch delivery loop. The reviews are static analysis, not acceptance evidence.
+**Date:** 2026-11-17. **Status:** done on branch `refactor/r41-r68`, not merged or pushed. **Scope:** the owner asked to work "from R-41 to R-68" of [the code-quality review's refactor plan](../../../reviews/review-2026-11-12-09-52-30/refactor-plan.md) and to make the decisions that would otherwise wait for them. Those decisions are [Decision 0029](../../decisions/0029-refactor-decisions-delegated-r41-r68.md) F1 to F13. R-01 to R-40 are recorded in [REFACTOR-R01-R20](../REFACTOR-R01-R20/summary.md) and [REFACTOR-R21-R40](../REFACTOR-R21-R40/summary.md). This short record follows DH-W01–06, outside the OhMyOrch delivery loop. The reviews are static analysis, not acceptance evidence.
 
 ## Plan
 
-Each item's steps, files, risk and verification are in the plan's own section. The 28 items overlap heavily, so they went in eleven rounds of two to five specialists with disjoint files, each specialist reading and planning while the previous round's profiles ran, then implementing once the tree was free. Service items that touch most modules (R-50, R-54, R-63) and the test refiling (R-66) ran alone. Every round passed `fast`, `db`, `operations` and `full` before its items were committed, one commit per item, apart from the final review fixes (see Verification); where items shared a file, the file went to the later item's commit, which its message says.
+Each item's steps, files, risk and verification are in the plan's own section. The 28 items overlap heavily, so they went in eleven rounds of two to five specialists with disjoint files, each specialist reading and planning while the previous round's profiles ran, then implementing once the tree was free. Service items that touch most modules (R-50, R-54, R-63) and the test refiling (R-66) ran alone. Every round passed `fast`, `db`, `operations` and `full` before its items were committed, one commit per item; where items shared a file, the file went to the later item's commit, which its message says.
 
 ## Implementation
 
@@ -47,7 +47,7 @@ Visible changes the owner may notice:
 
 ## Review
 
-Independent read-only reviewers (`autobots-reviewer`) inspected every item and ran nothing. Every finding marked blocking or should-fix was fixed before the item's commit or in the final review-fix commits (`6e5daff`, `6299aef`, `70bacd9`). Fixes before those passed all four profiles again; the final ones passed `full` and await `db` and `operations`.
+Independent read-only reviewers (`autobots-reviewer`) inspected every item and ran nothing. Every finding marked blocking or should-fix was fixed before the item's commit or in the final review-fix commits (`6e5daff`, `6299aef`, `70bacd9`). Every fix passed all four profiles again.
 
 - **Blocking findings, all fixed:** R-52 (Experts read through the request type, so a stored Expert with more than twenty tools failed the list), R-54 (the upstream fixture read a removed `app.state` attribute, so real catalog calls could have left a test; and `pull_request_check` indexed the new approval rows), R-56 (the backup qualifier counted bootstrap rows as migrations).
 - **Should-fix findings fixed, among others:** a lost lease could still consume an approval (R-50); two scheduling paths could start paid catch-up runs or schedule a non-text time (R-52); duplicated Runs lists from a theme provider wrapping streamed sections (R-67, found in `db` and reproduced on a disposable stack); deadlocks between an expiry, a decision and a cancel (R-60); a request holding two pool connections (R-55); an IPv6-first host failing the URL guard, and a lost readback read as a defect (R-62); writes that skipped `router.refresh()`, lost filter clicks and pages awaited outside Suspense (R-67); a dialog closed by a drag (R-68); the image check blocking the event loop and lease queries outside the fingerprint (R-57); scenarios that kept running after a failure (R-66).
@@ -55,14 +55,14 @@ Independent read-only reviewers (`autobots-reviewer`) inspected every item and r
 
 ## Verification
 
-At `b6e2e6f`, after the final review-fix commits, with no edit during any run.
+On the final tree, after the review fixes and the Search contrast fix below, with no edit during any run.
 
 | Check | Exit | Observed |
 |---|---|---|
-| `python3.12 scripts/verify.py --profile fast` | 0 | Passed before the last web fix (the server-read marker); `full` repeats every `fast` check after it |
+| `python3.12 scripts/verify.py --profile fast` | 0 | Passed on the review fixes; `full` repeats every `fast` check on the final tree |
 | `python3.12 scripts/verify.py --profile full` | 0 | Passed: every `fast` check (harness 603, service pytest 2971, web unit 451, API client, ruff, mypy, ESLint, Prettier, typecheck, contract drift), the production build, fault and toolchain-scope checks, and the web qualification at 57 of 57, including the server-read states. The first run failed three server-read cases where the composer's new load states sat beside the page's own; the page's read is now marked and the spec reads it |
-| `python3.12 scripts/verify.py --profile db` | 2 | Unavailable: the Docker engine was not reachable, so no disposable stack could start. Not run on the final review-fix commits |
-| `python3.12 scripts/verify.py --profile operations` | not run | Needs Docker, as `db` does |
+| `python3.12 scripts/verify.py --profile db` | 0 | Passed: app_db 667 of 667 and identity 739 of 739, including the visual walk's new Search, tool guide and About surfaces in both themes. The first run, after Docker was started again, found the Search palette's secondary text at 4.34:1 on the highlighted option in light; it now meets 4.5:1 |
+| `python3.12 scripts/verify.py --profile operations` | 0 | Passed: operations 73, backup 51 and upgrade 51 cases on new disposable Compose projects with a scripted model |
 | `python3.12 scripts/verify.py --profile harness` | 0 | Passed, after this record |
 
 Before the final review-fix commits, the tree at `311ab06` passed all four profiles: `db` with identity 739 of 739 and app_db 667 of 667, `operations` with 73, 51 and 51, and `full` with web 57 of 57. R-66's moves were compared with the tree before it (`63f1b99`) by collected test IDs and by every case-ID expression: nothing was lost; the differences are moves, one parametrized test split into two, six new harness tests, and the embedding scan moving from app_db to the harness.
