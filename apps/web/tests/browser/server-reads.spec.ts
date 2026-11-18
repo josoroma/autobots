@@ -67,8 +67,11 @@ function unavailableWords(what: string): string {
   return `${capitalized(what)} can't be read right now. Check that the local services are running, then try again.`;
 }
 
+// The page's own server read. Home's composer shows its own client reads' states beside it.
 const stateOf = (page: Page) =>
-  page.getByRole("main").locator('[data-state="unavailable"]');
+  page
+    .getByRole("main")
+    .locator('[data-read="server"] [data-state="unavailable"]');
 
 /**
  * Opens the page, after checking that its first HTML already holds the state and no server key. The
@@ -132,7 +135,9 @@ test("a page read on the server tells a signed-out visitor to sign in, from its 
         "You are not signed in.",
       );
       await expect(
-        page.getByRole("main").getByRole("link", { name: "Sign in" }),
+        page
+          .locator('[data-account-action="true"]')
+          .getByRole("link", { name: "Sign in" }),
       ).toHaveAttribute("href", "/sign-in");
       await expect(
         page.locator('[data-field="needs-you"], [data-field="recent-runs"]'),

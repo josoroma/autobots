@@ -35,6 +35,10 @@ export const STARTER_GRAPH = {
   ],
 } satisfies WorkflowGraph;
 
+function hasLabels(nodes: readonly LabelNode[]): boolean {
+  return nodes.some((node) => "label" in node);
+}
+
 function withoutNullLabel(node: LabelNode): LabelNode {
   const plain = { ...node };
   if (plain.label === null) delete plain.label;
@@ -54,7 +58,7 @@ export function irNormalized(graph: IrGraph): EditorGraph {
   };
   if (plain.ir_version === null || plain.ir_version === undefined) {
     delete plain.ir_version;
-    if (plain.nodes.some((node) => "label" in node)) {
+    if (hasLabels(plain.nodes)) {
       plain.ir_version = LABELLED_IR_VERSION;
     }
   }
@@ -111,7 +115,10 @@ export function parseGraphText(text: string): EditorGraph | null {
 
 /**
  * The graph with one step's label set, or removed when blank, then normalized under the domain's
- * rule above (PRD-Studio WF-06).
+ * rule above (PRD-Studio WF-06). An edit that leaves a step labelled on a graph declared at IR
+ * version 1 also raises it to 2, as the label fields' hint says a labelled graph is published at 2:
+ * the domain keeps a declared version and refuses labels at 1. Normalizing alone keeps 1, as the
+ * shared fixtures require.
  */
 export function withLabel(
   graph: EditorGraph,
@@ -125,5 +132,9 @@ export function withLabel(
     else next.label = label;
     return next;
   });
-  return irNormalized({ ...graph, nodes });
+  const labelled = irNormalized({ ...graph, nodes });
+  if (labelled.ir_version === 1 && hasLabels(labelled.nodes)) {
+    labelled.ir_version = LABELLED_IR_VERSION;
+  }
+  return labelled;
 }

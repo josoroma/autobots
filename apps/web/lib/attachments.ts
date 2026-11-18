@@ -72,6 +72,91 @@ export function inputPath(name: string, taken: readonly Attached[]): string {
 }
 
 /**
+ * A chosen file after the checks that need no kept files: read, with its text; refused for its type
+ * or size; or past `room`, so never read.
+ */
+export type CheckedFile =
+  | {
+      kind: "read";
+      name: string;
+      media_type: MediaType;
+      content: string;
+      size: number;
+    }
+  | { kind: "refused"; name: string; error: string }
+  | { kind: "no_room"; name: string };
+
+/**
+ * Each chosen file's type and size checked in order, and the text read of at most `room` files that
+ * pass, so a file refused for its type or size, or past the room, is never read. The count is
+ * checked by `admitChecked`, against the files kept when the choice lands.
+ */
+export async function checkFiles(
+  chosen: readonly ChosenFile[],
+  room: number,
+): Promise<CheckedFile[]> {
+  const checked: CheckedFile[] = [];
+  let read = 0;
+  for (const file of chosen) {
+    const mediaType = mediaTypeOf(file.name);
+    if (mediaType === undefined) {
+      checked.push({
+        kind: "refused",
+        name: file.name,
+        error: `${file.name}: only plain text, markdown, JSON or CSV can be attached.`,
+      });
+    } else if (file.size > MAX_FILE_BYTES) {
+      checked.push({
+        kind: "refused",
+        name: file.name,
+        error: `${file.name}: a file can be at most 1 MiB.`,
+      });
+    } else if (read >= room) {
+      checked.push({ kind: "no_room", name: file.name });
+    } else {
+      read += 1;
+      checked.push({
+        kind: "read",
+        name: file.name,
+        media_type: mediaType,
+        content: await file.text(),
+        size: file.size,
+      });
+    }
+  }
+  return checked;
+}
+
+/**
+ * The kept files, then each checked file in order unless it is past the fifth, of another type or
+ * over 1 MiB, checked in that order. A file left unread for want of room is past the fifth. Pure, so
+ * a choice can land on whatever files are kept by then.
+ */
+export function admitChecked(
+  kept: readonly Attached[],
+  checked: readonly CheckedFile[],
+): FileAdmission {
+  const files = [...kept];
+  const errors: string[] = [];
+  for (const file of checked) {
+    if (files.length >= MAX_FILES || file.kind === "no_room") {
+      errors.push(`${file.name}: only ${MAX_FILES} files can be attached.`);
+    } else if (file.kind === "refused") {
+      errors.push(file.error);
+    } else {
+      files.push({
+        name: file.name,
+        path: inputPath(file.name, files),
+        media_type: file.media_type,
+        content: file.content,
+        size: file.size,
+      });
+    }
+  }
+  return { files, errors };
+}
+
+/**
  * The kept files, then each chosen file in order unless it is past the fifth, of another type or
  * over 1 MiB, checked in that order. Only an attached file's text is read.
  */
@@ -79,29 +164,10 @@ export async function admitFiles(
   kept: readonly Attached[],
   chosen: readonly ChosenFile[],
 ): Promise<FileAdmission> {
-  const files = [...kept];
-  const errors: string[] = [];
-  for (const file of chosen) {
-    const mediaType = mediaTypeOf(file.name);
-    if (files.length >= MAX_FILES) {
-      errors.push(`${file.name}: only ${MAX_FILES} files can be attached.`);
-    } else if (mediaType === undefined) {
-      errors.push(
-        `${file.name}: only plain text, markdown, JSON or CSV can be attached.`,
-      );
-    } else if (file.size > MAX_FILE_BYTES) {
-      errors.push(`${file.name}: a file can be at most 1 MiB.`);
-    } else {
-      files.push({
-        name: file.name,
-        path: inputPath(file.name, files),
-        media_type: mediaType,
-        content: await file.text(),
-        size: file.size,
-      });
-    }
-  }
-  return { files, errors };
+  return admitChecked(
+    kept,
+    await checkFiles(chosen, Math.max(0, MAX_FILES - kept.length)),
+  );
 }
 
 /** A file chip's size in bytes, KB or MB (PRD-Studio HM-02). */

@@ -118,15 +118,19 @@ export function ServerLoadState({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // `data-read="server"` names a page's own server read apart from any client read beside it, such as
+  // the composer's; `contents` keeps the wrapper out of the layout.
   return (
-    <LoadState
-      state={state}
-      what={what}
-      pending={pending}
-      onRetry={() => startTransition(() => router.refresh())}
-      {...(notFound === undefined ? {} : { notFound })}
-      {...(className === undefined ? {} : { className })}
-    />
+    <div data-read="server" className="contents">
+      <LoadState
+        state={state}
+        what={what}
+        pending={pending}
+        onRetry={() => startTransition(() => router.refresh())}
+        {...(notFound === undefined ? {} : { notFound })}
+        {...(className === undefined ? {} : { className })}
+      />
+    </div>
   );
 }
 

@@ -6,9 +6,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  admitChecked,
   admitFiles,
   type Attached,
+  checkFiles,
   type ChosenFile,
+  type FileAdmission,
   fileSize,
   inputPath,
   MAX_FILE_BYTES,
@@ -135,6 +138,72 @@ test("the files already kept stay as they were, ahead of the new ones", async ()
   assert.equal(admitted.files[0], kept[0]);
   assert.equal(admitted.files[1]?.path, "inputs/2-notes.txt");
   assert.equal(kept.length, 1);
+});
+
+// The composer reads each choice's texts first, then lands it on the files kept by then, so a
+// second choice made while the first is read keeps the first one's files (use-attachments.ts).
+test("two choices read at once both keep their files, in the order they land", async () => {
+  const first = await checkFiles([chosen("notes.txt", "one")], MAX_FILES);
+  const second = await checkFiles(
+    [chosen("notes.txt", "two"), chosen("rates.csv", "a,b")],
+    MAX_FILES,
+  );
+  const none: FileAdmission = { files: [], errors: [] };
+  const landed = [second, first].reduce(
+    (current, checked) => admitChecked(current.files, checked),
+    none,
+  );
+  assert.deepEqual(
+    landed.files.map((file) => [file.path, file.content]),
+    [
+      ["inputs/notes.txt", "two"],
+      ["inputs/rates.csv", "a,b"],
+      ["inputs/2-notes.txt", "one"],
+    ],
+  );
+  assert.deepEqual(landed.errors, []);
+});
+
+test("a choice that lands on files kept meanwhile still stops at five", async () => {
+  const checked = await checkFiles(
+    [chosen("a.txt"), chosen("b.txt"), chosen("c.png")],
+    MAX_FILES,
+  );
+  const kept = [1, 2, 3, 4].map((index) => attached(`inputs/${index}.txt`));
+  const admitted = admitChecked(kept, checked);
+  assert.deepEqual(
+    admitted.files.map((file) => file.path),
+    [...kept.map((file) => file.path), "inputs/a.txt"],
+  );
+  assert.deepEqual(admitted.errors, [
+    "b.txt: only 5 files can be attached.",
+    "c.png: only 5 files can be attached.",
+  ]);
+});
+
+test("no more texts are read than there is room for, and an unread file is past the fifth", async () => {
+  let reads = 0;
+  const counted = (name: string): ChosenFile => ({
+    ...chosen(name),
+    text: () => {
+      reads += 1;
+      return Promise.resolve("text");
+    },
+  });
+  const kept = [1, 2, 3, 4].map((index) => attached(`inputs/${index}.txt`));
+  const checked = await checkFiles(
+    [counted("a.txt"), counted("photo.png"), counted("b.txt")],
+    MAX_FILES - kept.length,
+  );
+  assert.equal(reads, 1);
+  assert.deepEqual(
+    checked.map((file) => file.kind),
+    ["read", "refused", "no_room"],
+  );
+  assert.deepEqual(admitChecked(kept, checked).errors, [
+    "photo.png: only 5 files can be attached.",
+    "b.txt: only 5 files can be attached.",
+  ]);
 });
 
 test("an input path keeps safe characters and drops leading dots and dashes", () => {

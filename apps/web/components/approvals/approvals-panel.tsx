@@ -53,6 +53,7 @@ export function ApprovalsPanel() {
     selected,
     current,
     waiting,
+    pending: decision.pending,
     select: setChosen,
     decide: (approval, choice) => void decision.decide(approval, choice),
   });
@@ -117,6 +118,7 @@ export function ApprovalsPanel() {
               approval={current}
               now={read.now}
               waiting={waiting}
+              pending={decision.pending}
               onDecide={(choice) => void decision.decide(current, choice)}
             />
           )}

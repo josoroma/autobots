@@ -43,7 +43,9 @@ import {
 // the scripted worker can finish a run. WCAG 2.1 AA is the pass line, by Decision 0010.
 const OUT = optional("AUTOBOTS_TEST_VISUAL_DIR", "test-results/visual");
 
-// The screens the zoom test loads at each zoom's width.
+// The screens the zoom test loads at each zoom's width, as a zoomed window would. Each is also a
+// surface, whose zoom probe (sidewaysAtZoom) narrows the page after it has laid out at 1280 wide, so
+// the two overlap here and differ only for a page that lays out differently when it loads narrow.
 const ZOOM_PATHS = [
   "/",
   "/runs",
@@ -81,6 +83,7 @@ async function walkTheme(
           surface: surface.name,
           theme,
           out: OUT,
+          dialog: surface.dialog !== undefined,
         });
         walk.results.push(measured);
         expect

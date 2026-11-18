@@ -1,10 +1,18 @@
 /**
  * The files attached to the next run (PRD-Tool-Catalog FI-01), admitted by lib/attachments. Nothing
- * is sent until Run is pressed, and the files go with that one request.
+ * is sent until Run is pressed, and the files go with that one request. Each change lands on the
+ * files kept when it's applied, so two file choices that overlap while their texts are read both
+ * keep their files.
  */
 import { useState } from "react";
 
-import { admitFiles, type Attached } from "@/lib/attachments";
+import {
+  admitChecked,
+  checkFiles,
+  type Attached,
+  type FileAdmission,
+  MAX_FILES,
+} from "@/lib/attachments";
 
 export interface Attachments {
   files: readonly Attached[];
@@ -16,24 +24,27 @@ export interface Attachments {
   clear: () => void;
 }
 
+const NONE: FileAdmission = { files: [], errors: [] };
+
 export function useAttachments(): Attachments {
-  const [files, setFiles] = useState<readonly Attached[]>([]);
-  const [errors, setErrors] = useState<readonly string[]>([]);
+  const [admission, setAdmission] = useState<FileAdmission>(NONE);
 
   async function attach(chosen: FileList | null): Promise<void> {
-    const admitted = await admitFiles(files, Array.from(chosen ?? []));
-    setFiles(admitted.files);
-    setErrors(admitted.errors);
+    // At most MAX_FILES texts are read, which is all one choice can add. The count is checked as
+    // the choice lands.
+    const checked = await checkFiles(Array.from(chosen ?? []), MAX_FILES);
+    setAdmission((current) => admitChecked(current.files, checked));
   }
 
   return {
-    files,
-    errors,
+    files: admission.files,
+    errors: admission.errors,
     attach,
-    remove: (path) => setFiles(files.filter((file) => file.path !== path)),
-    clear: () => {
-      setFiles([]);
-      setErrors([]);
-    },
+    remove: (path) =>
+      setAdmission((current) => ({
+        ...current,
+        files: current.files.filter((file) => file.path !== path),
+      })),
+    clear: () => setAdmission(NONE),
   };
 }

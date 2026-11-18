@@ -7,11 +7,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * What each decision does, and its buttons with their shortcuts (PRD-Studio AP-04). The service
- * makes the decision; these only ask for it.
+ * makes the decision; these only ask for it. Both wait while a decision is in flight, since a press
+ * then would send nothing (Decision 0027 D2).
  */
 export function DecisionBar({
+  pending,
   onDecide,
 }: {
+  pending: boolean;
   onDecide: (decision: Decision) => void;
 }) {
   return (
@@ -32,11 +35,20 @@ export function DecisionBar({
         </span>
       </p>
       <div className="flex flex-wrap items-center gap-2.5">
-        <Button size="lg" onClick={() => onDecide("approve")}>
+        <Button
+          size="lg"
+          disabled={pending}
+          onClick={() => onDecide("approve")}
+        >
           <Check aria-hidden="true" />
           Approve
         </Button>
-        <Button size="lg" variant="outline" onClick={() => onDecide("reject")}>
+        <Button
+          size="lg"
+          variant="outline"
+          disabled={pending}
+          onClick={() => onDecide("reject")}
+        >
           Reject
         </Button>
         <span className="text-muted-foreground ml-auto text-meta">

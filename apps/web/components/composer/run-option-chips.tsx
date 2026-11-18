@@ -1,10 +1,13 @@
 import {
   NO_EXPERT,
+  type OptionsRead,
   type RunOptions,
 } from "@/components/composer/use-run-options";
 import { Select } from "@/components/ui/field";
+import { LoadState } from "@/components/ui/load-state";
 import type { BudgetChoices } from "@/lib/budget";
 import { formatUsd } from "@/lib/format";
+import { worstFailure } from "@/lib/load";
 import { cn } from "@/lib/utils";
 
 // Chips read as one row of compact, labelled native selects (Decision 0021: no box shadows).
@@ -32,8 +35,28 @@ function BudgetOptions({ budget }: { budget: BudgetChoices }) {
 }
 
 /**
+ * Why a chip's list can't be read, on a line of its own under the chips, with Retry for an outage
+ * (PRD-Development-Harness DH-06). Nothing while the read loads or once it's ready, as the chip
+ * offers its default meanwhile. During a Retry the failure stays, and Retry waits.
+ */
+function ReadFailure({ read, what }: { read: OptionsRead; what: string }) {
+  const failure = worstFailure([read.state]);
+  if (failure === null) return null;
+  return (
+    <LoadState
+      state={failure}
+      what={what}
+      onRetry={read.reload}
+      pending={read.pending}
+      className="basis-full"
+    />
+  );
+}
+
+/**
  * The model, Expert and budget chips, and what's left of today's cap (PRD-Studio HM-02, Decision
- * 0022 D11). While a request is held, each stays as it was sent (Decision 0027 D2).
+ * 0022 D11). While a request is held, each stays as it was sent (Decision 0027 D2). A list that
+ * can't be read says why after the chips.
  */
 export function RunOptionChips({
   options,
@@ -119,6 +142,8 @@ export function RunOptionChips({
           {formatUsd(budget.remainingMicroUsd)} left of today&apos;s cap
         </p>
       )}
+      <ReadFailure read={options.reads.models} what="models" />
+      <ReadFailure read={options.reads.experts} what="Experts" />
     </div>
   );
 }

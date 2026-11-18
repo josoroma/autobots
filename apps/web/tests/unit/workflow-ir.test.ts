@@ -67,6 +67,19 @@ test("a label on an unlabelled graph moves it to IR version 2", () => {
   assert.equal("label" in (labelled.nodes[0] ?? {}), false);
 });
 
+test("a label on a graph declared at IR version 1 raises it to 2, which normalizing alone doesn't", () => {
+  const declared = graph(JSON.stringify({ ...STARTER_GRAPH, ir_version: 1 }));
+  const labelled = withLabel(declared, "out", "Answer");
+  assert.equal(labelled.ir_version, 2);
+  assert.equal(labelled.nodes[1]?.label, "Answer");
+  assert.equal(
+    irNormalized({ ...declared, nodes: labelled.nodes }).ir_version,
+    1,
+  );
+  // A blank label on an unlabelled version 1 graph leaves it at 1.
+  assert.equal(withLabel(declared, "out", "  ").ir_version, 1);
+});
+
 test("clearing the last label keeps IR version 2, as the domain's rule does", () => {
   const labelled = withLabel(graph(STARTER), "out", "Answer");
   const cleared = withLabel(labelled, "out", "");

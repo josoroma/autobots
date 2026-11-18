@@ -9,6 +9,7 @@ const first = {
   approvalId: "a",
   truncated: false,
   repeat: false,
+  pending: false,
   now: 1_000,
 };
 const armed: Arm = {
@@ -54,6 +55,26 @@ test("a held key's repeated keydown is ignored, armed or not", () => {
     kind: "ignore",
   });
   assert.deepEqual(press(null, { ...first, repeat: true }), { kind: "ignore" });
+});
+
+test("no press arms or decides while a decision is in flight, and the arm holds until it settles", () => {
+  assert.deepEqual(press(null, { ...first, pending: true }), {
+    kind: "ignore",
+  });
+  assert.deepEqual(press(armed, { ...first, pending: true, now: 1_500 }), {
+    kind: "ignore",
+  });
+  assert.deepEqual(
+    press(null, { ...first, decision: "reject", pending: true }),
+    { kind: "ignore" },
+  );
+  assert.deepEqual(press(armed, { ...first, truncated: true, pending: true }), {
+    kind: "ignore",
+  });
+  assert.deepEqual(press(armed, { ...first, now: 1_500 }), {
+    kind: "decide",
+    decision: "approve",
+  });
 });
 
 test("an arm never carries over to another request", () => {

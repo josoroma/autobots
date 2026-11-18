@@ -1,20 +1,26 @@
 /**
- * Opens one surface and waits until it shows what it's captured for, in the theme it's walked in.
- * A surface that never gets there is reported by name with the reason, rather than ending the walk
- * (TWEB-03).
+ * Opens one surface and waits until it shows what it's captured for, in the theme it's walked in,
+ * with its modal dialog open when it has one. A surface that never gets there is reported by name
+ * with the reason, rather than ending the walk (TWEB-03).
  */
 import { stripVTControlCharacters } from "node:util";
 
 import { expect, type Page, type Request } from "@playwright/test";
 
-import type { Surface, SurfaceIds, Theme } from "./surfaces.ts";
+import type { Surface, SurfaceDialog, SurfaceIds, Theme } from "./surfaces.ts";
 
 const IDLE_TIMEOUT = 60_000;
+
+/** Opens the dialog, unless the path already has, and waits until it shows. */
+async function openDialog(page: Page, dialog: SurfaceDialog): Promise<void> {
+  await dialog.open?.(page);
+  await expect(page.getByRole("dialog", { name: dialog.name })).toBeVisible();
+}
 
 /**
  * Opens `surface` on `page` and waits for it. Returns null once it's ready, or why it never was.
  * A surface with its own arrangement holds or refuses requests on purpose, so only the others
- * must reach network idle.
+ * must reach network idle. A dialog opens after that, once the page can respond to it.
  */
 export async function settle(
   page: Page,
@@ -52,6 +58,7 @@ export async function settle(
           );
         });
     }
+    if (surface.dialog) await openDialog(page, surface.dialog);
     await expect(page.locator("html")).toHaveClass(new RegExp(theme));
     return null;
   } catch (error) {

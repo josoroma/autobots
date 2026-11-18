@@ -20,6 +20,8 @@ export interface ShortcutInputs {
   current: ApprovalView | null;
   /** Only a waiting request can be decided. */
   waiting: boolean;
+  /** A decision is in flight, so no chord arms or decides. */
+  pending: boolean;
   select: (id: string) => void;
   decide: (approval: ApprovalView, decision: Decision) => void;
 }
@@ -54,6 +56,7 @@ export function useApprovalShortcuts({
   selected,
   current,
   waiting,
+  pending,
   select,
   decide,
 }: ShortcutInputs): Shortcuts {
@@ -85,6 +88,7 @@ export function useApprovalShortcuts({
       approvalId: current.id,
       truncated: current.arguments_truncated,
       repeat: event.repeat,
+      pending,
       now: Date.now(),
     });
     if (next.kind === "ignore") return;

@@ -9,6 +9,15 @@ import type { JSHandle, Page } from "@playwright/test";
 /** WCAG 2.1 AA's contrast minimums, the walk's pass line (Decision 0010). */
 export const PASS_LINE = { text: 4.5, largeText: 3, nonText: 3 } as const;
 
+/**
+ * Where a kit reads, as selectors: `root` holds the text and fields it measures, and `controls` the
+ * buttons it hovers.
+ */
+export interface Scope {
+  root: string;
+  controls: string;
+}
+
 /** A color as sRGB channels from 0 to 255 and an alpha from 0 to 1. */
 export type Rgba = [number, number, number, number];
 
@@ -56,15 +65,15 @@ export interface HoverSample {
 }
 
 export interface ContrastKit {
-  /** Each visible, enabled text element against what is behind it. */
+  /** Each visible, enabled text element in the root against what is behind it. */
   text: () => TextSample[];
-  /** Each visible text field and select against what surrounds it. */
+  /** Each visible text field and select in the root against what surrounds it. */
   boundaries: () => Boundary[];
-  /** Controls that don't come from the shared components, which mark theirs with `data-slot`. */
+  /** The root's controls not from the shared components, which mark theirs with `data-slot`. */
   rawControls: () => string[];
   /** The focused element's outline or ring against what surrounds it. */
   focused: () => FocusStop | null;
-  /** The button under the pointer inside main, in its hovered colors. */
+  /** The button under the pointer among the scope's controls, in its hovered colors. */
   hover: () => HoverSample | null;
 }
 
@@ -146,11 +155,18 @@ type Field = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 function createContrastKit({
   colors,
   minimums,
+  scope,
 }: {
   colors: ColorKit;
   minimums: { text: number; largeText: number };
+  scope: Scope;
 }): ContrastKit {
   const { rgba, over, behind, ratio, visible, opacity } = colors;
+  const rootElement = (): Element => {
+    const element = document.querySelector(scope.root);
+    if (element === null) throw new Error(`Nothing matches ${scope.root}`);
+    return element;
+  };
   // A color in a box-shadow, so a ring or an underline drawn as a shadow counts as what is visible.
   const SHADOW_COLORS = /(rgba?|oklch|lab|oklab|color)\([^)]*\)/g;
   const skipped = (element: Element): boolean =>
@@ -166,7 +182,7 @@ function createContrastKit({
   };
   const text = (): TextSample[] => {
     const walker = document.createTreeWalker(
-      document.body,
+      rootElement(),
       NodeFilter.SHOW_TEXT,
     );
     const seen = new Set<Element>();
@@ -224,7 +240,7 @@ function createContrastKit({
   };
   const boundaries = (): Boundary[] =>
     [
-      ...document.querySelectorAll<Field>(
+      ...rootElement().querySelectorAll<Field>(
         "input:not([type=radio]):not([type=checkbox]):not([type=hidden]), select, textarea",
       ),
     ]
@@ -232,7 +248,7 @@ function createContrastKit({
       .map(boundary);
   const rawControls = (): string[] =>
     [
-      ...document.querySelectorAll<Field>(
+      ...rootElement().querySelectorAll<Field>(
         "input:not([type=hidden]), select, textarea",
       ),
     ]
@@ -256,7 +272,9 @@ function createContrastKit({
     };
   };
   const hover = (): HoverSample | null => {
-    const element = [...document.querySelectorAll("main button:hover")].pop();
+    const element = [
+      ...document.querySelectorAll(`${scope.controls} button:hover`),
+    ].pop();
     if (!element) return null;
     const style = getComputedStyle(element);
     const background = behind(element);
@@ -268,13 +286,15 @@ function createContrastKit({
   return { text, boundaries, rawControls, focused, hover };
 }
 
-/** Puts the contrast kit in the page, which keeps it until the page navigates. */
+/** Puts the contrast kit for `scope` in the page, which keeps it until the page navigates. */
 export async function openContrastKit(
   page: Page,
+  scope: Scope,
 ): Promise<JSHandle<ContrastKit>> {
   const colors = await page.evaluateHandle(createColorKit);
   return page.evaluateHandle(createContrastKit, {
     colors,
     minimums: { text: PASS_LINE.text, largeText: PASS_LINE.largeText },
+    scope,
   });
 }

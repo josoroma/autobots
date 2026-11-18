@@ -142,12 +142,12 @@ export async function walkKeyboard(page: Page): Promise<Keyboard> {
   };
 }
 
-/** Disabled controls in main, and which of them have no name a person could hear. */
-export function readDisabled(page: Page): Promise<Disabled> {
-  return page.evaluate(() => {
+/** Disabled controls in `scope`, main by default, and which have no name a person could hear. */
+export function readDisabled(page: Page, scope = "main"): Promise<Disabled> {
+  return page.evaluate((within) => {
     const items = [
       ...document.querySelectorAll<HTMLElement>(
-        'main :disabled, main [aria-disabled="true"]',
+        `${within} :disabled, ${within} [aria-disabled="true"]`,
       ),
     ];
     const name = (item: HTMLElement) =>
@@ -160,7 +160,7 @@ export function readDisabled(page: Page): Promise<Disabled> {
       count: items.length,
       unnamed: items.filter((item) => !name(item)).map((item) => item.tagName),
     };
-  });
+  }, scope);
 }
 
 function readMoving(): { checked: number; moving: string[] } {
@@ -197,26 +197,40 @@ export async function readMotion(page: Page): Promise<Motion> {
   };
 }
 
-/** Main's sections that cast a shadow, by their heading's id or their class. */
-export function readShadowedCards(page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll("main section")]
-      .filter((element) => getComputedStyle(element).boxShadow !== "none")
-      .map(
-        (element) =>
-          element.getAttribute("aria-labelledby") ||
-          element.className.slice(0, 60),
-      ),
+/** Sections in `scope`, main by default, that cast a shadow, by their heading's id or class. */
+export function readShadowedCards(
+  page: Page,
+  scope = "main",
+): Promise<string[]> {
+  return page.evaluate(
+    (within) =>
+      [...document.querySelectorAll(`${within} section`)]
+        .filter((element) => getComputedStyle(element).boxShadow !== "none")
+        .map(
+          (element) =>
+            element.getAttribute("aria-labelledby") ||
+            element.className.slice(0, 60),
+        ),
+    scope,
   );
 }
 
-/** How far the page scrolls sideways at its current viewport, in CSS pixels. */
-export function sidewaysOverflow(page: Page): Promise<number> {
-  return page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth,
-  );
+/**
+ * How far the page scrolls sideways at its current viewport, in CSS pixels, or the element
+ * `within` names, such as a modal dialog, whose top-layer box the page's width doesn't include.
+ */
+export function sidewaysOverflow(
+  page: Page,
+  within: string | null = null,
+): Promise<number> {
+  return page.evaluate((selector) => {
+    const element =
+      selector === null
+        ? document.documentElement
+        : document.querySelector(selector);
+    if (element === null) throw new Error(`Nothing matches ${selector}`);
+    return element.scrollWidth - element.clientWidth;
+  }, within);
 }
 
 /** For each zoom in ZOOM_WIDTHS, sets the viewport that zoom gives, then reads. */
@@ -232,11 +246,12 @@ export async function atEachZoom<T>(
   return results;
 }
 
-/** The page's sideways overflow at each zoom, then the walk's viewport again. */
+/** Sideways overflow at each zoom, of the page or of `within`, then the walk's viewport again. */
 export async function sidewaysAtZoom(
   page: Page,
+  within: string | null = null,
 ): Promise<Record<string, number>> {
-  const results = await atEachZoom(page, () => sidewaysOverflow(page));
+  const results = await atEachZoom(page, () => sidewaysOverflow(page, within));
   await page.setViewportSize(WALK_VIEWPORT);
   return results;
 }

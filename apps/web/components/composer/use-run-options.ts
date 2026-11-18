@@ -1,6 +1,7 @@
 /**
  * The composer's chips (PRD-Studio HM-02): the offered models and the Experts, each read once, and
- * the person's model, Expert and budget choices. A list that can't be read offers only its default.
+ * the person's model, Expert and budget choices. A list that can't be read offers only its default,
+ * and its read is kept so the chips can say why, with Retry (PRD-Development-Harness DH-06).
  */
 import {
   getModels,
@@ -12,10 +13,16 @@ import {
 import { useState } from "react";
 
 import { readOf } from "@/lib/load";
-import { useResource } from "@/lib/use-resource";
+import { useResource, type Resource } from "@/lib/use-resource";
 
 /** The Expert choice for a goal run, which starts no session. */
 export const NO_EXPERT = "";
+
+/** What the chips need of one list's read: how it settled, whether Retry waits, and Retry. */
+export type OptionsRead = Pick<
+  Resource<unknown>,
+  "state" | "pending" | "reload"
+>;
 
 export interface RunOptions {
   /** The models new runs may use, from ModelAvailability.offered. */
@@ -31,6 +38,8 @@ export interface RunOptions {
   /** The budget picked, or null for the server's default. */
   chosenBudget: number | null;
   chooseBudget: (budget: number) => void;
+  /** The models and Experts reads, so a list that can't be read says why beside the chips. */
+  reads: { models: OptionsRead; experts: OptionsRead };
 }
 
 export function useRunOptions(): RunOptions {
@@ -53,5 +62,6 @@ export function useRunOptions(): RunOptions {
     )?.config.role_bindings,
     chosenBudget,
     chooseBudget: setChosenBudget,
+    reads: { models: modelRead, experts: expertRead },
   };
 }

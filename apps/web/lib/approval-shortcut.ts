@@ -2,7 +2,8 @@
  * PRD-Studio AP-04: ⌘↵ or ⌘⌫ (Ctrl on other systems), pressed twice within 2 s, decides the selected
  * request. WTAP-02: a held key's repeated keydown is not a second press, an Alt chord is not a
  * shortcut, and an arm belongs to one request, so a reload that changes the selection can't carry
- * it to another.
+ * it to another. While a decision is in flight no press arms or decides, since the write it asked
+ * for would send nothing until the first settles (Decision 0027 D2).
  */
 export type Decision = "approve" | "reject";
 
@@ -43,10 +44,12 @@ export function press(
     approvalId: string;
     truncated: boolean;
     repeat: boolean;
+    /** A decision is in flight. */
+    pending: boolean;
     now: number;
   },
 ): Press {
-  if (input.repeat) return { kind: "ignore" };
+  if (input.repeat || input.pending) return { kind: "ignore" };
   if (input.decision === "approve" && input.truncated) {
     return { kind: "too_large" };
   }

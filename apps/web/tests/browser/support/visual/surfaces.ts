@@ -1,7 +1,7 @@
 /**
- * The screens the visual walk captures in both themes, and the DS-03 names it doesn't capture,
- * each with its reason (US-11.11, TWEB-03, TWEB-09). Every page route under app/ is a surface here
- * or listed in ABSENT_ROUTES, which the walk checks.
+ * The screens and modal dialogs the visual walk captures in both themes, and DS-03's names with
+ * where each is captured or why it isn't (US-11.11, TWEB-03, TWEB-09). Every page route under app/
+ * is a surface here or listed in ABSENT_ROUTES, which the walk checks.
  */
 import { expect, type Page } from "@playwright/test";
 
@@ -10,6 +10,14 @@ export type Theme = (typeof THEMES)[number];
 
 /** Who the surface is opened as: no one, workspace A's owner, or an owner with no provider key. */
 export type SurfaceContext = "signed-out" | "owner" | "no-key";
+
+/** A modal dialog a surface captures open, which makes the rest of the page inert. */
+export interface SurfaceDialog {
+  /** Its accessible name, which the walk waits to see. */
+  name: string;
+  /** Opens it once the page has settled. Absent when the path opens it. */
+  open?: (page: Page) => Promise<unknown>;
+}
 
 /** What arrangeSurfaces made for the surfaces to show. */
 export interface SurfaceIds {
@@ -29,14 +37,16 @@ export interface Surface {
   arrange?: (page: Page) => Promise<unknown>;
   /** Resolves once the page shows what it's captured for. */
   ready: (page: Page) => Promise<void>;
+  /** Set when the surface is a modal dialog, which the walk measures inside (measure.ts). */
+  dialog?: SurfaceDialog;
 }
 
-// DS-03's names that this walk doesn't capture, each with its reason, written into results.json.
+// DS-03's names, each with where this walk captures it or why not, written into results.json.
 export const ABSENT = {
   onboarding:
     "No separate flow. Key setup on Models is what a new owner meets, and it's captured as key-setup.",
   "dialogs and portals":
-    "Not walked. The Tools page's guide (Decision 0026 G2), Search and About are native modal dialogs, which make main inert, and this walk's keyboard, focus and hover probes read main. tools.spec.ts scans the guide with axe in both themes, appearance.spec.ts checks About's surface in both themes, and search.spec.ts checks Search by keyboard. No portals; selects are native.",
+    "Search, the Tools page's guide (Decision 0026 G2) and About are native modal dialogs, captured open as search, tool-guide and about, and measured inside the dialog. The keyboard walk reads main, which a modal makes inert, so it skips them; search.spec.ts, tools.spec.ts and appearance.spec.ts drive each one by keyboard. No portals; selects are native.",
   menus: "None apart from native selects, whose open lists the OS draws.",
   notifications:
     "No toast or notification surface. Results are inline status text, measured where they appear. Browser notifications are drawn by the OS, and their setting is captured as settings-notifications.",
@@ -264,5 +274,40 @@ export const SURFACES: readonly Surface[] = [
     context: "owner",
     path: () => "/settings/keys-and-vars",
     ready: showsSome("[data-item]"),
+  },
+  // The modal dialogs, each open (DS-03, TWEB-09). Search is typed into, so its results and the
+  // highlighted one are measured too; arrangeSurfaces names an Expert and a workflow "Visual".
+  {
+    name: "search",
+    context: "owner",
+    path: () => "/runs",
+    ready: heading("Runs"),
+    dialog: {
+      name: "Search",
+      open: async (page) => {
+        await page.locator('[data-field="search-button"]').click();
+        const palette = page.getByRole("dialog", { name: "Search" });
+        await palette.getByRole("combobox").fill("Visual");
+        await expect(palette.getByRole("option").first()).toBeVisible();
+      },
+    },
+  },
+  {
+    name: "tool-guide",
+    context: "owner",
+    path: () => "/tools?tool=calculate",
+    ready: shows('dialog[open] [data-guide="what"]'),
+    dialog: { name: "Calculate" },
+  },
+  {
+    name: "about",
+    context: "owner",
+    path: () => "/",
+    ready: heading("New goal"),
+    dialog: {
+      name: "About local services",
+      open: (page) =>
+        page.getByRole("button", { name: "About local services" }).click(),
+    },
   },
 ];

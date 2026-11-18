@@ -34,17 +34,18 @@ const CHECKS: readonly (readonly [string, (item: Measured) => boolean])[] = [
   ],
   ["axe violation", (item) => item.axe_violations.length > 0],
   ["raw control", (item) => item.raw_controls.length > 0],
-  ["no tab stop", (item) => item.keyboard.stops === 0],
-  ["keyboard walk cut short", (item) => item.keyboard.truncated],
+  // A dialog surface has no keyboard walk (measure.ts), so these find nothing on it.
+  ["no tab stop", (item) => item.keyboard?.stops === 0],
+  ["keyboard walk cut short", (item) => item.keyboard?.truncated === true],
   [
     "control unreached in main",
-    (item) => item.keyboard.unreached_in_main.length > 0,
+    (item) => (item.keyboard?.unreached_in_main.length ?? 0) > 0,
   ],
   [
     "focus moves up the page",
-    (item) => item.keyboard.upward_in_main.length > 0,
+    (item) => (item.keyboard?.upward_in_main.length ?? 0) > 0,
   ],
-  ["positive tabindex", (item) => item.keyboard.positive_tabindex > 0],
+  ["positive tabindex", (item) => (item.keyboard?.positive_tabindex ?? 0) > 0],
   ["unnamed disabled control", (item) => item.disabled.unnamed.length > 0],
   [
     "moves under reduced motion",

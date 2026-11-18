@@ -132,7 +132,7 @@ export default async function HomePage() {
           <div className={LOWER_ITEM}>
             <AccountState read={read} />
           </div>
-          <div className={LOWER_ACTION}>
+          <div data-account-action="true" className={LOWER_ACTION}>
             <AccountAction read={read} />
           </div>
         </section>

@@ -24,11 +24,15 @@ const QUERIES: Readonly<Record<Tab, ListApprovalsQuery>> = {
 const LOADING = { kind: "loading" } as const;
 
 export interface ApprovalListRead {
-  /** The tab's list, or null while it loads or once its read has failed. */
+  /**
+   * The tab's list while its newest read is ready. Null while it loads, while a Retry after a
+   * failure is pending and once its read has failed, so a failed list never returns with live
+   * buttons.
+   */
   list: ApprovalList | null;
   /** The newest counts, from either tab, since they're the same for both; null before any. */
   counts: ApprovalCounts | null;
-  /** What shows while there's no list: loading, or why the read failed. */
+  /** What shows while there's no list: loading, also during a Retry, or why the read failed. */
   state: ResourceState<unknown>;
   pending: boolean;
   /** Epoch milliseconds that expiries are read against. */
@@ -51,7 +55,7 @@ export function useApprovalList(tab: Tab): ApprovalListRead {
   const failed = !read.pending && read.state.kind !== "ready";
   const ready = read.state.kind === "ready" ? read.state.value : null;
   return {
-    list: failed ? null : read.value,
+    list: read.state.kind === "ready" ? read.value : null,
     counts: (read.value ?? ready)?.counts ?? null,
     state: failed ? read.state : LOADING,
     pending: read.pending,

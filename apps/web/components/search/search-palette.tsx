@@ -123,7 +123,8 @@ export function SearchPalette() {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Search runs, Experts, workflows and tools"
-            className="placeholder:text-muted-foreground h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-lead dark:bg-transparent"
+            // Decision 0023 E1: the field keeps the shared control border, so its boundary meets DS-03 in both themes.
+            className="placeholder:text-muted-foreground h-auto min-w-0 flex-1 bg-transparent px-2.5 py-1 text-lead dark:bg-transparent"
           />
         </div>
         <SearchResults

@@ -20,11 +20,14 @@ export function ApprovalDetail({
   approval,
   now,
   waiting,
+  pending,
   onDecide,
 }: {
   approval: ApprovalView;
   now: number;
   waiting: boolean;
+  /** A decision is in flight, so the decision bar waits. */
+  pending: boolean;
   onDecide: (decision: Decision) => void;
 }) {
   return (
@@ -58,7 +61,7 @@ export function ApprovalDetail({
           {TOO_LARGE}
         </p>
       ) : null}
-      {waiting ? <DecisionBar onDecide={onDecide} /> : null}
+      {waiting ? <DecisionBar pending={pending} onDecide={onDecide} /> : null}
     </Card>
   );
 }
