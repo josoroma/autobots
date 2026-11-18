@@ -8,7 +8,7 @@ paths:
 
 # OpenRouter application inference
 
-The [provider PRD](../../PRD-Model-Providers.md) owns IDs, credentials, routing and budgets. Read `autobots-model-gateway` for changes here.
+The [provider PRD](../../docs/PRD/PRD-Model-Providers.md) owns IDs, credentials, routing and budgets. Read `autobots-model-gateway` for changes here.
 
 - Exactly three approved profiles, by Decision 0019; all roles initially Terra, except that `researcher` defaults to Sol once Sol is offered. DeepSeek isn't offered for new runs until qualified, by Decision 0013, nor Sol until its route is qualified. No alternate provider, local model, hidden model default or fallback.
 - Freeze canonical/wire identities and role policy at admission; changed routes create linked new runs. Late-resolve credential references per attempt without serializing secrets/clients.

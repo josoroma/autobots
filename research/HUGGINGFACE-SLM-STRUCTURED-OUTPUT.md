@@ -1,6 +1,6 @@
 # Hugging Face local models for tools, structured results, and AutoGPT-style agents
 
-> **Historical research — deployment recommendation superseded.** The current app runs locally on this Mac with local Supabase/Docker and **OpenRouter-only inference**. Local model candidates and proposed qualification steps in this report are not active app requirements. See the [current deployment contract](../PRD-Local-Mac-Deployment.md) and [provider contract](../PRD-Model-Providers.md). Recorded observations remain unchanged.
+> **Historical research — deployment recommendation superseded.** The current app runs locally on this Mac with local Supabase/Docker and **OpenRouter-only inference**. Local model candidates and proposed qualification steps in this report are not active app requirements. See the [current deployment contract](../docs/PRD/PRD-Local-Mac-Deployment.md) and [provider contract](../docs/PRD/PRD-Model-Providers.md). Recorded observations remain unchanged.
 
 Research date: **2026-11-04**. Target: **Apple M3 Pro, 36 GiB unified memory**. This is source-based evaluation and a qualification plan. No candidate weights were downloaded or run for this report, and no runtime packages were installed. The only local model results remain the [Bonsai HTTP probe](local-model-probe.json).
 
@@ -214,7 +214,7 @@ Promote a candidate only when it passes correctness gates and improves an explic
 - [Official Qwen 3.8 catalog snapshot](qwen38-official-catalog.json): records which official model IDs were discoverable on this research date.
 - [PocketAI feature-suite copy](qwen38-publisher-4k-feature-suite.json) and [release-manifest copy](qwen38-publisher-release-manifest.json): **publisher measurements**, not local test results. Their source is revision `dcc3732f8c93ccf5580bf7a55e4ae639a40f194c`. The release manifest retains a `packaged-not-published` status despite publicly retrievable files; use it as provenance, not a deployment certification.
 - [Actual Bonsai probe](local-model-probe.json) and [probe source](probe_local_model.py): the local behavioral evidence.
-- [Architecture comparison](../PRD-Comparison-Recommendation.md): the application/runtime decision remains separate from this model shortlist.
+- [Architecture comparison](../docs/PRD/PRD-Comparison-Recommendation.md): the application/runtime decision remains separate from this model shortlist.
 
 Key pinned revisions:
 

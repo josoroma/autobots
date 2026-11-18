@@ -14,7 +14,7 @@ paths:
 
 # Mac-local operations
 
-The [local deployment PRD](../../PRD-Local-Mac-Deployment.md) owns topology. Use `autobots-docker-local` for configuration/recovery changes.
+The [local deployment PRD](../../docs/PRD/PRD-Local-Mac-Deployment.md) owns topology. Use `autobots-docker-local` for configuration/recovery changes.
 
 - Native Next.js/Python; local Docker Supabase/tools. Publish loopback only. Supabase gateway hosts authenticated Studio; expose no raw Studio port.
 - Native direct DB traffic uses the recorded host port, `55322` on the install, to `db:5432`, not pooler routing. Check merged ports so upstream wildcard bindings do not survive.

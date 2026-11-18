@@ -1,6 +1,6 @@
 ## Why
 
-US-15.20 implements [PRD-Studio SE-03](../../../PRD-Studio.md#settings), [DS-02 as amended](../../../PRD-Design-System.md#ds-02--dark-is-the-default) and [Decision 0022 D2](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), with DS-04 and DS-05. Appearance offers only Light and Dark. A person can't follow the OS, read documents in a non-serif face, tighten spacing or force reduced motion.
+US-15.20 implements [PRD-Studio SE-03](../../../../docs/PRD/PRD-Studio.md#settings), [DS-02 as amended](../../../../docs/PRD/PRD-Design-System.md#ds-02--dark-is-the-default) and [Decision 0022 D2](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), with DS-04 and DS-05. Appearance offers only Light and Dark. A person can't follow the OS, read documents in a non-serif face, tighten spacing or force reduced motion.
 
 ## What Changes
 

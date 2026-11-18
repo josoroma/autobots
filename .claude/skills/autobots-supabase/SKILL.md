@@ -5,7 +5,7 @@ description: Author or review local Supabase migrations, RLS/grants, determinist
 
 # Local database and storage changes
 
-Read `.claude/autobots.json`, the mapped contract/deployment and [DH-07](../../../PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality). Inspect migration history and affected consumers before editing.
+Read `.claude/autobots.json`, the mapped contract/deployment and [DH-07](../../../docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality). Inspect migration history and affected consumers before editing.
 
 - `supabase/migrations/<timestamp>_<description>.sql` is the application schema history. Never edit an applied migration or add competing ORM migration ownership. Document transaction/lock/backfill/forward-recovery behavior; coordinate vendor checkpoint upgrades separately.
 - Keep public domain tables under RLS. `app_private` credentials/ledgers and `agent_runtime` checkpoint/store remain private direct-SQL schemas excluded from PostgREST/Realtime/browser roles. Migration and runtime roles differ.

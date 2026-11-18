@@ -27,7 +27,7 @@ These are concept screens with fictional sample data (Tallyboard and Plainview a
 
 ## Relation to the design contract
 
-The screens consume [luma.css](../../../design/luma.css) unchanged. [quiet.css](source/quiet.css) only adds typography, radius steps derived from `--radius`, and semantic aliases: success is Luma's `--chart-3` (light) / `--chart-2` (dark), danger is `--destructive`, and attention is an added amber the palette doesn't define. Two choices go beyond what [PRD-Design-System.md](../../../../PRD-Design-System.md) states today, so they're proposals, not adopted requirements:
+The screens consume [luma.css](../../../design/luma.css) unchanged. [quiet.css](source/quiet.css) only adds typography, radius steps derived from `--radius`, and semantic aliases: success is Luma's `--chart-3` (light) / `--chart-2` (dark), danger is `--destructive`, and attention is an added amber the palette doesn't define. Two choices go beyond what [PRD-Design-System.md](../../../PRD/PRD-Design-System.md) states today, so they're proposals, not adopted requirements:
 
 1. A serif display face for headings and documents.
 2. The amber attention color for pending approvals and drafts.

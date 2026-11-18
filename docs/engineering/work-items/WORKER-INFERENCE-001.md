@@ -9,7 +9,7 @@ Evidence: [US-11.12's manifest](../evidence/US-11.12/gate-0.json), `manual.worke
 
 DH-W01.
 
-- **Source:** no `SPECS.md` story owns this, and the requesting session asked for the user to confirm it belongs in scope. MP-01, MP-02, MP-06, MP-07 and MP-08 in [PRD-Model-Providers.md](../../../PRD-Model-Providers.md). Live use stays with US-3.4.
+- **Source:** no `SPECS.md` story owns this, and the requesting session asked for the user to confirm it belongs in scope. MP-01, MP-02, MP-06, MP-07 and MP-08 in [PRD-Model-Providers.md](../../PRD/PRD-Model-Providers.md). Live use stays with US-3.4.
 - **Intended behavior and invariants:** `serve` can claim jobs through `process_next` with a real OpenRouter client from `adapters/models/factory.py`. Each job's route comes from its run's frozen `policy_snapshot`. The key resolves through `resolve_for_attempt` inside each attempt, and a missing key pauses the run. No paid call or real credential is used here.
 - **Affected layers, contracts and states:** the worker entry point, the goal loop's claim path, the attempt's failure classes, catalog parsing and provider settings. No migration or public contract changes. Pause reasons `credentials_required`, `credential_unavailable`, `model_unavailable` and `network_before_acceptance` are new values of the existing stop reason.
 - **Migration and operational impact:** none by default. `AUTOBOTS_WORKER_INFERENCE=enabled` turns it on, and that spends money once a key exists.

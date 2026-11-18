@@ -1,6 +1,6 @@
 ## Why
 
-US-15.5, [PRD-Studio SH-03 and AP-01 to AP-04](../../../PRD-Studio.md#approvals) and [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The approvals screen lists only pending requests, as separate cards. It has no history, counts, task link, request size, alternative views, keyboard path or sidebar badge.
+US-15.5, [PRD-Studio SH-03 and AP-01 to AP-04](../../../../docs/PRD/PRD-Studio.md#approvals) and [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The approvals screen lists only pending requests, as separate cards. It has no history, counts, task link, request size, alternative views, keyboard path or sidebar badge.
 
 ## What Changes
 

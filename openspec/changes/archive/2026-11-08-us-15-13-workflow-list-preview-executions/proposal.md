@@ -1,6 +1,6 @@
 ## Why
 
-US-15.13, [PRD-Studio WF-01 and WF-03 to WF-05](../../../PRD-Studio.md#workflows) and [Decision 0022 D11](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Workflows lists a name, version, node count and hash. It shows nothing of what a workflow does, how it runs, what its executions cost, or how much an execution may spend.
+US-15.13, [PRD-Studio WF-01 and WF-03 to WF-05](../../../../docs/PRD/PRD-Studio.md#workflows) and [Decision 0022 D11](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Workflows lists a name, version, node count and hash. It shows nothing of what a workflow does, how it runs, what its executions cost, or how much an execution may spend.
 
 ## What Changes
 

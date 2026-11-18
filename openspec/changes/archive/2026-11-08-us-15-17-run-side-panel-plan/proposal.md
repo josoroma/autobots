@@ -1,6 +1,6 @@
 ## Why
 
-US-15.17, [PRD-Studio RN-04 and RN-05](../../../PRD-Studio.md#runs), with [Decision 0017 Q4](../../../docs/engineering/decisions/0017-tool-catalog.md#open-questions), SP-010 and SP-012. To follow and steer a run, a person has to leave Runs today. Plan tasks also have no recorded times, so nothing can say which task is current or how long each took.
+US-15.17, [PRD-Studio RN-04 and RN-05](../../../../docs/PRD/PRD-Studio.md#runs), with [Decision 0017 Q4](../../../docs/engineering/decisions/0017-tool-catalog.md#open-questions), SP-010 and SP-012. To follow and steer a run, a person has to leave Runs today. Plan tasks also have no recorded times, so nothing can say which task is current or how long each took.
 
 ## What Changes
 

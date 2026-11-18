@@ -17,7 +17,7 @@ Review the code for quality and maintainability, then propose how to improve it.
 
 | Dimension | What to look at |
 |---|---|
-| `standards` | Conventions, lint, format and type configuration, and whether the code meets the project's own standards: DH-06 in `PRD-Development-Harness.md` and `.claude/rules/*.md` |
+| `standards` | Conventions, lint, format and type configuration, and whether the code meets the project's own standards: DH-06 in `docs/PRD/PRD-Development-Harness.md` and `.claude/rules/*.md` |
 | `modules` | Boundaries, cohesion, coupling, dependency direction and public surface |
 | `size` | File length, function length, cyclomatic complexity, nesting and parameter counts |
 | `functions` | Single responsibility, level of abstraction, side effects, parameter objects, pure versus effectful code |
@@ -47,7 +47,7 @@ Deliver three things: verified findings for each area, proposed standards that m
 ## Ground rules
 
 1. **Read only.** Write nothing outside the two output folders. Install nothing, start no service, touch no database and call no model. Do not run `scripts/verify.py`. Read its latest reports in `.checks/<profile>/latest.json` instead.
-2. **Project rules bind every recommendation.** Read `AGENTS.md`, the `.claude/rules/*.md` files that apply, DH-03 and DH-06 in `PRD-Development-Harness.md`, and `docs/engineering/option-b-contract.md` where states or recovery are involved. Search `docs/engineering/decisions/` before recommending a change that a decision may govern. Never recommend:
+2. **Project rules bind every recommendation.** Read `AGENTS.md`, the `.claude/rules/*.md` files that apply, DH-03 and DH-06 in `docs/PRD/PRD-Development-Harness.md`, and `docs/engineering/option-b-contract.md` where states or recovery are involved. Search `docs/engineering/decisions/` before recommending a change that a decision may govern. Never recommend:
    - editing an applied migration. Propose a forward migration instead.
    - merging domain, row, DTO, graph-state and UI types, which the rules keep apart. Propose clearer mapping instead.
    - hand-editing generated files: `packages/api-client/src/generated.ts`, `packages/db-types/src/generated.ts` and `contracts/generated/`.

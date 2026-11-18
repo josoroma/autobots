@@ -2,7 +2,7 @@
 
 ## Plan
 
-Source: [US-1.1](../../../SPECS.md#us-11-h0-repository-and-prerequisite-inventory), SP-001 item 1, DH-02 H0.1, SP-020 H0-01, [DH-W01–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Delivered through `/ohmyorch:deliver EPIC-1`, change `us-1-1-h0-repository-prerequisite-inventory`. This is the first story through the loop, so it also qualifies the loop.
+Source: [US-1.1](../../../SPECS.md#us-11-h0-repository-and-prerequisite-inventory), SP-001 item 1, DH-02 H0.1, SP-020 H0-01, [DH-W01–06](../../PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Delivered through `/ohmyorch:deliver EPIC-1`, change `us-1-1-h0-repository-prerequisite-inventory`. This is the first story through the loop, so it also qualifies the loop.
 
 **Intended behavior:** a versioned inventory at `docs/engineering/prerequisite-inventory.md` records actual paths, versions and missing prerequisites without secret values, and evaluates item by item whether version control or a required ignore is absent. Version-control and ignore configuration change only where something is missing.
 

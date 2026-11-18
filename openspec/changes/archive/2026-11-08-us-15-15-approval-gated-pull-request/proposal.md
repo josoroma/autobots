@@ -1,6 +1,6 @@
 ## Why
 
-US-15.15, [PRD-Studio GH-06](../../../PRD-Studio.md#github-tools) and [Decision 0022 D6, D7 and D15](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Code changes can't leave a run except as files. An Expert should be able to propose a pull request that a person approves with its full diff, and that is safe to retry.
+US-15.15, [PRD-Studio GH-06](../../../../docs/PRD/PRD-Studio.md#github-tools) and [Decision 0022 D6, D7 and D15](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Code changes can't leave a run except as files. An Expert should be able to propose a pull request that a person approves with its full diff, and that is safe to retry.
 
 ## What Changes
 

@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="388" viewBox="0 0 960 388" role="img" aria-labelledby="title desc">
+  <title id="title">A run in Autobots</title>
+  <desc id="desc">An illustration. A goal to fix a flaky test and open a pull request, with the Code maintainer Expert, the Terra model and a US$1.50 budget, becomes a run. The run reads the failing test and patches the fix, then stops before opening the pull request. A card asks a person to approve or decline it.</desc>
+  <style>
+    svg { --bg: #ffffff; --surface: #f5f5f5; --fg: #0a0a0a; --mfg: #737373; --line: #e5e5e5; --brand: #155dfc; --brand-deep: #1447e6; --on-brand: #eff6ff; --ok: #009966; --att: #a05000; --att-fg: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #171717; --surface: #262626; --fg: #fafafa; --mfg: #a1a1a1; --line: #333333; --brand: #2b7fff; --brand-deep: #193cb8; --ok: #00bc7d; --att: #ffb900; --att-fg: #1e170e; }
+    }
+    text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .frame { fill: var(--bg); stroke: var(--line); }
+    .card { fill: var(--bg); stroke: var(--line); }
+    .dot { fill: var(--line); }
+    .fg { fill: var(--fg); } .mfg { fill: var(--mfg); }
+    .brand { fill: var(--brand); } .deep { fill: var(--brand-deep); } .on-brand { fill: var(--on-brand); }
+    .ok { fill: var(--ok); } .att { fill: var(--att); } .att-fg { fill: var(--att-fg); }
+    .surface { fill: var(--surface); }
+    .rule { stroke: var(--line); }
+    .att-line { stroke: var(--att); fill: var(--bg); }
+    .ring { fill: none; stroke: var(--mfg); stroke-width: 1.5; }
+    .label { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; }
+    .step { font-size: 13px; font-weight: 600; }
+    .h { font-size: 20px; font-weight: 600; }
+    .t { font-size: 14px; } .s { font-size: 12px; }
+    .wire { fill: none; stroke: var(--mfg); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .glow-stop { stop-color: var(--brand); }
+    @media (prefers-reduced-motion: no-preference) {
+      .wire { animation: flow 1.2s linear infinite; }
+      .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    }
+    @keyframes flow { to { stroke-dashoffset: -18; } }
+    @keyframes pulse { 50% { opacity: 0.3; } }
+  </style>
+  <defs>
+    <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle class="dot" cx="2" cy="2" r="1"/></pattern>
+    <radialGradient id="glow" cx="0.5" cy="0.55" r="0.55">
+      <stop offset="0" class="glow-stop" stop-opacity="0.14"/>
+      <stop offset="1" class="glow-stop" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect class="frame" x="0.5" y="0.5" width="959" height="387" rx="16"/>
+  <rect x="1" y="1" width="958" height="386" rx="16" fill="url(#dots)"/>
+  <rect x="1" y="1" width="958" height="386" rx="16" fill="url(#glow)"/>
+
+  <!-- Step labels -->
+  <circle class="deep" cx="42" cy="36" r="10"/><text class="on-brand" x="42" y="40" font-size="11" font-weight="700" text-anchor="middle">1</text>
+  <text class="fg step" x="58" y="41">You set a goal</text>
+  <circle class="deep" cx="322" cy="36" r="10"/><text class="on-brand" x="322" y="40" font-size="11" font-weight="700" text-anchor="middle">2</text>
+  <text class="fg step" x="338" y="41">It plans and does the work</text>
+  <circle class="deep" cx="698" cy="36" r="10"/><text class="on-brand" x="698" y="40" font-size="11" font-weight="700" text-anchor="middle">3</text>
+  <text class="fg step" x="714" y="41">You approve what matters</text>
+
+  <!-- 1. The goal -->
+  <rect class="card" x="32" y="60" width="240" height="216" rx="14"/>
+  <text class="mfg label" x="52" y="92">GOAL</text>
+  <text class="fg h" x="52" y="124">Fix the flaky test</text>
+  <text class="fg h" x="52" y="148">and open a PR</text>
+  <line class="rule" x1="52" y1="172" x2="252" y2="172"/>
+  <text class="mfg s" x="52" y="198">Expert</text><text class="fg s" x="252" y="198" text-anchor="end">Code maintainer</text>
+  <text class="mfg s" x="52" y="222">Model</text><text class="fg s" x="252" y="222" text-anchor="end">Terra</text>
+  <text class="mfg s" x="52" y="246">Budget</text><text class="fg s" x="252" y="246" text-anchor="end">US$1.50</text>
+
+  <path class="wire" d="M272 168 H312"/>
+
+  <!-- 2. The run -->
+  <rect class="card" x="312" y="60" width="336" height="300" rx="14"/>
+  <circle class="ok pulse" cx="338" cy="89" r="5"/>
+  <text class="fg" x="352" y="94" font-size="15" font-weight="600">Working</text>
+  <text class="mfg mono" x="628" y="94" font-size="11" text-anchor="end">run · live</text>
+
+  <line class="rule" x1="344" y1="141" x2="344" y2="167"/>
+  <line class="rule" x1="344" y1="189" x2="344" y2="215"/>
+  <line class="rule" x1="344" y1="237" x2="344" y2="263"/>
+
+  <circle class="ok" cx="344" cy="130" r="11"/>
+  <path d="M339 130.5 l3.2 3.2 l6.3 -6.6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="fg t" x="366" y="129">Read the failing test</text>
+  <text class="mfg mono" x="366" y="147" font-size="11.5">github_read_file</text>
+
+  <circle class="ok" cx="344" cy="178" r="11"/>
+  <path d="M339 178.5 l3.2 3.2 l6.3 -6.6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="fg t" x="366" y="177">Patch the fix</text>
+  <text class="mfg mono" x="366" y="195" font-size="11.5">patch_code_file</text>
+
+  <circle class="att pulse" cx="344" cy="226" r="11"/>
+  <rect class="att-fg" x="342.5" y="220" width="3" height="7" rx="1.5"/><circle class="att-fg" cx="344" cy="231" r="1.6"/>
+  <text class="fg t" x="366" y="225">Open the pull request</text>
+  <text class="mfg mono" x="366" y="243" font-size="11.5">github_open_pull_request</text>
+
+  <circle class="ring" cx="344" cy="274" r="10"/>
+  <text class="mfg t" x="366" y="273">Record what was verified</text>
+  <text class="mfg mono" x="366" y="291" font-size="11.5">complete_task</text>
+
+  <text class="mfg s" x="336" y="326">Spent US$0.38 of US$1.50</text>
+  <text class="mfg mono" x="624" y="326" font-size="11" text-anchor="end">reserved per call</text>
+  <rect class="surface" x="336" y="336" width="288" height="6" rx="3"/>
+  <rect class="ok" x="336" y="336" width="73" height="6" rx="3"/>
+
+  <path class="wire" d="M648 226 C668 226 668 168 688 168"/>
+
+  <!-- 3. The approval -->
+  <rect class="att-line" x="688" y="60" width="240" height="216" rx="14" stroke-width="1.5"/>
+  <rect class="att" x="708" y="80" width="92" height="22" rx="11"/>
+  <text class="att-fg" x="754" y="95" font-size="11.5" font-weight="600" text-anchor="middle">Needs you</text>
+  <text class="fg" x="708" y="134" font-size="16" font-weight="600">Open pull request</text>
+  <text class="mfg mono" x="708" y="156" font-size="12">fix/flaky-test → main</text>
+  <text class="mfg s" x="708" y="184">Approval binds these exact</text>
+  <text class="mfg s" x="708" y="202">arguments and each file's diff.</text>
+  <rect class="deep" x="708" y="222" width="96" height="34" rx="8"/>
+  <text class="on-brand" x="756" y="244" font-size="13" font-weight="600" text-anchor="middle">Approve</text>
+  <rect class="card" x="816" y="222" width="92" height="34" rx="8"/>
+  <text class="fg" x="862" y="244" font-size="13" font-weight="600" text-anchor="middle">Decline</text>
+</svg>

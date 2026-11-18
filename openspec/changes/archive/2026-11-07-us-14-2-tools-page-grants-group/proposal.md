@@ -1,6 +1,6 @@
 ## Why
 
-US-14.2, [PRD-Tool-Catalog TS-01 to TS-04 and TC-06](../../../PRD-Tool-Catalog.md#tools-screen), Decision 0017 C9 and C10: the catalog from US-14.1 has no screen, and the Expert editor grants from a hard-coded list of seven tools, one at a time.
+US-14.2, [PRD-Tool-Catalog TS-01 to TS-04 and TC-06](../../../../docs/PRD/PRD-Tool-Catalog.md#tools-screen), Decision 0017 C9 and C10: the catalog from US-14.1 has no screen, and the Expert editor grants from a hard-coded list of seven tools, one at a time.
 
 ## What Changes
 

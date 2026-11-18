@@ -348,7 +348,7 @@ export async function sendJson<T>(path: string, options: {
 
 - **Severity** medium · **Dimension** standards · **Effort** M · **Risk** low · **Occurrences** 1
 - **Where:**
-  - [PRD-Development-Harness.md:141](../../../../PRD-Development-Harness.md#L141)
+  - [PRD-Development-Harness.md:141](../../../PRD/PRD-Development-Harness.md#L141)
   - [apps/web/package.json:25-37](../../../../apps/web/package.json#L25): Playwright and axe only
   - [apps/web/lib/bff.ts:15-19](../../../../apps/web/lib/bff.ts#L15): Body limits. No test asserts 413 or request_too_large.
   - [apps/web/lib/workspace-choice.ts:24-32](../../../../apps/web/lib/workspace-choice.ts#L24): currentWorkspace has no unit test.

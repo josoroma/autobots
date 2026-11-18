@@ -1,6 +1,6 @@
 # Qwen3.8 GGUF local qualification results
 
-> **Historical test report — model recommendation superseded.** The final app design uses **OpenRouter-only inference**, with all application services and Supabase/Docker on this Mac. Neither Qwen nor Bonsai is an active app backend. Recommendations below reflect the earlier local-model investigation; actual results and raw evidence remain unchanged. See the [current deployment contract](../PRD-Local-Mac-Deployment.md).
+> **Historical test report — model recommendation superseded.** The final app design uses **OpenRouter-only inference**, with all application services and Supabase/Docker on this Mac. Neither Qwen nor Bonsai is an active app backend. Recommendations below reflect the earlier local-model investigation; actual results and raw evidence remain unchanged. See the [current deployment contract](../docs/PRD/PRD-Local-Mac-Deployment.md).
 
 Tested **2026-11-04** on an **Apple M3 Pro with 36 GiB unified memory**. The result is **13 qualified bounded cases, one unsupported API contract, and one failed task**. The model handled the tested schema, streaming and simple calculator requests, but supplied **38 instead of 42** during a two-step invoice task. Keep this configuration as an **experimental non-MLX structured-output backend**, not the autonomous clone's default. Existing model-role constants remain assigned to Bonsai.
 

@@ -1,6 +1,6 @@
 ## Why
 
-US-15.21 implements [PRD-Studio SE-02 and SE-05 to SE-07](../../../PRD-Studio.md#settings), with [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), PRD 12.1 and SP-014. Settings is one page plus scattered sub-pages. Nothing tells a person when a run waits for them, a member can't see what the workspace keeps, and the shortcuts are undocumented.
+US-15.21 implements [PRD-Studio SE-02 and SE-05 to SE-07](../../../../docs/PRD/PRD-Studio.md#settings), with [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), PRD 12.1 and SP-014. Settings is one page plus scattered sub-pages. Nothing tells a person when a run waits for them, a member can't see what the workspace keeps, and the shortcuts are undocumented.
 
 ## What Changes
 

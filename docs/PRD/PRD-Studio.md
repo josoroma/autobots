@@ -1,13 +1,13 @@
 # PRD addition: Studio product surfaces
 
-**Status:** approved by the owner on 2026-11-07, through [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md).
+**Status:** approved by the owner on 2026-11-07, through [Decision 0022](../engineering/decisions/0022-studio-product-surfaces.md).
 
 **Extends:**
 - [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md): §7.3 (workflows), §9 (tools), §11.3 (events) and §12.1 (screens).
 - [PRD-Tool-Catalog.md](PRD-Tool-Catalog.md).
 - [PRD-Design-System.md](PRD-Design-System.md).
 
-**Derived from:** [the Studio features plan](docs/plan/studio-features.md) and the nine [Studio concepts](docs/imagine/README.md).
+**Derived from:** [the Studio features plan](../plan/studio-features.md) and the nine [Studio concepts](../imagine/README.md).
 
 Every earlier requirement still applies unless Decision 0022 amends it:
 - OpenRouter is the only inference provider.
@@ -136,7 +136,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 ## Tools
 
-**TL-01. Layout.** A group list with counts, a text filter, and the existing provider and availability filters. Selecting a row opens its detail in a side panel, which is a modal dialog since [Decision 0026](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md) G2 (PRD-Tool-Catalog TG-02). The `/tools/{tool_id}` page stays as the deep link.
+**TL-01. Layout.** A group list with counts, a text filter, and the existing provider and availability filters. Selecting a row opens its detail in a side panel, which is a modal dialog since [Decision 0026](../engineering/decisions/0026-cronjob-tool-and-tool-guide.md) G2 (PRD-Tool-Catalog TG-02). The `/tools/{tool_id}` page stays as the deep link.
 
 **TL-02. Granted to.** The detail lists the Experts whose latest version grants the tool, and the published workflows that reach it through their Experts.
 
@@ -144,7 +144,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 ## GitHub tools
 
-All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB_TOKEN`. Both resolve per workspace by [Decision 0025](docs/engineering/decisions/0025-keys-and-vars.md): the value saved at Settings → Keys & vars, then the worker's environment, then `.env`. They apply under the TC and TU requirements, the URL guard and fake-transport tests. No input names a repository.
+All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB_TOKEN`. Both resolve per workspace by [Decision 0025](../engineering/decisions/0025-keys-and-vars.md): the value saved at Settings → Keys & vars, then the worker's environment, then `.env`. They apply under the TC and TU requirements, the URL guard and fake-transport tests. No input names a repository.
 
 **GH-01. `github_list_pull_requests`.** Read only. Inputs: state (`open`, `closed` or `merged`), base branch, a since date, and a limit of up to 100. Outputs: number, title, author login, merged time, labels and URL.
 
@@ -168,7 +168,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 
 ## Seed
 
-**SD-01. Concept Experts and workflows.** A repeatable seed creates six Experts and six workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer and, by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, and Vendor due diligence. A workflow whose tools are unavailable is seeded as a draft.
+**SD-01. Concept Experts and workflows.** A repeatable seed creates six Experts and six workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer and, by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, and Vendor due diligence. A workflow whose tools are unavailable is seeded as a draft.
 
 **SD-02. Seed definitions.** Drafted by the coordinator from the concepts for the owner's review (Decision 0022 D17). Role bindings follow the workspace policy unless named.
 

@@ -6,9 +6,9 @@
 
 This is an engineering judgment about implementation fit, not a measured intelligence advantage. The TypeScript alternative remains credible: select it if the same task and recovery tests demonstrate equal outcomes with materially less maintenance. Both options obey the [provider contract](PRD-Model-Providers.md) and [local Mac deployment contract](PRD-Local-Mac-Deployment.md).
 
-Both interfaces use the same **shadcn Luma theme with dark mode as the default**, governed by [PRD-Design-System.md](PRD-Design-System.md) and the exact [theme tokens](docs/design/luma.css). A saved explicit light/dark choice is applied before paint; OS preference does not override the fresh-visit dark default. The prior warm-neutral/forest-green visual direction is superseded. Theme behavior is a shared product requirement, not an advantage of either execution framework.
+Both interfaces use the same **shadcn Luma theme with dark mode as the default**, governed by [PRD-Design-System.md](PRD-Design-System.md) and the exact [theme tokens](../design/luma.css). A saved explicit light/dark choice is applied before paint; OS preference does not override the fresh-visit dark default. The prior warm-neutral/forest-green visual direction is superseded. Theme behavior is a shared product requirement, not an advantage of either execution framework.
 
-**Implementation entry point:** [SPECS.md](SPECS.md) organizes Option B execution while preserving the normative companion PRDs. Its first task is the [development harness](PRD-Development-Harness.md): H0 foundation followed by H1 activated baseline, before feature code, product migrations or production worker logic. Minimal non-feature scaffolding and disposable qualification fixtures are permitted. The development coding assistant does not become a product inference provider.
+**Implementation entry point:** [SPECS.md](../../SPECS.md) organizes Option B execution while preserving the normative companion PRDs. Its first task is the [development harness](PRD-Development-Harness.md): H0 foundation followed by H1 activated baseline, before feature code, product migrations or production worker logic. Minimal non-feature scaffolding and disposable qualification fixtures are permitted. The development coding assistant does not become a product inference provider.
 
 ## 1. Evidence, scope and product evolution
 
@@ -16,7 +16,7 @@ Read the specification set together:
 
 | Document | Authority |
 |---|---|
-| [SPECS.md](SPECS.md) | Option B execution entry point, work order and completion evidence; the companion PRDs retain their stated authority |
+| [SPECS.md](../../SPECS.md) | Option B execution entry point, work order and completion evidence; the companion PRDs retain their stated authority |
 | [PRD-AutoGPT.md](PRD-AutoGPT.md) | Source reconstruction and AG-01–AG-14 product requirements |
 | [PRD-NextJS.md](PRD-NextJS.md) | Option A: TypeScript implementation |
 | [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) | Option B: Python execution implementation |
@@ -27,7 +27,7 @@ Read the specification set together:
 
 AutoGPT research is pinned to [`13ac38c5b6583bd01b0a6142b0060fc03e102b6e`](https://github.com/Significant-Gravitas/AutoGPT/tree/13ac38c5b6583bd01b0a6142b0060fc03e102b6e). It distinguishes Classic's command loop from current Platform workflows and expert orchestration. It does not establish every historical design decision or undisclosed hosted configuration.
 
-The final deployment decision supersedes earlier local-model and optional-cloud designs. [Bonsai research](research/LOCAL-MODEL-EVIDENCE.md) and the [Qwen experiment](research/QWEN38-GGUF-TEST-RESULTS.md) remain historical evidence, outside active implementation scope. Existing services and downloaded models belonging to other projects remain untouched.
+The final deployment decision supersedes earlier local-model and optional-cloud designs. [Bonsai research](../../research/LOCAL-MODEL-EVIDENCE.md) and the [Qwen experiment](../../research/QWEN38-GGUF-TEST-RESULTS.md) remain historical evidence, outside active implementation scope. Existing services and downloaded models belonging to other projects remain untouched.
 
 The initial product is a personal workbench on this Mac. Autonomous outcomes and inspectable artifacts take precedence over marketplace, billing and connector breadth. All application execution, authentication, records, files and logs stay local; selected inference context necessarily leaves the Mac through OpenRouter. Optional network tools require their own task permissions. There is no hosted application, remote database, external telemetry backend, local inference fallback or offline-inference promise.
 
@@ -96,19 +96,19 @@ Deep Agents backend choices also matter: state-backed files, cross-thread stores
 
 ## 5. Dependency evidence and compatibility
 
-These registry observations are dated research evidence, not an installed or tested lockfile. Preserve exact artifacts, solve the complete dependency graph and test the selected stack. [General snapshot](research/dependency-snapshot.json).
+These registry observations are dated research evidence, not an installed or tested lockfile. Preserve exact artifacts, solve the complete dependency graph and test the selected stack. [General snapshot](../../research/dependency-snapshot.json).
 
 | Area | Observed version / source | Selection implication |
 |---|---|---|
 | UI | Next.js 16.4.5; React 19.3.1 | Shared candidate |
 | AI SDK | `ai` 7.0.162; `@ai-sdk/react` 4.0.166 | A runtime; optional B UI adapter |
 | TypeScript durability | `@ai-sdk/workflow` 2.0.94; `workflow` 5.3.0; `@workflow/world-postgres` 5.1.0 | Local A runtime after recovery qualification |
-| TypeScript OpenRouter | `@openrouter/ai-sdk-provider` 3.1.0 | AI SDK 7 peer; [snapshot](research/openrouter-nextjs-sdk.json) |
+| TypeScript OpenRouter | `@openrouter/ai-sdk-provider` 3.1.0 | AI SDK 7 peer; [snapshot](../../research/openrouter-nextjs-sdk.json) |
 | Python harness | `deepagents` 0.7.32; `langchain` 1.4.8; `langgraph` 1.2.19 | B candidate |
 | Python persistence | `langgraph-checkpoint-postgres` 3.2.0 | Direct local database integration |
-| Python OpenRouter | `langchain-openrouter` 0.2.9; compatible `openrouter` candidate 0.11.46 | Combined core constraints admit 1.7.5; SDK requires Pydantic `<2.13`; [snapshot](research/openrouter-langchain-sdk.json) |
-| Supabase browser/server clients | `@supabase/supabase-js` 2.119.0; `@supabase/ssr` 0.12.7 | JS requires Node >=22; SSR peer accepts `^2.114.0`; [snapshot](research/supabase-nextjs-sdk.json) |
-| Local Supabase distribution | `self-hosted/v0.8.3`, commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e` | Coordinated Compose baseline; resolve image digests and verify ARM64; [snapshot](research/supabase-local-deployment-snapshot.json) |
+| Python OpenRouter | `langchain-openrouter` 0.2.9; compatible `openrouter` candidate 0.11.46 | Combined core constraints admit 1.7.5; SDK requires Pydantic `<2.13`; [snapshot](../../research/openrouter-langchain-sdk.json) |
+| Supabase browser/server clients | `@supabase/supabase-js` 2.119.0; `@supabase/ssr` 0.12.7 | JS requires Node >=22; SSR peer accepts `^2.114.0`; [snapshot](../../research/supabase-nextjs-sdk.json) |
+| Local Supabase distribution | `self-hosted/v0.8.3`, commit `bc27d2661edd09a5d0b8d76ce33da6d4071a756e` | Coordinated Compose baseline; resolve image digests and verify ARM64; [snapshot](../../research/supabase-local-deployment-snapshot.json) |
 
 Do not mix `@workflow/ai`'s inspected AI SDK 6 peer with the selected AI SDK 7 integration. Do not assume an npm `latest` tag means stable: inspected `eve` was `1.0.0-rc.3`, outside mandatory scope. A JavaScript Deep Agents package also exists; Python is a deliberate implementation choice, not a claim that the harness is Python-only.
 
@@ -189,7 +189,7 @@ roles:
 
 Resolve a role by run-specific override, run-wide profile, workspace role override, workspace default, then DeepSeek. Display the effective map and external payload categories before Run. Snapshot canonical/wire identity, role-policy version, catalog revision, limits and credential reference. Children, summaries and evaluators inherit the snapshot. Model changes create a linked new run; existing bindings remain immutable.
 
-Catalog metadata must be no older than five minutes, and the non-batch wire ID must still map to the approved canonical identity. Drift or absence pauses as `model_unavailable`. Public aliases do not guarantee immutable snapshot availability. Requests use OpenRouter Chat Completions with `require_parameters: true` and `allow_fallbacks: false`; no fallback array or hidden inference service. Record the reported upstream provider per attempt. Omit unadvertised Astra sampling parameters. [Catalog evidence](research/openrouter-model-catalog.json), [provider contract](PRD-Model-Providers.md).
+Catalog metadata must be no older than five minutes, and the non-batch wire ID must still map to the approved canonical identity. Drift or absence pauses as `model_unavailable`. Public aliases do not guarantee immutable snapshot availability. Requests use OpenRouter Chat Completions with `require_parameters: true` and `allow_fallbacks: false`; no fallback array or hidden inference service. Record the reported upstream provider per attempt. Omit unadvertised Astra sampling parameters. [Catalog evidence](../../research/openrouter-model-catalog.json), [provider contract](PRD-Model-Providers.md).
 
 Server `OPENROUTER_API_KEY` resolves through shared process/dotenv precedence before an encrypted app credential. Invalid nonempty environment configuration blocks fallback. Missing credentials permit local UI, settings and files but pause **every** model-backed operation as `credentials_required`.
 
@@ -203,7 +203,7 @@ MVP retrieval uses local lexical/full-text search. There is no extra embedding/r
 
 Complete H0 foundation and H1 activated baseline from the [normative harness PRD](PRD-Development-Harness.md). Establish project `.claude` skills, subagents, rules and deterministic hooks, `CLAUDE.md`, shared `AGENTS.md`, and a portable repository verification runner independent of Claude. Enforce standards for Next.js/TypeScript, Python, Docker, Supabase migrations/deterministic seeds, shared contracts/types, state transitions, workers and the model gateway. Hooks call deterministic repository checks; assistant instructions alone cannot certify a change.
 
-Prove the mandatory portable baseline with passing and deliberately failing fixtures in a disposable local project, using explicit test database identity and isolated ports/volumes. Never reset the persistent application database for verification. Missing required checks block Gate 0. An incompatible or unavailable optional Claude adapter may remain explicitly inactive without blocking a passing portable baseline; script fixtures cannot claim actual assistant delivery. Qualify event delivery for any enabled adapter. Only minimal non-feature scaffolding and disposable fixtures needed for H0–H1 precede product work; exact activation follows the normative document. This is a developer-time integration, separate from application agent roles and model defaults. The project-local ingestion and hook-script subset now exists; complete H0/H1 and actual assistant event delivery remain pending as recorded in [CODEBASE.md](CODEBASE.md).
+Prove the mandatory portable baseline with passing and deliberately failing fixtures in a disposable local project, using explicit test database identity and isolated ports/volumes. Never reset the persistent application database for verification. Missing required checks block Gate 0. An incompatible or unavailable optional Claude adapter may remain explicitly inactive without blocking a passing portable baseline; script fixtures cannot claim actual assistant delivery. Qualify event delivery for any enabled adapter. Only minimal non-feature scaffolding and disposable fixtures needed for H0–H1 precede product work; exact activation follows the normative document. This is a developer-time integration, separate from application agent roles and model defaults. The project-local ingestion and hook-script subset now exists; complete H0/H1 and actual assistant event delivery remain pending as recorded in [CODEBASE.md](../../CODEBASE.md).
 
 ### Gate A — Local deployment and provider contracts
 
@@ -237,7 +237,7 @@ Targets are not achieved results. Report uncertainty and failing categories; agg
 
 ## 10. Delivery sequence
 
-Use [SPECS.md](SPECS.md) to execute Option B. Each H0/H1 and product work item requires a proportional **plan → implement → independent review → verify → runbook + evidence** record. Record scope and success criteria, review findings and their disposition, final-state check results, operational guidance and remaining limitations. Exercise applicable runbook procedures in the qualified disposable environment and attach actual evidence. Small changes use short records rather than skipping stages; unchanged operational behavior is recorded explicitly. Review fixes return through the affected checks. The harness contract defines exact evidence and completion requirements; independent review does not depend on a Claude adapter being available.
+Use [SPECS.md](../../SPECS.md) to execute Option B. Each H0/H1 and product work item requires a proportional **plan → implement → independent review → verify → runbook + evidence** record. Record scope and success criteria, review findings and their disposition, final-state check results, operational guidance and remaining limitations. Exercise applicable runbook procedures in the qualified disposable environment and attach actual evidence. Small changes use short records rather than skipping stages; unchanged operational behavior is recorded explicitly. Review fixes return through the affected checks. The harness contract defines exact evidence and completion requirements; independent review does not depend on a Claude adapter being available.
 
 | Stage | Deliverable | Exit condition |
 |---|---|---|

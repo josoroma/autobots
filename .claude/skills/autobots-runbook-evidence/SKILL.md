@@ -5,7 +5,7 @@ description: Maintain and exercise an Autobots work item's reproducible runbook 
 
 # Make the result reproducible
 
-Read `.claude/autobots.json`, the mapped contract, work record and relevant harness/deployment procedure. Use [DH-W04–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract) as the completion contract.
+Read `.claude/autobots.json`, the mapped contract, work record and relevant harness/deployment procedure. Use [DH-W04–06](../../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract) as the completion contract.
 
 Create or update `docs/engineering/runbooks/<runbook-id>.md` with prerequisites, exact target identity, real commands, expected checkpoints, recovery and cleanup. Inspect scripts before documenting their invocation. If operating behavior is unchanged, say so and link the existing verified procedure plus relevant regression command; do not invent an operational change.
 

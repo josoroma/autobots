@@ -2134,7 +2134,7 @@ This is the execution backlog for the approved Option B: native Next.js plus nat
 
 The [explicit adaptation decision](docs/engineering/decisions/0001-ohmyorch-adaptation.md#project-decision) authorizes the project-local OhMyOrch ingestion format; it does not authorize a product build or broaden the runtime/provider boundary.
 
-Sources retain their authority: the [preserved engineering contract](docs/engineering/option-b-contract.md) owns its additional serialized-state and implementation decisions; the [Option B PRD](PRD-LangChain-Deep-Agents.md), [harness PRD](PRD-Development-Harness.md), [provider PRD](PRD-Model-Providers.md), [deployment PRD](PRD-Local-Mac-Deployment.md) and [design-system PRD](PRD-Design-System.md) own their detailed contracts. [AutoGPT research](PRD-AutoGPT.md) describes upstream behavior; it does not automatically authorize new clone features. [The comparison](PRD-Comparison-Recommendation.md) records the architecture rationale. Conflicts must remain visible and be resolved in their owning requirements, not silently in code.
+Sources retain their authority: the [preserved engineering contract](docs/engineering/option-b-contract.md) owns its additional serialized-state and implementation decisions; the [Option B PRD](docs/PRD/PRD-LangChain-Deep-Agents.md), [harness PRD](docs/PRD/PRD-Development-Harness.md), [provider PRD](docs/PRD/PRD-Model-Providers.md), [deployment PRD](docs/PRD/PRD-Local-Mac-Deployment.md) and [design-system PRD](docs/PRD/PRD-Design-System.md) own their detailed contracts. [AutoGPT research](docs/PRD/PRD-AutoGPT.md) describes upstream behavior; it does not automatically authorize new clone features. [The comparison](docs/PRD/PRD-Comparison-Recommendation.md) records the architecture rationale. Conflicts must remain visible and be resolved in their owning requirements, not silently in code.
 
 Story IDs are the execution identifiers. The H0/H1/B0–B7 labels retain the preserved milestone sequence; older numbered ranges are sequencing slots, not evidence that work is complete. Every story inherits DH-W01–DH-W06: proportional plan, implementation, independent review, verification and exercised runbook/evidence. No story is DONE merely because its specification or a development asset exists. Initial dependent stories remain BLOCKED until prerequisites are evidenced; READY means specified and actionable, not implemented.
 
@@ -2178,7 +2178,7 @@ Story IDs are the execution identifiers. The H0/H1/B0–B7 labels retain the pre
 - No public marketplace, billing product, complete AutoGPT integration parity, unrestricted code execution or unattended self-modification in this scope.
 - No claim that an optional Claude adapter is active, model capabilities are qualified, or the product is implemented because documentation/assets exist.
 
-Sources: [scope](PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices), SP-004–SP-008, and the normative provider/deployment boundaries.
+Sources: [scope](docs/PRD/PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices), SP-004–SP-008, and the normative provider/deployment boundaries.
 
 ## Actors
 
@@ -2190,7 +2190,7 @@ Sources: [scope](PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices), SP-004
 | Operator | Maintain the local stack, credentials, backups, recovery and qualification |
 | Developer | Implement bounded stories under the portable standards and evidence contract |
 
-Source: [Option B users](PRD-LangChain-Deep-Agents.md#21-primary-users), SP-003 and DH-W01–06.
+Source: [Option B users](docs/PRD/PRD-LangChain-Deep-Agents.md#21-primary-users), SP-003 and DH-W01–06.
 
 ## Global Business Rules
 
@@ -2204,7 +2204,7 @@ Source: [Option B users](PRD-LangChain-Deep-Agents.md#21-primary-users), SP-003 
 8. Every story follows the proportional DH-W01–06 delivery cycle. Changes invalidate affected evidence; templates/skips and inactive optional adapters are not passing results. Test resets and runbook exercises target qualified disposable environments, never persistent workbench data. Sources: SP-001–SP-003/SP-015/SP-021.
 9. Optional development assistant integration cannot add another inference provider, paid hook or remote reviewer requirement. The portable baseline must operate without Claude or model credentials; actual assistant event delivery is qualified only for an enabled adapter. Sources: SP-002 and DH-01/02/05.
 10. Review and promote memory/skills with scope, provenance, regression evidence and rollback. A saved key or generated recollection never authorizes unattended work or wider permissions. Source: SP-016.
-11. Use shadcn Luma with the exact user-supplied [semantic tokens](docs/design/luma.css). Dark is the fresh-visit default regardless of OS preference; explicit light/dark selection persists locally and applies before paint. All delivered UI uses this design contract, including keyless setup, states and workflow surfaces. Earlier warm-neutral/forest-green concepts are superseded. Sources: SP-014, LC-34 and [DS-01–DS-05](PRD-Design-System.md).
+11. Use shadcn Luma with the exact user-supplied [semantic tokens](docs/design/luma.css). Dark is the fresh-visit default regardless of OS preference; explicit light/dark selection persists locally and applies before paint. All delivered UI uses this design contract, including keyless setup, states and workflow surfaces. Earlier warm-neutral/forest-green concepts are superseded. Sources: SP-014, LC-34 and [DS-01–DS-05](docs/PRD/PRD-Design-System.md).
 
 ## Non-Functional Requirements
 
@@ -2213,7 +2213,7 @@ Source: [Option B users](PRD-LangChain-Deep-Agents.md#21-primary-users), SP-003 
 - Target at least 98 percent first-pass valid calls across 100 protocol cases and at least 85 percent task success on 40 held-out tasks repeated three times; report failing categories and keep task correctness separate from valid protocol output. Source: Option B §6.4 and SP-019/SP-021.
 - Keep secrets out of browser persistence, prompts, checkpoints, raw graph streams, logs and evidence. Use scoped Auth/RLS/Storage and privileged-server separation; no hosted tracing. Sources: SP-005/SP-007/SP-009/SP-011.
 - Use reproducible locks, generated contracts, deterministic tests and local redacted evidence. Demonstrate restart, complete isolated restore and checkpoint-compatible upgrades. Sources: SP-015/SP-017/SP-018/SP-021.
-- Verify shared theme tokens, first-paint/hydration behavior, keyboard/focus operation, contrast and state/diff meaning in both supported modes; capture implemented-screen evidence. Generated mockups do not establish browser or accessibility acceptance. Sources: SP-014, LC-34 and [DS-01–DS-05](PRD-Design-System.md).
+- Verify shared theme tokens, first-paint/hydration behavior, keyboard/focus operation, contrast and state/diff meaning in both supported modes; capture implemented-screen evidence. Generated mockups do not establish browser or accessibility acceptance. Sources: SP-014, LC-34 and [DS-01–DS-05](docs/PRD/PRD-Design-System.md).
 
 # EPIC-1: Development foundation and Gate 0
 
@@ -2230,7 +2230,7 @@ So that existing work and missing prerequisites are visible before changes.
 
 Source:
 - [SP-001](docs/engineering/option-b-contract.md#sp-001--h0-establish-the-development-contract)
-- [H0.1](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [H0.1](docs/PRD/PRD-Development-Harness.md#dh-02-first-implementation-tasks)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H0-01.
 
 Codebase Context:
@@ -2272,8 +2272,8 @@ So that development guidance is reusable without becoming a product model runtim
 Source:
 - [SP-001](docs/engineering/option-b-contract.md#sp-001--h0-establish-the-development-contract)
 - [SP-017](docs/engineering/option-b-contract.md#sp-017--language-and-contract-quality)
-- [DH-03 repository structure](PRD-Development-Harness.md#dh-03-required-repository-structure)
-- [DH-04 skills and agents](PRD-Development-Harness.md#dh-04-skills-and-specialist-agents)
+- [DH-03 repository structure](docs/PRD/PRD-Development-Harness.md#dh-03-required-repository-structure)
+- [DH-04 skills and agents](docs/PRD/PRD-Development-Harness.md#dh-04-skills-and-specialist-agents)
 - [Decision 0001: explicit ingestion request](docs/engineering/decisions/0001-ohmyorch-adaptation.md#requested-behavior)
 - [Decision 0001: local adaptation boundaries](docs/engineering/decisions/0001-ohmyorch-adaptation.md#project-decision)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H0-02.
@@ -2323,8 +2323,8 @@ Source:
 - [SP-001](docs/engineering/option-b-contract.md#sp-001--h0-establish-the-development-contract)
 - [SP-004](docs/engineering/option-b-contract.md#sp-004--local-architecture)
 - [SP-017](docs/engineering/option-b-contract.md#sp-017--language-and-contract-quality)
-- [DH-06 language standards](PRD-Development-Harness.md#dh-06-coding-and-layer-standards)
-- [Option B package constraints](PRD-LangChain-Deep-Agents.md#31-verified-python-package-snapshot)
+- [DH-06 language standards](docs/PRD/PRD-Development-Harness.md#dh-06-coding-and-layer-standards)
+- [Option B package constraints](docs/PRD/PRD-LangChain-Deep-Agents.md#31-verified-python-package-snapshot)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H0-03.
 
 Codebase Context:
@@ -2366,8 +2366,8 @@ So that required checks work independently of a coding assistant.
 Source:
 - [SP-001](docs/engineering/option-b-contract.md#sp-001--h0-establish-the-development-contract)
 - [SP-017](docs/engineering/option-b-contract.md#sp-017--language-and-contract-quality)
-- [DH-05 hooks and portable enforcement](PRD-Development-Harness.md#dh-05-hooks-and-portable-enforcement)
-- [DH-09 profiles](PRD-Development-Harness.md#dh-09-verification-profiles-and-completion-rules)
+- [DH-05 hooks and portable enforcement](docs/PRD/PRD-Development-Harness.md#dh-05-hooks-and-portable-enforcement)
+- [DH-09 profiles](docs/PRD/PRD-Development-Harness.md#dh-09-verification-profiles-and-completion-rules)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H0-04.
 
 Codebase Context:
@@ -2410,8 +2410,8 @@ So that every later work item can be reviewed and reproduced.
 Source:
 - [SP-003](docs/engineering/option-b-contract.md#sp-003--one-traceable-work-record-per-meaningful-change)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [DH-W01–DH-W06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
-- [DH-09.2 manifests](PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
+- [DH-W01–DH-W06](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [DH-09.2 manifests](docs/PRD/PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H0-05.
 
 Codebase Context:
@@ -2454,7 +2454,7 @@ Source:
 - [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
 - [SP-017](docs/engineering/option-b-contract.md#sp-017--language-and-contract-quality)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [DH-A02–05, DH-A08/11/14/15](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [DH-A02–05, DH-A08/11/14/15](docs/PRD/PRD-Development-Harness.md#dh-10-acceptance-and-closure)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H1-01.
 
 Codebase Context:
@@ -2497,8 +2497,8 @@ So that migration and operation tests cannot reset persistent workbench data.
 Source:
 - [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
-- [DH-07 migrations and seeds](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
-- [DH-08 target isolation](PRD-Development-Harness.md#dh-08-docker-and-local-operations-standards)
+- [DH-07 migrations and seeds](docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [DH-08 target isolation](docs/PRD/PRD-Development-Harness.md#dh-08-docker-and-local-operations-standards)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H1-02.
 
 Codebase Context:
@@ -2542,8 +2542,8 @@ Source:
 - [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
 - [SP-003](docs/engineering/option-b-contract.md#sp-003--one-traceable-work-record-per-meaningful-change)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [H1.3](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
-- [DH-A01–16](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [H1.3](docs/PRD/PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [DH-A01–16](docs/PRD/PRD-Development-Harness.md#dh-10-acceptance-and-closure)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference H1-03.
 
 Codebase Context:
@@ -2589,8 +2589,8 @@ So that application infrastructure stays on this Mac.
 
 Source:
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
-- [LM-03 Compose baseline](PRD-Local-Mac-Deployment.md#lm-03-supabase-and-docker-baseline)
-- [LM-04 addresses](PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
+- [LM-03 Compose baseline](docs/PRD/PRD-Local-Mac-Deployment.md#lm-03-supabase-and-docker-baseline)
+- [LM-04 addresses](docs/PRD/PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2630,8 +2630,8 @@ Source:
 - [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-017](docs/engineering/option-b-contract.md#sp-017--language-and-contract-quality)
-- [Option B entities](PRD-LangChain-Deep-Agents.md#111-product-entities)
-- [DH-06 contracts and state](PRD-Development-Harness.md#dh-06-coding-and-layer-standards)
+- [Option B entities](docs/PRD/PRD-LangChain-Deep-Agents.md#111-product-entities)
+- [DH-06 contracts and state](docs/PRD/PRD-Development-Harness.md#dh-06-coding-and-layer-standards)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2669,8 +2669,8 @@ So that another user cannot read my records or internal credentials.
 
 Source:
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
-- [LM-05 Auth and schema ownership](PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
-- [Option B authorization](PRD-LangChain-Deep-Agents.md#53-auth-private-artifacts-and-persistence-boundaries)
+- [LM-05 Auth and schema ownership](docs/PRD/PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
+- [Option B authorization](docs/PRD/PRD-LangChain-Deep-Agents.md#53-auth-private-artifacts-and-persistence-boundaries)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2710,8 +2710,8 @@ So that fresh setup and upgrades preserve user data.
 
 Source:
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
-- [DH-07 database quality](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
-- [LM-05 database roles](PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
+- [DH-07 database quality](docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [LM-05 database roles](docs/PRD/PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2751,10 +2751,10 @@ So that HTTP requests do not own durable work and users see a consistent dark-de
 Source:
 - [SP-004](docs/engineering/option-b-contract.md#sp-004--local-architecture)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
-- [Option B process boundaries](PRD-LangChain-Deep-Agents.md#51-process-boundaries-and-local-networking)
-- [Option B API contract](PRD-LangChain-Deep-Agents.md#112-api-contract)
-- [DS-01–DS-05: Luma tokens, theme behavior, components, accessibility and visual evidence](PRD-Design-System.md)
-- [LC-34: shared Luma interface](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Option B process boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#51-process-boundaries-and-local-networking)
+- [Option B API contract](docs/PRD/PRD-LangChain-Deep-Agents.md#112-api-contract)
+- [DS-01–DS-05: Luma tokens, theme behavior, components, accessibility and visual evidence](docs/PRD/PRD-Design-System.md)
+- [LC-34: shared Luma interface](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2815,8 +2815,8 @@ So that all model-backed roles follow one auditable policy.
 
 Source:
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
-- [MP-01 profiles and precedence](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
-- [MP-02 catalog and request contract](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-01 profiles and precedence](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02 catalog and request contract](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B0.
 
 Acceptance Criteria:
@@ -2859,8 +2859,8 @@ So that runs can authenticate without persisting raw secrets.
 
 Source:
 - [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
-- [MP-03 precedence](PRD-Model-Providers.md#mp-03-configuration-precedence)
-- [MP-06 encryption and replay](PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [MP-03 precedence](docs/PRD/PRD-Model-Providers.md#mp-03-configuration-precedence)
+- [MP-06 encryption and replay](docs/PRD/PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -2906,8 +2906,8 @@ Source:
 - [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [MP-04 Settings states](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
-- [MP-05 credential APIs](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-04 Settings states](docs/PRD/PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [MP-05 credential APIs](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -2952,8 +2952,8 @@ So that parallel work and retries cannot silently overrun the displayed budget.
 
 Source:
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
-- [MP-07 resources and spend](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
-- [MP-08 failures](PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [MP-07 resources and spend](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [MP-08 failures](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3000,8 +3000,8 @@ Source:
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [MP-A06/07/09/10](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [Option B capability gate matrix](PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
+- [MP-A06/07/09/10](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [Option B capability gate matrix](docs/PRD/PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1 qualification.
 - [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md#decision) — DeepSeek's strict nested output stays disabled.
 
@@ -3047,8 +3047,8 @@ So that retries and conflicting commands cannot corrupt lifecycle state.
 Source:
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
-- [Option B outer lifecycle](PRD-LangChain-Deep-Agents.md#71-outer-goal-lifecycle-application-owned)
-- [Run APIs](PRD-LangChain-Deep-Agents.md#112-api-contract)
+- [Option B outer lifecycle](docs/PRD/PRD-LangChain-Deep-Agents.md#71-outer-goal-lifecycle-application-owned)
+- [Run APIs](docs/PRD/PRD-LangChain-Deep-Agents.md#112-api-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3090,8 +3090,8 @@ So that a restarted or stale worker cannot write conflicting progress.
 
 Source:
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
-- [Option B queue/checkpoint ownership](PRD-LangChain-Deep-Agents.md#52-queue-checkpointer-and-store-ownership)
-- [Checkpoint durability](PRD-LangChain-Deep-Agents.md#101-checkpoints-and-exactly-once-limitations)
+- [Option B queue/checkpoint ownership](docs/PRD/PRD-LangChain-Deep-Agents.md#52-queue-checkpointer-and-store-ownership)
+- [Checkpoint durability](docs/PRD/PRD-LangChain-Deep-Agents.md#101-checkpoints-and-exactly-once-limitations)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3131,8 +3131,8 @@ So that work progresses with inspectable plans and finite limits.
 Source:
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
-- [Option B specialist loop](PRD-LangChain-Deep-Agents.md#72-inner-specialist-loop-deep-agents)
-- [Goal and plan contracts](PRD-LangChain-Deep-Agents.md#81-goal-and-plan-contracts)
+- [Option B specialist loop](docs/PRD/PRD-LangChain-Deep-Agents.md#72-inner-specialist-loop-deep-agents)
+- [Goal and plan contracts](docs/PRD/PRD-LangChain-Deep-Agents.md#81-goal-and-plan-contracts)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3173,8 +3173,8 @@ So that a model cannot bypass scope through SDK or MCP tools.
 
 Source:
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
-- [Execution boundaries](PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Execution boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3218,8 +3218,8 @@ So that a successful result refers to bytes that actually exist.
 
 Source:
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
-- [Artifact storage boundaries](PRD-LangChain-Deep-Agents.md#53-auth-private-artifacts-and-persistence-boundaries)
-- [LM-05 private Storage](PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
+- [Artifact storage boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#53-auth-private-artifacts-and-persistence-boundaries)
+- [LM-05 private Storage](docs/PRD/PRD-Local-Mac-Deployment.md#lm-05-database-auth-and-storage-ownership)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3260,8 +3260,8 @@ So that I can distinguish activity, waiting, errors and evidence.
 Source:
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
-- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
-- [Run workspace and inspector](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Public event envelope](docs/PRD/PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Run workspace and inspector](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3303,8 +3303,8 @@ Source:
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [Pause/cancel/resume](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
-- [Model uncertainty handling](PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [Pause/cancel/resume](docs/PRD/PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [Model uncertainty handling](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3350,8 +3350,8 @@ Source:
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [LC-03/04/06/08/11/12/13](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [Controlled benchmark patterns](PRD-LangChain-Deep-Agents.md#142-three-benchmark-tasks)
+- [LC-03/04/06/08/11/12/13](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Controlled benchmark patterns](docs/PRD/PRD-LangChain-Deep-Agents.md#142-three-benchmark-tasks)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B1.
 
 Acceptance Criteria:
@@ -3398,8 +3398,8 @@ Source:
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Expert identity](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
-- [Expert/session APIs](PRD-LangChain-Deep-Agents.md#112-api-contract)
+- [Expert identity](docs/PRD/PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [Expert/session APIs](docs/PRD/PRD-LangChain-Deep-Agents.md#112-api-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B2.
 
 Acceptance Criteria:
@@ -3438,8 +3438,8 @@ So that delegation adds useful work without multiplying permissions or budgets.
 Source:
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Scope/budget narrowing](PRD-LangChain-Deep-Agents.md#83-scope-and-budget-narrowing)
-- [Local synchronous specialists](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [Scope/budget narrowing](docs/PRD/PRD-LangChain-Deep-Agents.md#83-scope-and-budget-narrowing)
+- [Local synchronous specialists](docs/PRD/PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B3.
 
 Acceptance Criteria:
@@ -3479,8 +3479,8 @@ So that my decision cannot authorize a modified or replayed effect.
 
 Source:
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
-- [Approval and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
-- [Approval inbox](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Approval and replay](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [Approval inbox](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B3.
 
 Acceptance Criteria:
@@ -3522,8 +3522,8 @@ Source:
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [Exactly-once limitations](PRD-LangChain-Deep-Agents.md#101-checkpoints-and-exactly-once-limitations)
-- [External write failure policy](PRD-LangChain-Deep-Agents.md#102-failure-policy)
+- [Exactly-once limitations](docs/PRD/PRD-LangChain-Deep-Agents.md#101-checkpoints-and-exactly-once-limitations)
+- [External write failure policy](docs/PRD/PRD-LangChain-Deep-Agents.md#102-failure-policy)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B3.
 
 Acceptance Criteria:
@@ -3566,7 +3566,7 @@ So that a reviewed graph has a stable executable contract.
 
 Source:
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Workflow IR and node subset](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [Workflow IR and node subset](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B4.
 
 Acceptance Criteria:
@@ -3606,8 +3606,8 @@ So that iteration and joins do not overwrite or lose outputs.
 Source:
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [Readiness and emissions](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
-- [LC-14](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Readiness and emissions](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [LC-14](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B4.
 
 Acceptance Criteria:
@@ -3648,7 +3648,7 @@ So that I can review validation and inspect the actual published run.
 Source:
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Workflow editor/monitor](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Workflow editor/monitor](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B4.
 
 Acceptance Criteria:
@@ -3692,7 +3692,7 @@ So that schedule recovery cannot duplicate or silently broaden tasks.
 
 Source:
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Routines and scheduled work](PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
+- [Routines and scheduled work](docs/PRD/PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B5.
 
 Acceptance Criteria:
@@ -3734,8 +3734,8 @@ Source:
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence)
-- [Later connector scope](PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices)
-- [Tool classes and policies](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Later connector scope](docs/PRD/PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices)
+- [Tool classes and policies](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [Decision 0007](docs/engineering/decisions/0007-first-connector-github-issues.md#decision) — GitHub, creating an issue in one configured repository.
 
 Acceptance Criteria:
@@ -3778,7 +3778,7 @@ So that long work preserves criteria and citations without hidden inference serv
 Source:
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Memory and context design](PRD-LangChain-Deep-Agents.md#84-memory-and-context-design)
+- [Memory and context design](docs/PRD/PRD-LangChain-Deep-Agents.md#84-memory-and-context-design)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B6.
 
 Acceptance Criteria:
@@ -3818,7 +3818,7 @@ So that learned material cannot silently become policy.
 
 Source:
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
-- [Skills and learning](PRD-LangChain-Deep-Agents.md#85-skills-and-learning)
+- [Skills and learning](docs/PRD/PRD-LangChain-Deep-Agents.md#85-skills-and-learning)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B6.
 
 Acceptance Criteria:
@@ -3862,8 +3862,8 @@ So that interruptions are visible and ordinary operations preserve data.
 Source:
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 - [SP-014 receipt retention](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
-- [LM-07 local operations](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [Local logs and metrics](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LM-07 local operations](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [Local logs and metrics](docs/PRD/PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
 Acceptance Criteria:
@@ -3908,8 +3908,8 @@ So that history, artifact bytes and encrypted credentials recover together.
 Source:
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
-- [LM-07 backup scope](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [Local backup and restore](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LM-07 backup scope](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [Local backup and restore](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
 Acceptance Criteria:
@@ -3952,8 +3952,8 @@ Source:
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
-- [Upgrade operations](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [Resume compatibility](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [Upgrade operations](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [Resume compatibility](docs/PRD/PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
 Acceptance Criteria:
@@ -3999,9 +3999,9 @@ Source:
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [Shared model/task thresholds](PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
-- [Nonfunctional targets](PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
-- [Evaluation](PRD-LangChain-Deep-Agents.md#14-evaluation-and-release-qualification)
+- [Shared model/task thresholds](docs/PRD/PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
+- [Nonfunctional targets](docs/PRD/PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
+- [Evaluation](docs/PRD/PRD-LangChain-Deep-Agents.md#14-evaluation-and-release-qualification)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7 qualification.
 
 Acceptance Criteria:
@@ -4048,11 +4048,11 @@ Source:
 - [SP-019](docs/engineering/option-b-contract.md#sp-019--acceptance-scenarios)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
-- [DH-W01–06 completion](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
-- [LC-01–LC-34](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [DS-01–DS-05](PRD-Design-System.md)
-- [MP-A01–12](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [LM-A01–09](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [DH-W01–06 completion](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [LC-01–LC-34](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [DS-01–DS-05](docs/PRD/PRD-Design-System.md)
+- [MP-A01–12](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [LM-A01–09](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
 
 Acceptance Criteria:
 
@@ -4102,10 +4102,10 @@ So that Settings and the goal composer say only what was observed.
 Source:
 - [US-10.2 finding B6](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B6](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [Settings screen](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [MP-04 Settings states](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
-- [MP-05 qualification metadata](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [LC-17](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Settings screen](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-04 Settings states](docs/PRD/PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [MP-05 qualification metadata](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
 - [US-3.4 route results](docs/engineering/evidence/US-3.4/summary.md#outcome)
 - [Decision 0005](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md#decision) — DeepSeek's strict nested output stays disabled.
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -4153,10 +4153,10 @@ So that LC-23 reports what happens instead of assuming it.
 Source:
 - [US-10.2 finding B10](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B10 and spending](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [LC-23](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [MP-02 reasoning metadata](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
-- [MP-A06](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [Protected reasoning in logs](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LC-23](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-02 reasoning metadata](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-A06](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [Protected reasoning in logs](docs/PRD/PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4210,13 +4210,13 @@ Source:
 - [Runbooks not yet exercised](docs/engineering/evidence/US-10.2/summary.md#procedures)
 - [Decision 0009, B1 and spending](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
 - [Decision 0009, data stays](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#reversal)
-- [LM-04 addresses](PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
-- [LM-07 persistence](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A01, LM-A02 and LM-A04](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
-- [LC-27](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [MP-A12](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [Local shutdown, backup and upgrades](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [DH-07 target guards](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [LM-04 addresses](docs/PRD/PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
+- [LM-07 persistence](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A01, LM-A02 and LM-A04](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [LC-27](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-A12](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [Local shutdown, backup and upgrades](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [DH-07 target guards](docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 - [Operations runbook start](docs/engineering/runbooks/operations.md#start)
@@ -4275,9 +4275,9 @@ So that a person can control a run without calling the API.
 Source:
 - [US-10.2 finding B9](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B9](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [PRD 10.3 pause, cancel and resume](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
-- [LC-08 and LC-11](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [MP-08 uncertain calls](PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [PRD 10.3 pause, cancel and resume](docs/PRD/PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [LC-08 and LC-11](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-08 uncertain calls](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -4331,10 +4331,10 @@ So that I can find a run and see what it used, attempted and saved.
 Source:
 - [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B3](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [PRD 12.1 run inspector](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [PRD 12.2 frozen identity and upstream provider](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
-- [LC-19 and LC-20](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [MP-02 upstream provider](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [PRD 12.1 run inspector](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 12.2 frozen identity and upstream provider](docs/PRD/PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LC-19 and LC-20](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-02 upstream provider](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4384,10 +4384,10 @@ Source:
 - [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, revised role requirements](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#requirements-revised)
 - [Decision 0009, role overrides](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#what-this-gives-up)
-- [PRD 12.1 Settings](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [LC-01 and LC-25](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [MP-05 policy route](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
-- [MP-A08](PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [PRD 12.1 Settings](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [LC-01 and LC-25](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-05 policy route](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-A08](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
 Acceptance Criteria:
@@ -4433,9 +4433,9 @@ So that I know what the action touches and why it is asking me.
 Source:
 - [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B3 and the approval reason](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [PRD 12.1 approval inbox](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
-- [LC-10](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 12.1 approval inbox](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 9.2 approval request](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [LC-10](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4476,11 +4476,11 @@ So that the local install's state can be read in one place.
 Source:
 - [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B3](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [PRD 12.1 Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [PRD 10.4 missed occurrences](PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
-- [PRD 10.5 restore](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [LC-15 and LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [LM-07 network loss](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [PRD 12.1 Operations](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 10.4 missed occurrences](docs/PRD/PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
+- [PRD 10.5 restore](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LC-15 and LC-17](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LM-07 network loss](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4524,9 +4524,9 @@ So that starting a cloud run is an informed choice and its cost and errors can b
 Source:
 - [US-10.2 finding B3](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, run screens](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [PRD 12.1 run workspace and inspector](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [MP-07 budgets and disclosure](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
-- [LC-01 and LC-20](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 12.1 run workspace and inspector](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-07 budgets and disclosure](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [LC-01 and LC-20](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -4580,10 +4580,10 @@ So that recovery after sleep is observed rather than stood in for by SIGSTOP.
 Source:
 - [US-10.2 finding B2](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B2](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
-- [LC-31](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [PRD 10.5 Mac sleep](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [LM-07 interruptions](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A07](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [LC-31](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 10.5 Mac sleep](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LM-07 interruptions](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A07](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4631,11 +4631,11 @@ Source:
 - [US-10.2 finding B7](docs/engineering/evidence/US-10.2/summary.md#blocking-findings)
 - [Decision 0009, B7](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
 - [Decision 0010](docs/engineering/decisions/0010-contrast-pass-line.md#decision) — WCAG 2.1 AA is the contrast pass line.
-- [DS-03 named surfaces](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
-- [DS-04 usability](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
-- [DS-05 evidence](PRD-Design-System.md#ds-05--verification-and-design-evidence)
-- [LC-34](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [PRD 12.1.1 theme behavior](PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
+- [DS-03 named surfaces](docs/PRD/PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [DS-04 usability](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 evidence](docs/PRD/PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [LC-34](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 12.1.1 theme behavior](docs/PRD/PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4692,9 +4692,9 @@ Source:
 - [Decision 0009, revised LC-33 and DH-W03](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#requirements-revised)
 - [Decision 0003](docs/engineering/decisions/0003-openspec-only-delivery.md#decision)
 - [Decision 0011](docs/engineering/decisions/0011-review-dispositions.md#decision) — M8, M32, M33 and WORKER-INFERENCE-001, as built.
-- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
-- [DH-A03 and DH-A13](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [LC-32 and LC-33](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [DH-W03](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [DH-A03 and DH-A13](docs/PRD/PRD-Development-Harness.md#dh-10-acceptance-and-closure)
 - [The 41 minors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md#minors)
 - [The majors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/review-r1.md#majors)
 - [Owner decisions on majors](docs/engineering/evidence/REVIEW-US-5.1-to-US-9.3/fixes-majors.md#decisions-for-the-owner)
@@ -4767,11 +4767,11 @@ Source:
 - [Decision 0013, DeepSeek](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0013, revised MP-01 and PRD 6](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
 - [Review finding RR-7](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
-- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
-- [MP-05 model and policy routes](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
-- [Separate gates per binding](PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
-- [A binding that fails qualification stays unavailable](PRD-LangChain-Deep-Agents.md#15-implementation-sequence-and-exit-gates)
-- [LC-17](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [MP-01](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-05 model and policy routes](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [Separate gates per binding](docs/PRD/PRD-LangChain-Deep-Agents.md#64-capability-gate-matrix)
+- [A binding that fails qualification stays unavailable](docs/PRD/PRD-LangChain-Deep-Agents.md#15-implementation-sequence-and-exit-gates)
+- [LC-17](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [Decision 0006, saved choices and frozen runs](docs/engineering/decisions/0006-terra-is-the-default.md#consequences)
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -4846,15 +4846,15 @@ Source:
 - [Review findings RR-4, RR-5 and RR-10](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
 - [R5-1 to R5-7](docs/engineering/evidence/US-11.12/review-r5.md#nonblocking)
 - [Their earlier dispositions](docs/engineering/evidence/US-11.12/summary.md#found-by-the-later-rounds)
-- [LC-03, LC-04, LC-07, LC-13, LC-20, LC-25, LC-26 and LC-34](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [Dispatch inventory and Terra's generation options](PRD-LangChain-Deep-Agents.md#63-openrouter-only-model-factory)
-- [PRD 12.1.1 theme behavior](PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
-- [MP-A12](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [LM-06 with no key](PRD-Local-Mac-Deployment.md#lm-06-configuration-and-credentials)
-- [LM-A06](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
-- [DS-03 named surfaces](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
-- [DS-04 usability](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
-- [DS-05 evidence](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [LC-03, LC-04, LC-07, LC-13, LC-20, LC-25, LC-26 and LC-34](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [Dispatch inventory and Terra's generation options](docs/PRD/PRD-LangChain-Deep-Agents.md#63-openrouter-only-model-factory)
+- [PRD 12.1.1 theme behavior](docs/PRD/PRD-LangChain-Deep-Agents.md#1211-luma-design-and-theme-behavior)
+- [MP-A12](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [LM-06 with no key](docs/PRD/PRD-Local-Mac-Deployment.md#lm-06-configuration-and-credentials)
+- [LM-A06](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [DS-03 named surfaces](docs/PRD/PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [DS-04 usability](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 evidence](docs/PRD/PRD-Design-System.md#ds-05--verification-and-design-evidence)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -4955,12 +4955,12 @@ Source:
 - [US-11.12's bound fingerprint](docs/engineering/evidence/US-10.2/summary.md#revisions)
 - [US-11.12's Gate 0](docs/engineering/evidence/US-11.12/summary.md#gate-0-by-dh-a-gate)
 - [US-11.12's results](docs/engineering/evidence/US-11.12/summary.md#results-on-these-inputs)
-- [H1.3](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
-- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
-- [Fingerprints](PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
-- [DH-A01 to DH-A16](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [H1.3](docs/PRD/PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [DH-W03](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [Fingerprints](docs/PRD/PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
+- [DH-A01 to DH-A16](docs/PRD/PRD-Development-Harness.md#dh-10-acceptance-and-closure)
 - [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md#decision)
-- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LC-32 and LC-33](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -5015,11 +5015,11 @@ Source:
 - [Decision 0013, the workload and its spending](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0009, the ledger](docs/engineering/decisions/0009-release-scope-from-blocking-findings.md#decision)
 - [Review finding RR-8](docs/engineering/evidence/US-10.2/review-r2.md#blocking)
-- [PRD 13.1](PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
-- [Two calls per workspace](PRD-LangChain-Deep-Agents.md#65-provider-admission-and-budgets)
-- [MP-07 limits and spend](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
-- [LM-07 measured resources](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A09](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [PRD 13.1](docs/PRD/PRD-LangChain-Deep-Agents.md#131-nonfunctional-targets)
+- [Two calls per workspace](docs/PRD/PRD-LangChain-Deep-Agents.md#65-provider-admission-and-budgets)
+- [MP-07 limits and spend](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [LM-07 measured resources](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A09](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
 - [What hasn't run through this worker](docs/engineering/evidence/US-11.12/summary.md#failures-errors-skips-and-limitations)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
@@ -5080,10 +5080,10 @@ Source:
 - [Runbook procedure](docs/engineering/runbooks/mac-sleep.md#procedure)
 - [What to observe](docs/engineering/runbooks/mac-sleep.md#what-to-observe)
 - [How it's assessed](docs/engineering/runbooks/mac-sleep.md#how-its-assessed)
-- [LC-31](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [PRD 10.5 Mac sleep](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [LM-07 interruptions](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A07](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [LC-31](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 10.5 Mac sleep](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [LM-07 interruptions](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A07](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
 
@@ -5139,11 +5139,11 @@ Source:
 - [Upgrade procedure](docs/engineering/runbooks/upgrade.md#upgrade-procedure)
 - [Operations runbook start](docs/engineering/runbooks/operations.md#start)
 - [Turning on inference](docs/engineering/runbooks/operations.md#turning-on-inference)
-- [LM-04 addresses](PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
-- [LM-07 persistence](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A01, LM-A02, LM-A04 and LM-A08](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
-- [PRD 10.5 backup and upgrades](PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
-- [DH-07 target guards](PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
+- [LM-04 addresses](docs/PRD/PRD-Local-Mac-Deployment.md#lm-04-local-addresses-and-connection-types)
+- [LM-07 persistence](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A01, LM-A02, LM-A04 and LM-A08](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [PRD 10.5 backup and upgrades](docs/PRD/PRD-LangChain-Deep-Agents.md#105-local-shutdown-backup-restore-and-upgrades)
+- [DH-07 target guards](docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -5204,12 +5204,12 @@ Source:
 - [US-12.4's failed round](docs/engineering/evidence/US-12.4/summary.md#the-failed-round)
 - [US-10.2's item 1](docs/engineering/evidence/US-10.2/summary.md#what-needs-the-owner)
 - [Review finding RF-8](docs/engineering/evidence/US-10.2/review-r3.md#nonblocking)
-- [MP-08 partial SSE or uncertain acceptance](PRD-Model-Providers.md#mp-08-failure-and-recovery)
-- [MP-A11 log inspection](PRD-Model-Providers.md#mp-09-acceptance-evidence)
-- [PRD 12.2 structured logs and redaction](PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
-- [LC-18](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
-- [LM-07 local logs with redaction](PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
-- [LM-A09](PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [MP-08 partial SSE or uncertain acceptance](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [MP-A11 log inspection](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [PRD 12.2 structured logs and redaction](docs/PRD/PRD-LangChain-Deep-Agents.md#122-logs-and-metrics)
+- [LC-18](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LM-07 local logs with redaction](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [LM-A09](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
 - [The uncertain pause in the runbook](docs/engineering/runbooks/operations.md#turning-on-inference)
 - [The runbook on logs](docs/engineering/runbooks/operations.md#reading-health)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
@@ -5289,12 +5289,12 @@ Source:
 - [US-11.12's void notice](docs/engineering/evidence/US-11.12/summary.md#us-1112-evidence-summary-final-review-and-gate-0)
 - [Decision 0013, H1.3's records](docs/engineering/decisions/0013-release-closure.md#decision)
 - [Decision 0013, revised H1.3](docs/engineering/decisions/0013-release-closure.md#requirements-revised)
-- [H1.3](PRD-Development-Harness.md#dh-02-first-implementation-tasks)
-- [DH-W03](PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
-- [Fingerprints](PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
-- [DH-A01 to DH-A16](PRD-Development-Harness.md#dh-10-acceptance-and-closure)
+- [H1.3](docs/PRD/PRD-Development-Harness.md#dh-02-first-implementation-tasks)
+- [DH-W03](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract)
+- [Fingerprints](docs/PRD/PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts)
+- [DH-A01 to DH-A16](docs/PRD/PRD-Development-Harness.md#dh-10-acceptance-and-closure)
 - [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md#decision)
-- [LC-32 and LC-33](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [LC-32 and LC-33](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-002](docs/engineering/option-b-contract.md#sp-002--h1-prove-and-enable-the-baseline)
 - [SP-021](docs/engineering/option-b-contract.md#sp-021--completion-contract)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — phase reference B7.
@@ -5368,8 +5368,8 @@ Source:
 - [Decision 0015, the four answers and scheduling](docs/engineering/decisions/0015-approval-request-fields.md#decision)
 - [LC-10's row](docs/engineering/evidence/US-10.2/summary.md#lc-product-requirements)
 - [N-22, N-24 and N-25](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#table-1-minors)
-- [PRD 9.2 approval request](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
-- [LC-10](PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
+- [PRD 9.2 approval request](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [LC-10](docs/PRD/PRD-LangChain-Deep-Agents.md#13-functional-requirements-and-acceptance-criteria)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — after B7, post-release.
 
@@ -5415,7 +5415,7 @@ Source:
 - [N-new-2's disposition](docs/engineering/evidence/US-11.12/summary.md#found-by-this-review)
 - [N-new-2](docs/engineering/evidence/US-11.12/review-r1-open-findings.md#new-findings)
 - [Promotion's limit in this release](docs/engineering/evidence/US-10.2/summary.md#limits-on-the-release-as-it-stands)
-- [Skills and learning](PRD-LangChain-Deep-Agents.md#85-skills-and-learning)
+- [Skills and learning](docs/PRD/PRD-LangChain-Deep-Agents.md#85-skills-and-learning)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
 - [SP-020](docs/engineering/option-b-contract.md#sp-020--milestone-sequence) — after B7, post-release.
 
@@ -5445,7 +5445,7 @@ Open Questions:
 
 # EPIC-14: Tool catalog and tool-use record
 
-Scheduled now by [Decision 0017](docs/engineering/decisions/0017-tool-catalog.md#decision), independent of EPIC-13, and sourced from [PRD-Tool-Catalog.md](PRD-Tool-Catalog.md#catalog-contract). The order is catalog, record and readiness first, then the URL guard, then one provider at a time. Every provider-tool scenario runs against a fake transport, even when a real key is present. No story in this epic shows that a provider works live, and neither H1 nor product acceptance follows from it ([what Decision 0017 doesn't establish](docs/engineering/decisions/0017-tool-catalog.md#what-this-doesnt-establish)). Live qualification of a provider is a separate task with a cap the owner sets.
+Scheduled now by [Decision 0017](docs/engineering/decisions/0017-tool-catalog.md#decision), independent of EPIC-13, and sourced from [PRD-Tool-Catalog.md](docs/PRD/PRD-Tool-Catalog.md#catalog-contract). The order is catalog, record and readiness first, then the URL guard, then one provider at a time. Every provider-tool scenario runs against a fake transport, even when a real key is present. No story in this epic shows that a provider works live, and neither H1 nor product acceptance follows from it ([what Decision 0017 doesn't establish](docs/engineering/decisions/0017-tool-catalog.md#what-this-doesnt-establish)). Live qualification of a provider is a separate task with a cap the owner sets.
 
 ### US-14.1: Tool catalog API derived from the registry
 
@@ -5457,10 +5457,10 @@ I want one versioned catalog of every registered tool with its schemas, group, p
 So that tools can be discovered and granted without reading the code.
 
 Source:
-- [Catalog contract, TC-01 to TC-05](PRD-Tool-Catalog.md#catalog-contract)
-- [Autonomous browsing, catalogued as disabled](PRD-Tool-Catalog.md#autonomous-browsing)
+- [Catalog contract, TC-01 to TC-05](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Autonomous browsing, catalogued as disabled](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
 - [Decision 0017, Q10: registry–catalog parity stays exact](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Codebase Context:
@@ -5508,10 +5508,10 @@ I want a Tools page before Settings that shows each tool's inputs, outputs, type
 So that I can see what an agent may use and choose it precisely.
 
 Source:
-- [Tools screen, TS-01 to TS-04](PRD-Tool-Catalog.md#tools-screen)
-- [Grants by group, TC-06](PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-01 to TS-04](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Grants by group, TC-06](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
 - [Decision 0017, C9 and C10](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Required screens](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -5555,10 +5555,10 @@ I want every tool dispatch recorded with when, why, what it used and produced, a
 So that I can see which tools a run used and for which plan task.
 
 Source:
-- [Tool-use record, TU-01 to TU-07](PRD-Tool-Catalog.md#tool-use-record)
+- [Tool-use record, TU-01 to TU-07](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
 - [Decision 0017, Q3, Q4 and Q13](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Public event envelope](docs/PRD/PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
@@ -5610,9 +5610,9 @@ I want the run workspace and the workflow monitor to show the tools used, when, 
 So that a run's outcome can be traced to the tools behind it.
 
 Source:
-- [Tool-use views, TV-01 to TV-03](PRD-Tool-Catalog.md#tool-use-views)
+- [Tool-use views, TV-01 to TV-03](docs/PRD/PRD-Tool-Catalog.md#tool-use-views)
 - [Decision 0017, C10](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Required screens](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -5655,7 +5655,7 @@ I want each tool provider's key read in the worker for each attempt and shown on
 So that tools work when configured and no key leaks when they aren't.
 
 Source:
-- [Provider keys, PK-01 to PK-03](PRD-Tool-Catalog.md#provider-keys)
+- [Provider keys, PK-01 to PK-03](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
 - [Decision 0017, C1, C5 and C8](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q1](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 - [Decision 0007, credential](docs/engineering/decisions/0007-first-connector-github-issues.md#decision)
@@ -5703,9 +5703,9 @@ I want Tavily's four operations as bounded read-only tools
 So that a run can search, extract and crawl the web through one recorded and guarded path.
 
 Source:
-- [Web tools](PRD-Tool-Catalog.md#web-tools)
-- [URL guard](PRD-Tool-Catalog.md#url-guard)
-- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Web tools](docs/PRD/PRD-Tool-Catalog.md#web-tools)
+- [URL guard](docs/PRD/PRD-Tool-Catalog.md#url-guard)
+- [Provider keys](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
 - [Decision 0017, C1, C2, C5 and C12](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
@@ -5750,9 +5750,9 @@ I want Search The Web and Extract Website Content backed by Jina
 So that a run can search and read pages through one recorded and guarded path.
 
 Source:
-- [Web tools](PRD-Tool-Catalog.md#web-tools)
-- [URL guard](PRD-Tool-Catalog.md#url-guard)
-- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Web tools](docs/PRD/PRD-Tool-Catalog.md#web-tools)
+- [URL guard](docs/PRD/PRD-Tool-Catalog.md#url-guard)
+- [Provider keys](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
 - [Decision 0017, C2 and C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q2](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 
@@ -5797,7 +5797,7 @@ I want every URL a tool fetches, or sends to a provider, to pass one guard
 So that no tool can reach loopback services, private networks or cloud metadata.
 
 Source:
-- [URL guard, UG-01](PRD-Tool-Catalog.md#url-guard)
+- [URL guard, UG-01](docs/PRD/PRD-Tool-Catalog.md#url-guard)
 - [Decision 0017, C6](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
 
@@ -5840,11 +5840,11 @@ I want to attach text files to a goal, and give agents paged reading, CSV readin
 So that a run can work from my files and from fetched text without arbitrary access.
 
 Source:
-- [File tools and FI-01](PRD-Tool-Catalog.md#file-tools)
-- [URL guard](PRD-Tool-Catalog.md#url-guard)
-- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
+- [File tools and FI-01](docs/PRD/PRD-Tool-Catalog.md#file-tools)
+- [URL guard](docs/PRD/PRD-Tool-Catalog.md#url-guard)
+- [Tool-use record, TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
 - [Decision 0017, Q10 and Q11](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Acceptance Criteria:
@@ -5889,8 +5889,8 @@ I want price history from Yahoo Finance's chart endpoint and annual inflation fr
 So that a run can compare markets and inflation with named, timestamped sources.
 
 Source:
-- [Market data](PRD-Tool-Catalog.md#market-data)
-- [Tool-use record, TU-06](PRD-Tool-Catalog.md#tool-use-record)
+- [Market data](docs/PRD/PRD-Tool-Catalog.md#market-data)
+- [Tool-use record, TU-06](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
 - [Decision 0017, C11 and C12](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q4 to Q7](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 
@@ -5934,10 +5934,10 @@ I want to search, read, write and patch the run's own files with pure Python too
 So that a run can work on code-like text without a shell, a binary or access outside its files.
 
 Source:
-- [Code tools](PRD-Tool-Catalog.md#code-tools)
+- [Code tools](docs/PRD/PRD-Tool-Catalog.md#code-tools)
 - [Decision 0017, C7](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q8](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 
 Acceptance Criteria:
 
@@ -5978,17 +5978,17 @@ I want a read-only browsing tool that pursues a goal in an isolated browser
 So that a run can read sites through a browser within allowed domains, with a person approving each call.
 
 Source:
-- [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
-- [Catalog contract, TC-03](PRD-Tool-Catalog.md#catalog-contract)
+- [Autonomous browsing](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Catalog contract, TC-03](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
 - [Decision 0020, L2, L5 and L6](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
 - [Decision 0018, B5 and B6](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
 - [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
 - [Decision 0017, C3 and C4](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
 - [Decision 0017, Q9](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
-- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [Tool-use record](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Approval contract and replay](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
@@ -6042,11 +6042,11 @@ I want a browser that runs in a disposable container with no way to reach this M
 So that a browsing tool can read the web without arbitrary access.
 
 Source:
-- [Isolated browser executor](PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Isolated browser executor](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
 - [Decision 0018, B1 to B3 and B8](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
-- [Filesystem and execution boundaries](PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Filesystem and execution boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
 
 Acceptance Criteria:
@@ -6096,7 +6096,7 @@ I want a read-only browsing loop whose every step is an admitted call of its run
 So that browsing spends only within the run's budget, on an approved profile, with receipts, and needs no package outside the lock.
 
 Source:
-- [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
+- [Admitted browser model](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
 - [Decision 0020, L1 to L4 and L6](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
 - [Decision 0018, B4](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
@@ -6158,7 +6158,7 @@ Source:
 - [Decision 0019, revised SP-006 and MP-01](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#requirements-revised)
 - [Decision 0019, reversal](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#reversal)
 - [Decision 0004, a run bound to a removed profile stops](docs/engineering/decisions/0004-terra-replaces-astra.md#consequences)
-- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-01](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 
@@ -6217,8 +6217,8 @@ Source:
 - [Decision 0020, L3 to L5](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
 - [Decision 0018, B8](docs/engineering/decisions/0018-browser-executor.md#decision)
 - [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
-- [Autonomous browsing](PRD-Tool-Catalog.md#autonomous-browsing)
-- [Admitted browser model](PRD-Tool-Catalog.md#admitted-browser-model)
+- [Autonomous browsing](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Admitted browser model](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 
 Acceptance Criteria:
@@ -6260,13 +6260,13 @@ Source:
 - [Decision 0024, what was found](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#what-was-found)
 - [Decision 0024, owner steps after delivery](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#owner-steps-after-delivery)
 - [Decision 0024, what this doesn't establish](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#what-this-doesnt-establish)
-- [Provider keys, PK-01 and PK-03 to PK-06](PRD-Tool-Catalog.md#provider-keys)
-- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
-- [Catalog contract, TC-04](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
-- [MP-03 file order](PRD-Model-Providers.md#mp-03-configuration-precedence)
-- [MP-05 owner-only versioned credential routes, as the pattern](PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
-- [MP-06 sealed storage](PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [Provider keys, PK-01 and PK-03 to PK-06](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
+- [Tools screen, TS-03](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Catalog contract, TC-04](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [MP-03 file order](docs/PRD/PRD-Model-Providers.md#mp-03-configuration-precedence)
+- [MP-05 owner-only versioned credential routes, as the pattern](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-06 sealed storage](docs/PRD/PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
 - [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
@@ -6355,15 +6355,15 @@ Source:
 - [Decision 0025, what this doesn't establish](docs/engineering/decisions/0025-keys-and-vars.md#what-this-doesnt-establish)
 - [Decision 0024, K1, K2 and K7, the rules extended](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#decision)
 - [Decision 0007, amended](docs/engineering/decisions/0007-first-connector-github-issues.md#amended)
-- [Provider keys, PK-01 and PK-04 to PK-08](PRD-Tool-Catalog.md#provider-keys)
-- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
-- [Autonomous browsing, AB-02](PRD-Tool-Catalog.md#autonomous-browsing)
-- [Catalog contract, TC-04](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool-use record, TU-04](PRD-Tool-Catalog.md#tool-use-record)
-- [GitHub tools, GH-07](PRD-Studio.md#github-tools)
-- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
-- [MP-03 file order](PRD-Model-Providers.md#mp-03-configuration-precedence)
-- [MP-06 sealed storage](PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [Provider keys, PK-01 and PK-04 to PK-08](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
+- [Tools screen, TS-03](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Autonomous browsing, AB-02](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Catalog contract, TC-04](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [GitHub tools, GH-07](docs/PRD/PRD-Studio.md#github-tools)
+- [Approval contract and replay](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [MP-03 file order](docs/PRD/PRD-Model-Providers.md#mp-03-configuration-precedence)
+- [MP-06 sealed storage](docs/PRD/PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
 - [SP-007](docs/engineering/option-b-contract.md#sp-007--credentials-and-configuration-ux)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
@@ -6456,13 +6456,13 @@ So that an agent can manage scheduled work through the same rules as the Routine
 Source:
 - [Decision 0026, C1 to C10](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#cronjob)
 - [Decision 0026, what this doesn't establish](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#what-this-doesnt-establish)
-- [Automation, CJ-01 to CJ-04](PRD-Tool-Catalog.md#automation)
-- [Catalog contract, TC-01 to TC-03 and TC-06](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool-use record, TU-01, TU-03 and TU-04](PRD-Tool-Catalog.md#tool-use-record)
-- [Autonomous browsing, AB-02, the Expert-only pattern](PRD-Tool-Catalog.md#autonomous-browsing)
-- [Routines and scheduled work](PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
-- [Approval contract and replay](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [Automation, CJ-01 to CJ-04](docs/PRD/PRD-Tool-Catalog.md#automation)
+- [Catalog contract, TC-01 to TC-03 and TC-06](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-01, TU-03 and TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Autonomous browsing, AB-02, the Expert-only pattern](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Routines and scheduled work](docs/PRD/PRD-LangChain-Deep-Agents.md#104-routines-and-scheduled-work)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Approval contract and replay](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
@@ -6552,12 +6552,12 @@ So that I can understand a tool without leaving the list.
 
 Source:
 - [Decision 0026, G1 to G3](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md#tool-guide)
-- [Tool guide, TG-01 and TG-02](PRD-Tool-Catalog.md#tool-guide)
-- [Catalog contract, TC-01, TC-02 and TC-05](PRD-Tool-Catalog.md#catalog-contract)
-- [Tools screen, TS-02 and TS-03](PRD-Tool-Catalog.md#tools-screen)
-- [Tools, TL-01 to TL-03](PRD-Studio.md#tools)
-- [DS-04 usability and state meaning](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
-- [DS-05 verification in both themes](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [Tool guide, TG-01 and TG-02](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
+- [Catalog contract, TC-01, TC-02 and TC-05](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-02 and TS-03](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Tools, TL-01 to TL-03](docs/PRD/PRD-Studio.md#tools)
+- [DS-04 usability and state meaning](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 verification in both themes](docs/PRD/PRD-Design-System.md#ds-05--verification-and-design-evidence)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Codebase Context:
@@ -6628,14 +6628,14 @@ Source:
 - [Decision 0031, what the reference does](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#what-the-reference-does)
 - [Decision 0031, providers](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#providers)
 - [Decision 0031, what this doesn't establish](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#what-this-doesnt-establish)
-- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
-- [Web tools](PRD-Tool-Catalog.md#web-tools)
-- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
-- [Catalog contract, TC-01 and TC-02](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
+- [Search paging, WS-01 to WS-06](docs/PRD/PRD-Tool-Catalog.md#search-paging)
+- [Web tools](docs/PRD/PRD-Tool-Catalog.md#web-tools)
+- [Tool-use record, TU-01, TU-04 and TU-06](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Catalog contract, TC-01 and TC-02](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool guide, TG-01](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
 - [Decision 0017, C5 and Q4](docs/engineering/decisions/0017-tool-catalog.md#decision)
 - [Decision 0029, F13](docs/engineering/decisions/0029-refactor-decisions-delegated-r41-r68.md#decision-0029-choices-made-while-delivering-refactor-items-r-41-to-r-68)
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Codebase Context:
@@ -6721,18 +6721,18 @@ Source:
 - [Decision 0032, G1 to G8](docs/engineering/decisions/0032-google-search-through-serpapi.md#decision)
 - [Decision 0032, SerpApi's Google search](docs/engineering/decisions/0032-google-search-through-serpapi.md#serpapis-google-search-read-2026-11-18)
 - [Decision 0032, what this doesn't establish](docs/engineering/decisions/0032-google-search-through-serpapi.md#what-this-doesnt-establish)
-- [Google search, GS-01 to GS-04](PRD-Tool-Catalog.md#google-search)
-- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
-- [Provider keys, PK-01 and PK-04 to PK-07](PRD-Tool-Catalog.md#provider-keys)
-- [Catalog contract, TC-02 and TC-03](PRD-Tool-Catalog.md#catalog-contract)
-- [Tools screen, TS-03](PRD-Tool-Catalog.md#tools-screen)
-- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
-- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
+- [Google search, GS-01 to GS-04](docs/PRD/PRD-Tool-Catalog.md#google-search)
+- [Search paging, WS-01 to WS-06](docs/PRD/PRD-Tool-Catalog.md#search-paging)
+- [Provider keys, PK-01 and PK-04 to PK-07](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
+- [Catalog contract, TC-02 and TC-03](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-03](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Tool-use record, TU-01, TU-04 and TU-06](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
 - [Decision 0031, S1 to S9](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#decision)
 - [Decision 0017, C1, C2 and C5](docs/engineering/decisions/0017-tool-catalog.md#decision)
 - [Decision 0024, K1 to K7](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md#decision)
 - [Decision 0025, V1 to V9](docs/engineering/decisions/0025-keys-and-vars.md#decision)
-- [Seed, SD-01 and SD-02](PRD-Studio.md#seed)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 
@@ -6818,14 +6818,14 @@ Source:
 - [Decision 0033, K1 to K9](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#the-google-toolkit-us-1423)
 - [Decision 0033, what Google can and can't do here](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#what-google-can-and-cant-do-here)
 - [Decision 0033, what this doesn't establish](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#what-this-doesnt-establish)
-- [Google toolkit, GT-01 and GT-02](PRD-Tool-Catalog.md#google-toolkit)
-- [Google search, GS-01 to GS-04](PRD-Tool-Catalog.md#google-search)
-- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
-- [URL guard, UG-01](PRD-Tool-Catalog.md#url-guard)
-- [Catalog contract, TC-02 and TC-03](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
-- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
-- [Seed, SD-01 and SD-02](PRD-Studio.md#seed)
+- [Google toolkit, GT-01 and GT-02](docs/PRD/PRD-Tool-Catalog.md#google-toolkit)
+- [Google search, GS-01 to GS-04](docs/PRD/PRD-Tool-Catalog.md#google-search)
+- [Search paging, WS-01 to WS-06](docs/PRD/PRD-Tool-Catalog.md#search-paging)
+- [URL guard, UG-01](docs/PRD/PRD-Tool-Catalog.md#url-guard)
+- [Catalog contract, TC-02 and TC-03](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-01, TU-04 and TU-06](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
 - [Decision 0017, C5, C6 and C12](docs/engineering/decisions/0017-tool-catalog.md#decision)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
@@ -6911,12 +6911,12 @@ So that I can stop a provider's tools at once, or one tool at a time, without re
 
 Source:
 - [Decision 0033, W1 to W5](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#tool-switches-us-1424)
-- [Tool switches, TW-01 to TW-03](PRD-Tool-Catalog.md#tool-switches)
-- [Catalog contract, TC-02, TC-04 and TC-05](PRD-Tool-Catalog.md#catalog-contract)
-- [Tools screen, TS-01 to TS-03](PRD-Tool-Catalog.md#tools-screen)
-- [Provider keys, PK-02](PRD-Tool-Catalog.md#provider-keys)
-- [DS-04 usability and state meaning](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
-- [DS-05 verification in both themes](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [Tool switches, TW-01 to TW-03](docs/PRD/PRD-Tool-Catalog.md#tool-switches)
+- [Catalog contract, TC-02, TC-04 and TC-05](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-01 to TS-03](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Provider keys, PK-02](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
+- [DS-04 usability and state meaning](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 verification in both themes](docs/PRD/PRD-Design-System.md#ds-05--verification-and-design-evidence)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
@@ -6986,7 +6986,7 @@ Open Questions:
 
 # EPIC-15: Studio product surfaces
 
-Scheduled by [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and sourced from [PRD-Studio.md](PRD-Studio.md#shell). Story order follows the Studio plan's phasing: data the app already has, then read models, workflow depth, GitHub tools, run timing and Operations detail, and last search, preferences, streaming and the concept seed. The model-assisted features stay out of this epic (D13). Each element is built only where real data backs it, and no screen shows sample data. Every GitHub scenario runs against a fake transport, and live use is a separate story that needs the owner's token and a capped authorization (D12). No story in this epic establishes H1 or product acceptance ([what Decision 0022 doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)).
+Scheduled by [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and sourced from [PRD-Studio.md](docs/PRD/PRD-Studio.md#shell). Story order follows the Studio plan's phasing: data the app already has, then read models, workflow depth, GitHub tools, run timing and Operations detail, and last search, preferences, streaming and the concept seed. The model-assisted features stay out of this epic (D13). Each element is built only where real data backs it, and no screen shows sample data. Every GitHub scenario runs against a fake transport, and live use is a separate story that needs the owner's token and a capped authorization (D12). No story in this epic establishes H1 or product acceptance ([what Decision 0022 doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)).
 
 ### US-15.1: Sidebar groups with Tools under Build
 
@@ -6998,11 +6998,11 @@ I want the sidebar grouped into the daily work, Build and System, with Tools und
 So that the navigation matches the Studio concepts the owner chose.
 
 Source:
-- [Shell, SH-01](PRD-Studio.md#shell)
+- [Shell, SH-01](docs/PRD/PRD-Studio.md#shell)
 - [Decision 0022, D2](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [Decision 0017, amended C9](docs/engineering/decisions/0017-tool-catalog.md#amended)
 - [Decision 0021, amended R5](docs/engineering/decisions/0021-studio-interface-redesign.md#amended)
-- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-04](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
 
 Codebase Context:
 - [Design and Tools screen](CODEBASE.md#current-capabilities): the Studio presentation groups the sidebar into the daily work, Build and System, and US-14.2 put Tools before Settings. Both are described as after the analyzed revision. This is not product intent.
@@ -7048,9 +7048,9 @@ I want an editable display name, and my role and each workspace's name in my ses
 So that the shell, Home and Settings can name me without showing me to anyone outside my workspaces.
 
 Source:
-- [Identity, ID-01 and ID-02](PRD-Studio.md#identity)
-- [Shell, SH-05](PRD-Studio.md#shell)
-- [Settings, SE-04](PRD-Studio.md#settings)
+- [Identity, ID-01 and ID-02](docs/PRD/PRD-Studio.md#identity)
+- [Shell, SH-05](docs/PRD/PRD-Studio.md#shell)
+- [Settings, SE-04](docs/PRD/PRD-Studio.md#settings)
 - [Decision 0022, D10](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
 - [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
@@ -7114,10 +7114,10 @@ I want to see whether the local services are ready without owner-only detail
 So that I know whether a run can start before I write a goal.
 
 Source:
-- [Shell, SH-04](PRD-Studio.md#shell)
-- [Home, HM-05](PRD-Studio.md#home)
-- [PRD 12.1 Home and Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [MP-04](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [Shell, SH-04](docs/PRD/PRD-Studio.md#shell)
+- [Home, HM-05](docs/PRD/PRD-Studio.md#home)
+- [PRD 12.1 Home and Operations](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-04](docs/PRD/PRD-Model-Providers.md#mp-04-settings-flow-and-states)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 
@@ -7167,9 +7167,9 @@ I want each run in the list to show what it is, how far it got, its models and i
 So that I can find a run and read its state without opening it.
 
 Source:
-- [Runs, RN-01 to RN-03](PRD-Studio.md#runs)
+- [Runs, RN-01 to RN-03](docs/PRD/PRD-Studio.md#runs)
 - [Decision 0022, D9](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [MP-07](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
@@ -7224,11 +7224,11 @@ I want waiting and decided requests beside their full context, a count in the si
 So that I can decide exact requests quickly without approving anything I didn't see.
 
 Source:
-- [Approvals, AP-01 to AP-04](PRD-Studio.md#approvals)
-- [Shell, SH-03](PRD-Studio.md#shell)
+- [Approvals, AP-01 to AP-04](docs/PRD/PRD-Studio.md#approvals)
+- [Shell, SH-03](docs/PRD/PRD-Studio.md#shell)
 - [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [PRD 9.2](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
-- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
+- [PRD 9.2](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [Tool-use record](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Acceptance Criteria:
@@ -7288,10 +7288,10 @@ So that I can pick the right Expert and see which ones can change things outside
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Experts, EX-01 to EX-03](PRD-Studio.md#experts)
-- [Expert identity](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
-- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
-- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Experts, EX-01 to EX-03](docs/PRD/PRD-Studio.md#experts)
+- [Expert identity](docs/PRD/PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [Catalog contract](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [MP-07](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -7346,10 +7346,10 @@ I want the tool list grouped with counts, each tool's detail beside it with who 
 So that I can see where a tool is used without leaving the list.
 
 Source:
-- [Tools, TL-01 to TL-03](PRD-Studio.md#tools)
-- [Tools screen](PRD-Tool-Catalog.md#tools-screen)
-- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
-- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [Tools, TL-01 to TL-03](docs/PRD/PRD-Studio.md#tools)
+- [Tools screen](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Catalog contract](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Workflow IR](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -7394,10 +7394,10 @@ I want each approved profile's catalog prices and capabilities, where each role'
 So that I choose models knowing what they cost and why a role uses one.
 
 Source:
-- [Models, MD-01 to MD-03](PRD-Studio.md#models)
-- [MP-01](PRD-Model-Providers.md#mp-01-approved-models-and-selection)
-- [MP-02](PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
-- [MP-04](PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [Models, MD-01 to MD-03](docs/PRD/PRD-Studio.md#models)
+- [MP-01](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-04](docs/PRD/PRD-Model-Providers.md#mp-04-settings-flow-and-states)
 - [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
 
 Acceptance Criteria:
@@ -7443,11 +7443,11 @@ I want to choose an Expert, a budget and models from chips, and see which profil
 So that I start a bounded run knowing what it will use and spend.
 
 Source:
-- [Home, HM-02 and HM-03](PRD-Studio.md#home)
+- [Home, HM-02 and HM-03](docs/PRD/PRD-Studio.md#home)
 - [Decision 0022, D11](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
-- [Direct sessions](PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
-- [File tools](PRD-Tool-Catalog.md#file-tools)
+- [MP-07](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Direct sessions](docs/PRD/PRD-LangChain-Deep-Agents.md#82-expert-identity-versus-subagent-execution)
+- [File tools](docs/PRD/PRD-Tool-Catalog.md#file-tools)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
 
 Acceptance Criteria:
@@ -7507,7 +7507,7 @@ So that I can pick up what needs me before starting something new.
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Home, HM-01 and HM-04](PRD-Studio.md#home)
+- [Home, HM-01 and HM-04](docs/PRD/PRD-Studio.md#home)
 - [Decision 0022, D9 and D10](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
@@ -7558,8 +7558,8 @@ I want an optional description on a workflow and an optional label on each graph
 So that lists and previews can say what a workflow and each of its steps do.
 
 Source:
-- [Workflows, WF-06](PRD-Studio.md#workflows)
-- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [Workflows, WF-06](docs/PRD/PRD-Studio.md#workflows)
+- [Workflow IR](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
 - [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
@@ -7607,9 +7607,9 @@ I want one saved draft beside a workflow's published versions
 So that I can prepare the next version without changing what runs use.
 
 Source:
-- [Workflows, WF-02](PRD-Studio.md#workflows)
+- [Workflows, WF-02](docs/PRD/PRD-Studio.md#workflows)
 - [Decision 0022, D8](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Workflow IR](PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [Workflow IR](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
 
@@ -7662,10 +7662,10 @@ I want each workflow's Experts, versions, steps, last execution and run count in
 So that I can pick and run a workflow knowing what it does and what it costs.
 
 Source:
-- [Workflows, WF-01 and WF-03 to WF-05](PRD-Studio.md#workflows)
+- [Workflows, WF-01 and WF-03 to WF-05](docs/PRD/PRD-Studio.md#workflows)
 - [Decision 0022, D11](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [MP-07](PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
-- [Workflow editor and monitor](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [MP-07](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [Workflow editor and monitor](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
 
 Acceptance Criteria:
@@ -7716,14 +7716,14 @@ I want four read-only GitHub tools, and labels on new issues, all on one configu
 So that Experts can triage issues, read CI failures, list pull requests and read files without ever choosing a repository.
 
 Source:
-- [GitHub tools, GH-01 to GH-05 and GH-07](PRD-Studio.md#github-tools)
+- [GitHub tools, GH-01 to GH-05 and GH-07](docs/PRD/PRD-Studio.md#github-tools)
 - [Decision 0022, D6 and D12](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [Decision 0007, amended](docs/engineering/decisions/0007-first-connector-github-issues.md#amended)
 - [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [Catalog contract](PRD-Tool-Catalog.md#catalog-contract)
-- [Tool-use record](PRD-Tool-Catalog.md#tool-use-record)
-- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
-- [URL guard](PRD-Tool-Catalog.md#url-guard)
+- [Catalog contract](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Provider keys](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
+- [URL guard](docs/PRD/PRD-Tool-Catalog.md#url-guard)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Codebase Context:
@@ -7784,11 +7784,11 @@ So that code changes reach the repository only as reviewed pull requests that ar
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [GitHub tools, GH-06](PRD-Studio.md#github-tools)
+- [GitHub tools, GH-06](docs/PRD/PRD-Studio.md#github-tools)
 - [Decision 0022, D6 and D7](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [Decision 0007, marker readback](docs/engineering/decisions/0007-first-connector-github-issues.md#why)
 - [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [PRD 9.2](PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [PRD 9.2](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
@@ -7850,7 +7850,7 @@ Source:
 - [Decision 0022, what this doesn't establish](docs/engineering/decisions/0022-studio-product-surfaces.md#what-this-doesnt-establish)
 - [Decision 0007, what this doesn't establish](docs/engineering/decisions/0007-first-connector-github-issues.md#what-this-doesnt-establish)
 - [Decision 0017, C5](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
-- [GitHub tools](PRD-Studio.md#github-tools)
+- [GitHub tools](docs/PRD/PRD-Studio.md#github-tools)
 
 Acceptance Criteria:
 
@@ -7887,9 +7887,9 @@ I want a side panel on the run list with the plan's progress, each task's tools 
 So that I can follow and steer a run without leaving the list.
 
 Source:
-- [Runs, RN-04 and RN-05](PRD-Studio.md#runs)
+- [Runs, RN-04 and RN-05](docs/PRD/PRD-Studio.md#runs)
 - [Decision 0017, Q4 metered calls](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
-- [Pause, cancel and resume](PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [Pause, cancel and resume](docs/PRD/PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
 - [SP-010](docs/engineering/option-b-contract.md#sp-010--canonical-run-states-and-transitions)
 - [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
 
@@ -7938,10 +7938,10 @@ I want a one-line verdict and each check's measured value on Operations
 So that I can see how the local install is doing without reading logs.
 
 Source:
-- [Operations, OP-01, OP-02 and OP-04](PRD-Studio.md#operations)
+- [Operations, OP-01, OP-02 and OP-04](docs/PRD/PRD-Studio.md#operations)
 - [Decision 0022, D5](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [Decision 0013, amended](docs/engineering/decisions/0013-release-closure.md#amended)
-- [PRD 12.1 Operations](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 12.1 Operations](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
 
 Codebase Context:
@@ -7996,10 +7996,10 @@ So that I can see how much work ran and how it ended.
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Operations, OP-03](PRD-Studio.md#operations)
+- [Operations, OP-03](docs/PRD/PRD-Studio.md#operations)
 - [Decision 0022, D5](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 - [Decision 0013, amended](docs/engineering/decisions/0013-release-closure.md#amended)
-- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-04](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
 
 Acceptance Criteria:
 
@@ -8041,11 +8041,11 @@ I want System, Light or Dark, serif documents, a density and reduced motion, kep
 So that the app reads the way I like without changing any run.
 
 Source:
-- [Settings, SE-03](PRD-Studio.md#settings)
-- [DS-02 as amended](PRD-Design-System.md#ds-02--dark-is-the-default)
+- [Settings, SE-03](docs/PRD/PRD-Studio.md#settings)
+- [DS-02 as amended](docs/PRD/PRD-Design-System.md#ds-02--dark-is-the-default)
 - [Decision 0022, D2](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
-- [DS-05](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [DS-04](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05](docs/PRD/PRD-Design-System.md#ds-05--verification-and-design-evidence)
 
 Acceptance Criteria:
 
@@ -8094,9 +8094,9 @@ I want Settings divided into Appearance, Notifications, Account, Data on this Ma
 So that each preference and fact has one place.
 
 Source:
-- [Settings, SE-02 and SE-05 to SE-07](PRD-Studio.md#settings)
+- [Settings, SE-02 and SE-05 to SE-07](docs/PRD/PRD-Studio.md#settings)
 - [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [PRD 12.1 Settings](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [PRD 12.1 Settings](docs/PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -8148,10 +8148,10 @@ I want ⌘K to open one search over runs, Experts, workflows and tools
 So that I can jump to anything in this workspace from the keyboard.
 
 Source:
-- [Search, SR-01](PRD-Studio.md#search)
-- [Shell, SH-02](PRD-Studio.md#shell)
+- [Search, SR-01](docs/PRD/PRD-Studio.md#search)
+- [Shell, SH-02](docs/PRD/PRD-Studio.md#shell)
 - [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-04](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -8197,9 +8197,9 @@ So that I can start a goal from any screen.
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Shell, SH-02](PRD-Studio.md#shell)
+- [Shell, SH-02](docs/PRD/PRD-Studio.md#shell)
 - [Decision 0022, D3](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [DS-04](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-04](docs/PRD/PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
 
 Acceptance Criteria:
 
@@ -8241,10 +8241,10 @@ I want to see the final result while it's being written, and a preference to tur
 So that long results appear sooner without changing what's stored.
 
 Source:
-- [Streaming, ST-01](PRD-Studio.md#streaming)
-- [Settings, SE-03](PRD-Studio.md#settings)
+- [Streaming, ST-01](docs/PRD/PRD-Studio.md#streaming)
+- [Settings, SE-03](docs/PRD/PRD-Studio.md#settings)
 - [Decision 0022, D4](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Public event envelope](docs/PRD/PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
 - [Decision 0017, Q13 event compatibility](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
 - [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
 
@@ -8297,10 +8297,10 @@ So that I can start from working examples instead of an empty app.
 
 Source:
 - [Decision 0022, D14–D17](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
-- [Seed, SD-02](PRD-Studio.md#seed)
-- [Seed, SD-01](PRD-Studio.md#seed)
+- [Seed, SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Seed, SD-01](docs/PRD/PRD-Studio.md#seed)
 - [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
-- [Provider keys](PRD-Tool-Catalog.md#provider-keys)
+- [Provider keys](docs/PRD/PRD-Tool-Catalog.md#provider-keys)
 - [Decision 0022, D8](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 
 Acceptance Criteria:
@@ -8356,7 +8356,7 @@ So that forms read calmly, without a heavy line at the bottom.
 
 Source:
 - [Decision 0023, E1](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
-- [DS-03](PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
+- [DS-03](docs/PRD/PRD-Design-System.md#ds-03--apply-semantic-tokens-across-the-whole-ui)
 - [Decision 0021](docs/engineering/decisions/0021-studio-interface-redesign.md#decision)
 
 Acceptance Criteria:
@@ -8455,7 +8455,7 @@ So that member screens work instead of asking me to choose a workspace with no w
 
 Source:
 - [Decision 0023, E3](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
-- [Shell, SH-01](PRD-Studio.md#shell)
+- [Shell, SH-01](docs/PRD/PRD-Studio.md#shell)
 - [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
 
 Acceptance Criteria:
@@ -8554,7 +8554,7 @@ So that every screen shows what the system actually does, like the Studio concep
 
 Source:
 - [Decision 0023, E6](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision)
-- [Seed, SD-02](PRD-Studio.md#seed)
+- [Seed, SD-02](docs/PRD/PRD-Studio.md#seed)
 - [Decision 0022, D1](docs/engineering/decisions/0022-studio-product-surfaces.md#decision)
 
 Acceptance Criteria:

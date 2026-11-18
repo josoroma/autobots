@@ -409,7 +409,7 @@ def evidence_state(root: Path, manifest: dict[str, str] | None = None) -> tuple[
 
 - **Severity** medium · **Dimension** structure · **Effort** L · **Risk** medium · **Occurrences** 1
 - **Where:**
-  - [PRD-Development-Harness.md:54](../../../../PRD-Development-Harness.md#L54): DH-03: scripts/db/ for target-checked migration and seed operations
+  - [PRD-Development-Harness.md:54](../../../PRD/PRD-Development-Harness.md#L54): DH-03: scripts/db/ for target-checked migration and seed operations
   - [scripts/disposable_db.py:622-656](../../../../scripts/disposable_db.py#L622): a CLI inside a module 16 scripts import
   - [scripts/app_db.py:705-717](../../../../scripts/app_db.py#L705): a CLI inside a module 14 scripts import
   - [scripts/supabase_stack.py:331-352](../../../../scripts/supabase_stack.py#L331)

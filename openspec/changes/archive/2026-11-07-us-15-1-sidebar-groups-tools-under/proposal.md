@@ -1,6 +1,6 @@
 ## Why
 
-US-15.1, [PRD-Studio SH-01](../../../PRD-Studio.md#shell) and [Decision 0022 D2](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision): the owner chose the Studio concepts' navigation, with Tools under **Build**. Decision 0017 C9's "Tools directly before Settings" is amended, and so is Decision 0021 R5's grouping, which put Tools under System to keep that rule.
+US-15.1, [PRD-Studio SH-01](../../../../docs/PRD/PRD-Studio.md#shell) and [Decision 0022 D2](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision): the owner chose the Studio concepts' navigation, with Tools under **Build**. Decision 0017 C9's "Tools directly before Settings" is amended, and so is Decision 0021 R5's grouping, which put Tools under System to keep that rule.
 
 ## What Changes
 

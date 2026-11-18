@@ -1,6 +1,6 @@
 # Decision 0019: Sol as a third profile for browsing, browser-use's dependencies, and a capped live trial
 
-**Date:** 2026-11-07. **Authority:** the owner, who allowed `openai/gpt-6.1-sol-20260929` in their OpenRouter guardrail beside Terra and DeepSeek Flash, asked to try browsing with it, and then chose three options when asked: **Sol as a third approved profile, bound to the `researcher` role that browsing uses, its route qualified live before any run uses it**; **drop the unused `langchain-mcp-adapters` pin** so browser-use can be added; and **US$1 per live browse trial**. This amends [SP-006](../option-b-contract.md#sp-006--approved-model-profiles), [MP-01](../../../PRD-Model-Providers.md#mp-01-approved-models-and-selection) and [Decision 0018](0018-browser-executor.md) B7 and B8.
+**Date:** 2026-11-07. **Authority:** the owner, who allowed `openai/gpt-6.1-sol-20260929` in their OpenRouter guardrail beside Terra and DeepSeek Flash, asked to try browsing with it, and then chose three options when asked: **Sol as a third approved profile, bound to the `researcher` role that browsing uses, its route qualified live before any run uses it**; **drop the unused `langchain-mcp-adapters` pin** so browser-use can be added; and **US$1 per live browse trial**. This amends [SP-006](../option-b-contract.md#sp-006--approved-model-profiles), [MP-01](../../PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection) and [Decision 0018](0018-browser-executor.md) B7 and B8.
 
 ## Decision
 

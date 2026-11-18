@@ -1,6 +1,6 @@
 # Decision 0017: Tool catalog, tool-use record and tool providers
 
-**Date:** 2026-11-07. **Authority:** the owner, who asked the session to implement [the tool-catalog plan](../../plan/tool-catalog.md), to take the best-reasoned decision on every point the plan left open, to approve those decisions and to continue. That approves [PRD-Tool-Catalog.md](../../../PRD-Tool-Catalog.md) and schedules [EPIC-14](../../../SPECS.md#epic-14-tool-catalog-and-tool-use-record). Each answer below is the option the session reasoned best. The owner can change any of them under the story ID it affects.
+**Date:** 2026-11-07. **Authority:** the owner, who asked the session to implement [the tool-catalog plan](../../plan/tool-catalog.md), to take the best-reasoned decision on every point the plan left open, to approve those decisions and to continue. That approves [PRD-Tool-Catalog.md](../../PRD/PRD-Tool-Catalog.md) and schedules [EPIC-14](../../../SPECS.md#epic-14-tool-catalog-and-tool-use-record). Each answer below is the option the session reasoned best. The owner can change any of them under the story ID it affects.
 
 ## Decision
 

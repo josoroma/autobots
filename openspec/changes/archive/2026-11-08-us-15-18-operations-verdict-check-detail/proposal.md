@@ -1,6 +1,6 @@
 ## Why
 
-US-15.18 implements [PRD-Studio OP-01, OP-02 and OP-04](../../../PRD-Studio.md#operations), within [Decision 0022 D5](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and [Decision 0013, amended](../../../docs/engineering/decisions/0013-release-closure.md#amended). Operations shows each check's state and message. It doesn't count how many checks pass or how many workers are live, and it shows none of the measured values D5 allows.
+US-15.18 implements [PRD-Studio OP-01, OP-02 and OP-04](../../../../docs/PRD/PRD-Studio.md#operations), within [Decision 0022 D5](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and [Decision 0013, amended](../../../docs/engineering/decisions/0013-release-closure.md#amended). Operations shows each check's state and message. It doesn't count how many checks pass or how many workers are live, and it shows none of the measured values D5 allows.
 
 ## What Changes
 

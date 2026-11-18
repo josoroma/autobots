@@ -1,6 +1,6 @@
 ## Why
 
-US-15.2, [PRD-Studio ID-01, ID-02, SH-05 and SE-04](../../../PRD-Studio.md#identity), and [Decision 0022 D10](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The shell, Home and Settings need a name for the person, their role and their workspaces' names. Today the session summary returns only a user ID and workspace IDs.
+US-15.2, [PRD-Studio ID-01, ID-02, SH-05 and SE-04](../../../../docs/PRD/PRD-Studio.md#identity), and [Decision 0022 D10](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The shell, Home and Settings need a name for the person, their role and their workspaces' names. Today the session summary returns only a user ID and workspace IDs.
 
 ## What Changes
 

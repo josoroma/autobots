@@ -1,6 +1,6 @@
 ## Why
 
-US-14.7, [PRD-Tool-Catalog "Web tools"](../../../PRD-Tool-Catalog.md#web-tools) and Decision 0017 Q2: the requested "built-in" Search The Web and Extract Website Content are the Jina-backed tools AutoGPT ships under those names.
+US-14.7, [PRD-Tool-Catalog "Web tools"](../../../../docs/PRD/PRD-Tool-Catalog.md#web-tools) and Decision 0017 Q2: the requested "built-in" Search The Web and Extract Website Content are the Jina-backed tools AutoGPT ships under those names.
 
 ## What Changes
 

@@ -509,7 +509,7 @@ Retain explicit goals/directives, a visible action/result history, bounded loops
 
 AutoGPT already documents an OpenAI-compatible local transport for AutoPilot chat. It requires tool-calling and streaming support and routes local use through the baseline instead of the Claude Agent SDK path. Auxiliary model defaults can inherit the selected local chat model; graph-layer LLM blocks have a separate configuration path. This is an upstream capability, not the chosen inference deployment for our clone. [Official local AutoPilot guide](https://agpt.co/docs/platform/using-ai-services/copilot-local-llm)
 
-Earlier [Bonsai protocol research](research/LOCAL-MODEL-EVIDENCE.md) and the [Qwen GGUF experiment](research/QWEN38-GGUF-TEST-RESULTS.md) remain historical evidence outside the active OpenRouter-only clone scope.
+Earlier [Bonsai protocol research](../../research/LOCAL-MODEL-EVIDENCE.md) and the [Qwen GGUF experiment](../../research/QWEN38-GGUF-TEST-RESULTS.md) remain historical evidence outside the active OpenRouter-only clone scope.
 
 The implication is **protocol compatibility is necessary but insufficient**. Qualify each selected OpenRouter route for tool-call serialization, context behavior, structured output, cancellation, streaming and bounded concurrency. Catalog metadata is neither a completed protocol test nor evidence of autonomous task quality.
 
@@ -535,7 +535,7 @@ The public catalog snapshot distinguishes the requested canonical identifiers fr
 | `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
 | `openai/gpt-6-astra-20260903` | `openai/gpt-6-astra` |
 
-These mappings come from the [2026-11-04 catalog evidence](research/openrouter-model-catalog.json), not paid inference. In particular, a shorter request ID is not proof of permanent snapshot pinning; validate the canonical mapping according to the provider contract. Catalog availability does not establish task quality, schema support on every route, or release qualification. Provider setup and selection are finalized requirements; implementing and testing them remains pending.
+These mappings come from the [2026-11-04 catalog evidence](../../research/openrouter-model-catalog.json), not paid inference. In particular, a shorter request ID is not proof of permanent snapshot pinning; validate the canonical mapping according to the provider contract. Catalog availability does not establish task quality, schema support on every route, or release qualification. Provider setup and selection are finalized requirements; implementing and testing them remains pending.
 
 ## 15. Functional requirements for the independent clone
 

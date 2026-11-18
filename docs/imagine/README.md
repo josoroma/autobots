@@ -30,7 +30,7 @@ These are concept screens with sample data (Tallyboard, Plainview and `acme/tall
 
 ## Relation to the design contract
 
-The screens use [luma.css](../design/luma.css) unchanged. [quiet.css](source/quiet.css), carried over from the previous set, adds typography, radius steps derived from `--radius`, and semantic aliases. [studio.css](source/studio.css) adds only layout components on top: tables, segmented controls, side panels and callouts. Three choices go beyond what [PRD-Design-System.md](../../PRD-Design-System.md) says today, so they're proposals, not adopted requirements:
+The screens use [luma.css](../design/luma.css) unchanged. [quiet.css](source/quiet.css), carried over from the previous set, adds typography, radius steps derived from `--radius`, and semantic aliases. [studio.css](source/studio.css) adds only layout components on top: tables, segmented controls, side panels and callouts. Three choices go beyond what [PRD-Design-System.md](../PRD/PRD-Design-System.md) says today, so they're proposals, not adopted requirements:
 
 1. A serif display face for headings and documents.
 2. An amber attention color for pending approvals, input and drafts.

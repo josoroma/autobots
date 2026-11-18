@@ -2,7 +2,7 @@
 
 **Scope:** the approved Luma design contract, existing-doc/backlog integration, exact CSS tokens, and six regenerated dark UI concepts. Application theme behavior remains unimplemented.
 
-[Work record](../../work-items/LUMA-001.md) · [Design contract](../../../../PRD-Design-System.md) · [Exact tokens](../../../design/luma.css) · [Gallery](../../../imagine/index.html) · [Prompts](../../../imagine/prompts.json) · [Artifact manifest](../../../imagine/manifest.json) · [Static verification](verification.json) · [Repository verification](harness-verification.json)
+[Work record](../../work-items/LUMA-001.md) · [Design contract](../../../PRD/PRD-Design-System.md) · [Exact tokens](../../../design/luma.css) · [Gallery](../../../imagine/index.html) · [Prompts](../../../imagine/prompts.json) · [Artifact manifest](../../../imagine/manifest.json) · [Static verification](verification.json) · [Repository verification](harness-verification.json)
 
 ## Document and token review
 

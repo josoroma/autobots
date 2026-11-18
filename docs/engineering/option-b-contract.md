@@ -8,13 +8,13 @@ This preserves the SP-001–SP-021 technical contract previously held in root SP
 
 | Source | Authority retained by this specification |
 |---|---|
-| [Option B PRD](../../PRD-LangChain-Deep-Agents.md) | Product behavior, agent loops, domain entities, tools, durability and LC acceptance requirements |
-| [Development harness PRD](../../PRD-Development-Harness.md) | H0/H1 prerequisite, coding standards, `.claude` integration, portable checks and work evidence |
-| [Model provider PRD](../../PRD-Model-Providers.md) | Exact model identities, credentials, routing, budgets and MP acceptance requirements |
-| [Local deployment PRD](../../PRD-Local-Mac-Deployment.md) | Supabase/Docker topology, ports, private storage, operations and LM acceptance requirements |
-| [Design-system PRD](../../PRD-Design-System.md) | Exact shadcn Luma tokens, dark-default behavior, accessible component/state styling and DS verification requirements |
-| [AutoGPT research PRD](../../PRD-AutoGPT.md) | Source-grounded capability reference; upstream behavior is not automatically a clone requirement |
-| [Comparison](../../PRD-Comparison-Recommendation.md) | Rationale for Option B; Option A is outside this implementation scope |
+| [Option B PRD](../PRD/PRD-LangChain-Deep-Agents.md) | Product behavior, agent loops, domain entities, tools, durability and LC acceptance requirements |
+| [Development harness PRD](../PRD/PRD-Development-Harness.md) | H0/H1 prerequisite, coding standards, `.claude` integration, portable checks and work evidence |
+| [Model provider PRD](../PRD/PRD-Model-Providers.md) | Exact model identities, credentials, routing, budgets and MP acceptance requirements |
+| [Local deployment PRD](../PRD/PRD-Local-Mac-Deployment.md) | Supabase/Docker topology, ports, private storage, operations and LM acceptance requirements |
+| [Design-system PRD](../PRD/PRD-Design-System.md) | Exact shadcn Luma tokens, dark-default behavior, accessible component/state styling and DS verification requirements |
+| [AutoGPT research PRD](../PRD/PRD-AutoGPT.md) | Source-grounded capability reference; upstream behavior is not automatically a clone requirement |
+| [Comparison](../PRD/PRD-Comparison-Recommendation.md) | Rationale for Option B; Option A is outside this implementation scope |
 
 This file converts those requirements into an ordered build contract and closes the serialized state/terminal-transition details below. It does not replace the detailed security, provider or deployment contracts. Change a shared decision in its owning PRD and this specification together; record rationale and affected acceptance evidence. Do not silently resolve conflicting requirements in code.
 
@@ -263,7 +263,7 @@ Scope idempotency keys by workspace, actor, operation and target. Store a normal
 
 Required screens are local sign-in/setup, goal composer and model selection, run/plan activity, approvals, artifacts, Expert configuration, workflow editor/monitor, routines, memory provenance, Settings and local Operations as scoped by milestone. Provide explicit loading/empty/error/paused/reconnecting states and keyboard-accessible controls. Show evidence and decision summaries, not private chain-of-thought. Do not show a cloud/server error as endless “thinking.”
 
-Use shadcn Luma with the exact [user-supplied tokens](../design/luma.css), governed by [DS-01–DS-05](../../PRD-Design-System.md). Dark is the first-visit default regardless of OS preference; apply a saved explicit light/dark choice before paint and fall back to dark for missing/invalid preferences. Components, sidebar, overlays, charts and workflow surfaces use semantic tokens. State and diff meaning must remain legible through text/icons and accessible contrast in both modes. Theme changes do not alter run/model state or call inference. The prior warm-neutral/forest-green concepts are superseded; regenerated images remain design references rather than implementation evidence.
+Use shadcn Luma with the exact [user-supplied tokens](../design/luma.css), governed by [DS-01–DS-05](../PRD/PRD-Design-System.md). Dark is the first-visit default regardless of OS preference; apply a saved explicit light/dark choice before paint and fall back to dark for missing/invalid preferences. Components, sidebar, overlays, charts and workflow surfaces use semantic tokens. State and diff meaning must remain legible through text/icons and accessible contrast in both modes. Theme changes do not alter run/model state or call inference. The prior warm-neutral/forest-green concepts are superseded; regenerated images remain design references rather than implementation evidence.
 
 ### SP-015 — migrations and seeds
 

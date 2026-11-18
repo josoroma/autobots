@@ -1,6 +1,6 @@
 ## Why
 
-US-14.11, [PRD-Tool-Catalog "Code tools"](../../../PRD-Tool-Catalog.md#code-tools) and Decision 0017 C7 and Q8: the request asked for a ripgrep-style `search_files` with read, write and patch, modelled on Hermes Agent. Autobots grants no shell, and arbitrary execution stays disabled, so they work on the run's own files.
+US-14.11, [PRD-Tool-Catalog "Code tools"](../../../../docs/PRD/PRD-Tool-Catalog.md#code-tools) and Decision 0017 C7 and Q8: the request asked for a ripgrep-style `search_files` with read, write and patch, modelled on Hermes Agent. Autobots grants no shell, and arbitrary execution stays disabled, so they work on the run's own files.
 
 ## What Changes
 

@@ -1,6 +1,6 @@
 ## Why
 
-US-14.9, [PRD-Tool-Catalog "File tools" and FI-01](../../../PRD-Tool-Catalog.md#file-tools) and Decision 0017 Q10 and Q11: a person can't attach files to a goal, `read_run_file` returns a whole file or fails past its cap, there's no CSV reader, and nothing can save a remote text file.
+US-14.9, [PRD-Tool-Catalog "File tools" and FI-01](../../../../docs/PRD/PRD-Tool-Catalog.md#file-tools) and Decision 0017 Q10 and Q11: a person can't attach files to a goal, `read_run_file` returns a whole file or fails past its cap, there's no CSV reader, and nothing can save a remote text file.
 
 ## What Changes
 

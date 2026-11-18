@@ -1,6 +1,6 @@
 ## Why
 
-US-15.9, [PRD-Studio HM-02 and HM-03](../../../PRD-Studio.md#home) and [Decision 0022 D11](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Home's composer has a model select, a fixed US$1.00 disclosure and file chips that show a path and type. A person can't choose an Expert or a budget there, and can't see which profiles and tools the run would use.
+US-15.9, [PRD-Studio HM-02 and HM-03](../../../../docs/PRD/PRD-Studio.md#home) and [Decision 0022 D11](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Home's composer has a model select, a fixed US$1.00 disclosure and file chips that show a path and type. A person can't choose an Expert or a budget there, and can't see which profiles and tools the run would use.
 
 ## What Changes
 

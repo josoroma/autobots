@@ -7,7 +7,7 @@ Evidence: STUDIO-UI-001
 
 DH-W01.
 
-- **Source:** owner request to redesign the app from the [Studio concepts](../../imagine/README.md); [Decision 0021](../decisions/0021-studio-interface-redesign.md); [PRD-Design-System.md](../../../PRD-Design-System.md) DS-01–DS-05; SP-014.
+- **Source:** owner request to redesign the app from the [Studio concepts](../../imagine/README.md); [Decision 0021](../decisions/0021-studio-interface-redesign.md); [PRD-Design-System.md](../../PRD/PRD-Design-System.md) DS-01–DS-05; SP-014.
 - **Intended behavior and invariants:** every screen takes the Studio look: grouped sidebar, serif page titles, hairline surfaces, one accent, an attention tone for what waits for a person. Behavior, API calls, product wording, accessible names, roles and `data-*` hooks are unchanged. Dark stays the default; the selector offers only Dark and Light.
 - **Affected layers, contracts and states:** `apps/web` presentation only (`app/globals.css`, the shell and sidebar, `components/ui/*`, every page and panel component), plus the token extension file `docs/design/studio-extensions.css`. No API, contract, schema, worker or run-state change.
 - **Migration and operational impact:** none.

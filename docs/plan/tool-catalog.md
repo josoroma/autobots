@@ -1,6 +1,6 @@
 # Plan: tool catalog, tool-use record and Tools page
 
-**Date:** 2026-11-07. **Status:** superseded as a source by [PRD-Tool-Catalog.md](../../PRD-Tool-Catalog.md) and [Decision 0017](../engineering/decisions/0017-tool-catalog.md), which answer its open questions. Kept as the reasoning behind them.
+**Date:** 2026-11-07. **Status:** superseded as a source by [PRD-Tool-Catalog.md](../PRD/PRD-Tool-Catalog.md) and [Decision 0017](../engineering/decisions/0017-tool-catalog.md), which answer its open questions. Kept as the reasoning behind them.
 
 This plan is not a requirement source. `AGENTS.md` and `.claude/rules/delivery.md` say backlog intent comes from approved PRDs and owner decisions, ingested through `autobots-spec-ingest`. `CODEBASE.md` describes what exists, not what should exist. So the EPIC drafted in [section 12](#12-draft-epic-in-specs-style) is input for a PRD addition. It is not a backlog edit.
 
@@ -391,8 +391,8 @@ I want one versioned catalog of every registered tool with its schemas, group, p
 So that tools can be discovered and granted singly or by group without reading the code.
 
 Source:
-- [Proposed tool catalog contract](PRD-Tool-Catalog.md#catalog-contract) — not yet written.
-- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Proposed tool catalog contract](../PRD/PRD-Tool-Catalog.md#catalog-contract) — not yet written.
+- [Tool contract](../PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
 - [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
 
 Acceptance Criteria:
@@ -436,9 +436,9 @@ I want a Tools page before Settings that shows each tool's inputs, outputs, type
 So that I can see what an agent may use and choose it precisely.
 
 Source:
-- [Proposed Tools screen](PRD-Tool-Catalog.md#tools-screen) — not yet written.
-- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
-- [Design system](PRD-Design-System.md)
+- [Proposed Tools screen](../PRD/PRD-Tool-Catalog.md#tools-screen) — not yet written.
+- [Required screens](../PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Design system](../PRD/PRD-Design-System.md)
 
 Acceptance Criteria:
 
@@ -481,8 +481,8 @@ I want every tool call recorded with when, why, what it used and produced, and i
 So that I can see which tools a run or flow used and for what.
 
 Source:
-- [Proposed tool-use record](PRD-Tool-Catalog.md#tool-use-record) — not yet written.
-- [Public event envelope](PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
+- [Proposed tool-use record](../PRD/PRD-Tool-Catalog.md#tool-use-record) — not yet written.
+- [Public event envelope](../PRD/PRD-LangChain-Deep-Agents.md#113-public-event-envelope)
 - [SP-011](docs/engineering/option-b-contract.md)
 
 Acceptance Criteria:
@@ -527,8 +527,8 @@ I want the run workspace, inspector and workflow monitor to show tools used, whe
 So that a run's outcome can be traced to the tools behind it.
 
 Source:
-- [Proposed tool-use views](PRD-Tool-Catalog.md#tool-use-views) — not yet written.
-- [Required screens](PRD-LangChain-Deep-Agents.md#121-required-screens)
+- [Proposed tool-use views](../PRD/PRD-Tool-Catalog.md#tool-use-views) — not yet written.
+- [Required screens](../PRD/PRD-LangChain-Deep-Agents.md#121-required-screens)
 
 Acceptance Criteria:
 
@@ -563,7 +563,7 @@ I want each tool provider's key read server-side per attempt and shown only as a
 So that tools work when configured and nothing leaks when they aren't.
 
 Source:
-- [Proposed provider-key handling](PRD-Tool-Catalog.md#provider-keys) — not yet written.
+- [Proposed provider-key handling](../PRD/PRD-Tool-Catalog.md#provider-keys) — not yet written.
 - [Decision 0007, credential](docs/engineering/decisions/0007-first-connector-github-issues.md#decision)
 - Proposed decision: tool providers are not model providers.
 
@@ -603,7 +603,7 @@ I want Tavily's four operations as bounded read-only tools
 So that a run can search, extract and crawl the web through one recorded path.
 
 Source:
-- [Proposed web tools](PRD-Tool-Catalog.md#web-tools) — not yet written.
+- [Proposed web tools](../PRD/PRD-Tool-Catalog.md#web-tools) — not yet written.
 - Proposed decision naming Tavily as a tool provider, with no provider-side inference.
 
 Acceptance Criteria:

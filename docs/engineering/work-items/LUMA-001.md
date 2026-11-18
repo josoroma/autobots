@@ -6,7 +6,7 @@ Adopt the user's exact shadcn Luma CSS as the canonical palette, with dark as th
 
 ## Implemented
 
-Added [PRD-Design-System.md](../../../PRD-Design-System.md) DS-01–DS-05 and the verbatim [token file](../../design/luma.css). Updated the implementation, comparison, provider, deployment and development PRDs; expanded existing SP-014, added LC-34 and extended US-2.5 without changing its status. SPECS retains 10 epics and 42 stories, now with 86 tasks after two explicit theme tasks.
+Added [PRD-Design-System.md](../../PRD/PRD-Design-System.md) DS-01–DS-05 and the verbatim [token file](../../design/luma.css). Updated the implementation, comparison, provider, deployment and development PRDs; expanded existing SP-014, added LC-34 and extended US-2.5 without changing its status. SPECS retains 10 epics and 42 stories, now with 86 tasks after two explicit theme tasks.
 
 Mapped the design PRD into the local harness sources and linked it from the frontend rule and ingestion guidance. Regenerated backlog navigation. Product code, services and model credentials remain untouched.
 

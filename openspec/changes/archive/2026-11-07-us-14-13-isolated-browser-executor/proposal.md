@@ -1,6 +1,6 @@
 ## Why
 
-US-14.13, [PRD-Tool-Catalog BX-01 to BX-05](../../../PRD-Tool-Catalog.md#isolated-browser-executor) and [Decision 0018](../../../docs/engineering/decisions/0018-browser-executor.md) B1 to B3 and B8: `browse_goal` (US-14.12) needs a browser that can't reach this Mac, its services, its files or its credentials.
+US-14.13, [PRD-Tool-Catalog BX-01 to BX-05](../../../../docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor) and [Decision 0018](../../../docs/engineering/decisions/0018-browser-executor.md) B1 to B3 and B8: `browse_goal` (US-14.12) needs a browser that can't reach this Mac, its services, its files or its credentials.
 
 ## What Changes
 

@@ -1,6 +1,6 @@
 ## Why
 
-US-15.12, [PRD-Studio WF-02](../../../PRD-Studio.md#workflows) and [Decision 0022 D8](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The editor can only publish what's in its text area. There's no way to keep a next version in progress without publishing it.
+US-15.12, [PRD-Studio WF-02](../../../../docs/PRD/PRD-Studio.md#workflows) and [Decision 0022 D8](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The editor can only publish what's in its text area. There's no way to keep a next version in progress without publishing it.
 
 ## What Changes
 

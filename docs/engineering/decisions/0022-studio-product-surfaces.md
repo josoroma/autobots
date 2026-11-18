@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-07. **Authority:** the owner. They asked for the app to "look and work like" the nine [Studio concepts](../../imagine/README.md), and for the tools the concepts' Experts and workflows need. They read [the Studio features plan](../../plan/studio-features.md) and answered its open questions in this session, then answered the backlog's six open questions with D14 to D17. Their answers are recorded in [the plan's owner answers](../../plan/studio-features.md#owner-answers).
 
-This decision approves [PRD-Studio.md](../../../PRD-Studio.md) and schedules EPIC-15. It amends [Decision 0021](0021-studio-interface-redesign.md) R5 and R6, [PRD-Design-System.md](../../../PRD-Design-System.md) DS-02, [Decision 0017](0017-tool-catalog.md) C9 and [Decision 0007](0007-first-connector-github-issues.md), as listed below.
+This decision approves [PRD-Studio.md](../../PRD/PRD-Studio.md) and schedules EPIC-15. It amends [Decision 0021](0021-studio-interface-redesign.md) R5 and R6, [PRD-Design-System.md](../../PRD/PRD-Design-System.md) DS-02, [Decision 0017](0017-tool-catalog.md) C9 and [Decision 0007](0007-first-connector-github-issues.md), as listed below.
 
 ## Decision
 

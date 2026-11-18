@@ -1,6 +1,6 @@
 ## Why
 
-US-15.7, [PRD-Studio TL-01 to TL-03](../../../PRD-Studio.md#tools). Tools opens each tool on its own page, has no text filter or group counts, and labels its grant *sites* as "Granted to". Nothing shows which Experts or workflows actually hold a tool, and the schema can't be copied.
+US-15.7, [PRD-Studio TL-01 to TL-03](../../../../docs/PRD/PRD-Studio.md#tools). Tools opens each tool on its own page, has no text filter or group counts, and labels its grant *sites* as "Granted to". Nothing shows which Experts or workflows actually hold a tool, and the schema can't be copied.
 
 ## What Changes
 

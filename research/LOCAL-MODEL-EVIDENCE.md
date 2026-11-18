@@ -1,6 +1,6 @@
 # Local model evidence and qualification plan
 
-> **Historical evidence — earlier runtime plan superseded.** The current application uses **OpenRouter-only inference** with local Mac services and Supabase/Docker. This report does not require installing, starting or qualifying Bonsai for the app. See the [current deployment contract](../PRD-Local-Mac-Deployment.md) and [provider contract](../PRD-Model-Providers.md). Raw observations below are retained as recorded.
+> **Historical evidence — earlier runtime plan superseded.** The current application uses **OpenRouter-only inference** with local Mac services and Supabase/Docker. This report does not require installing, starting or qualifying Bonsai for the app. See the [current deployment contract](../docs/PRD/PRD-Local-Mac-Deployment.md) and [provider contract](../docs/PRD/PRD-Model-Providers.md). Raw observations below are retained as recorded.
 
 Research date: **2026-11-04**, America/Costa_Rica. Applies to both clone PRDs. This report separates current observations, historical local records, upstream claims, and proposed requirements.
 

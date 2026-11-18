@@ -320,12 +320,12 @@ extend = "../../../pyproject.toml"
 - **Severity** medium · **Dimension** standards · **Effort** S · **Risk** low · **Occurrences** 27
 - **Where:**
   - [.claude/rules/python-worker.md:11](../../../../.claude/rules/python-worker.md#L11): Use explicit UTC
-  - [PRD-Development-Harness.md:116](../../../../PRD-Development-Harness.md#L116): subprocess argument arrays, never shell code
+  - [PRD-Development-Harness.md:116](../../../PRD/PRD-Development-Harness.md#L116): subprocess argument arrays, never shell code
   - [AGENTS.md:27](../../../../AGENTS.md#L27): OpenRouter only, no alternative provider
   - [tests/toolchain/test_scaffold_scope.py:13](../../../../tests/toolchain/test_scaffold_scope.py#L13): the SDK ban, as a test
   - [scripts/verify.py:154-156](../../../../scripts/verify.py#L154): that test runs in full only
   - [services/agent/src/autobots/application/tool_gateway.py:372-373](../../../../services/agent/src/autobots/application/tool_gateway.py#L372): a broad catch that neither logs nor re-raises
-  - [PRD-Development-Harness.md:129](../../../../PRD-Development-Harness.md#L129): preserve causes; avoid swallowed exceptions
+  - [PRD-Development-Harness.md:129](../../../PRD/PRD-Development-Harness.md#L129): preserve causes; avoid swallowed exceptions
 - **Evidence:** Counted over all 318 Python files in this review. DTZ (naive datetimes): 0. S602, S604 and S605 (shell execution): 0. TID251, banning the unused and non-OpenRouter SDKs: 0. The SDK ban exists only as a test that only the full profile runs, so an edit gets no warning. BLE001 finds 22 broad catches in services/agent/src, 3 in scripts and 2 in .claude/hooks, none annotated. Ruff cannot see log_event, so it also flags handlers that do log: about 10 of the 22 log a named event and 2 raise a new error. The silent ones include `except Exception: return _denied("review_unavailable")`.
 - **Why it matters:** Rules a pinned linter checks in milliseconds depend on reviewers noticing, and nothing marks which broad catches are deliberate.
 - **Recommendation:** Select DTZ, S602, S604, S605 and TID251 in the shared config as errors. They need no baseline and then also run in the PostToolUse diagnostic. Add BLE001 and run `ruff check --add-noqa`, then write the reason on each of the 27 current sites, so each kept broad catch says why and any new one needs a reason. Keep test_scaffold_scope.py.
@@ -408,7 +408,7 @@ apps/web/lib/expert-draft.ts       <- draftOf, tested by node --test
 - **Where:**
   - [Makefile:232-234](../../../../Makefile#L232): validate, then the harness profile
   - [scripts/verify.py:79-88](../../../../scripts/verify.py#L79): the harness profile validates the backlog a second time
-  - [PRD-Development-Harness.md:123](../../../../PRD-Development-Harness.md#L123): Git hooks may call the same runner
+  - [PRD-Development-Harness.md:123](../../../PRD/PRD-Development-Harness.md#L123): Git hooks may call the same runner
 - **Evidence:** .github does not exist, core.hooksPath is unset and .git/hooks holds only samples; CODEBASE.md also notes no CI. `make check` runs `specs.py validate` and then the harness profile, which runs `specs.py validate` again as backlog_validation and runs no lint, type check or application test. Latest durations: harness 28 s, fast 44 s (Python scope), full 95 s, db 610 s, operations 266 s.
 - **Why it matters:** Commits made outside an assistant session reach main with no gate. The Stop hook is the only trigger, and DH-05 says bypassable hooks cannot be the only completion check.
 - **Recommendation:** Track `.githooks/pre-commit` running the fast profile (changed scope; no services, network or model), and document the explicit opt-in `git config core.hooksPath .githooks`. Run full before merging, either as a pre-push opt-in or as a job on a self-hosted Apple Silicon runner after `scripts/toolchain.py bootstrap`, keeping `.checks/full/latest.json` as the artifact. Keep db and operations manual, because they start disposable Docker projects. Drop make check's duplicate `specs.py validate`, and add a fast target beside it: fast exits 2 on a checkout that was never bootstrapped, so check can stay on harness for unprepared checkouts.

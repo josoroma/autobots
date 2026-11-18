@@ -1,6 +1,6 @@
 ## Why
 
-US-14.3, [PRD-Tool-Catalog TU-01 to TU-07](../../../PRD-Tool-Catalog.md#tool-use-record) and Decision 0017 Q3, Q4 and Q13: only effectful tools leave a receipt, so nothing durable says which reads a run made, when, or for which task, and metered provider calls have no limit.
+US-14.3, [PRD-Tool-Catalog TU-01 to TU-07](../../../../docs/PRD/PRD-Tool-Catalog.md#tool-use-record) and Decision 0017 Q3, Q4 and Q13: only effectful tools leave a receipt, so nothing durable says which reads a run made, when, or for which task, and metered provider calls have no limit.
 
 ## What Changes
 

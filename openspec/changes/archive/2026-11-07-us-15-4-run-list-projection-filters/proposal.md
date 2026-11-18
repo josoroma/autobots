@@ -1,6 +1,6 @@
 ## Why
 
-US-15.4, [PRD-Studio RN-01 to RN-03](../../../PRD-Studio.md#runs) and [Decision 0022 D9](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The run list returns only ID, parent, status, goal and created time, capped at 100 rows with no filters, counts or paging. Studio's Runs needs each run's facts, status groups with server counts, filters and keyset paging.
+US-15.4, [PRD-Studio RN-01 to RN-03](../../../../docs/PRD/PRD-Studio.md#runs) and [Decision 0022 D9](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The run list returns only ID, parent, status, goal and created time, capped at 100 rows with no filters, counts or paging. Studio's Runs needs each run's facts, status groups with server counts, filters and keyset paging.
 
 ## What Changes
 

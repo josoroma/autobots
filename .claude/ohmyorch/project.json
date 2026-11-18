@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "enabled": true,
   "documents": {
-    "prd": "PRD-LangChain-Deep-Agents.md",
+    "prd": "docs/PRD/PRD-LangChain-Deep-Agents.md",
     "specs": "SPECS.md",
     "codebase": "CODEBASE.md"
   },

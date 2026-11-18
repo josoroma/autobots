@@ -10,7 +10,7 @@ They approved this plan in the session ("yes go ahead"):
 - reading pages directly, as Deep-Research-Content-Writer does (its ADR 0006), with `trafilatura`;
 - per-workspace on/off switches on the Tools page, for each tool and each group.
 
-The owner can change any choice under US-14.23 or US-14.24. This amends [Decision 0017](0017-tool-catalog.md) C12 (no new package) for one package, and Decisions 0031 S1 and 0032 G2 (Google Search's group). It adds to [PRD-Tool-Catalog](../../../PRD-Tool-Catalog.md#google-toolkit) and schedules US-14.23 and US-14.24.
+The owner can change any choice under US-14.23 or US-14.24. This amends [Decision 0017](0017-tool-catalog.md) C12 (no new package) for one package, and Decisions 0031 S1 and 0032 G2 (Google Search's group). It adds to [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md#google-toolkit) and schedules US-14.23 and US-14.24.
 
 ## What Google can and can't do here
 

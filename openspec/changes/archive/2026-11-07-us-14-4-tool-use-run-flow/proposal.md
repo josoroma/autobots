@@ -1,6 +1,6 @@
 ## Why
 
-US-14.4, [PRD-Tool-Catalog TV-01 to TV-03](../../../PRD-Tool-Catalog.md#tool-use-views): US-14.3 records every tool use, but no screen shows them, so a run's outcome can't be traced to the tools behind it.
+US-14.4, [PRD-Tool-Catalog TV-01 to TV-03](../../../../docs/PRD/PRD-Tool-Catalog.md#tool-use-views): US-14.3 records every tool use, but no screen shows them, so a run's outcome can't be traced to the tools behind it.
 
 ## What Changes
 

@@ -7,7 +7,7 @@ description: Evolve and verify Autobots public API, event, database and state co
 
 Relevant paths: `contracts/**/*`, `packages/api-client/**/*`, `packages/db-types/**/*`, `services/agent/src/autobots/contracts/**/*` and `services/agent/src/autobots/domain/**/*`.
 
-Read `.claude/autobots.json`, the mapped contract, selected source requirements and [DH-06 contract standards](../../../PRD-Development-Harness.md#models-contracts-and-state). Inspect producers and consumers before editing.
+Read `.claude/autobots.json`, the mapped contract, selected source requirements and [DH-06 contract standards](../../../docs/PRD/PRD-Development-Harness.md#models-contracts-and-state). Inspect producers and consumers before editing.
 
 - Pydantic/OpenAPI owns public API DTOs; generate TypeScript consumers instead of parallel handwritten interfaces. SQL owns persistent schema; generated Supabase types cover intended exposed schemas only.
 - Keep domain objects, rows, graph checkpoint state, public events and UI projections distinct. Use the canonical state/transition contract; do not create a second UI enum or resume terminal runs.

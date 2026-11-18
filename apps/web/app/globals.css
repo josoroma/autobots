@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* The only token definition, unedited. See PRD-Design-System.md DS-01. */
+/* The only token definition, unedited. See docs/PRD/PRD-Design-System.md DS-01. */
 @import "../../../docs/design/luma.css";
 /* Decision 0021 R3: the one documented paired extension, kept beside the canonical file, never inside it. */
 @import "../../../docs/design/studio-extensions.css";

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="150" viewBox="0 0 960 150" role="img" aria-labelledby="title desc">
+  <title id="title">Autobots by the numbers</title>
+  <desc id="desc">118 of 118 stories delivered. 37 agent tools in 14 groups. 6 ready Experts plus 4 workflows. 70 API paths, generated from Pydantic into TypeScript. 64 SQL migrations. 44 browser suites with accessibility checks.</desc>
+  <style>
+    svg { --tile: #f5f5f5; --fg: #0a0a0a; --mfg: #737373; --brand: #1447e6; }
+    @media (prefers-color-scheme: dark) { svg { --tile: #262626; --fg: #fafafa; --mfg: #a1a1a1; --brand: #2b7fff; } }
+    text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+    .tile { fill: var(--tile); }
+    .n { fill: var(--brand); font-size: 40px; font-weight: 700; letter-spacing: -1px; }
+    .k { fill: var(--fg); font-size: 14px; font-weight: 600; }
+    .d { fill: var(--mfg); font-size: 12px; }
+  </style>
+  <rect class="tile" x="6" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="80" y="66">118</text><text class="k" x="80" y="96">stories delivered</text><text class="d" x="80" y="116">of 118 in SPECS.md</text>
+
+  <rect class="tile" x="166" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="240" y="66">37</text><text class="k" x="240" y="96">agent tools</text><text class="d" x="240" y="116">in 14 groups</text>
+
+  <rect class="tile" x="326" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="400" y="66">6</text><text class="k" x="400" y="96">ready Experts</text><text class="d" x="400" y="116">plus 4 workflows</text>
+
+  <rect class="tile" x="486" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="560" y="66">70</text><text class="k" x="560" y="96">API paths</text><text class="d" x="560" y="116">Pydantic → TypeScript</text>
+
+  <rect class="tile" x="646" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="720" y="66">64</text><text class="k" x="720" y="96">SQL migrations</text><text class="d" x="720" y="116">RLS on public tables</text>
+
+  <rect class="tile" x="806" y="8" width="148" height="134" rx="14"/>
+  <text class="n" x="880" y="66">44</text><text class="k" x="880" y="96">browser suites</text><text class="d" x="880" y="116">with axe checks</text>
+</svg>

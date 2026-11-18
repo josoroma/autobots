@@ -1,6 +1,6 @@
-# Runtime Q&A diagram sources
+# Runtime diagram sources
 
-These static figures accompany [README-QA.md](../../../README-QA.md). Open the HTML sources directly in a browser; the SVG exports are embedded in the README. No server, JavaScript, external font, image or network request is required.
+These static figures show a run's model/tool cycle, its delegation depth and one tool call. Open the HTML sources directly in a browser, or the SVG exports wherever Markdown renders images. No server, JavaScript, external font, image or network request is required.
 
 | Figure | Editable source | Markdown export | Reading |
 |---|---|---|---|
@@ -18,6 +18,6 @@ The system sans and monospace stacks keep these files offline; Georgia supplies 
 
 ## Scope and verification
 
-Each SVG uses a 960 × 600 `doc-inline` viewBox, accessible title/description, a local horizontal scroller in HTML and print scaling. Flowchart and tree nodes are bounded summaries; detailed reasons and limits remain in the Q&A. The sequence shows the permitted execution path, with denial/wait behavior described in its caption. The tree is one possible four-descendant history; its branches need not be open together.
+Each SVG uses a 960 × 600 `doc-inline` viewBox, accessible title/description, a local horizontal scroller in HTML and print scaling. Flowchart and tree nodes are bounded summaries, not every reason and limit. The sequence shows the permitted execution path, with denial/wait behavior described in its caption. The tree is one possible four-descendant history; its branches need not be open together.
 
 Upstream self-check and geometry checks run against each HTML; local browser checks cover desktop rendering, standalone SVGs, mobile scrolling and absence of external requests. Results and screenshots are retained as documentation evidence under `.checks/DOC-QA-001/2026-11-05-doc-qa/`, summarized in [DOC-QA-001 evidence](../../engineering/evidence/DOC-QA-001/summary.md). They do not qualify product execution.

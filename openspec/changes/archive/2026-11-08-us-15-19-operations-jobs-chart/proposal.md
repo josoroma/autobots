@@ -1,6 +1,6 @@
 ## Why
 
-US-15.19 implements [PRD-Studio OP-03](../../../PRD-Studio.md#operations), with [Decision 0022 D5 and D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and DS-04. Operations doesn't say how much work ran recently or how it ended.
+US-15.19 implements [PRD-Studio OP-03](../../../../docs/PRD/PRD-Studio.md#operations), with [Decision 0022 D5 and D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and DS-04. Operations doesn't say how much work ran recently or how it ended.
 
 ## What Changes
 

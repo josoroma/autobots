@@ -3,9 +3,9 @@
 **Decision date:** 2026-11-04.  
 **Status:** approved design requirement from the user's supplied CSS; application implementation and visual/accessibility qualification remain pending.  
 **Applies to:** the selected Option B Next.js UI, including any shared UI retained for the TypeScript alternative. Python, Docker and Supabase do not own presentation tokens.  
-**Canonical tokens:** [docs/design/luma.css](docs/design/luma.css). Both selector blocks reproduce the user's supplied declarations without changing values.
+**Canonical tokens:** [docs/design/luma.css](../design/luma.css). Both selector blocks reproduce the user's supplied declarations without changing values.
 
-“Luma” names this project's user-supplied palette. Do not replace it with a similarly named preset, infer a shadcn CLI preset identifier, or substitute generated default colors. The earlier warm-neutral/forest-green concepts are superseded as visual guidance. Their historical artwork remains in [the archive](docs/imagine/archive/warm-green-v1/).
+“Luma” names this project's user-supplied palette. Do not replace it with a similarly named preset, infer a shadcn CLI preset identifier, or substitute generated default colors. The earlier warm-neutral/forest-green concepts are superseded as visual guidance. Their historical artwork remains in [the archive](../imagine/archive/warm-green-v1/).
 
 ## DS-01 — Preserve the exact theme tokens
 
@@ -29,7 +29,7 @@ shadcn's documented theming model uses semantic surface/foreground pairs, CSS va
 
 ## DS-02 — Dark is the default
 
-A first visit, missing preference, invalid preference or unavailable preference storage renders dark. The Mac/browser operating-system preference does not change that default. An explicit user selection of **System**, **Dark** or **Light** persists locally and is restored on subsequent visits; **System** follows the operating-system preference only once the user has chosen it. *Amended by [Decision 0022](docs/engineering/decisions/0022-studio-product-surfaces.md) D2, which added System; before it, an old `system` value resolved to dark and the selector offered only Dark and Light.*
+A first visit, missing preference, invalid preference or unavailable preference storage renders dark. The Mac/browser operating-system preference does not change that default. An explicit user selection of **System**, **Dark** or **Light** persists locally and is restored on subsequent visits; **System** follows the operating-system preference only once the user has chosen it. *Amended by [Decision 0022](../engineering/decisions/0022-studio-product-surfaces.md) D2, which added System; before it, an old `system` value resolved to dark and the selector offered only Dark and Light.*
 
 Use a dedicated nonsecret appearance preference such as `autobots.theme`. This permission to store an appearance choice does not permit storing credentials, provider responses or sensitive run state in browser persistence.
 
@@ -101,8 +101,8 @@ At implementation time, record checks against the actual locked app, not just th
 5. Confirm appearance changes issue no model/task requests and do not mutate run, approval or workflow state.
 6. Capture reproducible screenshots and retain reviewed runbook evidence under the work item's evidence directory.
 
-The current [concept gallery](docs/imagine/index.html) illustrates the dark default. Generated raster artwork approximates the palette and layout; exact CSS values and product behavior are established by source and future implementation checks. The light theme is specified by the exact CSS even though the six regenerated concepts depict dark mode.
+The current [concept gallery](../imagine/index.html) illustrates the dark default. Generated raster artwork approximates the palette and layout; exact CSS values and product behavior are established by source and future implementation checks. The light theme is specified by the exact CSS even though the six regenerated concepts depict dark mode.
 
 ## Implementation handoff
 
-Apply this contract through SP-014 and the local frontend foundation story in [SPECS.md](SPECS.md), before feature screens establish competing styles. Follow the [development harness](PRD-Development-Harness.md) delivery loop. No story is complete solely because the tokens, requirements or concept images exist.
+Apply this contract through SP-014 and the local frontend foundation story in [SPECS.md](../../SPECS.md), before feature screens establish competing styles. Follow the [development harness](PRD-Development-Harness.md) delivery loop. No story is complete solely because the tokens, requirements or concept images exist.

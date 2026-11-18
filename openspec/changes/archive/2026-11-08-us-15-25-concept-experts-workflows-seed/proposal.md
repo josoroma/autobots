@@ -1,6 +1,6 @@
 ## Why
 
-US-15.25 implements [PRD-Studio SD-01 and SD-02](../../../PRD-Studio.md#seed), under [Decision 0022 D8 and D14 to D17](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and SP-015. A new workspace starts empty. The owner asked for the concept Experts and workflows as an optional starting point.
+US-15.25 implements [PRD-Studio SD-01 and SD-02](../../../../docs/PRD/PRD-Studio.md#seed), under [Decision 0022 D8 and D14 to D17](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and SP-015. A new workspace starts empty. The owner asked for the concept Experts and workflows as an optional starting point.
 
 ## What Changes
 

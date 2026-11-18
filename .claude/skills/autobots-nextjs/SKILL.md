@@ -5,7 +5,7 @@ description: Implement or review the Option B Next.js interface and BFF in apps/
 
 # Next.js interface and BFF
 
-Read `.claude/autobots.json`, the mapped contract, selected story and [Next.js standards in DH-06](../../../PRD-Development-Harness.md#nextjs-and-typescript). For behavior read the mapped Option B product PRD; the alternative Next.js-only runtime is outside scope.
+Read `.claude/autobots.json`, the mapped contract, selected story and [Next.js standards in DH-06](../../../docs/PRD/PRD-Development-Harness.md#nextjs-and-typescript). For behavior read the mapped Option B product PRD; the alternative Next.js-only runtime is outside scope.
 
 - Prefer Server Components and add client boundaries only for interaction. Use strict TypeScript, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`; document narrow exceptions.
 - Consume generated public API types. Validate untrusted JSON; do not duplicate Python business-state enums or implement a second scheduler in browser state.

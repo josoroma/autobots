@@ -579,18 +579,18 @@ const WEB_ARCHITECTURE_FOCUS = String.raw`Judge whether the screens share one ap
 4. State: screens with many useState calls (grep -c "useState" apps/web/components/*.tsx | sort -t: -k2 -rn | head), derived state kept in state, and reducer candidates.
 5. View states: how loading, empty, error, denied and saved states render across screens, and whether a shared component exists.
 6. Files holding several components (react/no-multi-comp in metrics.md), component naming, and colocated helpers that belong in lib/.
-7. Styling: use of the components/ui primitives versus ad-hoc class strings, and of the Luma tokens in PRD-Design-System.md.
+7. Styling: use of the components/ui primitives versus ad-hoc class strings, and of the Luma tokens in docs/PRD/PRD-Design-System.md.
 Compare at least three screens from different areas side by side before you report a pattern.`
 
 // ---------------------------------------------------------------- areas and lenses
 
 const RULES = {
-  web: '.claude/rules/nextjs.md; PRD-Development-Harness.md DH-06, "Next.js and TypeScript"; PRD-Design-System.md DS-01 to DS-05',
-  python: '.claude/rules/python-worker.md; .claude/rules/contracts.md; PRD-Development-Harness.md DH-06, "Python API, domain and workers" and "Models, contracts and state"',
-  durable: '.claude/rules/python-worker.md; .claude/rules/model-gateway.md; .claude/rules/contracts.md; PRD-Development-Harness.md DH-06, "Python API, domain and workers", "Models, contracts and state" and "Durable workers and model gateway"; docs/engineering/option-b-contract.md, the parts on states, transitions and recovery',
-  db: '.claude/rules/database.md; .claude/rules/infrastructure.md; PRD-Development-Harness.md DH-07 and DH-08',
-  tooling: '.claude/rules/delivery.md; .claude/rules/infrastructure.md; PRD-Development-Harness.md DH-03, DH-05, DH-06 and DH-09',
-  all: 'every .claude/rules/*.md; PRD-Development-Harness.md DH-03 and DH-06',
+  web: '.claude/rules/nextjs.md; docs/PRD/PRD-Development-Harness.md DH-06, "Next.js and TypeScript"; docs/PRD/PRD-Design-System.md DS-01 to DS-05',
+  python: '.claude/rules/python-worker.md; .claude/rules/contracts.md; docs/PRD/PRD-Development-Harness.md DH-06, "Python API, domain and workers" and "Models, contracts and state"',
+  durable: '.claude/rules/python-worker.md; .claude/rules/model-gateway.md; .claude/rules/contracts.md; docs/PRD/PRD-Development-Harness.md DH-06, "Python API, domain and workers", "Models, contracts and state" and "Durable workers and model gateway"; docs/engineering/option-b-contract.md, the parts on states, transitions and recovery',
+  db: '.claude/rules/database.md; .claude/rules/infrastructure.md; docs/PRD/PRD-Development-Harness.md DH-07 and DH-08',
+  tooling: '.claude/rules/delivery.md; .claude/rules/infrastructure.md; docs/PRD/PRD-Development-Harness.md DH-03, DH-05, DH-06 and DH-09',
+  all: 'every .claude/rules/*.md; docs/PRD/PRD-Development-Harness.md DH-03 and DH-06',
 }
 
 const WEB = 'apps/web/'
@@ -1005,7 +1005,7 @@ function standardsPrompt(ctx, digest) {
 
 Verified parts, with kept high/medium/low counts: ${digest}. A part missing from this list has no findings files; say so where it matters.
 
-Read ${PROMPT_FILE} ("Goal", "Ground rules" and "Standards document"), then every ${ctx.outDir}/findings/*.json (the verified findings), ${ctx.outDir}/metrics.md, AGENTS.md, every .claude/rules/*.md, PRD-Development-Harness.md DH-03, DH-06 and DH-09, PRD-Design-System.md, and the current tool configuration: services/agent/pyproject.toml, apps/web/eslint.config.mjs, apps/web/tsconfig.json, apps/web/package.json, packages/api-client/tsconfig.json, packages/api-client/package.json, the root package.json, and scripts/toolchain.py for which checks run on which paths.
+Read ${PROMPT_FILE} ("Goal", "Ground rules" and "Standards document"), then every ${ctx.outDir}/findings/*.json (the verified findings), ${ctx.outDir}/metrics.md, AGENTS.md, every .claude/rules/*.md, docs/PRD/PRD-Development-Harness.md DH-03, DH-06 and DH-09, docs/PRD/PRD-Design-System.md, and the current tool configuration: services/agent/pyproject.toml, apps/web/eslint.config.mjs, apps/web/tsconfig.json, apps/web/package.json, packages/api-client/tsconfig.json, packages/api-client/package.json, the root package.json, and scripts/toolchain.py for which checks run on which paths.
 
 Follow "Standards document" exactly. Ground every standard in this repository, with numbers from metrics.md and linked finding IDs (findings/<key>.md#<lowercase id>). Every enforcement snippet must be valid for the installed versions: ruff 0.17, ESLint 9 flat config with eslint-config-next 16, TypeScript 6 and mypy strict. Check ruff rule codes with services/agent/.venv/bin/ruff rule <CODE>, and ESLint rule names against apps/web/node_modules. When a threshold would flag existing code, say how much, and start it at warn or with a baseline. Cite existing rules instead of restating them. Nothing may conflict with the ground rules.
 

@@ -40,7 +40,7 @@ ALLOWED_LINK_PATHS = frozenset({
     '.claude/skills/autobots-review-change/SKILL.md',
     '.claude/agents/autobots-reviewer.md',
 })
-ALLOWED_LINK_ANCHOR = ('PRD-Development-Harness.md', 'dh-091-work-item-evidence-contract')
+ALLOWED_LINK_ANCHOR = ('docs/PRD/PRD-Development-Harness.md', 'dh-091-work-item-evidence-contract')
 AGENTS_MAPPING_HEADING = 'Rule checks and review'
 AGENTS_REQUIRED_ROWS = ('Opening paragraph', '.claude/settings.json', 'CLAUDE.md')
 
@@ -123,7 +123,7 @@ def input_files(root: Path, base: Path) -> Iterator[Path]:
 def input_manifest(root: Path) -> dict[str, str]:
     """Hash relevant nonsecret inputs, including untracked files, not report outputs."""
     root = root.resolve()
-    paths = set(root.glob('PRD*.md'))
+    paths = set((root / 'docs/PRD').glob('PRD*.md'))
     paths.update(root / name for name in ('AGENTS.md', 'CLAUDE.md', 'CODEBASE.md',
                                          'SPECS.md', 'README.md', '.gitignore', *APP_INPUT_FILES,
                                          *GATE_CONFIG_DOMAINS))

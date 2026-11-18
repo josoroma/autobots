@@ -1,4 +1,4 @@
-# Local commands for the persistent install. README-SETUP-RUN.md explains them.
+# Local commands for the persistent install. `make help` lists them, and README-DEV.md Part 1 explains them.
 # This wraps the guarded scripts and adds no behavior: scripts/persistent_install.py is still
 # the only path that changes the database, and nothing here removes a container or a volume.
 

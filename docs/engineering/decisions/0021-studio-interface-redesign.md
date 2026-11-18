@@ -1,6 +1,6 @@
 # Decision 0021: Studio interface redesign
 
-**Date:** 2026-11-07. **Authority:** the owner, who asked to "redesign the app totally" based on the [Studio concept set](../../imagine/README.md), one screen per sidebar section. This amends [PRD-Design-System.md](../../../PRD-Design-System.md) DS-03 where noted and adopts the three proposals the concept set listed.
+**Date:** 2026-11-07. **Authority:** the owner, who asked to "redesign the app totally" based on the [Studio concept set](../../imagine/README.md), one screen per sidebar section. This amends [PRD-Design-System.md](../../PRD/PRD-Design-System.md) DS-03 where noted and adopts the three proposals the concept set listed.
 
 ## Decision
 

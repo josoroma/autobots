@@ -1,6 +1,6 @@
 # PRD addition: tool catalog, tool-use record and Tools screen
 
-**Status:** approved by the owner on 2026-11-07, through [Decision 0017](docs/engineering/decisions/0017-tool-catalog.md). **Extends:** [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) §9 (tools), §11.3 (events) and §12.1 (screens). **Derived from:** [the tool-catalog plan](docs/plan/tool-catalog.md), sections 5 to 9, with the decision's answers applied. Where this document and the plan differ, this document holds.
+**Status:** approved by the owner on 2026-11-07, through [Decision 0017](../engineering/decisions/0017-tool-catalog.md). **Extends:** [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) §9 (tools), §11.3 (events) and §12.1 (screens). **Derived from:** [the tool-catalog plan](../plan/tool-catalog.md), sections 5 to 9, with the decision's answers applied. Where this document and the plan differ, this document holds.
 
 Everything in PRD §9 still applies: grants pin versions, discovery never grants, effects need receipts, consequential effects need approval, arbitrary execution stays disabled, and OpenRouter is the only inference provider.
 
@@ -13,7 +13,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`, or `by_action` for a tool whose actions differ, Decision 0026 C9), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
 
-**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, `automation` (Decision 0026), and `google` ([Decision 0033](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md) K1). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, `serpapi` by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md), and `direct` by Decision 0033 K3.
+**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, `automation` (Decision 0026), and `google` ([Decision 0033](../engineering/decisions/0033-google-toolkit-and-tool-switches.md) K1). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, `serpapi` by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md), and `direct` by Decision 0033 K3.
 
 **TC-04. Availability.** `available`, `key_missing`, `disabled_by_policy` or `not_qualified`, computed per request from the worker-facing configuration and never stored. It shows whether a key is set, never its value, prefix, length or hash.
 
@@ -70,13 +70,13 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **PK-03.** No live key check runs automatically. Tests use fake transports even when a real key is present.
 
-**PK-04.** By [Decision 0024](docs/engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys, and the SerpApi key by Decision 0032 G7, resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
+**PK-04.** By [Decision 0024](../engineering/decisions/0024-tool-keys-from-env-and-settings.md), the Tavily and Jina keys, and the SerpApi key by Decision 0032 G7, resolve in this order, highest first: the workspace's key saved in Settings, then the process environment, then the `.env` files under the configuration root in MP-03's file order. The first non-blank value wins. Each call resolves its key inside the attempt from the run's workspace, and availability, admission and save-time checks follow the same order for that workspace.
 
 **PK-05.** Settings → Tool keys (since PK-07, Settings → Keys & vars) lets the workspace owner save, replace or remove a Tavily or Jina key, with an expected version. The value is sealed with the master key like the OpenRouter key, and saving checks its shape only. Members see each key's source (`settings`, `environment` or none), never its value, prefix, length or hash. Removing a saved key falls back to the environment.
 
 **PK-06.** `make start` passes `TAVILY_API_KEY`, `JINA_API_KEY` and, by Decision 0032 G7, `SERPAPI_API_KEY` from the repository's `.env` to the persistent install's API and worker. It parses the file as data, never sources it, and takes no other variable from it, except that it also passes `AUTOBOTS_BROWSER_EXECUTOR=enabled` when the file sets exactly that value (Decision 0024 K7).
 
-**PK-07.** By [Decision 0025](docs/engineering/decisions/0025-keys-and-vars.md), Settings → Tool keys becomes **Settings → Keys & vars**.
+**PK-07.** By [Decision 0025](../engineering/decisions/0025-keys-and-vars.md), Settings → Tool keys becomes **Settings → Keys & vars**.
 - **What it holds.** It adds the GitHub token as a third secret. It also holds two values that aren't secret: the GitHub repository (`owner/name`) and the browsing switch (`enabled` or `disabled`).
 - **Order.** All five follow PK-04's order for the workspace, with PK-05's owner-only, versioned save and removal. Members see a value's current value, never a secret.
 - **`make start`.** It also passes `GITHUB_REPOSITORY` and `GITHUB_TOKEN` from `.env`, by PK-06's rules.
@@ -106,7 +106,7 @@ Every URL passes the URL guard before it is sent. Fetched text is labelled third
 
 ## Search paging
 
-By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md). Version 1 of each search tool, in the table above, stays registered unchanged for grants that pinned it.
+By [Decision 0031](../engineering/decisions/0031-search-tools-page-in-batches-of-ten.md). Version 1 of each search tool, in the table above, stays registered unchanged for grants that pinned it.
 
 **WS-01. Search tools.** `search_web`, `tavily_search` and, by Decision 0032, `google_search`. `google_search` sits in the group `google` by Decision 0033 K1, and the other two in `web_search`. `google_map` pages the same way (Decision 0033 K2). No other tool pages.
 
@@ -127,7 +127,7 @@ By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-
 
 ## Google search
 
-By [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md), G1 to G8.
+By [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md), G1 to G8.
 
 **GS-01.** `google_search` v1 searches Google through SerpApi only, with `SERPAPI_API_KEY`. It never fetches or parses Google's own pages.
 
@@ -146,7 +146,7 @@ The key travels only in that request's query string, and no URL or provider text
 
 ## Google toolkit
 
-By [Decision 0033](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md), K1 to K9. It finds with Google through SerpApi, and reads pages directly from their sites.
+By [Decision 0033](../engineering/decisions/0033-google-toolkit-and-tool-switches.md), K1 to K9. It finds with Google through SerpApi, and reads pages directly from their sites.
 
 | ID | Provider | Input → output |
 |---|---|---|
@@ -213,7 +213,7 @@ A match line is capped at 500 characters. A pattern that doesn't compile is `inv
 
 ## Isolated browser executor
 
-By [Decision 0018](docs/engineering/decisions/0018-browser-executor.md) B1 to B3.
+By [Decision 0018](../engineering/decisions/0018-browser-executor.md) B1 to B3.
 
 **BX-01. Container.** One disposable container per browsing call, from the official Playwright image pinned by digest: non-root, all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `tmpfs` for profile and cache, and no bind mount, volume or Docker socket. Its environment holds nothing of the worker's: no model or provider key, no database URL. Caps: 1 CPU, 1 GiB memory, 256 processes, 300 seconds.
 
@@ -259,7 +259,7 @@ Output: `summary` (labelled third-party, cut to the shared text budget), `visite
 
 ## Automation
 
-By [Decision 0026](docs/engineering/decisions/0026-cronjob-tool-and-tool-guide.md), C1 to C8.
+By [Decision 0026](../engineering/decisions/0026-cronjob-tool-and-tool-guide.md), C1 to C8.
 
 **CJ-01.** `cronjob` v1, in the group Automation, manages the workspace's routines (US-7.1) through the routine service. It takes the action `list`, `create`, `update`, `pause`, `resume`, `run` or `remove`, and it stays in the run's workspace.
 

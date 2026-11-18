@@ -1,6 +1,6 @@
 ## Why
 
-US-15.8, [PRD-Studio MD-01 to MD-03](../../../PRD-Studio.md#models). Models lists each approved model's identity only. It shows no catalog price or capability, and doesn't say where a role's binding comes from. It can't discard edits or clear every override at once.
+US-15.8, [PRD-Studio MD-01 to MD-03](../../../../docs/PRD/PRD-Studio.md#models). Models lists each approved model's identity only. It shows no catalog price or capability, and doesn't say where a role's binding comes from. It can't discard edits or clear every override at once.
 
 With no saved policy, it also claims Terra as the workspace default, so `researcher` reads Terra even though admission gives it Sol, MP-01's built-in default.
 

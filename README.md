@@ -1,62 +1,142 @@
-# AutoGPT clone: local Mac application with OpenRouter
+<p align="center">
+  <img src="docs/assets/autobots-logo.svg" alt="Autobots" width="300">
+</p>
 
-**PRDs finalized for implementation — November 4, 2026.** The application, workers, database, Auth, files and logs run locally on this Mac. **All model inference uses OpenRouter.** [SPECS.md](SPECS.md) is the Option B backlog and organizes the selected design and its normative companion contracts. The application, the durable worker, the database and the Studio screens are built and run on this Mac: [README-SETUP-RUN.md](README-SETUP-RUN.md) starts them, [CODEBASE.md](CODEBASE.md) describes what exists, and [AGENTS.md](AGENTS.md#commands) lists the checks.
+<h3 align="center">Autonomous agents that do real work, on your own Mac.</h3>
 
-| Document | Purpose |
-|---|---|
-| [SPECS.md](SPECS.md) | Option B execution entry point: ordered work, prerequisites, completion workflow and evidence; preserves the underlying PRDs' authority |
-| [Option B engineering contract](docs/engineering/option-b-contract.md) | Preserved SP-001–SP-021 decisions, API/run-state semantics and implementation boundaries |
-| [CODEBASE.md](CODEBASE.md) | Descriptive current state; development tooling is distinct from the unimplemented product |
-| [PRD-AutoGPT.md](PRD-AutoGPT.md) | Pinned-source reconstruction of current AutoGPT: Experts, workflows, Classic, loops, planning, tools, memory, logs and recovery |
-| [PRD-NextJS.md](PRD-NextJS.md) | Local Next.js, AI SDK 7 and Workflow 5 alternative, with local Supabase and OpenRouter-only inference |
-| [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) | Recommended local Next.js plus Python LangGraph/Deep Agents design, local Supabase and OpenRouter-only inference |
-| [PRD-Development-Harness.md](PRD-Development-Harness.md) | First Option B milestone: `.claude` skills, agents, rules and command hooks; portable checks for Next.js, Python, contracts, workers, Docker, migrations and seeds |
-| [PRD-Design-System.md](PRD-Design-System.md) | User-supplied shadcn Luma tokens, dark-default behavior, shared component styling and visual/accessibility evidence |
-| [PRD-Model-Providers.md](PRD-Model-Providers.md) | Three approved OpenRouter models, `.env` key loading, in-app setup, encrypted credentials, routing and budgets |
-| [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) | Local Supabase Docker deployment, Auth, private Storage, database connections, ports, backups and recovery |
-| [PRD-Comparison-Recommendation.md](PRD-Comparison-Recommendation.md) | Capability comparison, recommended architecture, tradeoffs and shared qualification gates |
+<p align="center">
+  Give Autobots a goal. It plans, searches, reads, writes code and drafts documents with the tools you grant.<br>
+  It asks before it changes anything outside your Mac, stays inside the budget you set,<br>
+  and hands you a result it has checked.
+</p>
 
-**Recommended direction:** native local Next.js interface + native local Python LangGraph/Deep Agents worker + **self-hosted Supabase in Docker on this Mac**. Supabase provides local PostgreSQL, Auth and private file Storage. The full TypeScript runtime remains an alternative on the same Mac. The app uses no hosted Supabase project, Vercel deployment, remote application worker or local model server.
+<p align="center">
+  <b>Product overview</b> ·
+  <a href="README-DEV.md">Developer guide</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="SPECS.md">Backlog</a> ·
+  <a href="CODEBASE.md">Codebase</a>
+</p>
 
-**Interface:** use **shadcn Luma, dark by default**, with the exact [light/dark CSS tokens](docs/design/luma.css). An explicit light/dark choice persists locally and is applied before paint; the OS setting does not change the first-visit dark default. Shared semantic tokens govern every screen, including the sidebar, forms, approvals and workflow canvas. The [regenerated concept gallery](docs/imagine/index.html) illustrates this direction; earlier warm-neutral/forest-green concepts are superseded. Images remain concept artwork, and browser/accessibility qualification remains implementation work.
+<p align="center">
+  <img src="docs/assets/readme/hero.svg" alt="A goal to fix a flaky test and open a pull request becomes a run that reads the test, patches the fix and then waits for a person to approve opening the pull request." width="100%">
+</p>
 
-**Development harness.** It was built first, as the H0 foundation and H1 activated baseline. Shared instructions, project `.claude` skills/agents/rules, command-hook configuration and the specification/harness checker are now present. They adapt the requested OhMyOrch ingestor. Application toolchain and database gates now exist, and actual Claude event delivery stays unqualified by [Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md). US-10.2 assesses H1 and release. The portable checker is usable independently. Development tooling adds no model/provider and does not start services. [Adaptation](docs/engineering/ohmyorch-adaptation.md) · [Runbook](docs/engineering/runbooks/development-harness.md) · [Evidence](docs/engineering/evidence/HARNESS-ADAPT-001/summary.md)
+## The problem
 
-Run the delivered checks locally:
+Agent demos are easy. Agents you can trust with real work are not. Most run in someone else's cloud. They spend money you see only on the invoice, act without asking, and lose their place when something crashes. And you can't tell what they actually checked before they said "done".
 
-```sh
-python3.12 scripts/specs.py validate
-python3.12 scripts/verify.py --profile harness
+## What Autobots does
+
+Autobots is a studio for autonomous agents that runs on your Mac. You describe a goal and pick an Expert, a model and a budget. A durable worker carries the goal out: it plans, calls tools, and records every step in Postgres. Anything with consequences outside your Mac, such as opening a pull request, filing an issue or driving a browser, stops and waits for you. The run ends when its plan is complete and its checks are recorded, not when the model says it's finished.
+
+- **For builders** who want an agent that can read a repository, patch code and propose a pull request they review.
+- **For researchers** who want sourced briefs from the open web, Google, GitHub and market data.
+- **For teams of one** who want recurring work, such as a weekly competitor brief or nightly test triage, on a schedule.
+
+## Superpowers
+
+<p align="center">
+  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 37 tools in 14 groups, Experts and workflows, local by design." width="100%">
+</p>
+
+- **Runs that survive.** A worker claims each run under a lease. Every checkpoint is fenced to that lease, so a crash, a restart or a sleeping Mac resumes the run instead of forking it. Each request carries a receipt, so a retry never starts a second run.
+- **Spending you control.** Pick US$0.25 to US$5.00 per run, never above what's left of the daily cap. Every model call reserves its worst-case cost before it's sent, and a call that can't be priced doesn't go out.
+- **Asks before it acts.** Opening a pull request, filing an issue and browsing need an approval every time. The approval binds the exact arguments and diffs you saw, and a changed request needs a new one.
+- **37 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
+- **Experts and workflows.** Six ready Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer and Google bot. Four workflows: Weekly competitor brief, Nightly test triage, Interview synthesis and Vendor due diligence. An agent can hand work to a specialist, and a routine can run a goal on a schedule.
+- **Local by design.** The web app, API and worker run natively on your Mac, and Supabase runs in Docker, every port on loopback. Stored keys are encrypted. What leaves your Mac is what OpenRouter needs, to validate your key and run the model calls, and the calls of the tools you granted.
+
+## How it works
+
+<p align="center">
+  <img src="docs/assets/readme/run-lifecycle.svg" alt="A run goes from goal to admission, where the budget is reserved and the model bound, to a leased worker, to the agent loop, which calls OpenRouter and waits for approvals, to a checked result. Postgres keeps the checkpoints, events, receipts and budgets, and the Studio streams the run live." width="100%">
+</p>
+
+1. **Set a goal** in the Studio's composer, with an Expert, a model and a budget. The composer shows what the run would use before you start it.
+2. **Admission** checks it once: the budget is reserved, all 14 model roles are bound and frozen, the tools are granted, and the request is receipted so a retry is safe.
+3. **A worker claims it** under a lease. Inference is off until you turn it on, so nothing is billed by accident.
+4. **The agent loop** plans, calls the model, calls tools and observes, on Deep Agents and LangGraph. Each model call is admitted, metered and bounded, and each tool call goes through one gateway that checks its grant, its switch and its approval.
+5. **The result is checked.** A run succeeds only with its plan complete and its verification recorded. Its result text streams into the Studio as it's written.
+
+Models come from **OpenRouter only**: Terra by default, and Sol for the `researcher` role. There's no fallback model and no local model server, so what you chose is what ran.
+
+## Everything runs on your Mac
+
+<p align="center">
+  <img src="docs/assets/readme/architecture.svg" alt="Inside the Mac, on loopback: the browser, the Next.js web app and BFF, the FastAPI API, the worker, a per-call browser executor, and Supabase in Docker with its gateway, Auth, REST, Storage, Studio and Postgres. Only the worker reaches out, to OpenRouter and to the search and GitHub APIs of granted tools." width="100%">
+</p>
+
+The browser talks only to the Next.js web app, which signs people in through Supabase Auth and forwards every API call with its session. The FastAPI API checks each request and reads and writes Postgres as a restricted role, with row-level security on every public table. Only two processes reach outside your Mac: the API, to validate your OpenRouter key against the public model catalog, and the worker, for model calls and the tools you granted.
+
+## The Studio
+
+<p align="center">
+  <img src="docs/assets/readme/studio.svg" alt="An illustration of the Studio in its dark theme: the sidebar with Work, Build and System sections, and a run page with its result streaming in, its plan, and a pull request waiting for approval." width="100%">
+</p>
+
+One app for the whole loop, dark by default in the shadcn Luma theme:
+
+- **Work:** Home with what needs you, Runs with live results, and Approvals with keyboard decisions.
+- **Build:** Experts, Workflows with drafts and executions, and Tools with the catalog and its switches.
+- **System:** Operations health, Models for the OpenRouter key and the model each role uses, and Settings for Keys & vars, appearance, notifications and your account.
+
+## By the numbers
+
+<p align="center">
+  <img src="docs/assets/readme/by-the-numbers.svg" alt="118 of 118 stories delivered, 37 agent tools in 14 groups, 6 ready Experts plus 4 workflows, 70 API paths, 64 SQL migrations, 44 browser suites with accessibility checks." width="100%">
+</p>
+
+Counted from the repository on 2026-11-18. Every story in [SPECS.md](SPECS.md) traces to its source requirements and was delivered as one [OpenSpec](openspec/) change, with its scenarios checked.
+
+## Quick start
+
+You need an Apple Silicon Mac with Docker running, `python3.12`, `uv` and Node 22. [Part 1 of the developer guide](README-DEV.md#part-1-install-set-up-and-run) has the exact versions.
+
+```bash
+make first-time
 ```
 
-Use the project skill `autobots-spec-ingest` to refresh the backlog. Its read-only agent proposes source-traceable stories; the caller persists them and regenerates navigation. The operations verification profile runs on disposable projects, so its pass is not H1 or product acceptance.
+```bash
+make start
+```
 
-Every H0/H1 and product work item follows a proportional **plan → implement → independent review → verify → runbook + evidence** workflow. Record review findings and their disposition, run the required checks against the final changes, and retain reproducible evidence and remaining limitations. Update and exercise the relevant runbook in the qualified disposable environment; if operational behavior is unchanged, record that fact rather than inventing a procedure. Small changes use concise records, not skipped stages. [SPECS.md](SPECS.md) and the [development harness contract](PRD-Development-Harness.md) define the detailed workflow.
+Then open http://127.0.0.1:3000, sign in as the generated owner, and add your OpenRouter key under **Settings → Models → OpenRouter → Save & validate**. Saving a key doesn't start a run or spend money.
 
-Of the **14 inference roles**, 13 default to Terra, and `researcher` defaults to Sol (`builtin_default` in `domain/models.py`). DeepSeek stays approved and isn't offered for new runs until it's qualified, by [Decision 0013](docs/engineering/decisions/0013-release-closure.md):
+Runs stay queued until you turn inference on, because this step spends real money:
 
-| Requested canonical snapshot | Verified OpenRouter API request ID |
+```bash
+make stop-worker && make start-worker INFERENCE=enabled
+```
+
+## How it's built
+
+| Layer | Stack |
 |---|---|
-| `deepseek/deepseek-v4.1-flash-20261017` | `deepseek/deepseek-v4.1-flash-1017` |
-| `openai/gpt-6.1-terra-20261026` | `openai/gpt-6.1-terra` |
+| Studio | Next.js 16, React 19, TypeScript, Tailwind and shadcn Luma |
+| API and agents | Python 3.12, FastAPI, LangGraph and Deep Agents |
+| Data | Supabase in Docker: Postgres, Auth and Storage |
+| Inference | OpenRouter, with three approved model profiles |
+| Contracts | Pydantic owns the API, OpenAPI is generated from it, and TypeScript clients from that |
 
-The app must revalidate these catalog mappings before use. It reads server-only `OPENROUTER_API_KEY` from environment/`.env` configuration first. When absent, **Settings → Models → OpenRouter → Save & validate** accepts and securely stores a key. Keys stay out of browser storage, prompts, logs and durable workflow payloads. Without a valid key, local sign-in, settings, drafts and stored files remain available, while every model-backed operation waits. Saving a key does not launch a paid run. There is no fallback to a different model or inference provider.
+The engineering is held to the same standard as the agents:
 
-Local hosting describes the application and its stored data; selected task context is sent to OpenRouter for inference. User-authorized network tools retain their separate permission policy. **Bonsai, MTPLX, MLX, llama.cpp and Ollama are outside the active application design.**
+- **Traceable.** Every story in [SPECS.md](SPECS.md) cites its requirements in [the PRDs](docs/PRD/), and the [decision records](docs/engineering/decisions/) settle the rest.
+- **Checked locally.** `scripts/verify.py` runs the `harness`, `fast`, `full`, `db` and `operations` profiles. The `db` and `operations` profiles use disposable Docker stacks, never your data.
+- **Fake by default.** Tests use fake model transports. A paid call is always an explicit, bounded step.
 
-Supporting evidence:
+## Documentation
 
-- [OpenRouter public model catalog snapshot](research/openrouter-model-catalog.json)
-- [Pinned local Supabase Docker source snapshot](research/supabase-local-deployment-snapshot.json)
-- [Supabase client package evidence](research/supabase-nextjs-sdk.json)
-- [Qwen3.8-27B Q4_K_M local test: results and limitations](research/QWEN38-GGUF-TEST-RESULTS.md)
-- [Qwen capability assessment, including the named-tool fallback](research/qwen38-gguf-assessment.json)
-- [Hugging Face SLM research and Qwen 3.8 MLX evaluation](research/HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md)
-- [Local model inspection and experiment](research/LOCAL-MODEL-EVIDENCE.md)
-- [Actual HTTP probe results](research/local-model-probe.json)
-- [Reproducible protocol probe](research/probe_local_model.py)
-- [Registry dependency snapshot](research/dependency-snapshot.json)
+| Read | For |
+|---|---|
+| [README-DEV.md](README-DEV.md) | The developer guide: install, local URLs, architecture, conventions and how work is delivered |
+| [SPECS.md](SPECS.md) | The backlog: epics, stories, acceptance scenarios and status |
+| [CODEBASE.md](CODEBASE.md) | What the repository contains today |
+| [Option B engineering contract](docs/engineering/option-b-contract.md) | Run states, transitions and recovery guarantees |
+| [docs/PRD/](docs/PRD/) | The product requirements, from the [main PRD](docs/PRD/PRD-LangChain-Deep-Agents.md) to the [tool catalog](docs/PRD/PRD-Tool-Catalog.md) and the [Studio](docs/PRD/PRD-Studio.md) |
+| [AGENTS.md](AGENTS.md) | The rules every coding agent and person follows here |
+| [Runbooks](docs/engineering/runbooks/) | Operations, backup and restore, upgrades and the local stack |
 
-The local-model reports above are **historical research from the superseded design**, not installation requirements, available app backends or current defaults. Their raw test results remain unchanged.
+## Status
 
-Neither the application nor its Supabase stack was installed or launched by this documentation update. OpenRouter catalog and SDK research do not constitute authenticated inference tests. The PRDs distinguish historical observations, finalized requirements and remaining implementation/release gates.
+All 118 stories in [SPECS.md](SPECS.md) are delivered and checked on this Mac. The [US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads the H1 baseline as met, with its stated limits, and release stays the owner's decision. Passing a check profile is not product acceptance, and the docs say which is which. [research/](research/) keeps the evaluations behind earlier designs, including local models that the current design doesn't use.

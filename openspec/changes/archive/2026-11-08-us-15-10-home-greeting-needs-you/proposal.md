@@ -1,6 +1,6 @@
 ## Why
 
-US-15.10, [PRD-Studio HM-01 and HM-04](../../../PRD-Studio.md#home) and [Decision 0022 D9 and D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Home opens with a fixed "Local workbench" title. It doesn't greet the member, show what waits for them, or list recent runs.
+US-15.10, [PRD-Studio HM-01 and HM-04](../../../../docs/PRD/PRD-Studio.md#home) and [Decision 0022 D9 and D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Home opens with a fixed "Local workbench" title. It doesn't greet the member, show what waits for them, or list recent runs.
 
 ## What Changes
 

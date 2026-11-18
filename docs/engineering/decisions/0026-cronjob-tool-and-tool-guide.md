@@ -5,7 +5,7 @@
 - "Automation | cronjob | Scheduled tasks with create/list/update/pause/resume/run/remove actions."
 - "On tool click open a modal with inputs and outputs and its why, when and what for that tool."
 
-The design choices are made under their standing delegation. This adds to [PRD-Tool-Catalog](../../../PRD-Tool-Catalog.md) (sections Automation and Tool guide) and schedules US-14.19 and US-14.20.
+The design choices are made under their standing delegation. This adds to [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md) (sections Automation and Tool guide) and schedules US-14.19 and US-14.20.
 
 The same request asked why the workflow preview didn't work. The preview loaded, but rendered under the list, below the fold, and its link doesn't scroll. That was fixed in the same session, without a story: choosing a workflow now brings its preview into view and focuses its heading.
 

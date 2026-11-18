@@ -24,7 +24,7 @@ The example journey is: configure a key when needed → describe a comparison ta
 
 ## Visual direction
 
-The approved direction is **shadcn Luma, dark by default**, using the user's exact [light/dark tokens](../design/luma.css) and [design-system requirements](../../PRD-Design-System.md). Neutral near-black backgrounds, slightly raised dark cards, white text and blue primary actions replace the earlier warm-neutral/forest-green exploration. Green remains a chart/success/diff color rather than the primary-action brand.
+The approved direction is **shadcn Luma, dark by default**, using the user's exact [light/dark tokens](../design/luma.css) and [design-system requirements](../../../PRD/PRD-Design-System.md). Neutral near-black backgrounds, slightly raised dark cards, white text and blue primary actions replace the earlier warm-neutral/forest-green exploration. Green remains a chart/success/diff color rather than the primary-action brand.
 
 A fresh visit is dark regardless of the OS setting. An explicit Light or Dark choice persists locally and is applied before paint in the planned app. The gallery presents six dark concepts; the CSS also defines the supported light theme. Generated raster colors approximate the palette, while the canonical CSS preserves exact OKLCH values, alpha and the 0.625rem radius.
 
@@ -41,7 +41,7 @@ The previous images and their provenance are retained as [superseded visual expl
 - A completed run offers **Start similar run**, not resume. A workflow draft is separate from its published version and from a run.
 - Completion checks describe structure and attached evidence; they do not certify that every generated statement is true.
 
-Layout, sample controls and placeholder content are design proposals. The [design-system PRD](../../PRD-Design-System.md) owns the theme. The other source specifications remain authoritative: [SPECS](../../SPECS.md), [Option B contract](../engineering/option-b-contract.md), [Next.js PRD](../../PRD-NextJS.md), [LangGraph / Deep Agents PRD](../../PRD-LangChain-Deep-Agents.md), [model providers](../../PRD-Model-Providers.md) and [local deployment](../../PRD-Local-Mac-Deployment.md).
+Layout, sample controls and placeholder content are design proposals. The [design-system PRD](../../../PRD/PRD-Design-System.md) owns the theme. The other source specifications remain authoritative: [SPECS](../../SPECS.md), [Option B contract](../engineering/option-b-contract.md), [Next.js PRD](../../../PRD/PRD-NextJS.md), [LangGraph / Deep Agents PRD](../../../PRD/PRD-LangChain-Deep-Agents.md), [model providers](../../../PRD/PRD-Model-Providers.md) and [local deployment](../../../PRD/PRD-Local-Mac-Deployment.md).
 
 ## Generation and review
 

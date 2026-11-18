@@ -1,6 +1,6 @@
 ## Why
 
-US-15.3, [PRD-Studio SH-04 and HM-05](../../../PRD-Studio.md#shell). Operations' local status is owner-only. A member has no way to see whether the API, worker, database and OpenRouter authentication are ready.
+US-15.3, [PRD-Studio SH-04 and HM-05](../../../../docs/PRD/PRD-Studio.md#shell). Operations' local status is owner-only. A member has no way to see whether the API, worker, database and OpenRouter authentication are ready.
 
 ## What Changes
 

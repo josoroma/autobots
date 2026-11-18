@@ -2,7 +2,7 @@
 
 ## Plan
 
-Source: [US-1.2](../../../SPECS.md#us-12-h0-shared-instructions-and-development-assistant-assets), SP-001, SP-017, DH-03, DH-04, Decisions 0001 and 0002, SP-020 H0-02, [DH-W01–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Delivered through `/ohmyorch:deliver EPIC-1`, change `us-1-2-h0-shared-instructions-development`.
+Source: [US-1.2](../../../SPECS.md#us-12-h0-shared-instructions-and-development-assistant-assets), SP-001, SP-017, DH-03, DH-04, Decisions 0001 and 0002, SP-020 H0-02, [DH-W01–06](../../PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Delivered through `/ohmyorch:deliver EPIC-1`, change `us-1-2-h0-shared-instructions-development`.
 
 **Intended behavior:** shared rules link to a check or review responsibility without inconsistent duplication; an unavailable or incompatible assistant adapter reports as explicitly inactive, with no new provider, paid call or activation claim; the read-only ingestor and its paired caller produce a source-traceable proposed backlog on a disposable copy without inventing behavior.
 

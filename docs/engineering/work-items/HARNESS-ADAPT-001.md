@@ -2,7 +2,7 @@
 
 ## Plan
 
-Source: [Decision 0001](../decisions/0001-ohmyorch-adaptation.md), [SP-001–003](../option-b-contract.md), [DH-W01–06](../../../PRD-Development-Harness.md).
+Source: [Decision 0001](../decisions/0001-ohmyorch-adaptation.md), [SP-001–003](../option-b-contract.md), [DH-W01–06](../../PRD/PRD-Development-Harness.md).
 
 Clone and pin OhMyOrch; adapt the ingestor and authoring workflow locally; retain existing SP decisions; regenerate SPECS into bounded source-traceable stories and generated views. Add focused development skills/agents/rules, deterministic project hook scripts and an independently usable verification command. Do not build the app, install dependencies, start services or call models.
 

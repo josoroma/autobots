@@ -1,8 +1,20 @@
+<p align="center">
+  <img src="docs/assets/autobots-logo.svg" alt="Autobots" width="260">
+</p>
+
+<p align="center">
+  <a href="README.md">Product overview</a> ·
+  <b>Developer guide</b> ·
+  <a href="README.md#quick-start">Quick start</a> ·
+  <a href="SPECS.md">Backlog</a> ·
+  <a href="CODEBASE.md">Codebase</a>
+</p>
+
 # Autobots developer guide
 
 The onboarding guide for new developers, architects and AI coding agents. It covers how to install, set up and run the Autobots backend and frontend on a Mac, how the system is built, and how work gets done in this repository.
 
-This guide summarizes and links. The documents it links to are the authority. If this guide and one of them disagree, follow the linked document, and fix this guide.
+For what Autobots is and why, start with [the product overview](README.md). This guide summarizes and links. The documents it links to are the authority. If this guide and one of them disagree, follow the linked document, and fix this guide.
 
 ## Start here
 
@@ -13,7 +25,7 @@ Pick your role, read its first stop, then follow the rest of its path.
 | **A new developer** | [Part 1: Install, set up and run](#part-1-install-set-up-and-run) | [Part 2](#part-2-local-urls-and-tools), [Part 4](#part-4-developing), then [Part 3](#part-3-how-autobots-is-built) as you need it |
 | **An architect** | [Part 3: How Autobots is built](#part-3-how-autobots-is-built) | [Part 6](#part-6-for-architects), then the [Option B engineering contract](docs/engineering/option-b-contract.md) |
 | **An AI coding agent** | [AGENTS.md](AGENTS.md), which your instructions load, then [Part 5: For AI coding agents](#part-5-for-ai-coding-agents) | [Part 4](#part-4-developing) and [Part 3](#part-3-how-autobots-is-built), then the [SPECS.md](SPECS.md) story you were given |
-| **Running the app day to day** | [README-SETUP-RUN.md](README-SETUP-RUN.md) | [Part 2](#part-2-local-urls-and-tools) and the [operations runbook](docs/engineering/runbooks/operations.md) |
+| **Running the app day to day** | [Part 1: Install, set up and run](#part-1-install-set-up-and-run) | [Part 2](#part-2-local-urls-and-tools) and the [operations runbook](docs/engineering/runbooks/operations.md) |
 
 ```mermaid
 flowchart LR
@@ -77,7 +89,7 @@ flowchart LR
 
 ## Part 1: Install, set up and run
 
-The web app, API and worker run natively on the Mac. Supabase runs in Docker. [README-SETUP-RUN.md](README-SETUP-RUN.md) has every step in full, with troubleshooting. This part is the short version.
+The web app, API and worker run natively on the Mac. Supabase runs in Docker. The `make` targets wrap `scripts/persistent_install.py`, which [the persistent install runbook](docs/engineering/runbooks/local-supabase.md#the-persistent-install) describes.
 
 ### What you need
 
@@ -111,12 +123,12 @@ It downloads packages and the pinned Supabase images, so it needs the network. I
 5. Builds the web app.
 6. Creates your owner account and a workspace named `Personal`.
 
-If it stops partway, [README-SETUP-RUN.md](README-SETUP-RUN.md#2-run-the-setup) says which command resumes each step.
+If it stops partway, `make first-time` won't run again once an install is recorded. Run the steps after the one that failed, in the order the Makefile's `first-time` target lists them: `make images`, `make install`, `make build` and `make owner`, after `make toolchain`. [The persistent install runbook](docs/engineering/runbooks/local-supabase.md#the-persistent-install) says what each install stage refuses.
 
 Then:
 
 1. Start everything with `make start`.
-2. Open http://127.0.0.1:3000 and sign in as the generated owner. [Step 3 of the setup guide](README-SETUP-RUN.md#3-start-and-sign-in) shows how to read the owner's email and password.
+2. Open http://127.0.0.1:3000 and sign in as the generated owner. The email and password are `OWNER_EMAIL` and `OWNER_PASSWORD` in the install's owner file, which [the persistent install runbook](docs/engineering/runbooks/local-supabase.md#the-persistent-install) locates.
 3. Add your OpenRouter key at **Settings → Models → OpenRouter → Save & validate**. Saving it doesn't start a run or spend money.
 4. Set up backups with [the backup runbook](docs/engineering/runbooks/backup-restore.md). Saving a key creates the master key that encrypts stored credentials, and losing it loses them.
 
@@ -282,7 +294,7 @@ docker logs -f autobots-install-db-1
 - An exception logs its type, never its message.
 - HTTP access lines aren't logged.
 
-Adding Grafana, Loki or another service would change the install's topology, which [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) owns, so it needs the owner's decision first.
+Adding Grafana, Loki or another service would change the install's topology, which [PRD-Local-Mac-Deployment.md](docs/PRD/PRD-Local-Mac-Deployment.md) owns, so it needs the owner's decision first.
 
 ### Browsing and the browser executor
 
@@ -418,7 +430,7 @@ Two more places:
   - Server components read through [lib/server-api.ts](apps/web/lib/server-api.ts).
   - Browser code goes through [lib/api/browser.ts](apps/web/lib/api/browser.ts), which calls the same generated operations against the BFF's same-origin `/api` routes and sends writes with the CSRF token through `csrfFetch`.
   - The BFF checks the host, origin, token, session and workspace of every call.
-- **Design system:** the interface uses shadcn Luma, dark by default, with the exact tokens in [docs/design/luma.css](docs/design/luma.css) and [docs/design/studio-extensions.css](docs/design/studio-extensions.css). [PRD-Design-System.md](PRD-Design-System.md) owns it.
+- **Design system:** the interface uses shadcn Luma, dark by default, with the exact tokens in [docs/design/luma.css](docs/design/luma.css) and [docs/design/studio-extensions.css](docs/design/studio-extensions.css). [PRD-Design-System.md](docs/PRD/PRD-Design-System.md) owns it.
 - **Contrast:** WCAG 2.1 AA is the pass line, by [Decision 0010](docs/engineering/decisions/0010-contrast-pass-line.md). The `db` profile's visual walk measures contrast on every named surface in both themes.
 
 ### The Python service
@@ -599,8 +611,6 @@ sequenceDiagram
 5. Each model call goes through `adapters/loop_middleware.py`, which reserves budget before the call and charges it after. Checkpoints and events are saved in Postgres as the pass goes.
 6. The run page follows the run's event stream, which the API reads with Postgres `LISTEN`.
 
-[README-QA.md](README-QA.md) answers the questions developers usually have next: how the loop repeats, what stops it, the default limits, retries and repairs, receipts, and where to look when a run stops.
-
 ### Contracts: from Pydantic to TypeScript
 
 ```mermaid
@@ -723,7 +733,7 @@ A tool is more than a Python function. It needs:
 - a guide, which a unit test requires for every tool;
 - an updated execution version, so existing checkpoints aren't reinterpreted.
 
-[README-QA.md](README-QA.md#19-how-should-a-developer-add-a-tool) walks through the steps and what to verify. [PRD-Tool-Catalog.md](PRD-Tool-Catalog.md) owns the catalog.
+[PRD-Tool-Catalog.md](docs/PRD/PRD-Tool-Catalog.md) owns the catalog.
 
 ### Code conventions
 
@@ -826,7 +836,7 @@ flowchart LR
 - **Order:** a story waiting only on another story's delivery is a matter of order. Deliver the prerequisite first. Never hand-edit a story to `READY`.
 - **The runbook:** [docs/engineering/runbooks/ohmyorch-delivery.md](docs/engineering/runbooks/ohmyorch-delivery.md) covers install, stop, resume and recovery.
 
-**Other work.** Anything outside that loop follows the [work-item contract, DH-W01 to DH-W06](PRD-Development-Harness.md#dh-091-work-item-evidence-contract):
+**Other work.** Anything outside that loop follows the [work-item contract, DH-W01 to DH-W06](docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract):
 1. A proportional plan.
 2. The implementation.
 3. An independent read-only review.
@@ -869,15 +879,15 @@ Keep unsupported behavior as a question and conflicts as blocked work. Don't inf
 
 | Source | Owns |
 |---|---|
-| [PRD-LangChain-Deep-Agents.md](PRD-LangChain-Deep-Agents.md) | The selected product design: native Next.js plus Python LangGraph and Deep Agents, local Supabase, OpenRouter only |
+| [PRD-LangChain-Deep-Agents.md](docs/PRD/PRD-LangChain-Deep-Agents.md) | The selected product design: native Next.js plus Python LangGraph and Deep Agents, local Supabase, OpenRouter only |
 | [docs/engineering/option-b-contract.md](docs/engineering/option-b-contract.md) | The binding engineering decisions SP-001 to SP-021: architecture, run states and transitions, durable jobs, tools and approvals, migrations, definition of done |
-| [PRD-Model-Providers.md](PRD-Model-Providers.md) | The approved OpenRouter models, credentials, routing and budgets |
-| [PRD-Local-Mac-Deployment.md](PRD-Local-Mac-Deployment.md) | Local topology: Supabase in Docker, Auth, Storage, ports, backups and recovery |
-| [PRD-Tool-Catalog.md](PRD-Tool-Catalog.md) | The tools, their providers and keys |
-| [PRD-Studio.md](PRD-Studio.md) | The product surfaces: Experts, workflows and the Studio screens |
-| [PRD-Design-System.md](PRD-Design-System.md) | Tokens, components, themes, and visual and accessibility evidence |
-| [PRD-Development-Harness.md](PRD-Development-Harness.md) | The harness: skills, agents, rules, hooks, checks and the work-item contract |
-| [PRD-AutoGPT.md](PRD-AutoGPT.md), [PRD-Comparison-Recommendation.md](PRD-Comparison-Recommendation.md), [PRD-NextJS.md](PRD-NextJS.md) | The research and the comparison behind the selected design, and the alternative not taken |
+| [PRD-Model-Providers.md](docs/PRD/PRD-Model-Providers.md) | The approved OpenRouter models, credentials, routing and budgets |
+| [PRD-Local-Mac-Deployment.md](docs/PRD/PRD-Local-Mac-Deployment.md) | Local topology: Supabase in Docker, Auth, Storage, ports, backups and recovery |
+| [PRD-Tool-Catalog.md](docs/PRD/PRD-Tool-Catalog.md) | The tools, their providers and keys |
+| [PRD-Studio.md](docs/PRD/PRD-Studio.md) | The product surfaces: Experts, workflows and the Studio screens |
+| [PRD-Design-System.md](docs/PRD/PRD-Design-System.md) | Tokens, components, themes, and visual and accessibility evidence |
+| [PRD-Development-Harness.md](docs/PRD/PRD-Development-Harness.md) | The harness: skills, agents, rules, hooks, checks and the work-item contract |
+| [PRD-AutoGPT.md](docs/PRD/PRD-AutoGPT.md), [PRD-Comparison-Recommendation.md](docs/PRD/PRD-Comparison-Recommendation.md), [PRD-NextJS.md](docs/PRD/PRD-NextJS.md) | The research and the comparison behind the selected design, and the alternative not taken |
 | [SPECS.md](SPECS.md) | The execution backlog, traced to these sources |
 | [CODEBASE.md](CODEBASE.md) | What exists now. It describes the code and never sets intent. |
 

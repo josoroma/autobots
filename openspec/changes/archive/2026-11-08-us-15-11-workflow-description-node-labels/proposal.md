@@ -1,6 +1,6 @@
 ## Why
 
-US-15.11, [PRD-Studio WF-06](../../../PRD-Studio.md#workflows). A workflow has only a name, and a graph's nodes have only an ID and a block. Neither lists nor previews can say what a workflow or one of its steps does.
+US-15.11, [PRD-Studio WF-06](../../../../docs/PRD/PRD-Studio.md#workflows). A workflow has only a name, and a graph's nodes have only an ID and a block. Neither lists nor previews can say what a workflow or one of its steps does.
 
 ## What Changes
 

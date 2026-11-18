@@ -66,11 +66,11 @@ class InstructionAssetTests(HarnessTestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = valid_root(directory)
             rule = root / '.claude/rules/fixture.md'
-            for target in ('../../absent.md', '../../PRD-Development-Harness.md#absent-heading'):
+            for target in ('../../absent.md', '../../docs/PRD/PRD-Development-Harness.md#absent-heading'):
                 with self.subTest(target=target):
                     rule.write_text(f'# Rule\n\n[target]({target})\n')
                     self.assertEqual(broken_links([rule], root), [f'.claude/rules/fixture.md: {target}'])
-            rule.write_text('# Rule\n\n[DH-W](../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract) '
+            rule.write_text('# Rule\n\n[DH-W](../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract) '
                             '[external](https://example.invalid/absent)\n\n```text\n[fenced](absent.md)\n```\n')
             self.assertEqual(broken_links([rule], root), [])
 

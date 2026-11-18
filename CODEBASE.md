@@ -20,7 +20,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
 
 ## Repository Map
 
-- **Intent:** `PRD-*.md` (10 files, including `PRD-Studio.md` and `PRD-Tool-Catalog.md`) and `SPECS.md`, mapped through `.claude/autobots.json`. The technical contract is `docs/engineering/option-b-contract.md`.
+- **Intent:** `docs/PRD/PRD-*.md` (10 files, including `PRD-Studio.md` and `PRD-Tool-Catalog.md`) and `SPECS.md`, mapped through `.claude/autobots.json`. The technical contract is `docs/engineering/option-b-contract.md`.
 - **Source:**
   - `services/agent/src/autobots/`: the Python service (`domain/`, `contracts/`, `application/`, `adapters/`, `api/`, `operations/`, `persistence/`).
   - `apps/web/`: Next.js (`app/`, `components/`, `lib/`).
@@ -39,7 +39,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `tests/db/fixtures/checklib.py` holds the database checks' shared case protocol, `tests/harness/harness_support.py` what the harness tests share, `scripts/instruction_checks.py` the instruction-file checks that `project_configuration` reports, and `services/agent/tests/sql_fakes.py` the one SQL fake that refuses unscripted statements, and `scripts/qualification/` the qualifiers' one child-check runner and typed records; `scripts/paid_run.py` is the one paid-run session (after the analyzed revision).
   - `contracts/fixtures/`: shared cases.
 - **Tooling:** `scripts/` (27 tracked files), `Makefile` (wraps the persistent install), and `.claude/` (7 agents, 13 skills, 9 rules, `hooks/dispatch.py`, `settings.json`, `ohmyorch/`).
-- **Operator guides:** `README-SETUP-RUN.md` (set up, start, stop) and `README-QA.md` (runtime Q&A, which describes revision `ecb34900e46c`).
+- **Operator guides:** `README-DEV.md` Part 1 (set up, start, stop) and the runbooks in `docs/engineering/runbooks/`.
 - **Delivery records:** `openspec/` (105 archived changes, 74 specs, `delivery/goal.md`), `.claude/ohmyorch/project.json`. The empty `SPEC-LOGS/` scaffold was removed after the analyzed revision (Decision 0030).
 - **Engineering records:** `docs/engineering/` holds:
   - `decisions/`: 0001–0022;
@@ -140,7 +140,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - It always runs `maintenance_step`: expiring approvals, evaluating routines, and `retention.apply_all` hourly.
   - `AUTOBOTS_WORKER_INFERENCE=enabled` adds `inference_step` (`operations/job_dispatch.process_next`).
   - It exits on a partial configuration: `AUTOBOTS_DATABASE_URL`, an absolute `AUTOBOTS_CONFIG_ROOT`, and the Supabase URL and service key (`operations/worker.py:284–323`).
-- **Web:** `next start` in `apps/web`, or `make start-web` ([local app runbook](docs/engineering/runbooks/local-app.md), `README-SETUP-RUN.md`).
+- **Web:** `next start` in `apps/web`, or `make start-web` ([local app runbook](docs/engineering/runbooks/local-app.md)).
 - **Owner bootstrap:** `python -m autobots.operations.bootstrap_owner`. Since R-64 it inserts the workspace before it creates the Auth user, prints the user id and a `--user-id` command when the workspace step fails after that, and the [local app runbook](docs/engineering/runbooks/local-app.md) gives both recoveries.
 - **Concept seed:** `python -m autobots.operations.concept_seed --workspace <id>`.
 - **Paid operations modules:** `operations/route_qualification.py`, `operations/reasoning_trial.py`, and `operations/browse_trial.py` (through `scripts/browse_trial.py`).
@@ -402,7 +402,7 @@ python3.12 scripts/qualify_worker_inference.py
 make help                                        # persistent install: start, stop, status, migrate, check
 ```
 
-Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/operations.md) and `README-SETUP-RUN.md`. The other runbooks in `docs/engineering/runbooks/` are `backup-restore`, `upgrade`, `mac-sleep`, `local-supabase`, `local-app`, `first-slice`, `toolchains`, `development-harness` and `ohmyorch-delivery`.
+Start, drain and stop are in [the operations runbook](docs/engineering/runbooks/operations.md). The other runbooks in `docs/engineering/runbooks/` are `backup-restore`, `upgrade`, `mac-sleep`, `local-supabase`, `local-app`, `first-slice`, `toolchains`, `development-harness` and `ohmyorch-delivery`.
 
 ## Conventions
 
@@ -435,7 +435,6 @@ Repository text that differs from the code or tree:
 - `application/run_projection.py:1` says nothing there reads checkpoints, while line 642 reads their metadata.
 - `docs/engineering/runbooks/mac-sleep.md` doesn't name `sleep_counted_as_work`.
 - `services/agent/pyproject.toml:4` still says "minimal non-feature scaffold".
-- `README-QA.md` describes revision `ecb34900e46c`.
 
 Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering/runbooks/development-harness.md)).
 
@@ -470,7 +469,7 @@ Hooks are guardrails, not OS confinement ([the harness runbook](docs/engineering
 - `openspec/changes/archive/2026-11-07-us-14-*/`, `2026-11-08-us-15-*/verification.md`: per-story records (pointers only).
 - `docs/engineering/decisions/0019-sol-profile-and-browser-use.md`, `0022-studio-product-surfaces.md`: paid authority, Studio scope.
 - `docs/engineering/evidence/US-10.2/`, `US-12.8/`, `US-12.6/`: release record, Gate 0 binding, install.
-- `Makefile`, `README-SETUP-RUN.md`, `.env.example` (variable names only), `.claude/autobots.json`.
+- `Makefile`, `.env.example` (variable names only), `.claude/autobots.json`.
 
 ## Unknowns
 

@@ -2,7 +2,7 @@
 
 ## Plan
 
-Source: explicit user request on 2026-11-04 to use OhMyOrch locally for epic loops with `deliver` from `SPECS.md`; [Decision 0002](../decisions/0002-ohmyorch-delivery-loop.md); [DH-W01–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract).
+Source: explicit user request on 2026-11-04 to use OhMyOrch locally for epic loops with `deliver` from `SPECS.md`; [Decision 0002](../decisions/0002-ohmyorch-delivery-loop.md); [DH-W01–06](../../PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract).
 
 Make `/ohmyorch:deliver <EPIC-N>` usable against this repository without changing story intent or weakening the project contract. This item sets up the loop. It delivers no `US-*` story and changes no story status. Rehearse on throwaway copies before touching the repository. No product code, paid model call, or database or service startup.
 

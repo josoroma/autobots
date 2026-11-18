@@ -2,7 +2,7 @@
 
 Read `.claude/autobots.json` and the mapped contract before a bounded work item. Current user scope and approved owning PRDs define intent; CODEBASE is descriptive. Preserve `SP-*`, `EPIC-*`, `US-*` IDs and source coverage. Missing decisions remain questions; conflicts remain visible.
 
-Follow [DH-W01–06](../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract): proportional plan, actual implementation record, independent read-only review, current verification and exercised runbook. Templates, skipped checks and mocks are not live evidence. The coordinator owns status changes.
+Follow [DH-W01–06](../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract): proportional plan, actual implementation record, independent read-only review, current verification and exercised runbook. Templates, skipped checks and mocks are not live evidence. The coordinator owns status changes.
 
 Keep writer scopes disjoint. Never repair implementation in a supposedly independent review. Fingerprint final relevant tracked/untracked source, nonsecret configuration, locks, generated contracts and verifier; changed inputs invalidate affected evidence.
 

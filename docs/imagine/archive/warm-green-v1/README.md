@@ -46,7 +46,7 @@ These are proposed design values rather than measured raster colors or approved 
 - A completed run offers **Start similar run**, not resume. A workflow draft is separate from its published version and from a run.
 - Completion checks describe structure and attached evidence; they do not certify that every generated statement is true.
 
-Layout, sample controls and placeholder content are design proposals. The source specifications remain authoritative: [SPECS](../../SPECS.md), [Option B contract](../engineering/option-b-contract.md), [Next.js PRD](../../PRD-NextJS.md), [LangGraph / Deep Agents PRD](../../PRD-LangChain-Deep-Agents.md), [model providers](../../PRD-Model-Providers.md) and [local deployment](../../PRD-Local-Mac-Deployment.md).
+Layout, sample controls and placeholder content are design proposals. The source specifications remain authoritative: [SPECS](../../SPECS.md), [Option B contract](../engineering/option-b-contract.md), [Next.js PRD](../../../PRD/PRD-NextJS.md), [LangGraph / Deep Agents PRD](../../../PRD/PRD-LangChain-Deep-Agents.md), [model providers](../../../PRD/PRD-Model-Providers.md) and [local deployment](../../../PRD/PRD-Local-Mac-Deployment.md).
 
 ## Generation and review
 

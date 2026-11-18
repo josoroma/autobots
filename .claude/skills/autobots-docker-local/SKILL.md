@@ -7,7 +7,7 @@ description: Author or inspect Autobots local Docker/Supabase configuration and 
 
 Relevant paths: `infra/**/*`, `**/Dockerfile*`, `**/*compose*.yml`, `**/*compose*.yaml` and `scripts/operations/**/*`.
 
-Read `.claude/autobots.json`, the mapped deployment/contract and [DH-08](../../../PRD-Development-Harness.md#dh-08-docker-and-local-operations-standards). Use the pinned self-hosted Compose source; do not replace it with a hosted project or treat the CLI test stack as the persistent stack.
+Read `.claude/autobots.json`, the mapped deployment/contract and [DH-08](../../../docs/PRD/PRD-Development-Harness.md#dh-08-docker-and-local-operations-standards). Use the pinned self-hosted Compose source; do not replace it with a hosted project or treat the CLI test stack as the persistent stack.
 
 - Next.js and Python stay native on this Mac; Docker hosts Supabase and scoped tools. Qualify reviewed image versions/digests on Apple Silicon.
 - Bind published ports to `127.0.0.1`. Gateway `54321` includes authenticated Studio; direct database `54322` maps to `db:5432`, not Supavisor. Do not expose raw Studio or leave inherited wildcard bindings through a Compose merge.

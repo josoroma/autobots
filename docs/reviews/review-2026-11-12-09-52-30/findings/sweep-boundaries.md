@@ -335,9 +335,9 @@ api/errors.py: budget_error and the other shared mappers
 
 - **Severity** medium · **Dimension** structure · **Effort** S · **Risk** low · **Occurrences** 5
 - **Where:**
-  - [PRD-Development-Harness.md:60](../../../../PRD-Development-Harness.md#L60): src/autobots/{api,domain,application,adapters,workers,graphs,contracts}/
-  - [PRD-Development-Harness.md:54](../../../../PRD-Development-Harness.md#L54): scripts/db/
-  - [PRD-Development-Harness.md:63](../../../../PRD-Development-Harness.md#L63): packages/db-types/ described as a boundary
+  - [PRD-Development-Harness.md:60](../../../PRD/PRD-Development-Harness.md#L60): src/autobots/{api,domain,application,adapters,workers,graphs,contracts}/
+  - [PRD-Development-Harness.md:54](../../../PRD/PRD-Development-Harness.md#L54): scripts/db/
+  - [PRD-Development-Harness.md:63](../../../PRD/PRD-Development-Harness.md#L63): packages/db-types/ described as a boundary
   - [CODEBASE.md:25](../../../../CODEBASE.md#L25): documents the seven packages that actually exist
   - [services/agent/src/autobots/application/goal_loop.py:208-246](../../../../services/agent/src/autobots/application/goal_loop.py#L208): the Deep Agents wiring DH-03 places in graphs/
   - [services/agent/src/autobots/operations/worker.py:1](../../../../services/agent/src/autobots/operations/worker.py#L1): the worker DH-03 places in workers/

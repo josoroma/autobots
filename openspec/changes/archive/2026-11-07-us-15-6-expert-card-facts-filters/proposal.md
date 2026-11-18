@@ -1,6 +1,6 @@
 ## Why
 
-US-15.6, [PRD-Studio EX-01 to EX-03](../../../PRD-Studio.md#experts) and [Decision 0022 D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Expert cards show only a version and raw bindings. They have no usage, no way to start a run, no filters by effect, and no note when a tool needs approval on every call.
+US-15.6, [PRD-Studio EX-01 to EX-03](../../../../docs/PRD/PRD-Studio.md#experts) and [Decision 0022 D14](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). Expert cards show only a version and raw bindings. They have no usage, no way to start a run, no filters by effect, and no note when a tool needs approval on every call.
 
 ## What Changes
 

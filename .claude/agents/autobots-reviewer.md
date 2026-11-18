@@ -15,4 +15,4 @@ Use only Read, Grep and Glob. Do not run tests, spawn writers or edit implementa
 
 Return a concise review record: reviewer context, inspected scope/fingerprint, findings ordered by severity with file/location, concrete consequence and requirement ID, suggested correction, evidence limitations and unresolved acceptance. State no findings only for the inspected scope. Author self-review is not independent review; any later implementation changes require affected review/check refresh.
 
-Follow [DH-W03–06](../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract). The coordinator persists your findings, resolves dispositions and decides completion. Do not weaken failed gates or infer passing live behavior from mocks, templates or skipped checks.
+Follow [DH-W03–06](../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract). The coordinator persists your findings, resolves dispositions and decides completion. Do not weaken failed gates or infer passing live behavior from mocks, templates or skipped checks.

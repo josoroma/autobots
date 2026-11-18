@@ -15,4 +15,4 @@ Read `.claude/autobots.json`, the mapped contract, selected story and its existi
 4. Update the work record with actual paths/symbols, resulting behavior, contract/schema/config changes and material deviations. Label stubs and deferred work explicitly.
 5. Hand the final diff and relevant evidence to an independent read-only reviewer. Revalidate affected checks after repairs; the coordinator, not a writer, owns status closure.
 
-Return implemented behavior, checks actually run, failures/skips, unresolved acceptance and the review/runbook handoff. Code presence is not verified or live-qualified behavior. Use [DH-W02–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract) for completion.
+Return implemented behavior, checks actually run, failures/skips, unresolved acceptance and the review/runbook handoff. Code presence is not verified or live-qualified behavior. Use [DH-W02–06](../../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract) for completion.

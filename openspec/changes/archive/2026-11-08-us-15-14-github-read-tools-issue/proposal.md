@@ -1,6 +1,6 @@
 ## Why
 
-US-15.14, [PRD-Studio GH-01 to GH-05 and GH-07](../../../PRD-Studio.md#github-tools) and [Decision 0022 D6 and D12](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The only GitHub tool creates an issue. The concepts' Experts must triage issues, read CI failures, list pull requests and read files on the same one repository, and label new issues.
+US-15.14, [PRD-Studio GH-01 to GH-05 and GH-07](../../../../docs/PRD/PRD-Studio.md#github-tools) and [Decision 0022 D6 and D12](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision). The only GitHub tool creates an issue. The concepts' Experts must triage issues, read CI failures, list pull requests and read files on the same one repository, and label new issues.
 
 ## What Changes
 

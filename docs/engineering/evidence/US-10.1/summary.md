@@ -63,7 +63,7 @@ This counts what these 120 goals did. The deterministic policy suites are `db` a
 
 The 9 goals whose worker was killed all finished, with no repeated effect, 56.2 to 64.4 seconds after the kill.
 
-**Correction: this was first reported as a missed target, and that was wrong.** The source, [PRD-LangChain-Deep-Agents.md](../../../../PRD-LangChain-Deep-Agents.md), says an eligible run is reclaimed "within 60 seconds after lease expiry/worker availability". The first reading used SPECS' shorter wording and timed from the kill. The lease expiry itself isn't recorded, so the figure after it is inferred: a heartbeat every 20 seconds on a 60-second lease means expiry 40 to 60 seconds after a kill, so reclaim came at most about 24 seconds after it. Commit `93245b9`'s message still says missed.
+**Correction: this was first reported as a missed target, and that was wrong.** The source, [PRD-LangChain-Deep-Agents.md](../../../PRD/PRD-LangChain-Deep-Agents.md), says an eligible run is reclaimed "within 60 seconds after lease expiry/worker availability". The first reading used SPECS' shorter wording and timed from the kill. The lease expiry itself isn't recorded, so the figure after it is inferred: a heartbeat every 20 seconds on a 60-second lease means expiry 40 to 60 seconds after a kill, so reclaim came at most about 24 seconds after it. Commit `93245b9`'s message still says missed.
 
 **Each of the 9 needed an owner's action.** The kill landed during a model call, so the charge was uncertain and the run paused until it was reconciled. The runner did that immediately, recording the worst case, so these figures leave out any time a real person would take.
 

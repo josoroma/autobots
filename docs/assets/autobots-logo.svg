@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="352" height="96" viewBox="0 0 352 96" role="img" aria-labelledby="title">
+  <title id="title">Autobots</title>
+  <!-- The Studio's own mark (components/app-shell.tsx): Lucide's Zap on the sidebar primary, beside the serif name. -->
+  <style>
+    .word { fill: #0a0a0a; font-family: Georgia, "Times New Roman", serif; font-size: 56px; letter-spacing: -1px; }
+    @media (prefers-color-scheme: dark) { .word { fill: #fafafa; } }
+  </style>
+  <defs>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b7fff"/>
+      <stop offset="1" stop-color="#1447e6"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="8" width="80" height="80" rx="20" fill="url(#mark)"/>
+  <g transform="translate(14 18) scale(2.5)" fill="none" stroke="#eff6ff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+  </g>
+  <text class="word" x="104" y="68">Autobots</text>
+</svg>

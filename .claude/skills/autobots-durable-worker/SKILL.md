@@ -7,7 +7,7 @@ description: Implement or review Autobots Python job and LangGraph execution sem
 
 Relevant paths: `services/agent/**/*`.
 
-Read `.claude/autobots.json`, the mapped contract's state/worker sections, selected story and the mapped product PRD. Use [DH-06 worker standards](../../../PRD-Development-Harness.md#durable-workers-and-model-gateway) for checks.
+Read `.claude/autobots.json`, the mapped contract's state/worker sections, selected story and the mapped product PRD. Use [DH-06 worker standards](../../../docs/PRD/PRD-Development-Harness.md#durable-workers-and-model-gateway) for checks.
 
 - Preserve one LangGraph lifecycle; Deep Agents runs bounded stages inside it. HTTP admission commits the run, job and initial outbox event transactionally; no request-local background task owns durable work.
 - Use database-time leases, heartbeat and monotonic fencing. Enforce current ownership for both product writes and checkpoint/store writes; checking only before a provider request is insufficient.

@@ -1,6 +1,6 @@
 ## Why
 
-US-15.24 implements [PRD-Studio ST-01 and SE-03](../../../PRD-Studio.md#streaming), under [Decision 0022 D4 and its streaming decision](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#streaming-decision), Decision 0017 Q13 and SP-011. A run's result appears only once its artifact is stored. The owner decided that every worker model call streams, so its text can show while it's written.
+US-15.24 implements [PRD-Studio ST-01 and SE-03](../../../../docs/PRD/PRD-Studio.md#streaming), under [Decision 0022 D4 and its streaming decision](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#streaming-decision), Decision 0017 Q13 and SP-011. A run's result appears only once its artifact is stored. The owner decided that every worker model call streams, so its text can show while it's written.
 
 ## What Changes
 

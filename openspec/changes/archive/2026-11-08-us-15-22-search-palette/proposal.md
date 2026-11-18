@@ -1,6 +1,6 @@
 ## Why
 
-US-15.22 implements [PRD-Studio SR-01 and SH-02](../../../PRD-Studio.md#search), with [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), DS-04 and SP-014. There's no way to jump to a run, Expert, workflow or tool from the keyboard.
+US-15.22 implements [PRD-Studio SR-01 and SH-02](../../../../docs/PRD/PRD-Studio.md#search), with [Decision 0022 D3](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision), DS-04 and SP-014. There's no way to jump to a run, Expert, workflow or tool from the keyboard.
 
 ## What Changes
 

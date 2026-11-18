@@ -67,7 +67,7 @@ AGENTS.md > Comments (written with the conventions in XDOC-02)
 
 - **Severity** medium · **Dimension** standards · **Effort** M · **Risk** low · **Occurrences** 36
 - **Where:**
-  - [PRD-Development-Harness.md:129](../../../../PRD-Development-Harness.md#L129): DH-06's only comment rule: 'Explain nonobvious invariants in code; avoid comments that restate syntax.'
+  - [PRD-Development-Harness.md:129](../../../PRD/PRD-Development-Harness.md#L129): DH-06's only comment rule: 'Explain nonobvious invariants in code; avoid comments that restate syntax.'
   - [services/agent/src/autobots/api/memory_routes.py:1](../../../../services/agent/src/autobots/api/memory_routes.py#L1): 'PRD 8.4': PRD-AutoGPT.md:346, PRD-LangChain-Deep-Agents.md:509 and PRD-NextJS.md:471 each have a section 8.4
   - [services/agent/src/autobots/contracts/approvals.py:1](../../../../services/agent/src/autobots/contracts/approvals.py#L1): 'PRD 9.2': three PRDs have a section 9.2
   - [services/agent/src/autobots/application/tool_gateway.py:110](../../../../services/agent/src/autobots/application/tool_gateway.py#L110): Bare 'AB-02', five lines after 'PRD-Studio GH-06' at 105

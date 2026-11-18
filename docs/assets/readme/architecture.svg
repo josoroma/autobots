@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="460" viewBox="0 0 960 460" role="img" aria-labelledby="title desc">
+  <title id="title">Everything runs on your Mac</title>
+  <desc id="desc">Inside the Mac, every port is on 127.0.0.1. The browser talks to the Next.js web app and BFF on port 3000, which forwards to the FastAPI API on port 8001 and signs people in through the Supabase gateway. Supabase runs in Docker: the gateway on port 55321 in front of Auth, REST, Storage and Studio, and Postgres on port 55322. The API and the worker read and write Postgres. The worker runs Deep Agents on LangGraph and opens one browser-executor container per browsing call. Only two parts reach outside: the API, which validates the OpenRouter key against the public model catalog, and the worker, which makes model calls to OpenRouter and calls the search and GitHub APIs of the tools a person granted.</desc>
+  <style>
+    svg { --bg: #ffffff; --fg: #0a0a0a; --mfg: #737373; --line: #e5e5e5; --surface: #f5f5f5; --brand: #155dfc; --ok: #009966; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #171717; --fg: #fafafa; --mfg: #a1a1a1; --line: #333333; --surface: #262626; --brand: #2b7fff; --ok: #00bc7d; }
+    }
+    text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .frame { fill: var(--bg); stroke: var(--line); }
+    .mac { fill: var(--brand); fill-opacity: 0.035; stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 6 6; }
+    .docker { fill: none; stroke: var(--mfg); stroke-opacity: 0.6; stroke-dasharray: 4 5; }
+    .box { fill: var(--bg); stroke: var(--line); }
+    .chip { fill: var(--surface); }
+    .db { fill: var(--surface); stroke: var(--line); }
+    .db-top { fill: var(--bg); stroke: var(--line); }
+    .out { fill: var(--bg); stroke: var(--mfg); stroke-opacity: 0.6; }
+    .fg { fill: var(--fg); } .mfg { fill: var(--mfg); } .brandf { fill: var(--brand); } .okf { fill: var(--ok); }
+    .name { font-size: 14px; font-weight: 600; fill: var(--fg); }
+    .sub { font-size: 11.5px; fill: var(--mfg); }
+    .label { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; }
+    .wire { fill: none; stroke: var(--mfg); stroke-width: 1.5; }
+    .flow { fill: none; stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .head { fill: var(--mfg); } .head-b { fill: var(--brand); }
+    @media (prefers-reduced-motion: no-preference) { .flow { animation: flow 1.2s linear infinite; } }
+    @keyframes flow { to { stroke-dashoffset: -18; } }
+  </style>
+
+  <rect class="frame" x="0.5" y="0.5" width="959" height="459" rx="16"/>
+
+  <!-- The Mac -->
+  <rect class="mac" x="24" y="24" width="684" height="412" rx="18"/>
+  <text class="brandf label" x="48" y="52">YOUR MAC</text>
+  <text class="mfg mono" x="684" y="52" font-size="11" text-anchor="end">every port on 127.0.0.1</text>
+
+  <!-- Row: browser, web, API -->
+  <rect class="box" x="48" y="72" width="148" height="64" rx="12"/>
+  <text class="name" x="64" y="100">Browser</text>
+  <text class="sub" x="64" y="120">the Studio</text>
+
+  <rect class="box" x="228" y="72" width="200" height="64" rx="12"/>
+  <text class="name" x="244" y="100">Next.js web + BFF</text>
+  <text class="mfg mono" x="244" y="120" font-size="11.5">:3000 · CSRF-checked</text>
+
+  <rect class="box" x="460" y="72" width="224" height="64" rx="12"/>
+  <text class="name" x="476" y="100">FastAPI API</text>
+  <text class="mfg mono" x="476" y="120" font-size="11.5">:8001 · Pydantic contracts</text>
+
+  <path class="wire" d="M196 104 H221"/><path class="head" d="M228 104 l-7 -4 v8 z"/>
+  <path class="wire" d="M428 104 H453"/><path class="head" d="M460 104 l-7 -4 v8 z"/>
+
+  <!-- Supabase in Docker -->
+  <rect class="docker" x="48" y="164" width="380" height="248" rx="14"/>
+  <text class="mfg label" x="412" y="188" text-anchor="end">DOCKER · SUPABASE</text>
+
+  <path class="wire" d="M300 136 V148 H143 V197"/><path class="head" d="M143 204 l-4 -7 h8 z"/>
+  <text class="mfg mono" x="152" y="160" font-size="10.5">sign-in</text>
+
+  <rect class="box" x="68" y="204" width="150" height="56" rx="10"/>
+  <text class="name" x="84" y="228">Gateway</text>
+  <text class="mfg mono" x="84" y="247" font-size="11">:55321</text>
+  <path class="wire" d="M218 232 H232"/>
+  <rect class="chip" x="236" y="206" width="82" height="24" rx="6"/><text class="fg" x="277" y="222" font-size="12" text-anchor="middle">Auth</text>
+  <rect class="chip" x="326" y="206" width="82" height="24" rx="6"/><text class="fg" x="367" y="222" font-size="12" text-anchor="middle">REST</text>
+  <rect class="chip" x="236" y="236" width="82" height="24" rx="6"/><text class="fg" x="277" y="252" font-size="12" text-anchor="middle">Storage</text>
+  <rect class="chip" x="326" y="236" width="82" height="24" rx="6"/><text class="fg" x="367" y="252" font-size="12" text-anchor="middle">Studio</text>
+  <path class="wire" d="M322 260 V284"/>
+
+  <path class="db" d="M68 296 V380 A170 12 0 0 0 408 380 V296"/>
+  <ellipse class="db-top" cx="238" cy="296" rx="170" ry="12"/>
+  <text class="name" x="238" y="333" text-anchor="middle">Postgres</text>
+  <text class="mfg mono" x="238" y="351" font-size="11" text-anchor="middle">:55322 · RLS on public tables</text>
+  <text class="sub" x="238" y="369" text-anchor="middle">runs · checkpoints · events · receipts</text>
+
+  <!-- Worker -->
+  <rect class="box" x="460" y="164" width="224" height="72" rx="12"/>
+  <text class="name" x="476" y="191">Worker</text>
+  <text class="sub" x="476" y="210">Deep Agents on LangGraph</text>
+  <text class="mfg mono" x="476" y="226" font-size="10.5">inference off by default</text>
+
+  <!-- API and worker share Postgres -->
+  <path class="wire" d="M460 124 H444 V320 H415"/><path class="head" d="M408 320 l7 -4 v8 z"/>
+  <path class="wire" d="M460 200 H444"/>
+  <text class="mfg mono" x="438" y="286" font-size="10.5" text-anchor="end">runtime role</text>
+
+  <!-- Browser executor -->
+  <rect class="box" x="460" y="300" width="224" height="88" rx="12"/>
+  <text class="name" x="476" y="326">Browser executor</text>
+  <text class="sub" x="476" y="346">Docker · one container per call</text>
+  <text class="sub" x="476" y="364">behind an egress proxy</text>
+  <path class="wire" d="M572 236 V293"/><path class="head" d="M572 300 l-4 -7 h8 z"/>
+  <text class="mfg mono" x="580" y="272" font-size="10.5">browse_goal</text>
+
+  <!-- Outside -->
+  <rect class="out" x="744" y="148" width="192" height="80" rx="12"/>
+  <text class="name" x="760" y="176">OpenRouter</text>
+  <text class="sub" x="760" y="196">the only model provider</text>
+  <text class="mfg mono" x="760" y="214" font-size="11">Terra · Sol</text>
+
+  <rect class="out" x="744" y="260" width="192" height="96" rx="12"/>
+  <text class="name" x="760" y="288">Search &amp; GitHub</text>
+  <text class="sub" x="760" y="308">Jina · Tavily · SerpApi</text>
+  <text class="sub" x="760" y="326">GitHub</text>
+  <text class="mfg mono" x="760" y="344" font-size="11">only tools you grant</text>
+
+  <path class="flow" d="M684 96 H776 Q800 96 800 120 V141"/><path class="head-b" d="M800 148 l-4 -7 h8 z"/>
+  <text class="brandf mono" x="720" y="88" font-size="10.5">key check · catalog</text>
+  <path class="flow" d="M684 188 H737"/><path class="head-b" d="M744 188 l-7 -4 v8 z"/>
+  <path class="flow" d="M684 220 C716 220 712 300 737 300"/><path class="head-b" d="M744 300 l-7 -4 v8 z"/>
+</svg>

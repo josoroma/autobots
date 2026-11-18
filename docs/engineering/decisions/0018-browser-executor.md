@@ -27,7 +27,7 @@
 
 ## Requirements revised
 
-- PRD-Tool-Catalog gains [Isolated browser executor](../../../PRD-Tool-Catalog.md#isolated-browser-executor) and [Admitted browser model](../../../PRD-Tool-Catalog.md#admitted-browser-model). [Autonomous browsing](../../../PRD-Tool-Catalog.md#autonomous-browsing) gains `browse_goal`'s contract.
+- PRD-Tool-Catalog gains [Isolated browser executor](../../PRD/PRD-Tool-Catalog.md#isolated-browser-executor) and [Admitted browser model](../../PRD/PRD-Tool-Catalog.md#admitted-browser-model). [Autonomous browsing](../../PRD/PRD-Tool-Catalog.md#autonomous-browsing) gains `browse_goal`'s contract.
 - PRD 9.1's rule stands: arbitrary execution stays disabled except for a tool whose executor reports qualified. `browse_goal` is the only such tool, and only through an Expert grant with approval on every call.
 
 ## What this gives up

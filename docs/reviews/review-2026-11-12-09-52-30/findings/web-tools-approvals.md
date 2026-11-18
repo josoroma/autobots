@@ -306,7 +306,7 @@ components/tool-grants.tsx   Grants, CopySchema
   - [apps/web/components/tool-catalog.tsx:461](../../../../apps/web/components/tool-catalog.tsx#L461): bg-background text-foreground … backdrop:bg-black/60
   - [apps/web/components/search-palette.tsx:132](../../../../apps/web/components/search-palette.tsx#L132): bg-popover text-popover-foreground … backdrop:bg-black/50
   - [apps/web/components/about-services.tsx:22](../../../../apps/web/components/about-services.tsx#L22): bg-popover text-popover-foreground … backdrop:bg-black/50
-  - [PRD-Design-System.md:65](../../../../PRD-Design-System.md#L65): menus, selects and dialogs use popover and popover-foreground
+  - [PRD-Design-System.md:65](../../../PRD/PRD-Design-System.md#L65): menus, selects and dialogs use popover and popover-foreground
 - **Evidence:** The tool modal is the only dialog on the page surface, with a darker backdrop. No comment explains the difference. The cards inside use bg-card, which has the same value as popover in both themes (docs/design/luma.css:4-7 and 39-42), so a popover-surfaced dialog would hide their edges; that may be the reason.
 - **Why it matters:** The modal's surface and backdrop differ from the other two dialogs and from DS-03, and a fourth dialog will copy one of the three variants.
 - **Recommendation:** Add a shared native-dialog primitive, components/ui/dialog.tsx: showModal on mount, backdrop click, a form method='dialog' close, the popover surface and one backdrop class. Use it for all three dialogs. If the tool modal keeps the page surface so its cards stand out, say so in a comment and record it as a documented design-system exception rather than a per-screen override, then check both themes as DS-05 requires.

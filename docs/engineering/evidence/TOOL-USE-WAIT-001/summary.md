@@ -4,7 +4,7 @@
 
 ## Plan
 
-[TU-01](../../../PRD-Tool-Catalog.md#tool-use-record) says the gateway records every dispatch, denials included, with its outcome.
+[TU-01](../../../PRD/PRD-Tool-Catalog.md#tool-use-record) says the gateway records every dispatch, denials included, with its outcome.
 
 The gap: a call held for approval returned `approval_pending`, but its tool-use row kept no outcome. The approval gate moves the run to waiting and releases the job's lease. `complete_use` then failed its lease fence and returned without writing.
 

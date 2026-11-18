@@ -95,7 +95,7 @@ class RuleLinkTests(HarnessTestCase):
         for target in ('../../scripts/verify.py', '../../scripts/specs.py',
                        '../skills/autobots-verify-change/SKILL.md', '../skills/autobots-review-change/SKILL.md',
                        '../agents/autobots-reviewer.md',
-                       '../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract'):
+                       '../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract'):
             with self.subTest(target=target):
                 self.rule.write_text(f'# Rule\n\nSee [target]({target}).\n')
                 self.assertEqual(config_errors(self.root), [])
@@ -103,9 +103,9 @@ class RuleLinkTests(HarnessTestCase):
     def test_rule_without_allowed_link_fails(self):
         cases = {
             'no link': '# Rule\n\nNo link.\n',
-            'non-DH-W PRD anchor': '# Rule\n\nSee [DH-07](../../PRD-Development-Harness.md'
+            'non-DH-W PRD anchor': '# Rule\n\nSee [DH-07](../../docs/PRD/PRD-Development-Harness.md'
                                    '#dh-07-supabase-migrations-seeds-and-database-quality).\n',
-            'PRD without anchor': '# Rule\n\nSee [PRD](../../PRD-Development-Harness.md).\n',
+            'PRD without anchor': '# Rule\n\nSee [PRD](../../docs/PRD/PRD-Development-Harness.md).\n',
             'other file': '# Rule\n\nSee [source](../../source.md).\n',
             'missing file': '# Rule\n\nSee [runner](../../scripts/absent.py).\n',
             'named in prose only': '# Rule\n\nSee scripts/verify.py and `autobots-review-change`.\n',
@@ -114,7 +114,7 @@ class RuleLinkTests(HarnessTestCase):
             'external': '# Rule\n\nSee [runner](https://example.invalid/scripts/verify.py).\n',
         }
         # A target that doesn't resolve is also a broken link, which project_configuration reports first (THRN-05).
-        broken = {'non-DH-W PRD anchor': '../../PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality',
+        broken = {'non-DH-W PRD anchor': '../../docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality',
                   'missing file': '../../scripts/absent.py'}
         for name, text in cases.items():
             with self.subTest(case=name):

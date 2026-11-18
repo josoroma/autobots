@@ -1,6 +1,6 @@
 ## Why
 
-US-15.23 implements [PRD-Studio SH-02](../../../PRD-Studio.md#shell), with [Decision 0022 D3 and D16](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and DS-04. Starting a goal means first going to Home and finding the composer.
+US-15.23 implements [PRD-Studio SH-02](../../../../docs/PRD/PRD-Studio.md#shell), with [Decision 0022 D3 and D16](../../../docs/engineering/decisions/0022-studio-product-surfaces.md#decision) and DS-04. Starting a goal means first going to Home and finding the composer.
 
 ## What Changes
 

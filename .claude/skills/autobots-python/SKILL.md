@@ -5,7 +5,7 @@ description: Implement or review typed Python domain, application and FastAPI co
 
 # Python application boundaries
 
-Read `.claude/autobots.json`, the mapped contract, selected story and [Python standards in DH-06](../../../PRD-Development-Harness.md#python-api-domain-and-workers). Use `autobots-durable-worker` for graph/job ownership changes and `autobots-contracts` for public schema changes.
+Read `.claude/autobots.json`, the mapped contract, selected story and [Python standards in DH-06](../../../docs/PRD/PRD-Development-Harness.md#python-api-domain-and-workers). Use `autobots-durable-worker` for graph/job ownership changes and `autobots-contracts` for public schema changes.
 
 - Keep domain/application logic separate from FastAPI, SQL and provider adapters. Pydantic owns external DTOs; persistence rows, graph state and public contracts are distinct types.
 - Use the qualified Python 3.12 `src` package and prepared locked environment. Explicit installation may use `uv sync --locked`; checks must not silently sync or install dependencies.

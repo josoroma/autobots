@@ -1,6 +1,6 @@
 # Decision 0025: Settings → Keys & vars
 
-**Date:** 2026-11-08. **Authority:** the owner. Looking at `.env` beside Settings → Tool keys, they said: "these 3 are pending, so name it to keys & vars". The three are `GITHUB_REPOSITORY`, `GITHUB_TOKEN` and `AUTOBOTS_BROWSER_EXECUTOR`, which Tool keys didn't offer. The design choices are made under their standing delegation. This extends [Decision 0024](0024-tool-keys-from-env-and-settings.md) and amends [PRD-Tool-Catalog PK-04 to PK-06](../../../PRD-Tool-Catalog.md#provider-keys) and AB-02. It schedules US-14.18.
+**Date:** 2026-11-08. **Authority:** the owner. Looking at `.env` beside Settings → Tool keys, they said: "these 3 are pending, so name it to keys & vars". The three are `GITHUB_REPOSITORY`, `GITHUB_TOKEN` and `AUTOBOTS_BROWSER_EXECUTOR`, which Tool keys didn't offer. The design choices are made under their standing delegation. This extends [Decision 0024](0024-tool-keys-from-env-and-settings.md) and amends [PRD-Tool-Catalog PK-04 to PK-06](../../PRD/PRD-Tool-Catalog.md#provider-keys) and AB-02. It schedules US-14.18.
 
 ## Decision
 

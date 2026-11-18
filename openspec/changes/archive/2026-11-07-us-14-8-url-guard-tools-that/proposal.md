@@ -1,6 +1,6 @@
 ## Why
 
-US-14.8, [PRD-Tool-Catalog UG-01](../../../PRD-Tool-Catalog.md#url-guard) and Decision 0017 C6: provider and file tools are about to take URLs, and nothing yet stops a URL from reaching this Mac's loopback services (Supabase on `127.0.0.1:55321`, the API), a private network or cloud metadata.
+US-14.8, [PRD-Tool-Catalog UG-01](../../../../docs/PRD/PRD-Tool-Catalog.md#url-guard) and Decision 0017 C6: provider and file tools are about to take URLs, and nothing yet stops a URL from reaching this Mac's loopback services (Supabase on `127.0.0.1:55321`, the API), a private network or cloud metadata.
 
 ## What Changes
 

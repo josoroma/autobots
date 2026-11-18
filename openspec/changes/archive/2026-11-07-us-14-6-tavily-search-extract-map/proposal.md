@@ -1,6 +1,6 @@
 ## Why
 
-US-14.6, [PRD-Tool-Catalog "Web tools"](../../../PRD-Tool-Catalog.md#web-tools) and Decision 0017 C1, C2, C5 and C12: runs can't search, read or crawl the web. Tavily is the first tool provider.
+US-14.6, [PRD-Tool-Catalog "Web tools"](../../../../docs/PRD/PRD-Tool-Catalog.md#web-tools) and Decision 0017 C1, C2, C5 and C12: runs can't search, read or crawl the web. Tavily is the first tool provider.
 
 ## What Changes
 

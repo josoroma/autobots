@@ -1,6 +1,6 @@
 # Evidence contract
 
-This defines what a work item's evidence holds and how long it lasts, per [DH-09.2](../../../PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts). Directories here that lack the `autobots.work-evidence/v1` manifest predate this schema and were not rewritten. Routine `/ohmyorch:deliver` stories keep their archived OpenSpec change as their record, by [Decision 0003](../decisions/0003-openspec-only-delivery.md); this contract applies when a story's acceptance or the user asks for it.
+This defines what a work item's evidence holds and how long it lasts, per [DH-09.2](../../PRD/PRD-Development-Harness.md#dh-092-fingerprints-manifests-and-retained-artifacts). Directories here that lack the `autobots.work-evidence/v1` manifest predate this schema and were not rewritten. Routine `/ohmyorch:deliver` stories keep their archived OpenSpec change as their record, by [Decision 0003](../decisions/0003-openspec-only-delivery.md); this contract applies when a story's acceptance or the user asks for it.
 
 ## Durable, versioned
 

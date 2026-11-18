@@ -1,6 +1,6 @@
 # Decision 0031: Search tools page in batches of 10, at most 3 pages a call
 
-**Date:** 2026-11-18. **Authority:** the owner. They asked that Autobots' search tools fetch results in batches of 10, with at most 3 pages per call, following [Deep-Research-Content-Writer](https://github.com/josoroma/Deep-Research-Content-Writer), planned in SPECS first. The choices below are the ones that request and its sources leave open. They are made under the owner's standing delegation, and the owner can change any of them under US-14.21. This adds the section Search paging to [PRD-Tool-Catalog](../../../PRD-Tool-Catalog.md#search-paging) and schedules US-14.21.
+**Date:** 2026-11-18. **Authority:** the owner. They asked that Autobots' search tools fetch results in batches of 10, with at most 3 pages per call, following [Deep-Research-Content-Writer](https://github.com/josoroma/Deep-Research-Content-Writer), planned in SPECS first. The choices below are the ones that request and its sources leave open. They are made under the owner's standing delegation, and the owner can change any of them under US-14.21. This adds the section Search paging to [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md#search-paging) and schedules US-14.21.
 
 ## What the reference does
 

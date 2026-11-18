@@ -213,7 +213,8 @@ def valid_root(directory: str | Path) -> Path:
     (root / '.claude/autobots.json').write_text(json.dumps(config))
     shutil.copyfile(ROOT / '.claude/settings.json', root / '.claude/settings.json')
     (root / 'source.md').write_text('# Source\n')
-    (root / 'PRD-Development-Harness.md').write_text('# PRD\n\n### DH-09.1. Work-item evidence contract\n')
+    (root / 'docs/PRD').mkdir(parents=True)
+    (root / 'docs/PRD/PRD-Development-Harness.md').write_text('# PRD\n\n### DH-09.1. Work-item evidence contract\n')
     for name in ('verify.py', 'specs.py'):
         (root / 'scripts' / name).write_text('# fixture\n')
     for name in ('autobots-verify-change', 'autobots-review-change'):

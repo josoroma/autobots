@@ -7,7 +7,7 @@ paths:
 
 # Database ownership
 
-Follow [DH-07](../../PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality) and `autobots-supabase`.
+Follow [DH-07](../../docs/PRD/PRD-Development-Harness.md#dh-07-supabase-migrations-seeds-and-database-quality) and `autobots-supabase`.
 
 - SQL migrations own application schema; never edit applied migrations or introduce competing history. Document locks/backfills and forward recovery in the `-- Locks:`, `-- Data:` and `-- Recovery:` header lines that [comments-and-names.md](comments-and-names.md) defines.
 - Public domain tables require RLS. `app_private` and `agent_runtime` remain private direct-SQL schemas, outside PostgREST/Realtime/browser grants.

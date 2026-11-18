@@ -1,6 +1,6 @@
 ## Why
 
-US-14.10, [PRD-Tool-Catalog "Market data"](../../../PRD-Tool-Catalog.md#market-data) and Decision 0017 C11, C12, Q5, Q6 and Q7: the request asked for crypto and colón exchange history with daily percent change, and inflation for Costa Rica, the USA and Europe.
+US-14.10, [PRD-Tool-Catalog "Market data"](../../../../docs/PRD/PRD-Tool-Catalog.md#market-data) and Decision 0017 C11, C12, Q5, Q6 and Q7: the request asked for crypto and colón exchange history with daily percent change, and inflation for Costa Rica, the USA and Europe.
 
 ## What Changes
 

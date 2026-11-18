@@ -7,7 +7,7 @@ description: Plan one authorized Autobots work item against its SPECS and PRD ac
 
 Read `.claude/autobots.json`, the mapped contract, selected SPECS story and only its cited sources. Inspect relevant code and CODEBASE as evidence of current behavior. Preserve stable identifiers and distinguish the requested result from tempting adjacent features.
 
-Create or update `docs/engineering/work-items/<work-item-id>.md` under [DH-W01–06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Record:
+Create or update `docs/engineering/work-items/<work-item-id>.md` under [DH-W01–06](../../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract). Record:
 
 - Story and requirement IDs, observable acceptance, current behavior and intended change.
 - Owned files/layers and interfaces; state/contract compatibility, migration/seed or operational impact.

@@ -15,4 +15,4 @@ Assess observable behavior, failure/recovery cases, API/state compatibility, sec
 
 Return findings ordered by severity with path/location, concrete consequence, source requirement and suggested correction; also record inspected invariants, reviewer identity/context, fingerprint and limitations. If no defects are found, state the scope reviewed rather than asserting universal correctness.
 
-After an author fixes a finding, inspect its resolution and affected evidence. A reviewer that edits implementation becomes an author for that scope and requires another independent review. Follow [DH-W03 and DH-W06](../../../PRD-Development-Harness.md#dh-091-work-item-evidence-contract); review adds no user-permission ceremony.
+After an author fixes a finding, inspect its resolution and affected evidence. A reviewer that edits implementation becomes an author for that scope and requires another independent review. Follow [DH-W03 and DH-W06](../../../docs/PRD/PRD-Development-Harness.md#dh-091-work-item-evidence-contract); review adds no user-permission ceremony.

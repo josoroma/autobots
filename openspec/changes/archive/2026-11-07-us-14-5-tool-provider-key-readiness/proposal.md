@@ -1,6 +1,6 @@
 ## Why
 
-US-14.5, [PRD-Tool-Catalog PK-01 to PK-03](../../../PRD-Tool-Catalog.md#provider-keys) and Decision 0017 C1, C5, C8 and Q1: provider tools are about to arrive, and nothing yet reads a tool-provider key safely, refuses a run that grants a tool whose key is missing, or recognizes those keys in logs and evidence.
+US-14.5, [PRD-Tool-Catalog PK-01 to PK-03](../../../../docs/PRD/PRD-Tool-Catalog.md#provider-keys) and Decision 0017 C1, C5, C8 and Q1: provider tools are about to arrive, and nothing yet reads a tool-provider key safely, refuses a run that grants a tool whose key is missing, or recognizes those keys in logs and evidence.
 
 ## What Changes
 

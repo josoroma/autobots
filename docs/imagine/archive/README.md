@@ -1,6 +1,6 @@
 # Superseded visual concepts
 
-The active direction is the [Studio gallery](../index.html), one screen per sidebar section, rendered from HTML on the exact Luma tokens. The [design contract](../../../PRD-Design-System.md) remains authoritative. Folders here are historical snapshots and don't define current requirements.
+The active direction is the [Studio gallery](../index.html), one screen per sidebar section, rendered from HTML on the exact Luma tokens. The [design contract](../../PRD/PRD-Design-System.md) remains authoritative. Folders here are historical snapshots and don't define current requirements.
 
 ## quiet-workbench-v1 (2026-11-07)
 

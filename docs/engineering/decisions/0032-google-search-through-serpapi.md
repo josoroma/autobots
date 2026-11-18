@@ -8,7 +8,7 @@ The owner chose two options in this session:
 
 The other choices below are made under the owner's standing delegation. The owner can change any of them under US-14.22.
 
-This amends [Decision 0017](0017-tool-catalog.md) C1, which named the tool providers, and adds to [PRD-Tool-Catalog](../../../PRD-Tool-Catalog.md#google-search) and [PRD-Studio](../../../PRD-Studio.md) SD-01 and SD-02. It schedules US-14.22.
+This amends [Decision 0017](0017-tool-catalog.md) C1, which named the tool providers, and adds to [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md#google-search) and [PRD-Studio](../../PRD/PRD-Studio.md) SD-01 and SD-02. It schedules US-14.22.
 
 ## SerpApi's Google search (read 2026-11-18)
 
