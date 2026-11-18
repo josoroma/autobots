@@ -63,7 +63,7 @@ async def plan_summary(connection: SqlConnection, run_id: UUID) -> PlanSummary |
     plan = await latest_plan(connection, run_id)
     if plan is None:
         return None
-    version, tasks = plan
+    version, tasks = plan.version, plan.tasks
     (reason,) = await one(
         connection,
         "select revision_reason from app_private.plan_versions where run_id = %s and version = %s",

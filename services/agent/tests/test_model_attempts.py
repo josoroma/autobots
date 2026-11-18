@@ -16,7 +16,6 @@ from autobots.adapters.models.factory import (
     default_sdk_client,
     prepare_attempt,
 )
-from autobots.application.goal_loop import LoopConfig
 from autobots.application.model_admission import (
     AdmissionRequest,
     CostUnavailable,
@@ -35,6 +34,7 @@ from autobots.application.model_attempts import (
     classify_status,
     executable_tool_calls,
 )
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.domain.models import (
     DEFAULT_PROFILE,
     PROFILES,

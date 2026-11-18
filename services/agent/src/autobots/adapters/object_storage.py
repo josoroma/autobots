@@ -12,14 +12,19 @@ import httpx
 from pydantic import SecretStr
 
 from autobots.adapters.provider_http import http_client
+from autobots.domain.errors import FixedRefusal, RefusalKind
 
 BUCKET = "workspace-artifacts"
 _UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _SCOPED = re.compile(rf"^{_UUID}/{_UUID}(/[A-Za-z0-9._-]+)?$")
 
 
-class StorageUnavailable(Exception):
-    """Storage couldn't answer, so nothing can be said about the object."""
+class StorageUnavailable(FixedRefusal):
+    """Storage couldn't answer, or none is configured, so nothing can be said about the object.
+    A download answers it as a refusal (api/errors.py), and no response shows its detail."""
+
+    code = "storage_unavailable"
+    kind = RefusalKind.UNAVAILABLE
 
 
 def _scoped(path: str) -> str:

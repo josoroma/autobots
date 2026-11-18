@@ -107,7 +107,7 @@ Build both images on this Mac, through the one build entry point. The browser im
 make browser-images
 ```
 
-It runs `scripts/browser_images.py build`. Each Dockerfile's own `<Dockerfile>.dockerignore` narrows its build context to the one file it copies, and each image gets the label `autobots.fingerprint`: a digest of the executor's fingerprint, which hashes the two Dockerfiles and their ignore files, the entrypoint, `egress_proxy.py` and the executor's three modules, `browser_executor.py` (the Docker session and the lease checks), `browser_cdp.py` (the DevTools client and request guard) and `browser_qualification.py` (what a qualification binds). To see whether the local images carry the current fingerprint, without changing anything:
+It runs `scripts/browser_images.py build`. Each Dockerfile's own `<Dockerfile>.dockerignore` narrows its build context to the one file it copies, and each image gets the label `autobots.fingerprint`: a digest of the executor's fingerprint, which hashes the two Dockerfiles and their ignore files, the entrypoint, `egress_proxy.py` and the executor's three modules, `browser_executor.py` (the Docker session), `browser_cdp.py` (the DevTools client and request guard) and `browser_qualification.py` (what a qualification binds), plus `application/browser_leases.py` (the sweeper's lease and attempt checks). To see whether the local images carry the current fingerprint, without changing anything:
 
 ```sh
 python3.12 scripts/browser_images.py check
@@ -123,7 +123,7 @@ python3.12 scripts/qualify_browser_executor.py
 
 It writes `.checks/browser-executor/qualification.json`, bound to the fingerprint it started with. The executor reports qualified only from a passing report at the current fingerprint, and only while both images it starts carry that fingerprint's label, so after changing any file the fingerprint names, run both commands again. Until then `browse_goal` is off. It's in no verification profile, since it needs network and images a check never builds.
 
-**Re-qualification owed.** The executor's split into three modules, the image labels and R-50's edit to `adapters/browser_executor.py`, whose sweeper now reads its lease through `application/worker_leases.py`, changed the fingerprint, so the qualification recorded on 2026-11-07 reads as stale and `browse_goal` is off, the safe state. Re-qualifying is the owner's step ([Decision 0029](../decisions/0029-refactor-decisions-delegated-r41-r68.md) F4, [Decision 0018](../decisions/0018-browser-executor.md) B8). It needs Docker, the base images (pulled once if absent) and outbound network to the qualification host:
+**Re-qualification owed.** The executor's split into three modules, the image labels and the sweeper's lease and attempt queries, now in the fingerprinted `application/browser_leases.py`, changed the fingerprint, so the qualification recorded on 2026-11-07 reads as stale and `browse_goal` is off, the safe state. Re-qualifying is the owner's step ([Decision 0029](../decisions/0029-refactor-decisions-delegated-r41-r68.md) F4, [Decision 0018](../decisions/0018-browser-executor.md) B8). It needs Docker, the base images (pulled once if absent) and outbound network to the qualification host:
 
 ```sh
 make browser-images && python3.12 scripts/qualify_browser_executor.py

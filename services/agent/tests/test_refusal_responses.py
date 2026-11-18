@@ -17,6 +17,7 @@ from uuid import UUID
 
 import pytest
 
+from autobots.adapters.object_storage import StorageUnavailable
 from autobots.api import (
     approval_routes,
     artifact_routes,
@@ -76,6 +77,8 @@ APPROVAL = UUID("0b000000-0000-4000-8000-0000000000c8")
 ARTIFACT = UUID("0b000000-0000-4000-8000-0000000000c9")
 
 KEY_NEEDED = "Model-backed work needs a usable OpenRouter key."
+NO_STORAGE = (503, "storage_unavailable", "Artifact storage is unavailable.")
+DISPLAY_NAME = (422, "display_name_invalid", "A display name needs 1 to 60 characters.")
 KEY_REUSED = "This key was already used with different content."
 ROUTING = "That routing isn't available."
 SAVED_CONFLICT = "That conflicts with what is saved. Reload and try again."
@@ -619,6 +622,12 @@ OTHERS = [
         )
         for code, status in (("artifact_not_found", 404), ("artifact_missing", 409))
     ),
+    Case(
+        f"GET /v1/artifacts/{ARTIFACT}/download",
+        "artifact_routes.read_artifact",
+        StorageUnavailable("arranged"),
+        NO_STORAGE,
+    ),
     *(
         Case(request, f"event_routes.{name}", RunNotFound("arranged"), reply)
         for request, name in (
@@ -656,6 +665,18 @@ def test_each_route_answers_a_refusal_as_it_always_has(
 ) -> None:
     _patched(monkeypatch, case)
     assert answer(client, case.request, case.body) == case.expected
+
+
+def test_a_download_without_artifact_storage_is_unavailable(client: ApiClient) -> None:
+    resources_of(client.app).object_store = None
+    assert answer(client, f"GET /v1/artifacts/{ARTIFACT}/download") == NO_STORAGE
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 61])
+def test_a_display_name_out_of_bounds_is_refused_in_its_fixed_wording(
+    client: ApiClient, name: str
+) -> None:
+    assert answer(client, "PUT /v1/profile", {"display_name": name}) == DISPLAY_NAME
 
 
 @pytest.mark.parametrize(

@@ -11,9 +11,14 @@ from uuid import UUID
 
 import pytest
 
-from autobots.application.model_policy import PolicyChanged, save_model_policy, validated_choice
+from autobots.application.model_policy import (
+    ChoiceNotApproved,
+    PolicyChanged,
+    save_model_policy,
+    validated_choice,
+)
 from autobots.domain.errors import RefusalKind
-from autobots.domain.models import ModelProfileId, ProfileNotOffered, UnknownModelProfile
+from autobots.domain.models import ModelProfileId, ProfileNotOffered
 from fake_api import MEMBER, OWNER, WORKSPACE, ApiClient, FakeDatabase
 
 READ = (
@@ -202,7 +207,7 @@ def test_a_choice_is_validated_roles_first_then_offering() -> None:
         SOL,
         {"executor": TERRA},
     )
-    with pytest.raises(UnknownModelProfile):
+    with pytest.raises(ChoiceNotApproved):
         validated_choice(None, {"not_a_role": ModelProfileId.DEEPSEEK_FLASH})
     with pytest.raises(ProfileNotOffered):
         validated_choice(ModelProfileId.DEEPSEEK_FLASH, {})

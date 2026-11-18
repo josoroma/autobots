@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 
+from autobots.adapters.object_storage import StorageUnavailable
 from autobots.adapters.tool_registry import catalog
 from autobots.api.errors import STATUS
 from autobots.application import experts
@@ -19,7 +20,9 @@ from autobots.application.credentials.store import CredentialStorageUnavailable
 from autobots.application.experts import ExpertRefused, validate_config
 from autobots.application.improvements import ImprovementRefused
 from autobots.application.memory import MemoryRefused
+from autobots.application.model_policy import ChoiceNotApproved
 from autobots.application.plans import GoalMissing, load_goal
+from autobots.application.profiles import DisplayNameInvalid
 from autobots.application.provider_settings import StaleVersion, ValidationUnavailable
 from autobots.application.routines import RoutineRefused
 from autobots.application.run_admission import AdmissionRefused, ModelNotReady, PolicyNotOffered
@@ -106,6 +109,9 @@ def test_a_tool_list_stays_detail_beside_the_code() -> None:
         (ValidationUnavailable("arranged"), RefusalKind.UNAVAILABLE),
         (CredentialStorageUnavailable("arranged"), RefusalKind.UNAVAILABLE),
         (InvalidCursor("arranged"), RefusalKind.INVALID),
+        (StorageUnavailable("arranged"), RefusalKind.UNAVAILABLE),
+        (DisplayNameInvalid(), RefusalKind.INVALID),
+        (ChoiceNotApproved("arranged"), RefusalKind.INVALID),
     ],
     ids=lambda value: getattr(value, "code", None) or str(value),
 )

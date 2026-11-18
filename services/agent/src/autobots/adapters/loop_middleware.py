@@ -64,8 +64,8 @@ from autobots.application.tool_definitions import ToolScope
 from autobots.contracts.plans import GoalSpec
 from autobots.domain.models import ModelRoute
 
-# LoopStopped, UnadmittedModelCall and ModelRoute are imported from here by the disposable checks
-# and tests/web; `_MIDDLEWARE` is the loop's ContextVar, which browse_trial.py and
+# LoopStopped, UnadmittedModelCall and ModelRoute are imported from here by the disposable checks;
+# `_MIDDLEWARE` is the loop's ContextVar, which browse_trial.py and
 # tests/db/checks/browse_goal_check.py set by this name; `_charged` is the settlement
 # tests/test_reported_charges.py pins under that name (R-22).
 __all__ = [

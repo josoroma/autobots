@@ -6,11 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 
 from autobots.api.dependencies import CurrentUser, require_workspace_member
-from autobots.api.errors import ApiError
 from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import require_internal, session_email
 from autobots.application.profiles import (
-    DisplayNameInvalid,
     fallback_name,
     normalize_display_name,
     save_name,
@@ -86,12 +84,7 @@ async def update_profile(
     user_id: CurrentUser,
     email: Annotated[str | None, Depends(session_email)],
 ) -> ProfileView:
-    try:
-        name = normalize_display_name(body.display_name)
-    except DisplayNameInvalid as error:
-        raise ApiError(
-            422, "display_name_invalid", "A display name needs 1 to 60 characters."
-        ) from error
+    name = normalize_display_name(body.display_name)
     saved = await save_name(request_pool(request), user_id, name)
     return ProfileView(schema_version=1, display_name=saved, saved=True, email=email)
 

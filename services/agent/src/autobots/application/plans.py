@@ -148,7 +148,15 @@ async def load_goal(connection: SqlConnection, run_id: UUID) -> GoalSpec:
     return goal_spec(read_goal_spec(row[0]))
 
 
-async def latest_plan(connection: SqlConnection, run_id: UUID) -> tuple[int, list[PlanTask]] | None:
+@dataclass(frozen=True)
+class PlanVersion:
+    """One committed version of a run's plan, as app_private.plan_versions stores it."""
+
+    version: int
+    tasks: list[PlanTask]
+
+
+async def latest_plan(connection: SqlConnection, run_id: UUID) -> PlanVersion | None:
     cursor = await connection.execute(
         "select version, tasks from app_private.plan_versions where run_id = %s "
         "order by version desc limit 1",
@@ -157,7 +165,7 @@ async def latest_plan(connection: SqlConnection, run_id: UUID) -> tuple[int, lis
     row = await cursor.fetchone()
     if row is None:
         return None
-    return row[0], [plan_task(task) for task in read_plan_tasks(row[1])]
+    return PlanVersion(row[0], [plan_task(task) for task in read_plan_tasks(row[1])])
 
 
 async def completed_tasks(connection: SqlConnection, run_id: UUID) -> frozenset[str]:
@@ -185,12 +193,11 @@ async def plan_view(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -> 
     plan = await latest_plan(connection, run_id)
     if plan is None:
         return PlanView(None, (), (), tuple(sorted(goal.criteria)))
-    version, tasks = plan
-    met = {criterion for task in tasks if task.id in done for criterion in task.criteria}
+    met = {criterion for task in plan.tasks if task.id in done for criterion in task.criteria}
     return PlanView(
-        version,
-        tuple(task.id for task in tasks if task.id in done),
-        tuple(task.id for task in tasks if task.id not in done),
+        plan.version,
+        tuple(task.id for task in plan.tasks if task.id in done),
+        tuple(task.id for task in plan.tasks if task.id not in done),
         tuple(sorted(set(goal.criteria) - met)),
     )
 
@@ -232,10 +239,10 @@ async def propose_plan(
     plan = await latest_plan(context.connection, run_id)
     done = await completed_tasks(context.connection, run_id)
     try:
-        validate_proposal(goal, arguments, plan[1] if plan else None, done)
+        validate_proposal(goal, arguments, plan.tasks if plan else None, done)
     except PlanRejected as rejected:
         raise ToolFailed(rejected.code, detail=rejected.detail) from None
-    version = plan[0] + 1 if plan else 1
+    version = plan.version + 1 if plan else 1
     try:
         async with context.connection.transaction():
             await hold_lease(context.connection, context.scope)
@@ -266,9 +273,9 @@ async def plan_proposed_already(
 ) -> PlanCommitted | None:
     """A crash may have committed this exact plan. If not, the transaction left nothing."""
     plan = await latest_plan(context.connection, context.scope.run_id)
-    if plan is None or plan[1] != arguments.tasks:
+    if plan is None or plan.tasks != arguments.tasks:
         return None
-    return PlanCommitted(version=plan[0], tasks=[task.id for task in arguments.tasks])
+    return PlanCommitted(version=plan.version, tasks=[task.id for task in arguments.tasks])
 
 
 async def complete_task(arguments: CompleteTask, context: ToolContext) -> TaskCompleted:
@@ -278,7 +285,7 @@ async def complete_task(arguments: CompleteTask, context: ToolContext) -> TaskCo
     plan = await latest_plan(context.connection, run_id)
     if plan is None:
         raise ToolFailed(GatewayCode.PLAN_MISSING)
-    tasks = {task.id: task for task in plan[1]}
+    tasks = {task.id: task for task in plan.tasks}
     task = tasks.get(arguments.task_id)
     if task is None:
         raise ToolFailed(GatewayCode.TASK_UNKNOWN)

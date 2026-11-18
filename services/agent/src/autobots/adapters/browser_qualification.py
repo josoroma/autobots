@@ -6,17 +6,26 @@ only while both images it starts carry that fingerprint's digest in their `autob
 label. An edit without a rebuild, or a rebuild without a new qualification, turns browsing off
 (refactor plan R-57, SQLI-02). Standard library only, so `scripts/browser_images.py` labels each
 build with this same digest.
+
+The catalog, search, Expert saves and the gateway ask on every read, synchronously. The report and
+the sources are read each time, so a withdrawn report or an edited source turns browsing off at
+once. The labels need Docker, so one inspect per fingerprint digest is reused for
+IMAGE_CHECK_SECONDS: an image rebuilt with another label reads as unqualified within that window,
+and a new digest is inspected afresh.
 """
 
 import hashlib
 import json
 import os
 import subprocess
+import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 ADAPTERS = "services/agent/src/autobots/adapters"
+APPLICATION = "services/agent/src/autobots/application"
 FINGERPRINT_LABEL = "autobots.fingerprint"
 QUALIFICATION = Path(".checks/browser-executor/qualification.json")
 # Only what the Docker CLI needs to find its engine. Nothing else of the process reaches it.
@@ -25,6 +34,9 @@ DOCKER_ENV_NAMES = ("PATH", "HOME", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CON
 INSPECT_LABELS = ("image", "inspect", "--format", "{{json .Config.Labels}}")
 # A read of two local images, bounded, since it runs synchronously wherever qualification is asked.
 INSPECT_SECONDS = 5.0
+# How long one inspect's verdict stands for the same fingerprint digest, so repeated reads start no
+# Docker process while a rebuilt image is still seen soon.
+IMAGE_CHECK_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -54,8 +66,9 @@ FINGERPRINTED = (
     PROXY.dockerfile,
     PROXY.ignore_file,
     f"{ADAPTERS}/egress_proxy.py",
-    # The Docker session, and the lease checks that end one.
+    # The Docker session, the lease checks that end one, the DevTools client and this binding.
     f"{ADAPTERS}/browser_executor.py",
+    f"{APPLICATION}/browser_leases.py",
     f"{ADAPTERS}/browser_cdp.py",
     f"{ADAPTERS}/browser_qualification.py",
 )
@@ -141,12 +154,58 @@ def images_match(fingerprint: Mapping[str, str], labels: LabelReader = image_lab
     return all(found.get(image.tag) == expected for image in IMAGES)
 
 
+@dataclass(frozen=True)
+class _Checked:
+    digest: str
+    matched: bool
+    at: float
+
+
+class ImageCheck:
+    """`images_match` for the process, reusing a verdict for the same digest for `seconds`.
+
+    Thread-safe, so a registry built off the event loop shares it. A failed inspect is reused too,
+    so an unreachable Docker isn't asked again on every read.
+    """
+
+    def __init__(
+        self,
+        labels: LabelReader = image_labels,
+        seconds: float = IMAGE_CHECK_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._labels = labels
+        self._seconds = seconds
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._checked: _Checked | None = None
+
+    def matches(self, fingerprint: Mapping[str, str]) -> bool:
+        digest = fingerprint_digest(fingerprint)
+        with self._lock:
+            checked = self._checked
+            if (
+                checked is not None
+                and checked.digest == digest
+                and self._clock() - checked.at < self._seconds
+            ):
+                return checked.matched
+            matched = images_match(fingerprint, self._labels)
+            self._checked = _Checked(digest, matched, self._clock())
+            return matched
+
+
+# The one the service asks through, unless a caller names its own label reader.
+IMAGE_CHECK = ImageCheck()
+
+
 def executor_qualified(
-    root: Path, report: Path = QUALIFICATION, labels: LabelReader = image_labels
+    root: Path, report: Path = QUALIFICATION, labels: LabelReader | None = None
 ) -> bool:
     """Only after a passing live check at today's fingerprint, and while both images carry it.
 
-    The images are inspected last, so a missing or stale report never reaches Docker.
+    The images are inspected last, so a missing or stale report never reaches Docker. Without
+    `labels`, the process's IMAGE_CHECK reads them; a reader passed in is asked every time.
     """
     try:
         data = json.loads((root / report).read_text())
@@ -161,9 +220,10 @@ def executor_qualified(
         for case in (cases if isinstance(cases, list) else [])
         if isinstance(case, dict) and case.get("status") == "passed"
     }
-    return (
-        data.get("status") == "passed"
-        and all(case in passed for case in REQUIRED_CASES)
-        and data.get("executor_fingerprint") == fingerprint
-        and images_match(fingerprint, labels)
-    )
+    if (
+        data.get("status") != "passed"
+        or not all(case in passed for case in REQUIRED_CASES)
+        or data.get("executor_fingerprint") != fingerprint
+    ):
+        return False
+    return IMAGE_CHECK.matches(fingerprint) if labels is None else images_match(fingerprint, labels)

@@ -12,8 +12,13 @@ from uuid import UUID
 
 from autobots.application.provider_settings import policy_overrides_json
 from autobots.application.sql import SqlConnection, optional_row
-from autobots.domain.errors import FixedRefusal
-from autobots.domain.models import ModelProfileId, require_offered, resolve_role_policy
+from autobots.domain.errors import FixedRefusal, RefusalKind
+from autobots.domain.models import (
+    ModelProfileId,
+    UnknownModelProfile,
+    require_offered,
+    resolve_role_policy,
+)
 from autobots.persistence.rows import ModelPolicyRow
 
 
@@ -21,6 +26,16 @@ class PolicyChanged(FixedRefusal):
     """The policy was saved again since the version the request expected. Nothing is written."""
 
     code = "stale_version"
+
+
+class ChoiceNotApproved(FixedRefusal):
+    """A requested role or profile outside the approved set, so nothing is saved
+    (PRD-Model-Providers MP-05). Only a request's choice is refused this way: a stored value that
+    names one still raises UnknownModelProfile, a fault in saved data rather than a request to
+    refuse, which a response must not word as the person's mistake."""
+
+    code = "unknown_model"
+    kind = RefusalKind.INVALID
 
 
 @dataclass(frozen=True)
@@ -34,10 +49,13 @@ def validated_choice(
     default_profile: ModelProfileId | None, role_overrides: Mapping[str, ModelProfileId]
 ) -> tuple[str | None, dict[str, str]]:
     """A requested default and overrides as stored values, once every role is approved and every
-    named profile is offered for new runs. Raises UnknownModelProfile, then ProfileNotOffered."""
+    named profile is offered for new runs. Raises ChoiceNotApproved, then ProfileNotOffered."""
     overrides = {role: profile.value for role, profile in role_overrides.items()}
     chosen_default = None if default_profile is None else default_profile.value
-    resolve_role_policy(workspace_default=chosen_default, workspace_role_overrides=overrides)
+    try:
+        resolve_role_policy(workspace_default=chosen_default, workspace_role_overrides=overrides)
+    except UnknownModelProfile as unknown:
+        raise ChoiceNotApproved(str(unknown)) from None
     require_offered([*([default_profile] if default_profile else []), *role_overrides.values()])
     return chosen_default, overrides
 

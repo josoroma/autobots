@@ -4,6 +4,7 @@ Nothing here outlives an attempt except references. The key is read inside each 
 rotation reaches the next call without a restart, and no key or client can reach graph state.
 """
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
@@ -34,7 +35,7 @@ from autobots.application.credentials.store import (
     CredentialReference,
     CredentialStorageUnavailable,
 )
-from autobots.application.goal_loop import UNBOUND, LoopConfig
+from autobots.application.goal_loop import UNBOUND
 from autobots.application.loop_admission import current_invocation
 from autobots.application.model_admission import (
     CostUnavailable,
@@ -47,6 +48,7 @@ from autobots.application.provider_settings import (
     ProviderContext,
     ProviderSettings,
 )
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import frozen_snapshot
 from autobots.application.sql import SqlConnection
 from autobots.application.tool_definitions import Browsing
@@ -332,7 +334,9 @@ class InferenceSource:
             return None
         # Decision 0025 V6: the run's workspace decides, by its saved switch, then the environment.
         view = await key_sources(connection, lease.workspace_id, os.environ)
-        if not browsing_tool.executor_ready(environ=view):
+        # Off the event loop, as an expired image check runs `docker image inspect`; the pass's
+        # later checks read what this one cached (browser_qualification.IMAGE_CHECK).
+        if not await asyncio.to_thread(browsing_tool.executor_ready, environ=view):
             return None
         bound = await self.role_route(connection, lease, ModelRole.RESEARCHER)
         if isinstance(bound, str):

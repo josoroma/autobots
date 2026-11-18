@@ -1,7 +1,7 @@
 """One bounded model call: classify failures, retry only what is safe, run no partial output."""
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
@@ -163,14 +163,4 @@ async def call_with_policy(
 
 
 def _with_attempt(request: AdmissionRequest, attempt: int) -> AdmissionRequest:
-    return AdmissionRequest(
-        workspace_id=request.workspace_id,
-        root_run_id=request.root_run_id,
-        run_id=request.run_id,
-        role=request.role,
-        profile=request.profile,
-        wire_id=request.wire_id,
-        attempt=attempt,
-        worst_case_micro_usd=request.worst_case_micro_usd,
-        credential_version=request.credential_version,
-    )
+    return replace(request, attempt=attempt)

@@ -30,6 +30,7 @@ from autobots.application.plans import load_goal
 from autobots.application.recovery import classify_interrupted, open_obligation, outstanding
 from autobots.application.run_lifecycle import (
     Drive,
+    LoopConfig,
     LoopResult,
     finish,
     lease_heartbeat,
@@ -37,9 +38,6 @@ from autobots.application.run_lifecycle import (
     result_of,
     run_status,
 )
-
-# `LoopConfig` is re-exported for the disposable checks that import it from here.
-from autobots.application.run_lifecycle import LoopConfig as LoopConfig
 from autobots.application.run_usage import begin_segment, end_segment, ensure_usage
 from autobots.application.runs import LeaseLost, apply_worker_command, frozen_snapshot
 from autobots.application.sql import SqlConnection, one

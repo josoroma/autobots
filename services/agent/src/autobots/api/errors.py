@@ -17,12 +17,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from autobots.adapters.object_storage import StorageUnavailable
 from autobots.application.approvals import ApprovalRefused
 from autobots.application.artifacts import ArtifactUnavailable
 from autobots.application.credentials.store import CredentialMissing, CredentialStorageUnavailable
 from autobots.application.experts import ExpertRefused
 from autobots.application.improvements import ImprovementRefused
 from autobots.application.memory import MemoryRefused
+from autobots.application.model_policy import ChoiceNotApproved
+from autobots.application.profiles import DisplayNameInvalid
 from autobots.application.provider_settings import (
     EnvironmentManaged,
     InvalidKey,
@@ -141,6 +144,9 @@ WORDING: Final[Mapping[type, Wording]] = MappingProxyType(
         ),
         ApprovalRefused: Wording("That decision can't be applied."),
         ArtifactUnavailable: Wording("That artifact is not available."),
+        StorageUnavailable: Wording("Artifact storage is unavailable."),
+        DisplayNameInvalid: Wording("A display name needs 1 to 60 characters."),
+        ChoiceNotApproved: Wording("Choose an approved model and role."),
         ImprovementRefused: Wording("That can't be done to this proposal."),
         MemoryRefused: Wording(codes={"expert_not_found": "That Expert isn't in this workspace."}),
         ExpertRefused: Wording(

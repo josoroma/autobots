@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
+from browser_images import require_current_images
 from disposable_db import (
     PROJECT_PREFIX,
     Cases,
@@ -34,8 +35,8 @@ from disposable_db import (
 from harness_lib import project_root
 from qualification.children import run_child_check, service_env
 from qualification.records import write_report
-from qualify_browser_executor import IMAGES, executor_fingerprint
 from qualify_browser_executor import REPORT as EXECUTOR_REPORT
+from qualify_browser_executor import executor_fingerprint
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/browse-goal/check.json')
@@ -44,9 +45,8 @@ MODEL_TRANSPORT = 'mock'
 
 
 def qualify(root: Path) -> int:
-    for image in IMAGES:
-        if run(['docker', 'image', 'inspect', image], tool_env()).returncode:
-            raise Unavailable(f'{image} is not built; build it as the operations runbook says')
+    # Both images carry today's fingerprint label, or the executor reads as unqualified (refactor plan R-57).
+    require_current_images(executor_fingerprint(root))
     if not (root / EXECUTOR_REPORT).exists():
         raise Unavailable('the executor is not qualified; run scripts/qualify_browser_executor.py first')
     project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'

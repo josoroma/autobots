@@ -26,13 +26,12 @@ from autobots.adapters.browser_executor import (
     Cdp,
     ExecutorUnavailable,
     RequestGuard,
-    attempt_alive,
     executor_qualified,
-    lease_alive,
 )
 from autobots.adapters.browser_page import CdpPage, PageUnavailable
 from autobots.adapters.provider_http import fit
 from autobots.application.bounded import stop_task
+from autobots.application.browser_leases import attempt_alive, lease_alive
 from autobots.application.browsing_loop import BrowseOutcome, admitted_steps, browse
 from autobots.application.loop_admission import current_middleware
 from autobots.application.loop_policy import LoopStopped

@@ -8,6 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from autobots.application.sql import SqlPool, all_rows, one, stored
+from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.persistence.rows import SessionWorkspaceRow
 
 MAX_DISPLAY_NAME = 60
@@ -19,14 +20,18 @@ WorkspaceRole = Literal["owner", "member"]
 _ROLES: tuple[WorkspaceRole, ...] = ("owner", "member")
 
 
-class DisplayNameInvalid(ValueError):
-    """A display name that is empty or longer than 60 characters after trimming."""
+class DisplayNameInvalid(FixedRefusal):
+    """A display name that is empty or longer than 60 characters after trimming (PRD-Studio
+    ID-01). Nothing is saved."""
+
+    code = "display_name_invalid"
+    kind = RefusalKind.INVALID
 
 
 def normalize_display_name(value: str) -> str:
     name = value.strip()
     if not 1 <= len(name) <= MAX_DISPLAY_NAME:
-        raise DisplayNameInvalid("display_name_invalid")
+        raise DisplayNameInvalid
     return name
 
 

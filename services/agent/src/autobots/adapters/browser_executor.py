@@ -7,9 +7,10 @@ Mac's loopback behind a per-session token. Nothing of the worker's environment i
 session belongs to one attempt: losing the lease, cancelling the run or reaching the time cap
 removes it, and a sweeper removes any a crashed worker left, by their labels.
 
-The DevTools client and request guard are in `browser_cdp`, and what a qualification binds is in
-`browser_qualification`. This module, those two and the images' sources are all in the images'
-fingerprint. The Docker CLI is driven directly, so no Docker SDK is installed.
+The DevTools client and request guard are in `browser_cdp`, what a qualification binds is in
+`browser_qualification`, and the checks that end a session are in `application/browser_leases`.
+This module, those three and the images' sources are all in the images' fingerprint. The Docker CLI
+is driven directly, so no Docker SDK is installed.
 """
 
 import asyncio
@@ -19,7 +20,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -31,14 +32,11 @@ from autobots.adapters.browser_qualification import (
     PROXY,
     executor_qualified,
 )
-from autobots.application.sql import SqlConnection
+from autobots.application.browser_leases import attempt_alive, lease_alive
 
-if TYPE_CHECKING:
-    # Imported for its type only: application/browsing_tool imports this module.
-    from autobots.application.tool_definitions import ToolScope
-
-# Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool, browser_page
-# and tests/db/checks/browser_executor_check.py import them from this module.
+# Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool and
+# browser_page import them from this module; attempt_alive and lease_alive, because
+# tests/db/checks/browser_executor_check.py does.
 __all__ = [
     "LABEL",
     "BrowserExecutor",
@@ -326,21 +324,3 @@ class BrowserExecutor:
         finally:
             await self.stop(session)
         return reason
-
-
-async def attempt_alive(connection: SqlConnection, scope: "ToolScope") -> bool:
-    """The attempt still owns a running run, by database time, as the gateway decides it."""
-    from autobots.application.tool_gateway import ownership_refusal
-
-    return await ownership_refusal(connection, scope) is None
-
-
-def lease_alive(connection: SqlConnection) -> Callable[[str, int], Awaitable[bool]]:
-    """For the sweeper: a session lives only while its run's job is claimed at its generation
-    (worker_leases.generation_alive, which owns the query)."""
-    from autobots.application.worker_leases import generation_alive
-
-    async def alive(run_id: str, generation: int) -> bool:
-        return await generation_alive(connection, run_id, generation)
-
-    return alive

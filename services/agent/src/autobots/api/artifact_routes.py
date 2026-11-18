@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from autobots.adapters.object_storage import StorageUnavailable
 from autobots.api.dependencies import MemberWorkspace
-from autobots.api.errors import ApiError
 from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import require_internal
 from autobots.application.artifacts import artifact_summary, list_artifacts, read_artifact
@@ -31,14 +30,11 @@ async def download(artifact_id: UUID, request: Request, workspace_id: MemberWork
     """Binary, so it has no generated client. Always an attachment, and never sniffed."""
     store = app_resources(request).object_store
     if store is None:
-        raise ApiError(503, "storage_unavailable", "Artifact storage is unavailable.")
-    try:
-        async with request_pool(request).connection() as connection:
-            name, media_type, content = await read_artifact(
-                connection, store, workspace_id, artifact_id
-            )
-    except StorageUnavailable:
-        raise ApiError(503, "storage_unavailable", "Artifact storage is unavailable.") from None
+        raise StorageUnavailable("no object store is configured")
+    async with request_pool(request).connection() as connection:
+        name, media_type, content = await read_artifact(
+            connection, store, workspace_id, artifact_id
+        )
     return Response(
         content,
         media_type=media_type,

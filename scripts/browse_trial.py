@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
+from browser_images import require_current_images
 from disposable_db import (
     PROJECT_PREFIX,
     Refused,
@@ -33,11 +34,11 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
+from qualify_browser_executor import executor_fingerprint
 from supabase_stack import generated_values, require_images, require_rendered
 
 OUT = Path('.checks/browse-trial')
 PYTHON = Path('services/agent/.venv/bin/python')
-IMAGES = ('autobots-browser:local', 'autobots-egress:local')
 
 
 def trial(root: Path, key_file: Path, repeat: bool) -> int:
@@ -45,9 +46,8 @@ def trial(root: Path, key_file: Path, repeat: bool) -> int:
         raise Refused("this trial already ran; a repeat needs the owner's request (--owner-requested-repeat)")
     if not key_file.is_file():
         raise Unavailable(f'no key file at {key_file}')
-    for image in IMAGES:
-        if run(['docker', 'image', 'inspect', image], tool_env()).returncode:
-            raise Unavailable(f'{image} is not built; build it as the operations runbook says')
+    # Both images carry today's fingerprint label, or the executor reads as unqualified (refactor plan R-57).
+    require_current_images(executor_fingerprint(root))
     project = f'{PROJECT_PREFIX}{secrets.token_hex(4)}'
     gateway_port = free_port()
     db_port = free_port([gateway_port])

@@ -1,6 +1,8 @@
 """The worker's route and attempt client, through the real adapter and SDK over a fake transport."""
 
 import asyncio
+import threading
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -21,6 +23,7 @@ from autobots.adapters.models.catalog import (
     ModelUnavailable,
     parse_catalog,
 )
+from autobots.application import browsing_tool, worker_inference
 from autobots.application.credentials.store import (
     CredentialBlocked,
     CredentialMissing,
@@ -28,7 +31,7 @@ from autobots.application.credentials.store import (
     CredentialStorageUnavailable,
     CredentialUnreadable,
 )
-from autobots.application.goal_loop import UNBOUND, LoopConfig
+from autobots.application.goal_loop import UNBOUND
 from autobots.application.loop_admission import admitted_scope
 from autobots.application.model_attempts import (
     UNCERTAIN,
@@ -39,6 +42,7 @@ from autobots.application.provider_settings import (
     CredentialRefused,
     ProviderSettings,
 )
+from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.worker_inference import (
     CATALOG_REFRESH,
     ROLE,
@@ -452,6 +456,39 @@ async def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_rea
     with pytest.raises(ProviderFailure) as caught:
         await source.open_attempt(uuid4(), frozen_policy(snapshot()))
     assert caught.value.failure is FailureClass.COST_UNAVAILABLE
+
+
+def test_whether_browsing_is_ready_is_asked_off_the_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An expired image check runs `docker image inspect`, which would stall every job the worker
+    holds if it ran on the loop (refactor plan R-57)."""
+    asked: list[tuple[int, Mapping[str, str] | None]] = []
+
+    async def view(*_: Any) -> dict[str, str]:
+        return {"AUTOBOTS_BROWSER_EXECUTOR": "enabled"}
+
+    def ready(environ: Mapping[str, str] | None = None) -> bool:
+        asked.append((threading.get_ident(), environ))
+        return False
+
+    async def arranged(*_: Any) -> tuple[str | None, int]:
+        return None, 777
+
+    monkeypatch.setattr(worker_inference, "key_sources", view)
+    monkeypatch.setattr(browsing_tool, "executor_ready", ready)
+    monkeypatch.setattr(InferenceSource, "_refusal", arranged)
+    source = replace(real_source(), browser=object())
+
+    async def bind() -> tuple[int, LoopConfig]:
+        _, config = await source.bind(Rows(snapshot()), lease(), LoopConfig(route=UNBOUND))
+        return threading.get_ident(), config
+
+    loop_thread, config = asyncio.run(bind())
+    assert config.browsing is None
+    assert len(asked) == 1
+    assert asked[0][0] != loop_thread
+    assert asked[0][1] == {"AUTOBOTS_BROWSER_EXECUTOR": "enabled"}
 
 
 # The worker's refusal, for what a job's configuration can raise

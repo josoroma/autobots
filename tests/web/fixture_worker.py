@@ -18,10 +18,10 @@ from typing import Any
 
 import psycopg
 from autobots.adapters import tool_registry
-from autobots.adapters.loop_middleware import ModelRoute
 from autobots.adapters.object_storage import SupabaseObjectStore
 from autobots.application.compaction import SUMMARY_MARKER
 from autobots.application.run_lifecycle import LoopConfig
+from autobots.domain.models import ModelRoute
 from autobots.operations.job_dispatch import process_next
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage

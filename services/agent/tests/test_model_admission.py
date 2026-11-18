@@ -73,7 +73,7 @@ class NothingOpen(ScriptedConnection):
 @pytest.mark.asyncio
 async def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, message: str) -> None:
     """Recovery can settle or close an attempt while it is out (refactor plan R-41, PRUN-13). The
-    refusal stays a ValueError while callers move to its name."""
+    refusal is its own type, so a handler for ValueError never mistakes it for bad input."""
     ledger = ModelAdmission(NothingOpen())
     arguments: dict[str, tuple[object, ...]] = {
         "settle": (1,),
@@ -84,4 +84,4 @@ async def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, messag
     }
     with pytest.raises(AttemptAlreadySettled, match=message) as caught:
         await getattr(ledger, step)(uuid4(), *arguments[step])
-    assert isinstance(caught.value, ValueError)
+    assert not isinstance(caught.value, ValueError)

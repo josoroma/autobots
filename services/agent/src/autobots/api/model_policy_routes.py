@@ -31,7 +31,7 @@ from autobots.contracts.settings import (
     RunIntentCheck,
     budget_range,
 )
-from autobots.domain.models import UnknownModelProfile, approved_profile, resolve_role_policy
+from autobots.domain.models import approved_profile, resolve_role_policy
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 POLICY_CHANGED = "The policy changed. Reload and try again."
@@ -81,10 +81,7 @@ async def put_model_policy(
     request: Request,
     workspace_id: OwnerWorkspace,
 ) -> ModelPolicyState:
-    try:
-        chosen_default, overrides = validated_choice(body.default_profile, body.role_overrides)
-    except UnknownModelProfile as error:
-        raise ApiError(422, "unknown_model", "Choose an approved model and role.") from error
+    chosen_default, overrides = validated_choice(body.default_profile, body.role_overrides)
     try:
         async with _policy_pool(request).connection() as connection:
             stored = await save_model_policy(
