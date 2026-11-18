@@ -42,6 +42,7 @@ The locks are the full record: `services/agent/uv.lock` and `pnpm-lock.yaml`. `p
 | `cryptography` | 50.0.2 |
 | `pyjwt` | 2.15.1 |
 | `httpx` | 0.28.1 |
+| `trafilatura` | 2.3.1, Google Extract's reader ([Decision 0033](../decisions/0033-google-toolkit-and-tool-switches.md) K5) |
 | `uvicorn` | 0.54.0 |
 | `langchain-mcp-adapters` | 0.3.2 |
 | `ruff` | 0.17.3 |

@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import psycopg
+from autobots.adapters.google_reader import google_crawl_tool, google_extract_tool
 from autobots.adapters.jina import jina_tools
 from autobots.adapters.market_data import market_tools
 from autobots.adapters.remote_files import store_remote_file_tool
@@ -69,6 +70,23 @@ def serpapi(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={'organic_results': results, 'serpapi_pagination': {'next': 'https://serpapi.com/search.json'}})
 
 
+def site(request: httpx.Request) -> httpx.Response:
+    """US-14.23: one site's robots.txt and pages, read directly, and SerpApi's map of it."""
+    if request.url.host == 'serpapi.com':
+        requests.append('serpapi:map')
+        links = [f'https://example.com/read{n}' for n in range(3)]
+        return httpx.Response(200, json={'organic_results': [{'position': n + 1, 'title': 't', 'link': link} for n, link in enumerate(links)]})
+    requests.append(f'site:{request.url.path}')
+    if request.url.path == '/robots.txt':
+        return httpx.Response(200, text='User-agent: *\nAllow: /\n', headers={'content-type': 'text/plain'})
+    body = '<html><head><title>Colón page</title></head><body><article><h1>Colón page</h1>' + '<p>' + 'directly read page text ' * 80 + '</p></article></body></html>'
+    return httpx.Response(200, text=body, headers={'content-type': 'text/html'})
+
+
+async def no_wait(_: float) -> None:
+    return None
+
+
 def markets(request: httpx.Request) -> httpx.Response:
     requests.append(f'market:{request.url.host}')
     if request.url.host == 'api.worldbank.org':
@@ -94,6 +112,8 @@ def gateway_over_fakes() -> ToolGateway:
     for tool in jina_tools(httpx.MockTransport(jina), environ={'JINA_API_KEY': 'jina_fixtureDB0123456'}, resolver=resolve):
         registry.register(tool)
     registry.register(google_search_tool(httpx.MockTransport(serpapi), environ={'SERPAPI_API_KEY': 'serpapi_fixtureDB0123456'}))
+    registry.register(google_extract_tool(httpx.MockTransport(site), resolve, no_wait, lambda: 0.0))
+    registry.register(google_crawl_tool(httpx.MockTransport(site), {'SERPAPI_API_KEY': 'serpapi_fixtureDB0123456'}, resolve, no_wait, lambda: 0.0))
     for tool in CODE_TOOLS:
         registry.register(tool)
     for tool in market_tools(httpx.MockTransport(markets)):
@@ -236,6 +256,36 @@ async def google_search_is_one_metered_use(ctx: Tools) -> None:
           bool(uses) and uses[0].output_public == {'result_count': 30, 'pages': 3, 'stopped': 'enough', 'duplicates_removed': 0,
                                                   'page_error': None, 'truncated': True}
           and 'google result text' not in record and 'serpapi_fixture' not in record)
+
+
+async def google_reading_is_one_metered_use_each(ctx: Tools) -> None:
+    """US-14.23: google_extract and google_crawl through the gateway, one metered tool use each, with counts and no page text."""
+    check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
+    await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+    admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='google reading', limit_micro_usd=1000, policy=resolve_role_policy())
+    lease = await claim_next(db, worker_id='google-reading', lease_seconds=120)
+    assert lease is not None
+    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'google_extract': 1, 'google_crawl': 1}, ('outputs',))
+    requests.clear()
+    extracted = await gateway.execute(db, scope, 'google_extract', {'urls': ['https://example.com/a', 'https://example.com/b']})
+    crawled = await gateway.execute(db, scope, 'google_crawl', {'url': 'https://example.com', 'limit': 3})
+    check('google_extract reads two pages and google_crawl maps once and reads three, directly', 'succeeded x2, 2 and 3 results, one map',
+          ((extracted.output or {}).get('result_count'), (crawled.output or {}).get('result_count'), requests.count('serpapi:map')),
+          extracted.outcome.value == crawled.outcome.value == 'succeeded' and (extracted.output or {}).get('result_count') == 2
+          and (crawled.output or {}).get('result_count') == 3 and requests.count('serpapi:map') == 1)
+    listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
+    uses = listed.uses if listed else []
+    metered = await (await db.execute('select metered from app_private.tool_uses where run_id = %s order by id', (admitted.run_id,))).fetchall()
+    check('each Google read is one tool use, counted once against the metered limit', 'google_extract then google_crawl, metered once each',
+          ([(use.tool_id, use.provider, use.outcome) for use in uses], [row[0] for row in metered]),
+          [(use.tool_id, use.provider, use.outcome) for use in uses] == [('google_extract', 'direct', 'succeeded'), ('google_crawl', 'serpapi', 'succeeded')]
+          and [row[0] for row in metered] == [True, True])
+    record = ''.join(use.model_dump_json() for use in uses)
+    check('their records hold counts, and no page text or key', 'counts only',
+          [(use.input_public, use.output_public) for use in uses],
+          len(uses) == 2 and uses[0].output_public == {'result_count': 2, 'truncated': False}
+          and uses[1].output_public == {'base_url': 'https://example.com', 'result_count': 3, 'pages': 1, 'truncated': False}
+          and 'directly read page text' not in record and 'serpapi_fixture' not in record)
 
 
 async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
@@ -400,6 +450,7 @@ SCENARIOS = (
     jina_calls_are_bounded_and_recorded,
     paged_search_is_one_metered_use,
     google_search_is_one_metered_use,
+    google_reading_is_one_metered_use_each,
     file_tools_read_inputs_and_guard_stores,
     market_data_counts_against_the_tree,
     code_tools_stay_in_the_runs_files,

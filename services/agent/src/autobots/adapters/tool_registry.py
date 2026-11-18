@@ -13,10 +13,11 @@ from collections.abc import Mapping
 from autobots.adapters.github_issues import GITHUB_ISSUE, GITHUB_ISSUE_V2
 from autobots.adapters.github_pulls import GITHUB_PULL_REQUEST
 from autobots.adapters.github_reads import GITHUB_READ_TOOLS
+from autobots.adapters.google_reader import GOOGLE_CRAWL, GOOGLE_EXTRACT
 from autobots.adapters.jina import JINA_TOOLS
 from autobots.adapters.market_data import MARKET_TOOLS
 from autobots.adapters.remote_files import STORE_REMOTE_FILE
-from autobots.adapters.serpapi import GOOGLE_SEARCH
+from autobots.adapters.serpapi import GOOGLE_MAP, GOOGLE_SEARCH
 from autobots.adapters.tavily import TAVILY_TOOLS
 from autobots.application import browsing_tool
 from autobots.application.artifact_tool import publish_tool
@@ -68,6 +69,9 @@ def tool_definitions(
         *TAVILY_TOOLS,
         *JINA_TOOLS,
         GOOGLE_SEARCH,
+        GOOGLE_MAP,
+        GOOGLE_EXTRACT,
+        GOOGLE_CRAWL,
         *MARKET_TOOLS,
         *CODE_TOOLS,
         cronjob_tool(CATALOG),

@@ -13,6 +13,7 @@ export const PROVIDER_LABEL: Readonly<
   tavily: "Tavily",
   jina: "Jina",
   serpapi: "SerpApi (Google)",
+  direct: "Directly from each site",
   yahoo_finance: "Yahoo Finance",
   world_bank: "World Bank",
   github: "GitHub",

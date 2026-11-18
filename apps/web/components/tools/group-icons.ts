@@ -5,6 +5,7 @@ import {
   ChartLine,
   Code,
   Compass,
+  Globe,
   FileText,
   GraduationCap,
   Link2,
@@ -33,4 +34,5 @@ export const GROUP_ICONS: Readonly<
   delegation: Users,
   learning: GraduationCap,
   automation: CalendarClock,
+  google: Globe,
 };

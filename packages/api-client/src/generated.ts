@@ -1667,11 +1667,12 @@ export const schemas = {
             "connectors",
             "delegation",
             "learning",
-            "automation"
+            "automation",
+            "google"
           ],
           "type": "string"
         },
-        "maxItems": 13,
+        "maxItems": 14,
         "title": "Tool Groups",
         "type": "array"
       },
@@ -1730,7 +1731,8 @@ export const schemas = {
             "connectors",
             "delegation",
             "learning",
-            "automation"
+            "automation",
+            "google"
           ],
           "type": "string"
         },
@@ -6210,7 +6212,8 @@ export const schemas = {
           "connectors",
           "delegation",
           "learning",
-          "automation"
+          "automation",
+          "google"
         ],
         "title": "Group",
         "type": "string"
@@ -6269,6 +6272,7 @@ export const schemas = {
           "tavily",
           "jina",
           "serpapi",
+          "direct",
           "yahoo_finance",
           "world_bank",
           "github"
@@ -6390,7 +6394,8 @@ export const schemas = {
           "connectors",
           "delegation",
           "learning",
-          "automation"
+          "automation",
+          "google"
         ],
         "title": "Group",
         "type": "string"
@@ -8184,7 +8189,7 @@ export interface ExpertConfig {
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;
   skills?: string[];
-  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation")[];
+  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google")[];
   tools?: string[];
 }
 
@@ -8197,7 +8202,7 @@ export interface ExpertConfigView {
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;
   skills?: string[];
-  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation")[];
+  tool_groups?: ("planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google")[];
   tools?: string[];
 }
 
@@ -9355,7 +9360,7 @@ export interface ToolDescriptor {
   description: string;
   fields: FieldDescriptor[];
   grantable_to: ("goal" | "expert" | "workflow_node" | "coordinator")[];
-  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation";
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google";
   guide: ToolGuideView;
   input_schema: Record<string, unknown>;
   key_requirement: KeyRequirementView | null;
@@ -9363,7 +9368,7 @@ export interface ToolDescriptor {
   network: boolean;
   operation_class: "pure" | "read_only" | "reversible_internal_write" | "consequential_external_write" | "arbitrary_execution";
   output_schema: Record<string, unknown>;
-  provider: "autobots" | "tavily" | "jina" | "serpapi" | "yahoo_finance" | "world_bank" | "github";
+  provider: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "world_bank" | "github";
   registered: boolean;
   side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
   title: string;
@@ -9388,7 +9393,7 @@ export function parseToolGrants(value: unknown): ToolGrants {
 
 export interface ToolGroupDescriptor {
   description: string;
-  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation";
+  group: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google";
   title: string;
   tool_ids: string[];
 }
@@ -10060,9 +10065,9 @@ export async function validateOpenRouter(options: ClientOptions, request?: Reque
 }
 
 export type ListToolsQuery = {
-  group?: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | null | undefined;
+  group?: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google" | null | undefined;
   availability?: "available" | "key_missing" | "disabled_by_policy" | "not_qualified" | null | undefined;
-  provider?: "autobots" | "tavily" | "jina" | "serpapi" | "yahoo_finance" | "world_bank" | "github" | null | undefined;
+  provider?: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "world_bank" | "github" | null | undefined;
 };
 
 export async function listTools(options: ClientOptions, query?: ListToolsQuery, request?: RequestOptions): Promise<ToolCatalog> {

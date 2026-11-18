@@ -1666,11 +1666,12 @@
                 "connectors",
                 "delegation",
                 "learning",
-                "automation"
+                "automation",
+                "google"
               ],
               "type": "string"
             },
-            "maxItems": 13,
+            "maxItems": 14,
             "title": "Tool Groups",
             "type": "array"
           },
@@ -1729,7 +1730,8 @@
                 "connectors",
                 "delegation",
                 "learning",
-                "automation"
+                "automation",
+                "google"
               ],
               "type": "string"
             },
@@ -6209,7 +6211,8 @@
               "connectors",
               "delegation",
               "learning",
-              "automation"
+              "automation",
+              "google"
             ],
             "title": "Group",
             "type": "string"
@@ -6268,6 +6271,7 @@
               "tavily",
               "jina",
               "serpapi",
+              "direct",
               "yahoo_finance",
               "world_bank",
               "github"
@@ -6389,7 +6393,8 @@
               "connectors",
               "delegation",
               "learning",
-              "automation"
+              "automation",
+              "google"
             ],
             "title": "Group",
             "type": "string"
@@ -16741,7 +16746,8 @@
                     "connectors",
                     "delegation",
                     "learning",
-                    "automation"
+                    "automation",
+                    "google"
                   ],
                   "type": "string"
                 },
@@ -16786,6 +16792,7 @@
                     "tavily",
                     "jina",
                     "serpapi",
+                    "direct",
                     "yahoo_finance",
                     "world_bank",
                     "github"

@@ -209,3 +209,67 @@ class GoogleSearchInput(SearchWebV2Input):
 
 class GoogleSearchOutput(SearchWebV2Output):
     """Decision 0032 G2: ranked results, as search_web v2 gives them."""
+
+
+class GoogleMapInput(BaseModel):
+    """Decision 0033 K2: a site, as a URL whose host and path are searched with `site:`."""
+
+    model_config = TOOL_CONTRACT
+
+    url: GuardedUrl
+    max_results: int = Field(default=10, ge=1, le=30)
+
+
+class GoogleMapOutput(PagedSearchOutput):
+    base_url: str
+    urls: list[str]
+
+
+class GoogleExtractInput(BaseModel):
+    """Decision 0033 K3: up to 5 pages, each read from its own site through the URL guard."""
+
+    model_config = TOOL_CONTRACT
+
+    urls: list[GuardedUrl] = Field(min_length=1, max_length=5)
+
+
+class ReadPage(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    url: str
+    title: str
+    content_markdown: str
+    word_count: int
+
+
+class ReadFailure(BaseModel):
+    """A page that wasn't read, by its typed code (Decision 0033 K4). Never page text."""
+
+    model_config = TOOL_CONTRACT
+
+    url: str
+    code: str
+
+
+class GoogleExtractOutput(WebOutput):
+    results: list[ReadPage]
+    failed: list[ReadFailure]
+    result_count: int
+
+
+class GoogleCrawlInput(BaseModel):
+    """Decision 0033 K6: a site, mapped with Google, then up to `limit` of its pages read."""
+
+    model_config = TOOL_CONTRACT
+
+    url: GuardedUrl
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class GoogleCrawlOutput(WebOutput):
+    base_url: str
+    results: list[ReadPage]
+    failed: list[ReadFailure]
+    result_count: int
+    # SerpApi searches the map step made.
+    pages: int

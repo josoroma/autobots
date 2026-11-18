@@ -45,8 +45,11 @@ PROVIDER_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "tavily_crawl": 1,
         "search_web": 2,
         "extract_website_content": 1,
-        # Google through SerpApi (Decision 0032).
+        # Google through SerpApi (Decisions 0032 and 0033). google_extract needs no key, so it is
+        # granted beside the provider tools.
         "google_search": 1,
+        "google_map": 1,
+        "google_crawl": 1,
         "market_history": 1,
         "inflation_rates": 1,
     }
@@ -68,6 +71,8 @@ EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "github_open_pull_request": 1,
         # It reaches the network, so only an owner's Expert grants it, never a plain goal.
         "store_remote_file": 1,
+        # Reads pages directly from their sites, in the Google toolkit (Decision 0033 K3).
+        "google_extract": 1,
         # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
         "search_files": 1,
         "read_code_file": 1,

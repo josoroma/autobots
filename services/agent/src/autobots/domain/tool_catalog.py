@@ -26,6 +26,8 @@ class ToolGroup(StrEnum):
     DELEGATION = "delegation"
     LEARNING = "learning"
     AUTOMATION = "automation"
+    # Find with Google through SerpApi, read pages directly (Decision 0033 K1).
+    GOOGLE = "google"
 
 
 GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
@@ -45,6 +47,10 @@ GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
     ToolGroup.DELEGATION: ("Delegation", "Assign bounded work to an Expert."),
     ToolGroup.LEARNING: ("Learning", "Propose memory or skill changes for review."),
     ToolGroup.AUTOMATION: ("Automation", "Scheduled tasks that start goals and workflows."),
+    ToolGroup.GOOGLE: (
+        "Google",
+        "Find with Google through SerpApi, and read pages directly from their sites.",
+    ),
 }
 
 
@@ -54,6 +60,8 @@ class ToolProvider(StrEnum):
     JINA = "jina"
     # Google search through SerpApi (Decision 0032 G1).
     SERPAPI = "serpapi"
+    # Autobots' own reader, fetching each page from its site (Decision 0033 K3).
+    DIRECT = "direct"
     YAHOO_FINANCE = "yahoo_finance"
     WORLD_BANK = "world_bank"
     GITHUB = "github"

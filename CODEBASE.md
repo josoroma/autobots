@@ -228,6 +228,14 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - A page's `serpapi_pagination.next` says whether more exist (`search_paging.Page.more`), and a "Fully empty" reply is an empty page (Decision 0032).
   - Its key is the Keys & vars secret `serpapi` (`SERPAPI_API_KEY`), which migration 63 allows.
   - The concept seed's sixth Expert, Google bot, is granted it.
+- **Google toolkit** (US-14.23, after the analyzed revision): the group `google` holds `google_search`, `google_map`, `google_extract` and `google_crawl` (Decision 0033).
+  - `google_map` (`adapters/serpapi.py`) searches `site:<host><path>` and keeps the site's own links.
+  - `adapters/google_reader.py` reads pages directly, provider `direct`, with no key:
+    - the URL guard and robots.txt first, failing closed and checking the final host after redirects;
+    - one request per page, at least a second apart per host, under the user agent `Autobots/1.0 (local research agent)`;
+    - extraction by `trafilatura` 2.3.1, the only package added and pinned for it, which gets the bytes and no URL.
+  - `google_extract` reads up to 5 pages, and `google_crawl` maps a site, then reads up to 10.
+  - Google bot is granted all four.
 - **Market data** (`adapters/market_data.py`): `market_history` (Yahoo chart endpoint over `httpx`) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG`), both keyless.
 - **Fetch guard:** `adapters/url_guard.py` admits only `https` URLs whose every DNS answer is global, requests the address it checked (R-62), revalidates up to 3 redirects, and caps size and time; a test keeps its public-address rule equal to the egress proxy's. `adapters/provider_http.py` reads a provider key per attempt. For Tavily and Jina, `application/tool_keys.py` resolves it from the run's workspace: the key saved in Settings, then the process environment, then the configuration root's `.env` files (US-14.17, after the analyzed revision). `make start` passes those two keys, the GitHub pair and an exact `enabled` browsing switch from the repository's `.env` through `scripts/tool_keys_env.py`. Since US-14.18 the GitHub adapters resolve their repository and token the same way, per attempt (`adapters/github_issues.py` `attempt_target`). The gateway refuses an approved write whose target now resolves differently, `approval_target_changed`. The worker binds `browse_goal` only when the run's workspace resolves the switch to `enabled`.
 - **Browser:** `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts and gates DevTools with a token. `browser_page.py` reads pages over CDP.

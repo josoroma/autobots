@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 and US-14.22 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 
@@ -106,6 +106,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-14.20: Tool guide, shown in a modal on the Tools page](#us-1420-tool-guide-shown-in-a-modal-on-the-tools-page)
   - [US-14.21: Search tools page in batches of 10, at most 3 pages a call](#us-1421-search-tools-page-in-batches-of-10-at-most-3-pages-a-call)
   - [US-14.22: Google search through SerpApi, and a Google bot Expert](#us-1422-google-search-through-serpapi-and-a-google-bot-expert)
+  - [US-14.23: A Google toolkit that finds with Google and reads pages directly](#us-1423-a-google-toolkit-that-finds-with-google-and-reads-pages-directly)
+  - [US-14.24: Tool switches on the Tools page](#us-1424-tool-switches-on-the-tools-page)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -498,6 +500,19 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-14.22#4 | Add Google bot to the concept seed and its checks. | DONE | US-14.22 |
 | US-14.22#5 | Cover the scenarios with fake-transport unit tests, harness tests and disposable database and browser checks, with no SerpApi search and no model call. | DONE | US-14.22 |
 | US-14.22#6 | Update `CODEBASE.md`. | DONE | US-14.22 |
+| US-14.23 | A Google toolkit that finds with Google and reads pages directly | DONE | EPIC-14 |
+| US-14.23#1 | Pin `trafilatura` 2.3.1, lock and prepare it, and name it in the toolchain runbook. | DONE | US-14.23 |
+| US-14.23#2 | Add the group `google` and the provider `direct`, move `google_search` into the group, and register `google_map`, `google_extract` and `google_crawl` v1 with Decision 0033's behavior, limits, metering, public fields, guides and version pins. | DONE | US-14.23 |
+| US-14.23#3 | Give the seeded Google bot the toolkit. | DONE | US-14.23 |
+| US-14.23#4 | Cover the scenarios with fake-transport unit tests, the toolchain manifest test and disposable database checks, with no SerpApi search or live page read. | DONE | US-14.23 |
+| US-14.23#5 | Update `CODEBASE.md`. | DONE | US-14.23 |
+| US-14.24 | Tool switches on the Tools page | READY | EPIC-14 |
+| US-14.24#1 | Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`. | TODO | US-14.24 |
+| US-14.24#2 | Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`. | TODO | US-14.24 |
+| US-14.24#3 | Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client. | TODO | US-14.24 |
+| US-14.24#4 | Add accessible switches for tools and groups to the Tools page, owner-only, in both themes. | TODO | US-14.24 |
+| US-14.24#5 | Cover the scenarios with unit tests, disposable database checks and a browser suite. | TODO | US-14.24 |
+| US-14.24#6 | Update `CODEBASE.md` and the operations runbook. | TODO | US-14.24 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -763,6 +778,8 @@ flowchart TD
     US_14_20["US-14.20: Tool guide, shown in a modal on the Tools page"]
     US_14_21["US-14.21: Search tools page in batches of 10, at most 3 pages a call"]
     US_14_22["US-14.22: Google search through SerpApi, and a Google bot Expert"]
+    US_14_23["US-14.23: A Google toolkit that finds with Google and reads pages directly"]
+    US_14_24["US-14.24: Tool switches on the Tools page"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -1048,6 +1065,11 @@ flowchart TD
   US_14_21 -.-> US_14_22
   US_14_18 -.-> US_14_22
   US_15_25 -.-> US_14_22
+  US_14_22 -.-> US_14_23
+  US_14_8 -.-> US_14_23
+  US_14_23 -.-> US_14_24
+  US_14_18 -.-> US_14_24
+  US_14_2 -.-> US_14_24
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1807,6 +1829,30 @@ flowchart TD
     US_14_22 --> T_14_22_5
     T_14_22_6["US-14.22#6: Update `CODEBASE.md`."]
     US_14_22 --> T_14_22_6
+    US_14_23["US-14.23: A Google toolkit that finds with Google and reads pages directly"]
+    T_14_23_1["US-14.23#1: Pin `trafilatura` 2.3.1, lock and prepare it, and name it in the toolchain runbook."]
+    US_14_23 --> T_14_23_1
+    T_14_23_2["US-14.23#2: Add the group `google` and the provider `direct`, move `google_search` into the group, and register `google_map`, `google_extract` and `google_crawl` v1 with Decision 0033&#x27;s behavior, limits, metering, public fields, guides and version pins."]
+    US_14_23 --> T_14_23_2
+    T_14_23_3["US-14.23#3: Give the seeded Google bot the toolkit."]
+    US_14_23 --> T_14_23_3
+    T_14_23_4["US-14.23#4: Cover the scenarios with fake-transport unit tests, the toolchain manifest test and disposable database checks, with no SerpApi search or live page read."]
+    US_14_23 --> T_14_23_4
+    T_14_23_5["US-14.23#5: Update `CODEBASE.md`."]
+    US_14_23 --> T_14_23_5
+    US_14_24["US-14.24: Tool switches on the Tools page"]
+    T_14_24_1["US-14.24#1: Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner&#x27;s `make migrate`."]
+    US_14_24 --> T_14_24_1
+    T_14_24_2["US-14.24#2: Read each workspace&#x27;s switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`."]
+    US_14_24 --> T_14_24_2
+    T_14_24_3["US-14.24#3: Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client."]
+    US_14_24 --> T_14_24_3
+    T_14_24_4["US-14.24#4: Add accessible switches for tools and groups to the Tools page, owner-only, in both themes."]
+    US_14_24 --> T_14_24_4
+    T_14_24_5["US-14.24#5: Cover the scenarios with unit tests, disposable database checks and a browser suite."]
+    US_14_24 --> T_14_24_5
+    T_14_24_6["US-14.24#6: Update `CODEBASE.md` and the operations runbook."]
+    US_14_24 --> T_14_24_6
   end
 ```
 
@@ -6755,6 +6801,184 @@ Tasks:
 - [x] Add Google bot to the concept seed and its checks.
 - [x] Cover the scenarios with fake-transport unit tests, harness tests and disposable database and browser checks, with no SerpApi search and no model call.
 - [x] Update `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.23: A Google toolkit that finds with Google and reads pages directly
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-14-23-google-toolkit-that-finds/`
+
+As an Expert author whose runs research the web
+I want a Google group of tools, search, map, extract and crawl, that finds with Google through SerpApi and reads pages directly from their sites, politely and through the URL guard
+So that a run can find and read sources with one toolkit, with no third-party reader, and turn it off as a whole or tool by tool.
+
+Source:
+- [Decision 0033, K1 to K9](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#the-google-toolkit-us-1423)
+- [Decision 0033, what Google can and can't do here](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#what-google-can-and-cant-do-here)
+- [Decision 0033, what this doesn't establish](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#what-this-doesnt-establish)
+- [Google toolkit, GT-01 and GT-02](PRD-Tool-Catalog.md#google-toolkit)
+- [Google search, GS-01 to GS-04](PRD-Tool-Catalog.md#google-search)
+- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
+- [URL guard, UG-01](PRD-Tool-Catalog.md#url-guard)
+- [Catalog contract, TC-02 and TC-03](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
+- [Seed, SD-01 and SD-02](PRD-Studio.md#seed)
+- [Decision 0017, C5, C6 and C12](docs/engineering/decisions/0017-tool-catalog.md#decision)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `adapters/url_guard.py` guards every fetched URL and redirect. `adapters/serpapi.py` pages Google search through `adapters/search_paging.py`. No HTML extractor is locked. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The Google group holds four tools
+  Given the registry the catalog and the worker are built from
+  When the catalog lists the group google and the schema-version pin test runs
+  Then google_search v1, google_map v1, google_extract v1 and google_crawl v1 appear once each in the group google with providers serpapi, serpapi, direct and serpapi, google_search keeps its pinned digest, the new tools' schemas are pinned, new grants take version 1, and search_web and tavily_search stay in web_search
+
+Scenario: google_map lists the pages Google has indexed for a site
+  Given google_map over a fake SerpApi transport whose two pages of results include a link on another host and one on a subdomain
+  When it is called with url https://Example.com/docs/?x=1#top and max_results 20
+  Then every request searches site:example.com/docs, the off-host link is dropped, the subdomain's link is kept, and the output holds base_url, the urls in Google's order, pages 2 and the stop reason
+
+Scenario: google_extract reads pages as markdown, politely
+  Given a fake resolver and transport serving robots.txt and two HTML pages on one host and one HTML page on another, and a recorded sleep
+  When google_extract is called with those three URLs
+  Then each host's robots.txt is fetched once, every request carries the user agent Autobots/1.0 (local research agent), the two requests to the same host are at least one second apart, each result holds its url, title, markdown and word count, the output is labelled third-party, and the text is cut to the shared budget
+
+Scenario: robots.txt is obeyed and fails closed
+  Given hosts whose robots.txt disallows a path for Autobots, answers 404, answers 500, and a page that redirects to a host whose robots.txt disallows it
+  When google_extract reads a URL on each
+  Then the disallowed path fails robots_disallowed with no page request, the 404 host's page is read, the 500 host's page fails robots_disallowed with no page request, and the redirected page fails robots_disallowed and none of its text is returned
+
+Scenario: Page failures are typed and never retried
+  Given pages that answer 404, a PDF, an HTML page with no readable text, and a URL whose host resolves to a private address
+  When google_extract reads each
+  Then they fail page_http_404, unsupported_media_type, no_readable_text and url_host_refused, the private address is never requested, and each page is requested at most once
+
+Scenario: google_crawl maps a site with Google, then reads its pages
+  Given a fake SerpApi transport that returns three links on the site and one off it, and a fake site serving those pages
+  When google_crawl is called with that site and limit 5
+  Then it makes one SerpApi search and reads the three pages on the site, returns their markdown, lists any failures, and reports pages 1
+
+Scenario: Extraction opens no connection of its own
+  Given an HTML page that references images, scripts and other sites, served by a fake transport
+  When google_extract reads it
+  Then the transport receives only that page's robots.txt and the page itself
+
+Scenario: One metered call each, with public fields only
+  Given a disposable database, a run whose scope grants google_extract and google_crawl, and fake transports
+  When the gateway executes one call of each
+  Then each is one tool use counted once against the metered limit, its public output holds counts and no page text, and no key appears in the record
+
+Scenario: Google bot gets the toolkit
+  Given a disposable stack, a fresh workspace and no SerpApi, Jina or GitHub variable
+  When the concept seed runs
+  Then Google bot is granted google_extract, save_artifact and publish_artifact, is saved without google_search, google_map and google_crawl, and says so in its purpose
+
+Scenario: The new dependency is pinned and recorded
+  Given the Python manifest, its lock and the toolchain runbook
+  When the toolchain manifest test runs
+  Then trafilatura is an exact pin at 2.3.1, locked with its transitive packages, and named in the runbook's table
+```
+
+Dependencies:
+- US-14.22
+- US-14.8
+
+Tasks:
+- [x] Pin `trafilatura` 2.3.1, lock and prepare it, and name it in the toolchain runbook.
+- [x] Add the group `google` and the provider `direct`, move `google_search` into the group, and register `google_map`, `google_extract` and `google_crawl` v1 with Decision 0033's behavior, limits, metering, public fields, guides and version pins.
+- [x] Give the seeded Google bot the toolkit.
+- [x] Cover the scenarios with fake-transport unit tests, the toolchain manifest test and disposable database checks, with no SerpApi search or live page read.
+- [x] Update `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.24: Tool switches on the Tools page
+
+Status: READY
+
+As a workspace owner
+I want to turn any tool, or a whole group such as Google, on or off for my workspace from the Tools page
+So that I can stop a provider's tools at once, or one tool at a time, without removing keys or editing every Expert.
+
+Source:
+- [Decision 0033, W1 to W5](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md#tool-switches-us-1424)
+- [Tool switches, TW-01 to TW-03](PRD-Tool-Catalog.md#tool-switches)
+- [Catalog contract, TC-02, TC-04 and TC-05](PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-01 to TS-03](PRD-Tool-Catalog.md#tools-screen)
+- [Provider keys, PK-02](PRD-Tool-Catalog.md#provider-keys)
+- [DS-04 usability and state meaning](PRD-Design-System.md#ds-04--preserve-usability-and-state-meaning)
+- [DS-05 verification in both themes](PRD-Design-System.md#ds-05--verification-and-design-evidence)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): the catalog's availability comes from each workspace's Keys & vars view (`application/tool_catalog.py`, `application/tool_keys.py`). The Tools page lists tools by group with a modal (`components/tool-catalog.tsx`). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Every switchable tool and group shows its switch
+  Given a disposable stack and a workspace member
+  When the member reads GET /v1/tools
+  Then every Expert-grantable tool and every group carries a switch that is on at version 0, and the plan, delegation and workflow approval tools carry none
+
+Scenario: Turning a tool off makes it unavailable in that workspace only
+  Given an owner of one workspace and a second workspace
+  When the owner turns google_crawl off and the catalog is read in both workspaces
+  Then google_crawl is disabled_by_policy with reason turned_off in the first workspace, its repair says to turn it on in Tools, and it is unchanged in the second
+
+Scenario: Turning a group off turns off its tools
+  Given the google group with all four tools on
+  When the owner turns the group off, turns google_search on individually, and then turns the group back on
+  Then while the group is off all four read disabled_by_policy with reason group_turned_off, google_search stays off despite its own switch, and turning the group on makes all four available again
+
+Scenario: Admission and Expert saves refuse a tool that is off
+  Given google_search turned off in a workspace
+  When a run that grants it is admitted and an Expert that grants it is saved
+  Then the run is refused tool_unavailable and the Expert expert_tool_unavailable, and nothing is created
+
+Scenario: A run in progress can't call a tool that is turned off
+  Given a disposable database, a running run whose scope grants google_search, and a fake SerpApi transport
+  When google_search is turned off, the run calls it, google_search is turned back on, and the run calls it again
+  Then the first call is refused tool_turned_off before any request, and the second succeeds
+
+Scenario: Only the owner changes a switch, at its version
+  Given an owner and a member of a workspace
+  When the member turns a tool off, the owner sends a stale version, and then the owner sends the current version
+  Then the member is refused and nothing changes, the stale change is refused stale_version, and the owner's change is saved with the next version
+
+Scenario: Migration 64 adds the private switch table
+  Given a disposable database migrated through migration 63
+  When migration 64 is applied
+  Then app_private.tool_switches exists with no anon or authenticated access, the runtime role can read, insert and update it, readiness ships 64 migrations, and the schema snapshot matches
+
+Scenario: The Tools page switches
+  Given an owner and a member signed in on the Tools page of a disposable stack
+  When the owner turns the Google group off and back on with the keyboard, and the member opens the page
+  Then each switchable tool and group shows an on or off switch with its state in words, the four Google tools read off while the group is off, the member sees each state but no switch they can change, and axe reports no violations in either theme
+```
+
+Dependencies:
+- US-14.23
+- US-14.18
+- US-14.2
+
+Tasks:
+- [ ] Add migration 64 with `app_private.tool_switches`, ship it in the readiness record, and regenerate the schema snapshot and row types on a disposable target. Leave applying it to the persistent install to the owner's `make migrate`.
+- [ ] Read each workspace's switches into its availability view, and mark a turned-off tool or group `disabled_by_policy` with its reason and repair. Refuse calls to it in the gateway with `tool_turned_off`.
+- [ ] Add the switch state to the catalog contract, and the owner-only, versioned switch endpoints. Regenerate OpenAPI and the TypeScript client.
+- [ ] Add accessible switches for tools and groups to the Tools page, owner-only, in both themes.
+- [ ] Cover the scenarios with unit tests, disposable database checks and a browser suite.
+- [ ] Update `CODEBASE.md` and the operations runbook.
 
 Open Questions:
 - None.

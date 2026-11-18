@@ -93,12 +93,19 @@ EXPERTS = (
             "github_open_pull_request",
         ),
     ),
-    # Decision 0032 G8: Google through SerpApi, reading pages through Jina.
+    # Decisions 0032 G8 and 0033 K8: finds with Google, reads pages directly.
     ExpertSeed(
         "Google bot",
         "Searches Google through SerpApi for up to 30 ranked results, reads the most relevant "
         "pages and cites each source.",
-        ("google_search", "extract_website_content", "save_artifact", "publish_artifact"),
+        (
+            "google_search",
+            "google_map",
+            "google_extract",
+            "google_crawl",
+            "save_artifact",
+            "publish_artifact",
+        ),
     ),
 )
 

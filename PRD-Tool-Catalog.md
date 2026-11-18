@@ -13,7 +13,7 @@ Everything in PRD §9 still applies: grants pin versions, discovery never grants
 
 **TC-02. Descriptor.** Each `(tool_id, version)` has a descriptor with: `tool_id` (snake_case, `^[a-z][a-z0-9_]{2,63}$`), `version`, `title`, `description` (the text the model sees), `group`, `provider`, `operation_class`, `side_effects` (derived from the class), `network`, `cost_class` (`free_local` or `metered_provider`), an optional owner-maintained `cost_note`, an optional `key_requirement` naming the credential and its environment **variable name**, `approval` (`never`, `always`, or `by_action` for a tool whose actions differ, Decision 0026 C9), `input_schema` and `output_schema` (JSON Schema from the Pydantic models), flattened `fields` (path, direction, type, required, description, constraints, public), `limits` (timeout, retries, output bytes), `grantable_to` (`goal`, `expert`, `workflow_node`, `coordinator`), and `availability` with a typed `availability_reason`.
 
-**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, and `automation` (Decision 0026). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, and `serpapi` by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md).
+**TC-03. Groups.** `planning`, `general`, `web_search`, `web_extraction`, `web_crawling`, `files`, `market_data`, `browsing`, `code`, `connectors`, `delegation`, `learning`, `automation` (Decision 0026), and `google` ([Decision 0033](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md) K1). One group per tool. Providers: `autobots`, `tavily`, `jina`, `yahoo_finance`, `world_bank`, `github`, `serpapi` by [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi.md), and `direct` by Decision 0033 K3.
 
 **TC-04. Availability.** `available`, `key_missing`, `disabled_by_policy` or `not_qualified`, computed per request from the worker-facing configuration and never stored. It shows whether a key is set, never its value, prefix, length or hash.
 
@@ -108,7 +108,7 @@ Every URL passes the URL guard before it is sent. Fetched text is labelled third
 
 By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md). Version 1 of each search tool, in the table above, stays registered unchanged for grants that pinned it.
 
-**WS-01. Search tools.** `search_web`, `tavily_search` and, by Decision 0032, `google_search`: the group `web_search`. No other tool pages.
+**WS-01. Search tools.** `search_web`, `tavily_search` and, by Decision 0032, `google_search`. `google_search` sits in the group `google` by Decision 0033 K1, and the other two in `web_search`. `google_map` pages the same way (Decision 0033 K2). No other tool pages.
 
 **WS-02. Batches.** A page is 10 results, and a call requests at most 3 pages, planned as `ceil(max_results / 10)`. `search_web` v2 sends `q`, `num: 10` and `page: n` to `s.jina.ai` for each page. Tavily has no next-page request, so `tavily_search` v2 asks once for up to 20 results.
 
@@ -143,6 +143,41 @@ By [Decision 0032](docs/engineering/decisions/0032-google-search-through-serpapi
 The key travels only in that request's query string, and no URL or provider text is kept.
 
 **GS-04.** The SerpApi key is a Keys & vars secret by PK-04 and PK-07, and `make start` passes it by PK-06.
+
+## Google toolkit
+
+By [Decision 0033](docs/engineering/decisions/0033-google-toolkit-and-tool-switches.md), K1 to K9. It finds with Google through SerpApi, and reads pages directly from their sites.
+
+| ID | Provider | Input → output |
+|---|---|---|
+| `google_search` | SerpApi | As GS-01 to GS-03; it moves to the group `google` |
+| `google_map` | SerpApi | `url`, `max_results` 1 to 30 → `base_url`, `urls[]`, WS-04's paging fields. The pages Google has indexed under `site:<host><path>` |
+| `google_extract` | Direct | `urls[]` 1 to 5 → `results[] {url, title, content_markdown, word_count}`, `failed[] {url, code}`, `result_count`, `truncated` |
+| `google_crawl` | SerpApi, then direct | `url`, `limit` 1 to 10 → `base_url`, `google_extract`'s fields, `pages` |
+
+**GT-01. Reading directly.** Every page and every robots.txt passes the URL guard. Each request carries the user agent `Autobots/1.0 (local research agent)`. Hosts are handled this way:
+- Robots.txt is obeyed: 404 or 410 allows, and anything else that isn't a readable file denies.
+- The final host after redirects is checked too.
+- Requests to one host are at least a second apart, or its crawl delay up to 5 seconds.
+- No page is retried.
+- Only HTML and XHTML are extracted, by `trafilatura`, while plain text and markdown pass through.
+
+A failure is a typed code, never the page's or provider's text.
+
+**GT-02. Spend and keys.** Each call is one metered call under TU-06. `google_map` and `google_crawl` need the SerpApi key, and `google_extract` needs none.
+
+## Tool switches
+
+By Decision 0033, W1 to W5.
+
+**TW-01.** The owner turns any Expert-grantable tool, or any group, on or off for the workspace on the Tools page. Everything starts on. A tool is on only while it and its group are on. The plan, delegation and workflow approval tools aren't switchable.
+
+**TW-02.** A tool that is off reads `disabled_by_policy` with reason `turned_off` or `group_turned_off`, and its repair says where to turn it on. Then:
+- admission refuses it `tool_unavailable`;
+- saving an Expert refuses it `expert_tool_unavailable`;
+- the gateway refuses each call to it `tool_turned_off`, before any effect.
+
+**TW-03.** The switches live in a private table with an expected version per switch, and a stale change is refused `stale_version`. Members see the switches, and only the owner changes them.
 
 ## File tools
 

@@ -92,7 +92,7 @@ async def search(
 def test_google_search_is_a_web_search_tool_from_serpapi() -> None:
     tools = catalog()
     [descriptor] = [item for item in tools.descriptors({}) if item.tool_id == "google_search"]
-    assert (descriptor.version, descriptor.group) == (1, "web_search")
+    assert (descriptor.version, descriptor.group) == (1, "google")
     assert descriptor.provider == "serpapi"
     assert (descriptor.operation_class, descriptor.cost_class) == ("read_only", "metered_provider")
     assert descriptor.key_requirement is not None

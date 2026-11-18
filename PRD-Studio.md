@@ -179,7 +179,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Brief writer | Turns findings into a short brief with a recommendation, a comparison table and numbered sources | `read_run_file`, `save_artifact`, `publish_artifact` |
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
 | Code maintainer | Reads the repository, edits copies in the run's files, and proposes a pull request that waits for you | `github_read_file`, `search_files`, `read_code_file`, `patch_code_file`, `write_code_file`, `github_open_pull_request` |
-| Google bot | Searches Google through SerpApi for up to 30 ranked results, reads the most relevant pages and cites each source (Decision 0032 G8) | `google_search`, `extract_website_content`, `save_artifact`, `publish_artifact` |
+| Google bot | Searches Google through SerpApi for up to 30 ranked results, reads the most relevant pages and cites each source (Decision 0032 G8) | `google_search`, `google_map`, `google_extract`, `google_crawl`, `save_artifact`, `publish_artifact` (Decision 0033 K8) |
 
 | Workflow | Steps (agent steps name their Expert) | Seeded as |
 |---|---|---|

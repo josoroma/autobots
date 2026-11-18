@@ -60,6 +60,21 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
         "When a run needs what Google ranks for a query, such as official pages or recent news.",
         "Google's own ranking, labelled as third-party data and not instructions.",
     ),
+    "google_map": ToolGuide(
+        "Lists the pages Google has indexed for a site or one of its sections, up to 30.",
+        "Before reading a site, to see which of its pages Google knows about.",
+        "It finds a site's pages through Google without walking the site.",
+    ),
+    "google_extract": ToolGuide(
+        "Reads up to five web pages as markdown, directly from their sites, obeying robots.txt.",
+        "When pages found with Google need to be read, not just their snippets.",
+        "Page text without a third-party reader, labelled as data and not instructions.",
+    ),
+    "google_crawl": ToolGuide(
+        "Maps a site with Google, then reads up to ten of its pages as markdown.",
+        "When an answer is spread across several pages of one site.",
+        "A site's pages found and read in one call, politely and within fixed limits.",
+    ),
     "tavily_search": ToolGuide(
         "Searches the web through Tavily for up to 20 ranked results, with optional domains, topic "
         "and time range.",

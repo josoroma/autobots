@@ -96,12 +96,14 @@ def main() -> None:
         publishing = {name: 'publish_artifact' in configs[name]['tools'] for name in ('Market watcher', 'Research analyst', 'Brief writer')}
         check('every concept Expert that saves files can also publish them', 'Market watcher, Research analyst and Brief writer publish',
               publishing, all(publishing.values()))
-        # US-14.22, Decision 0032 G8: with no SerpApi or Jina variable, Google bot keeps only what is available, and says so.
+        # US-14.23, Decision 0033 K8: with no SerpApi variable, Google bot keeps google_extract, which needs no key, and says
+        # what it was saved without.
         bot = configs.get('Google bot', {})
-        check('Google bot is saved without google_search and extract_website_content, and says so in its purpose',
-              'save_artifact and publish_artifact only; purpose names both missing tools', (bot.get('tools'), bot.get('purpose')),
-              bot.get('tools') == ['save_artifact', 'publish_artifact'] and 'Saved without' in bot.get('purpose', '')
-              and 'google_search' in bot.get('purpose', '') and 'extract_website_content' in bot.get('purpose', ''))
+        purpose = bot.get('purpose', '')
+        check('Google bot keeps google_extract and is saved without google_search, google_map and google_crawl, saying so',
+              'google_extract, save_artifact and publish_artifact; purpose names the three missing tools', (bot.get('tools'), purpose),
+              bot.get('tools') == ['google_extract', 'save_artifact', 'publish_artifact'] and 'Saved without' in purpose
+              and all(tool in purpose for tool in ('google_search', 'google_map', 'google_crawl')))
         labels = rows(db, "select v.graph -> 'nodes' from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
                           "where w.workspace_id = %s and w.name = 'Vendor due diligence'", WORKSPACE)
         steps = [node.get('label') for node in labels[0][0] if node.get('block') == 'agent'] if labels else []
