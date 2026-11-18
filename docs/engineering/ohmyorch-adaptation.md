@@ -40,7 +40,7 @@ The local parser checks syntax, source locations, identity, dependency/status co
 | Check | Covers |
 |---|---|
 | `project_configuration` in [`scripts/verify.py`](../../scripts/verify.py) | Hook configuration shape, skill and agent `name` and `description`, rule links, the `AGENTS.md` mapping, and the qualification fields |
-| [`tests/harness/test_assistant_assets.py`](../../tests/harness/test_assistant_assets.py) | Allowlisted frontmatter keys for skills, agents and rules, agent `model` being `inherit`, names matching locations, instruction links including fragments, and representative rule paths |
+| [`tests/harness/test_instruction_assets.py`](../../tests/harness/test_instruction_assets.py) and [`scripts/instruction_checks.py`](../../scripts/instruction_checks.py) | Allowlisted frontmatter keys for skills, agents and rules, agent `model` being `inherit`, names matching locations, instruction links including fragments, and representative rule paths |
 | [`scripts/specs.py`](../../scripts/specs.py) | Backlog grammar, sources, Gherkin and generated navigation |
 | `claude plugin validate` | Skill frontmatter, on the conditions below |
 
