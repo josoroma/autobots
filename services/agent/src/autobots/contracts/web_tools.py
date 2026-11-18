@@ -134,6 +134,61 @@ class SearchWebOutput(WebOutput):
     result_count: int
 
 
+# Why a paged search stopped asking for pages (Decision 0031 S5).
+SearchStop = Literal["enough", "no_more", "page_limit", "provider_error"]
+
+
+class PagedSearchOutput(WebOutput):
+    """What a version 2 search tool reports beside its results (Decision 0031 S8)."""
+
+    result_count: int
+    # Provider requests the call made, the first included.
+    pages: int
+    stopped: SearchStop
+    duplicates_removed: int
+    # A later page's typed failure, when one ended the paging. Never provider text.
+    page_error: str | None = None
+
+
+class SearchWebV2Input(SearchWebInput):
+    """Decision 0031 S9: up to 3 pages of 10 results."""
+
+    max_results: int = Field(default=10, ge=1, le=30)
+
+
+class RankedSnippet(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    rank: int
+    title: str
+    url: str
+    snippet: str
+
+
+class SearchWebV2Output(PagedSearchOutput):
+    results: list[RankedSnippet]
+
+
+class TavilySearchV2Input(TavilySearchInput):
+    """Decision 0031 S9: version 1's inputs, up to Tavily's own ceiling of 20 results."""
+
+    max_results: int = Field(default=10, ge=1, le=20)
+
+
+class RankedSearchResult(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    rank: int
+    title: str
+    url: str
+    content: str
+    score: float | None = None
+
+
+class TavilySearchV2Output(PagedSearchOutput):
+    results: list[RankedSearchResult]
+
+
 class ExtractWebsiteInput(BaseModel):
     model_config = TOOL_CONTRACT
 

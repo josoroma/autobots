@@ -2,6 +2,8 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 on 2026-11-18. The sections its Codebase Context cites, Integration points and Tests and Quality Gates, were checked against the search adapters at `05bdb6f`; refreshing the whole analysis is separate work.
+
 ## Table of Contents
 
 - [EPIC-1: Development foundation and Gate 0](#epic-1-development-foundation-and-gate-0)
@@ -102,6 +104,7 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
   - [US-14.18: Settings → Keys & vars, with the GitHub token, repository and browsing switch per workspace](#us-1418-settings--keys--vars-with-the-github-token-repository-and-browsing-switch-per-workspace)
   - [US-14.19: The cronjob tool manages the workspace's routines](#us-1419-the-cronjob-tool-manages-the-workspaces-routines)
   - [US-14.20: Tool guide, shown in a modal on the Tools page](#us-1420-tool-guide-shown-in-a-modal-on-the-tools-page)
+  - [US-14.21: Search tools page in batches of 10, at most 3 pages a call](#us-1421-search-tools-page-in-batches-of-10-at-most-3-pages-a-call)
 - [EPIC-15: Studio product surfaces](#epic-15-studio-product-surfaces)
   - [US-15.1: Sidebar groups with Tools under Build](#us-151-sidebar-groups-with-tools-under-build)
   - [US-15.2: Display name, workspace role and account](#us-152-display-name-workspace-role-and-account)
@@ -481,6 +484,12 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 | US-14.20#3 | Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link. | DONE | US-14.20 |
 | US-14.20#4 | Update the browser suites for the Tools page and Granted to, with axe in both themes. | DONE | US-14.20 |
 | US-14.20#5 | Update `CODEBASE.md`. | DONE | US-14.20 |
+| US-14.21 | Search tools page in batches of 10, at most 3 pages a call | DONE | EPIC-14 |
+| US-14.21#1 | Add a shared pager for the search tools with a page size of 10 and a cap of 3: canonical-URL de-duplication, contiguous ranks, the stop reasons `enough`, `no_more`, `page_limit` and `provider_error`, and a later page's typed failure kept as `page_error`. | DONE | US-14.21 |
+| US-14.21#2 | Register `search_web` v2 (Jina, `num` 10 and `page` n per page, `max_results` 1 to 30, a 70-second timeout) and `tavily_search` v2 (one request, `max_results` 1 to 20) with Decision 0031 S8's output and public fields. Keep version 1 of each registered and unchanged. | DONE | US-14.21 |
+| US-14.21#3 | Give new grants version 2 in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, record both changes as compatible, and pin version 2's schema digests. Update the guides for both tools. | DONE | US-14.21 |
+| US-14.21#4 | Cover the scenarios with fake-transport unit tests and a disposable database check through the gateway, with no live provider call. | DONE | US-14.21 |
+| US-14.21#5 | Update `CODEBASE.md`. | DONE | US-14.21 |
 | EPIC-15 | Studio product surfaces | — | — |
 | US-15.1 | Sidebar groups with Tools under Build | DONE | EPIC-15 |
 | US-15.1#1 | Regroup the sidebar's links in the web shell, keeping link names, roles and data hooks. | DONE | US-15.1 |
@@ -744,6 +753,7 @@ flowchart TD
     US_14_18["US-14.18: Settings → Keys &amp; vars, with the GitHub token, repository and browsing switch per workspace"]
     US_14_19["US-14.19: The cronjob tool manages the workspace&#x27;s routines"]
     US_14_20["US-14.20: Tool guide, shown in a modal on the Tools page"]
+    US_14_21["US-14.21: Search tools page in batches of 10, at most 3 pages a call"]
   end
   subgraph EPIC_15["EPIC-15: Studio product surfaces"]
     US_15_1["US-15.1: Sidebar groups with Tools under Build"]
@@ -1021,6 +1031,11 @@ flowchart TD
   US_15_7 -.-> US_14_20
   US_11_11 -.-> US_14_20
   US_14_19 -.-> US_14_20
+  US_14_1 -.-> US_14_21
+  US_14_3 -.-> US_14_21
+  US_14_6 -.-> US_14_21
+  US_14_7 -.-> US_14_21
+  US_14_17 -.-> US_14_21
   US_14_2 -.-> US_15_1
   US_11_11 -.-> US_15_1
   US_2_2 -.-> US_15_2
@@ -1756,6 +1771,17 @@ flowchart TD
     US_14_20 --> T_14_20_4
     T_14_20_5["US-14.20#5: Update `CODEBASE.md`."]
     US_14_20 --> T_14_20_5
+    US_14_21["US-14.21: Search tools page in batches of 10, at most 3 pages a call"]
+    T_14_21_1["US-14.21#1: Add a shared pager for the search tools with a page size of 10 and a cap of 3: canonical-URL de-duplication, contiguous ranks, the stop reasons `enough`, `no_more`, `page_limit` and `provider_error`, and a later page&#x27;s typed failure kept as `page_error`."]
+    US_14_21 --> T_14_21_1
+    T_14_21_2["US-14.21#2: Register `search_web` v2 (Jina, `num` 10 and `page` n per page, `max_results` 1 to 30, a 70-second timeout) and `tavily_search` v2 (one request, `max_results` 1 to 20) with Decision 0031 S8&#x27;s output and public fields. Keep version 1 of each registered and unchanged."]
+    US_14_21 --> T_14_21_2
+    T_14_21_3["US-14.21#3: Give new grants version 2 in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, record both changes as compatible, and pin version 2&#x27;s schema digests. Update the guides for both tools."]
+    US_14_21 --> T_14_21_3
+    T_14_21_4["US-14.21#4: Cover the scenarios with fake-transport unit tests and a disposable database check through the gateway, with no live provider call."]
+    US_14_21 --> T_14_21_4
+    T_14_21_5["US-14.21#5: Update `CODEBASE.md`."]
+    US_14_21 --> T_14_21_5
   end
 ```
 
@@ -6512,6 +6538,100 @@ Tasks:
 - [x] Add a test that fails, naming the tool, when a tool's guide is missing or has an empty text.
 - [x] Replace the Tools page's side panel with a native `dialog` modal labelled by the tool's title. Keep `?tool=<id>`, Granted to, Copy schema and the link to `/tools/{tool_id}`. Close it on Escape, Close and an outside click, returning focus to the tool's link.
 - [x] Update the browser suites for the Tools page and Granted to, with axe in both themes.
+- [x] Update `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+### US-14.21: Search tools page in batches of 10, at most 3 pages a call
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-14-21-search-tools-page-batches/`
+
+As an Expert author whose runs research the web
+I want `search_web` and `tavily_search` to fetch results in batches of 10, up to 3 pages a call, without duplicates and stopping when the provider has no more
+So that one search can return up to 30 distinct results, each search's spend stays bounded and visible, and a failure on a later page doesn't lose the results already paid for.
+
+Source:
+- [Decision 0031, S1 to S9](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#decision)
+- [Decision 0031, what the reference does](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#what-the-reference-does)
+- [Decision 0031, providers](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#providers)
+- [Decision 0031, what this doesn't establish](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md#what-this-doesnt-establish)
+- [Search paging, WS-01 to WS-06](PRD-Tool-Catalog.md#search-paging)
+- [Web tools](PRD-Tool-Catalog.md#web-tools)
+- [Tool-use record, TU-01, TU-04 and TU-06](PRD-Tool-Catalog.md#tool-use-record)
+- [Catalog contract, TC-01 and TC-02](PRD-Tool-Catalog.md#catalog-contract)
+- [Tool guide, TG-01](PRD-Tool-Catalog.md#tool-guide)
+- [Decision 0017, C5 and Q4](docs/engineering/decisions/0017-tool-catalog.md#decision)
+- [Decision 0029, F13](docs/engineering/decisions/0029-refactor-decisions-delegated-r41-r68.md#decision-0029-choices-made-while-delivering-refactor-items-r-41-to-r-68)
+- [Tool contract](PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `adapters/tavily.py` and `adapters/jina.py` make one request per call, `max_results` at most 10, through `adapters/provider_http.py` with the key read per attempt. Not product intent.
+- [Tests and Quality Gates](CODEBASE.md#tests-and-quality-gates): provider tools are tested on fake transports, which is mock-level evidence.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Version 2 of each search tool sits beside version 1
+  Given the registry the catalog and the worker are built from
+  When the catalog lists the group web_search and the schema-version pin test runs
+  Then search_web and tavily_search each list versions 1 and 2, version 1's input and output schemas keep their pinned digests, new grants take version 2, and a run that pinned version 1 keeps calling it and is not stopped as incompatible_version
+
+Scenario: search_web asks for pages of 10
+  Given search_web version 2 over a fake Jina transport that serves three full pages of distinct results
+  When it is called with max_results 30, and separately with max_results 15
+  Then the first call sends three requests with num 10 and page 1, 2 and 3 and returns 30 results ranked 1 to 30 in page order with pages 3 and stopped enough, and the second sends two requests and returns 15 results with pages 2
+
+Scenario: Never more than 3 pages
+  Given the same fake transport, and one whose every page repeats the same 10 results
+  When search_web version 2 is called with max_results 31, and then with max_results 30 over the repeating transport
+  Then the first is refused invalid_arguments before any request, and the second sends no more than 3 requests, returns 10 results and stops no_more
+
+Scenario: Duplicates are removed across pages
+  Given a fake Jina transport whose second page repeats first-page URLs with a utm_source parameter, a fragment, an upper-case host and a trailing slash
+  When search_web version 2 is called with max_results 20
+  Then each repeat is dropped, the first occurrence keeps the URL the provider gave, ranks run from 1 without gaps, and duplicates_removed counts the repeats
+
+Scenario: A short page stops the paging
+  Given a fake Jina transport whose first page is full and whose second page holds 4 results
+  When search_web version 2 is called with max_results 30
+  Then it sends two requests, returns 14 results, and reports pages 2 and stopped no_more
+
+Scenario: Tavily asks once for up to 20
+  Given tavily_search version 2 over a fake Tavily transport
+  When it is called with max_results 20, then with max_results 21
+  Then the first sends one request with max_results 20 and Tavily's inference options off and reports pages 1, and the second is refused invalid_arguments before any request
+
+Scenario: A provider error on a later page keeps the earlier pages
+  Given a fake Jina transport whose first page is full and whose second page answers 429 with a body naming a fake key, and another whose first page answers 503
+  When search_web version 2 is called with max_results 30 over each
+  Then the first call succeeds with the first page's 10 results, pages 2, stopped provider_error and page_error rate_limited, sends no third request and no retry, and its output holds neither the body nor the key; the second call fails provider_unavailable
+
+Scenario: What the model sees
+  Given a search_web version 2 call whose results together exceed the shared text budget
+  When its output is returned to the model
+  Then it carries source third_party and the notice, results with rank, title, url and snippet, result_count, pages, stopped, duplicates_removed, page_error and truncated true, within the tool's output cap
+
+Scenario: One metered call per search, with its pages recorded
+  Given a disposable database, a run whose scope grants search_web version 2, and a fake Jina transport that serves three full pages
+  When the run's gateway executes one search_web call with max_results 30
+  Then exactly one tool use is recorded for it and counted once against the metered limit, its public output holds result_count 30, pages 3, stopped enough, duplicates_removed 0, page_error null and truncated, and neither a result's text nor the key appears in the record
+```
+
+Dependencies:
+- US-14.1
+- US-14.3
+- US-14.6
+- US-14.7
+- US-14.17
+
+Tasks:
+- [x] Add a shared pager for the search tools with a page size of 10 and a cap of 3: canonical-URL de-duplication, contiguous ranks, the stop reasons `enough`, `no_more`, `page_limit` and `provider_error`, and a later page's typed failure kept as `page_error`.
+- [x] Register `search_web` v2 (Jina, `num` 10 and `page` n per page, `max_results` 1 to 30, a 70-second timeout) and `tavily_search` v2 (one request, `max_results` 1 to 20) with Decision 0031 S8's output and public fields. Keep version 1 of each registered and unchanged.
+- [x] Give new grants version 2 in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, record both changes as compatible, and pin version 2's schema digests. Update the guides for both tools.
+- [x] Cover the scenarios with fake-transport unit tests and a disposable database check through the gateway, with no live provider call.
 - [x] Update `CODEBASE.md`.
 
 Open Questions:

@@ -49,12 +49,14 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
     ),
     # Web search
     "search_web": ToolGuide(
-        "Searches the web through Jina and returns titles, links and snippets.",
+        "Searches the web through Jina in pages of 10, up to 30 ranked results a call, and returns "
+        "titles, links and snippets without repeats.",
         "To find sources on a topic the run can't answer from its own files.",
         "Fresh public information, labelled as third-party data and not instructions.",
     ),
     "tavily_search": ToolGuide(
-        "Searches the web through Tavily, with optional domains, topic and time range.",
+        "Searches the web through Tavily for up to 20 ranked results, with optional domains, topic "
+        "and time range.",
         "To find recent or focused sources, such as news from the last week or one site's pages.",
         "Search tuned for research, with results scored by relevance.",
     ),

@@ -29,11 +29,13 @@
     "search_files@1": "0432c68cf8fd8a3be91991037521755c9bb759c95cd724f28c0189d8ff5301b0",
     "search_memory@1": "af36a38a0b15892da9b4d49ce58b580e42380f7fa24f155b07f9edebe8b6cae0",
     "search_web@1": "ee74f4dc9cf27239ac4afaba0e80713336e58435934f855c5c82830ec7ec7d30",
+    "search_web@2": "298337ea0c3a82fc7a908a71d7ca8256a0750f0e5a2820bd641034b598000ad0",
     "store_remote_file@1": "d0a3d15b22e28479e88c4462ae19a1eb1e12f2a8cb5396453db26ca743eba153",
     "tavily_crawl@1": "798a7ef9a51dff0c379e6ea69688c546ea26d32f4b4738d9f3dd54432a1fb9d6",
     "tavily_extract@1": "81a77ebe0e9706b8ab0c2b0bc2b48e1eccaca1e8a12d860d28effe6741bfd5f5",
     "tavily_map@1": "b344557c1edcac1a4b59337f2c26a407d691e169b13a823ffad01abf8dd70e2c",
     "tavily_search@1": "2e4de2b6abbc037f449666f3cf720ebd7c620e52e5ea357c5b5d67e051c692ba",
+    "tavily_search@2": "cb32f12e9dde85765f8ac495b3ed8137db79f80dcd6ac908a6e832d59928cd36",
     "workflow_approval@1": "42a68d7ed09a18b2ad7b83b9f2a28e12e7ce2bb7b85bc2d9ad1637d33b833f0b",
     "write_code_file@1": "4c3c65175a99d52a8a187e9c123886bbedfd672083d2b7eb11a26361389727c3"
   }

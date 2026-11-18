@@ -2,7 +2,8 @@
 scenario at a time (refactor plan R-66, TDBC-06).
 
 US-14.6 onward: a call past a ceiling is refused before any request, an allowed one returns
-labelled, size-capped output and is recorded as a tool use with public fields only.
+labelled, size-capped output and is recorded as a tool use with public fields only. US-14.21: a paged
+search is one metered tool use that records its pages.
 """
 from __future__ import annotations
 
@@ -46,6 +47,12 @@ def tavily(request: httpx.Request) -> httpx.Response:
 
 def jina(request: httpx.Request) -> httpx.Response:
     requests.append(f'jina:{request.url.host}')
+    page = json.loads(request.content).get('page') if request.url.host == 's.jina.ai' else None
+    if page is not None:
+        # search_web version 2 names its page (US-14.21): ten distinct results each, long enough to be cut.
+        requests.append(f'jina:page{page}')
+        return httpx.Response(200, json={'data': [{'title': f'Colón {n}', 'url': f'https://example.com/{n}', 'description': 'paged result text ' * 300}
+                                                  for n in range((page - 1) * 10, page * 10)]})
     if request.url.host == 's.jina.ai':
         return httpx.Response(200, json={'data': [{'title': 'Colón', 'url': 'https://example.com/a', 'description': 'about colones'}] * 3})
     return httpx.Response(200, json={'data': {'url': 'https://example.com/a?token=abc', 'title': 'A', 'content': 'page text body',
@@ -155,6 +162,38 @@ async def jina_calls_are_bounded_and_recorded(ctx: Tools) -> None:
           len(uses) > 2 and uses[2].input_public == {'url': 'https://example.com/a'}
           and uses[2].output_public == {'url': 'https://example.com/a', 'title': 'A', 'link_count': 1, 'truncated': False}
           and 'page text body' not in uses[2].model_dump_json() and 'jina_' not in uses[2].model_dump_json())
+
+
+async def paged_search_is_one_metered_use(ctx: Tools) -> None:
+    """US-14.21: a three-page search_web version 2 call is one metered tool use that records its pages."""
+    check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
+    await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
+    admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='paged search', limit_micro_usd=1000, policy=resolve_role_policy())
+    lease = await claim_next(db, worker_id='paged-search', lease_seconds=120)
+    assert lease is not None
+    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'search_web': 2}, ('outputs',))
+    requests.clear()
+    found = await gateway.execute(db, scope, 'search_web', {'query': 'colones', 'max_results': 30})
+    out = found.output or {}
+    ranks = [item.get('rank') for item in out.get('results', [])]
+    pages = [entry for entry in requests if entry.startswith('jina:page')]
+    check('a three-page search returns 30 ranked results from pages 1 to 3', 'succeeded, ranks 1-30, page1-page3',
+          (found.outcome.value, ranks[:1] + ranks[-1:], pages),
+          found.outcome.value == 'succeeded' and ranks == list(range(1, 31)) and pages == ['jina:page1', 'jina:page2', 'jina:page3'])
+    listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
+    uses = listed.uses if listed else []
+    metered = await (await db.execute('select metered from app_private.tool_uses where run_id = %s order by id', (admitted.run_id,))).fetchall()
+    check('the call is one tool use, counted once against the metered limit', 'one search_web v2 use, metered once',
+          ([(use.tool_id, use.tool_version, use.outcome) for use in uses], [row[0] for row in metered]),
+          [(use.tool_id, use.tool_version, use.outcome) for use in uses] == [('search_web', 2, 'succeeded')]
+          and [row[0] for row in metered] == [True])
+    record = uses[0].model_dump_json() if uses else ''
+    check('its record holds the paging counts, and no result text or key', '30 results, 3 pages, enough, none removed, no error, cut',
+          uses[0].output_public if uses else None,
+          bool(uses) and uses[0].output_public == {'result_count': 30, 'pages': 3, 'stopped': 'enough', 'duplicates_removed': 0,
+                                                  'page_error': None, 'truncated': True}
+          and uses[0].input_public == {'query': 'colones', 'max_results': 30}
+          and 'paged result text' not in record and 'jina_' not in record)
 
 
 async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
@@ -317,6 +356,7 @@ async def code_tools_stay_in_the_runs_files(ctx: Tools) -> None:
 SCENARIOS = (
     tavily_calls_are_bounded_and_recorded,
     jina_calls_are_bounded_and_recorded,
+    paged_search_is_one_metered_use,
     file_tools_read_inputs_and_guard_stores,
     market_data_counts_against_the_tree,
     code_tools_stay_in_the_runs_files,

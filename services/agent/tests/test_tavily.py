@@ -1,4 +1,5 @@
-"""US-14.6: Tavily's four tools against a fake transport. Sockets are blocked (conftest)."""
+"""US-14.6: Tavily's four tools against a fake transport. Sockets are blocked (conftest). US-14.21:
+tavily_search version 2 asks once for up to 20 results (Decision 0031 S3)."""
 
 import json
 from typing import Any
@@ -50,10 +51,21 @@ class Fake:
 
 
 def tools(fake: Fake, environ: dict[str, str] = KEY) -> dict[str, Any]:
+    """Each tool at version 1. Version 2 of tavily_search is `search_v2`'s."""
     return {
         tool.tool_id: tool
         for tool in tavily_tools(fake.transport(), environ=environ, resolver=resolve)
+        if tool.version == 1
     }
+
+
+def search_v2(fake: Fake, environ: dict[str, str] = KEY) -> Any:
+    [tool] = [
+        tool
+        for tool in tavily_tools(fake.transport(), environ=environ, resolver=resolve)
+        if (tool.tool_id, tool.version) == ("tavily_search", 2)
+    ]
+    return tool
 
 
 CONTEXT = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
@@ -198,3 +210,71 @@ def test_each_request_fits_inside_its_tools_timeout() -> None:
     from autobots.adapters.tavily import REQUEST_SECONDS
 
     assert all(REQUEST_SECONDS < tool.timeout_seconds for tool in tools(Fake()).values())
+
+
+def found(count: int, start: int = 0) -> dict[str, Any]:
+    return {
+        "results": [
+            {"title": f"T{n}", "url": f"https://example.com/{n}", "content": "c", "score": 0.5}
+            for n in range(start, start + count)
+        ]
+    }
+
+
+@pytest.mark.asyncio
+async def test_version_2_asks_once_for_up_to_twenty_with_inference_off() -> None:
+    fake = Fake(reply=found(20))
+    tool = search_v2(fake)
+    arguments = tool.input_model.model_validate({"query": "colones", "max_results": 20})
+    output = await tool.handler(arguments, CONTEXT)
+    [(path, body, _)] = fake.bodies
+    assert (path, body["max_results"], body["query"]) == ("/search", 20, "colones")
+    assert body["include_answer"] is False and body["auto_parameters"] is False
+    assert not FORBIDDEN & {key for key, value in body.items() if value}
+    assert [item.rank for item in output.results] == list(range(1, 21))
+    assert (output.result_count, output.pages, output.stopped) == (20, 1, "enough")
+    assert output.source == "third_party" and output.page_error is None
+
+
+def test_version_2_refuses_more_than_twenty_before_any_request() -> None:
+    fake = Fake()
+    tool = search_v2(fake)
+    registry = ToolRegistry()
+    registry.register(tool)
+    scope = ToolScope(uuid4(), uuid4(), 1, {"tavily_search": 2})
+    refused = resolve_call(registry, scope, "tavily_search", {"query": "x", "max_results": 21})
+    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
+    assert fake.bodies == []
+
+
+@pytest.mark.asyncio
+async def test_version_2_drops_repeats_and_says_when_tavily_has_no_more() -> None:
+    reply = found(5)
+    reply["results"].append({"title": "again", "url": "https://EXAMPLE.com/0/?utm_medium=x"})
+    tool = search_v2(Fake(reply=reply))
+    arguments = tool.input_model.model_validate({"query": "x", "max_results": 10})
+    output = await tool.handler(arguments, CONTEXT)
+    assert [item.title for item in output.results] == [f"T{n}" for n in range(5)]
+    assert [item.rank for item in output.results] == list(range(1, 6))
+    assert (output.duplicates_removed, output.pages, output.stopped) == (1, 1, "no_more")
+    assert {name: output.model_dump()[name] for name in tool.public_output_fields} == {
+        "result_count": 5,
+        "pages": 1,
+        "stopped": "no_more",
+        "duplicates_removed": 1,
+        "page_error": None,
+        "truncated": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_version_2_failures_stay_typed() -> None:
+    tool = search_v2(Fake(status=429, reply={"detail": "secret provider text"}))
+    with pytest.raises(ToolFailed) as failed:
+        await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    assert str(failed.value) == "rate_limited"
+    fake = Fake()
+    tool = search_v2(fake, environ={})
+    with pytest.raises(ToolFailed) as failed:
+        await tool.handler(tool.input_model.model_validate({"query": "x"}), CONTEXT)
+    assert (str(failed.value), fake.bodies) == ("tavily_key_missing", [])

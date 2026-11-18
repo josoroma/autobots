@@ -37,11 +37,13 @@ GENERAL_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
 # Tool-provider tools, Decision 0017. Each needs its provider's key, read per attempt.
 PROVIDER_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
     {
-        "tavily_search": 1,
+        # Version 2 of each search tool pages its results (Decision 0031). A run or Expert version
+        # that pinned version 1 keeps it, and it stays registered.
+        "tavily_search": 2,
         "tavily_extract": 1,
         "tavily_map": 1,
         "tavily_crawl": 1,
-        "search_web": 1,
+        "search_web": 2,
         "extract_website_content": 1,
         "market_history": 1,
         "inflation_rates": 1,

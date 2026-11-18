@@ -102,6 +102,27 @@ All are `read_only`, `metered_provider`, use `httpx` through an injectable trans
 
 Every URL passes the URL guard before it is sent. Fetched text is labelled third-party in the tool output.
 
+## Search paging
+
+By [Decision 0031](docs/engineering/decisions/0031-search-tools-page-in-batches-of-ten.md). Version 1 of each search tool, in the table above, stays registered unchanged for grants that pinned it.
+
+**WS-01. Search tools.** `search_web` and `tavily_search`, the group `web_search`. No other tool pages.
+
+**WS-02. Batches.** A page is 10 results, and a call requests at most 3 pages, planned as `ceil(max_results / 10)`. `search_web` v2 sends `q`, `num: 10` and `page: n` to `s.jina.ai` for each page. Tavily has no next-page request, so `tavily_search` v2 asks once for up to 20 results.
+
+| ID | Input → output |
+|---|---|
+| `search_web` v2 | `query`, `max_results` 1 to 30 (default 10) → `results[] {rank, title, url, snippet}`, `result_count`, `pages`, `stopped`, `duplicates_removed`, `page_error` |
+| `tavily_search` v2 | Version 1's inputs with `max_results` 1 to 20 (default 10) → `results[] {rank, title, url, content, score}`, `result_count`, `pages`, `stopped`, `duplicates_removed`, `page_error` |
+
+**WS-03. Duplicates.** Results are de-duplicated across and within pages by canonical URL (scheme and host lowercased; no fragment, `utm_*`, `gclid`, `fbclid`, `msclkid`, `mc_cid` or `mc_eid`; no trailing slash). The first occurrence is kept with its URL as given, ranks run from 1 without gaps, and the count removed is reported.
+
+**WS-04. Stopping.** Paging stops when the call has `max_results` results (`enough`), a page is short or adds nothing new (`no_more`), the planned pages are spent (`page_limit`), or a later page fails (`provider_error`).
+
+**WS-05. Spend.** A search call is one metered call under TU-06, admitted before its first page. Its public output records `pages`, the provider requests it made. The key is resolved once per call, and no page is retried.
+
+**WS-06. Errors.** A first-page failure fails the call with its typed code. A later page's failure keeps the earlier pages' results, with `stopped: provider_error` and the typed code as `page_error`. Provider text never reaches the model. `search_web` v2's 70-second timeout holds three 20-second requests.
+
 ## File tools
 
 | ID | Class | Input → output |

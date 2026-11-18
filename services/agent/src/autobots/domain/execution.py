@@ -41,20 +41,26 @@ TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
         "save_artifact": 1,
         "search_files": 1,
         "search_memory": 1,
-        "search_web": 1,
+        "search_web": 2,
         "store_remote_file": 1,
         "tavily_crawl": 1,
         "tavily_extract": 1,
         "tavily_map": 1,
-        "tavily_search": 1,
+        "tavily_search": 2,
         "write_code_file": 1,
     }
 )
 # (tool, recorded version, current version), only where old checkpoints keep their meaning.
 # read_run_file 1 stays registered, and a run that pinned it keeps calling it (US-14.9).
 # create_github_issue 1 stays registered too, unchanged, beside version 2's labels (US-15.14).
+# search_web 1 and tavily_search 1 stay registered beside version 2's pages (Decision 0031 S9).
 COMPATIBLE_TOOL_CHANGES: frozenset[tuple[str, int, int]] = frozenset(
-    {("read_run_file", 1, 2), ("create_github_issue", 1, 2)}
+    {
+        ("read_run_file", 1, 2),
+        ("create_github_issue", 1, 2),
+        ("search_web", 1, 2),
+        ("tavily_search", 1, 2),
+    }
 )
 
 INCOMPATIBLE = "incompatible_version"

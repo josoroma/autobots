@@ -42,6 +42,16 @@ def test_an_older_contract_with_fewer_tools_can_continue() -> None:
     assert incompatibility({"graph_state": GRAPH_STATE_VERSION, "tools": {"calculate": 1}}) is None
 
 
+def test_a_run_that_pinned_version_1_of_a_search_tool_can_continue() -> None:
+    """Version 1 stays registered beside version 2's pages (US-14.21, Decision 0031 S9)."""
+    recorded = {
+        "graph_state": GRAPH_STATE_VERSION,
+        "tools": {**TOOL_VERSIONS, "search_web": 1, "tavily_search": 1},
+    }
+    assert TOOL_VERSIONS["search_web"] == TOOL_VERSIONS["tavily_search"] == 2
+    assert incompatibility(recorded) is None
+
+
 def test_nothing_recorded_is_blocked() -> None:
     assert incompatibility(None) == "no execution contract is recorded"
 
