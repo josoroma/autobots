@@ -155,7 +155,7 @@ Expert revisions default to an empty configurable tool list; they do not automat
 
 The registry now holds web search and extraction (Tavily and Jina, Decision 0017), GitHub issue and pull-request connectors, the `cronjob` tool (Decision 0026) and an isolated browser behind `browse_goal` (Decision 0020), each through the gateway's policy, approvals and receipts; `adapters/tool_registry.tool_definitions` lists them. It has **no shell, unrestricted Python execution, host-file access, dynamic MCP discovery, email send or external publishing connector**. The consequential-effect fixtures use mock destinations. The required gateway policy for future MCP tools does not mean MCP integration is already implemented.
 
-Code: [grant vocabulary](services/agent/src/autobots/domain/tools.py), [runtime registry](services/agent/src/autobots/adapters/tool_registry.py), [version inventory](services/agent/src/autobots/domain/execution.py), [Expert contract](services/agent/src/autobots/contracts/experts.py), [mock effect tools](tests/db/effect_tools.py).
+Code: [grant vocabulary](services/agent/src/autobots/domain/tools.py), [runtime registry](services/agent/src/autobots/adapters/tool_registry.py), [version inventory](services/agent/src/autobots/domain/execution.py), [Expert contract](services/agent/src/autobots/contracts/experts.py), [mock effect tools](tests/db/fixtures/effect_tools.py).
 
 ## 9. What happens between a tool request and its result?
 
@@ -271,7 +271,7 @@ Start with the run's **status and reason**, then the records that explain the la
 
 The default worker process performs maintenance without claiming inference jobs unless explicitly enabled. See [`operations/worker.py`](services/agent/src/autobots/operations/worker.py) and the [operations runbook](docs/engineering/runbooks/operations.md) for the deliberate activation procedure. Do not start services or use paid inference merely to read this guide.
 
-Useful starting points: [run projection](services/agent/src/autobots/application/run_projection.py), [public event routes](services/agent/src/autobots/api/event_routes.py), [sanitized logs](services/agent/src/autobots/logs.py), [existing loop fixtures](tests/db/goal_loop_check.py), [tool unit tests](services/agent/tests/test_tools.py).
+Useful starting points: [run projection](services/agent/src/autobots/application/run_projection.py), [public event routes](services/agent/src/autobots/api/event_routes.py), [sanitized logs](services/agent/src/autobots/logs.py), [existing loop fixtures](tests/db/checks/goal_loop_check.py), [tool unit tests](services/agent/tests/test_tools.py).
 
 ## 19. How should a developer add a tool?
 
