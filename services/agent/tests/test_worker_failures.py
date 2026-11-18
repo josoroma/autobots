@@ -279,7 +279,8 @@ def test_a_suspension_that_cant_apply_requeues_after_the_longest_backoff(
     ],
     ids=["settled", "children_still_owned"],
 )
-def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
+@pytest.mark.asyncio
+async def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
     monkeypatch: pytest.MonkeyPatch, settled: str | None, expected: PassFailure
 ) -> None:
     """A run a person is cancelling can't be suspended, so at the bound its cancellation is settled
@@ -306,7 +307,7 @@ def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
     monkeypatch.setattr(run_lifecycle, "_holds_live_lease", holds)
     monkeypatch.setattr(run_lifecycle, "_settle", settle)
     monkeypatch.setattr(run_lifecycle, "_transition", transition)
-    failure = asyncio.run(record_failure(database, LEASE, ArrangedDefect()))
+    failure = await record_failure(database, LEASE, ArrangedDefect())
     assert failure == expected
     assert settles == [LEASE]
     if settled is None:
@@ -316,7 +317,8 @@ def test_a_run_being_cancelled_settles_its_cancellation_at_the_bound(
 
 
 @pytest.mark.parametrize("arranged", ["lapsed_lease", "settlement_fails"])
-def test_a_cancelling_run_that_cant_settle_at_the_bound_retries_after_the_longest_backoff(
+@pytest.mark.asyncio
+async def test_a_cancelling_run_that_cant_settle_at_the_bound_retries_after_the_longest_backoff(
     monkeypatch: pytest.MonkeyPatch, arranged: str
 ) -> None:
     """Only a live lease settles, as finish requires; a settlement that itself fails is logged and
@@ -333,7 +335,7 @@ def test_a_cancelling_run_that_cant_settle_at_the_bound_retries_after_the_longes
 
     monkeypatch.setattr(run_lifecycle, "_holds_live_lease", holds)
     monkeypatch.setattr(run_lifecycle, "_settle", settle)
-    failure = asyncio.run(record_failure(database, LEASE, ArrangedDefect()))
+    failure = await record_failure(database, LEASE, ArrangedDefect())
     assert failure == PassFailure(FailureEnding.RETRY, 3, RETRY_DELAYS_SECONDS[-1])
     assert (database.job.status, database.job.delay) == ("queued", 60.0)
     assert settles == ([] if arranged == "lapsed_lease" else [LEASE])

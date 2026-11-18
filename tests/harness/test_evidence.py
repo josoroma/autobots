@@ -18,6 +18,7 @@ import evidence  # noqa: E402
 
 TEMPLATES = ROOT / 'docs/engineering/templates'
 ITEM, EVIDENCE = 'US-9.9', 'run-1'
+from harness_support import HarnessTestCase  # noqa: E402 - after the scripts path, as the imports above
 
 
 class Templates(unittest.TestCase):
@@ -50,7 +51,7 @@ class Templates(unittest.TestCase):
             self.assertIn(field, summary)
 
 
-class Completion(unittest.TestCase):
+class Completion(HarnessTestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -152,7 +153,7 @@ class Completion(unittest.TestCase):
                 target = self.root / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('{}')
-                self.assertTrue(any(key in error for error in self.errors()))
+                self.assertMentions(self.errors(), key)
                 self.write_manifest(self.valid_manifest())
 
     def test_skipped_and_unrun_checks_are_rejected(self):
@@ -202,7 +203,7 @@ class Completion(unittest.TestCase):
         self.runbook.write_text('TEMPLATE, not an exercised procedure\n')
         data['runbook']['revision_sha256'] = hashlib.sha256(self.runbook.read_bytes()).hexdigest()
         self.write_manifest(data)
-        self.assertTrue(any('still a template' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'still a template')
 
     def test_a_fake_model_cannot_satisfy_a_live_gate(self):
         self.rejected('fake model', lambda d: d['checks'][0].update(verification_class='live', model_transport='mock'))
@@ -239,7 +240,7 @@ class Completion(unittest.TestCase):
         self.rejected('recognizable secret', lambda d: d['checks'][0].update(observed='sk-or-v1-abcdefghijkl'))
         self.write_manifest(self.valid_manifest())
         (self.directory / 'summary.md').write_text(f'{EVIDENCE} OPENROUTER_API_KEY=abc\n')
-        self.assertTrue(any('summary: contains' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'summary: contains')
 
     def test_missing_pieces_are_all_listed(self):
         self.write_manifest({'schema_version': evidence.SCHEMA})
@@ -293,7 +294,7 @@ class Completion(unittest.TestCase):
         plan = self.plan()
         plan['manual_checks'] = []
         self.assertEqual(evidence.record_manifest(self.root, ITEM, EVIDENCE, plan), [])
-        self.assertTrue(any('was not exercised' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'was not exercised')
 
     def test_record_keeps_failures_and_unrun_checks_visible_to_validate(self):
         self.write_report([self.passed_record(status='failed', exit_code=1), {'id': 'build', 'status': 'not_run'}], status='failed')
@@ -305,7 +306,7 @@ class Completion(unittest.TestCase):
     def test_record_refuses_a_stale_missing_or_unstable_report(self):
         self.assertTrue(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()))
         self.write_report([self.passed_record()], inputs_unchanged_during_check=False)
-        self.assertTrue(any('changed during' in p for p in evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan())))
+        self.assertMentions(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()), 'changed during')
         self.write_report([self.passed_record()], template=True)
         self.assertTrue(evidence.record_manifest(self.root, ITEM, EVIDENCE, self.plan()))
         self.write_report([self.passed_record()])
@@ -320,15 +321,15 @@ class Completion(unittest.TestCase):
         data = json.loads(self.manifest_path.read_text())
         data['checks'][0]['verification_class'] = 'disposable'
         self.write_manifest(data)
-        self.assertTrue(any('differs from the harness report' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'differs from the harness report')
         data['checks'][0]['verification_class'] = 'mock'
         self.write_manifest(data)
         self.write_report([self.passed_record(status='failed', exit_code=1)], status='failed')
-        self.assertTrue(any('differs from the harness report' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'differs from the harness report')
         self.write_report([self.passed_record()], status='failed')
         self.assertTrue(any('report did not pass' in error for error in self.errors()), 'a manifest trimmed of a failing check')
         (self.root / '.checks/harness/latest.json').unlink()
-        self.assertTrue(any('no valid verifier report' in error for error in self.errors()))
+        self.assertMentions(self.errors(), 'no valid verifier report')
 
     def test_command_line_exit_codes(self):
         script = str(ROOT / 'scripts/evidence.py')

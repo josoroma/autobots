@@ -156,7 +156,7 @@ const SPY = (permission: string) => {
   });
 };
 
-/** tests/db/notify_live.py makes two of the ops-n workspace's runs start waiting, and names them. */
+/** tests/db/arrange/notify_live.py makes two of the ops-n workspace's runs start waiting, and names them. */
 function arrangeWaiting(
   label: string,
 ): Promise<{ waiting_approval: string; waiting_input: string }> {

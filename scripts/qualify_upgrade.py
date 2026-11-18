@@ -97,6 +97,8 @@ class UpgradeRun:
     def prior(self) -> Path:
         return self.work / 'prior'
 
+    # The prior revision's tests/db is flat, as PRIOR_REVISION committed it, so the prior admission and worker keep
+    # its paths, and only its own service source is on their path.
     @property
     def prior_env(self) -> dict[str, str]:
         return {'PYTHONPATH': str(self.prior / 'services/agent/src')}
@@ -240,7 +242,7 @@ def upgrade(run: UpgradeRun, cases: Cases) -> None:
     cases.check('readiness returns once the schema has caught up', 'ready', ready, ready)
     kept = ops.sql(f"select count(*) from agent_runtime.checkpoints c join public.runs r on r.checkpoint_thread_id = c.thread_id where r.id = '{run.interrupted}';")
     cases.check('saved checkpoints are all still there', run.checkpoints, kept, kept == run.checkpoints)
-    checked = run_child_check(cases, root, 'upgrade_check.py', 'upgrade', run.workspace, run.queued, run.interrupted, run.before_hash, label='the upgrade check',
+    checked = run_child_check(cases, root, 'checks/upgrade_check.py', 'upgrade', run.workspace, run.queued, run.interrupted, run.before_hash, label='the upgrade check',
                               env={**ops.env, 'AUTOBOTS_PRIOR_RUNS': json.dumps(run.prior_runs)}, timeout=240, err_dir=root / ERR_DIR, err_name='upgrade')
     # Arranged: this process inherited tracing settings and skipped every entry point, and built real agents.
     tried = 'collector.example.invalid' in checked.stderr or 'LangSmith' in checked.stderr
@@ -251,7 +253,7 @@ def prior_checkpoint_continues(run: UpgradeRun, cases: Cases) -> None:
     """A prior checkpoint continuing on this release's code, after a person settled the uncertain call."""
     root, ops, interrupted = run.root, run.ops, run.interrupted
     reconciled, _ = api_call(run.api_port, ops.internal, run.token, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
-    resume = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', run.workspace, interrupted], env=ops.env, timeout=60, label='the upgraded resume')
+    resume = launch([str(root / PYTHON), str(root / 'tests/db/arrange/run_commands.py'), 'resume', run.workspace, interrupted], env=ops.env, timeout=60, label='the upgraded resume')
     run.marker.unlink(missing_ok=True)
     worker = ops.fixture_worker('upgraded-resume', 0, 30, run.marker, 'resume', 'openrouter_deepseek_flash')
     resumed = wait(lambda: ops.sql(f"select status from public.runs where id = '{interrupted}';") == 'succeeded', 60)
@@ -284,7 +286,7 @@ def unqualified_adapter(run: UpgradeRun, cases: Cases) -> None:
     """An unqualified adapter (arranged): as if a framework release changed under the same schema."""
     root, stack, ops = run.root, run.stack, run.ops
     migrator_url = ops.url.replace(f'autobots_runtime:{stack.runtime_password}', f'autobots_migrator:{stack.migrator_password}')
-    run_child_check(cases, root, 'upgrade_check.py', 'adapter', migrator_url, ops.url, label='the adapter check', env=ops.env, timeout=120,
+    run_child_check(cases, root, 'checks/upgrade_check.py', 'adapter', migrator_url, ops.url, label='the adapter check', env=ops.env, timeout=120,
                     err_dir=root / ERR_DIR, err_name='adapter')
     saved = stack.sql('create table public.arranged_adapter_rows as select * from agent_runtime.adapter_qualifications;\ndelete from agent_runtime.adapter_qualifications;\n')
     cases.arrange('an unqualified adapter', saved)

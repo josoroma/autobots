@@ -12,7 +12,7 @@ import { expectNoPrivateValues } from "./support/leaks.ts";
 
 // US-15.18, PRD-Studio OP-01, OP-02 and OP-04. scripts/qualify_identity.py arranges the ops-n workspace:
 // one job that lost its worker, one leased and one queued that no worker may take, and published
-// artifacts of 1,000 and 2,345 bytes. tests/db/operations_live.py adds two live worker heartbeats.
+// artifacts of 1,000 and 2,345 bytes. tests/db/arrange/operations_live.py adds two live worker heartbeats.
 // Decision 0022 D5's values, exactly, and Decision 0023 E2's shipped count.
 const D5 = [
   "applied_migrations",

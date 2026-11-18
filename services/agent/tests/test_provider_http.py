@@ -2,7 +2,6 @@
 R-62: PADP-04, PADP-05, PADP-07 and XDUP-11). Fake transports only; nothing leaves the process.
 """
 
-import asyncio
 from typing import Annotated
 
 import httpx
@@ -100,7 +99,8 @@ def test_the_openrouter_metadata_client_keeps_its_timeout_and_base() -> None:
     assert (made.follow_redirects, made.trust_env) == (False, False)
 
 
-def test_refusing_redirects_changes_no_path_that_worked() -> None:
+@pytest.mark.asyncio
+async def test_refusing_redirects_changes_no_path_that_worked() -> None:
     """httpx follows none by default, which the OpenRouter metadata client used, and the storage
     client already refused them, so neither path ever followed one. A redirect still reads as an
     outage on both, as it did."""
@@ -109,12 +109,12 @@ def test_refusing_redirects_changes_no_path_that_worked() -> None:
     fetch = openrouter_metadata.catalog_fetcher(
         lambda: openrouter_metadata.http_client(answering(moved))
     )
-    assert asyncio.run(fetch()) is None
+    assert await fetch() is None
     store = SupabaseObjectStore(
         "http://storage.invalid", SecretStr("k"), transport=answering(httpx.Response(302))
     )
     with pytest.raises(StorageUnavailable):
-        asyncio.run(store.ping())
+        await store.ping()
 
 
 @pytest.mark.parametrize(
@@ -133,16 +133,17 @@ def test_a_refusal_maps_to_one_typed_code(status: int, code: str) -> None:
     assert refusal_code("tavily", status) == code
 
 
-def test_a_read_maps_transport_errors_and_statuses_to_typed_codes() -> None:
+@pytest.mark.asyncio
+async def test_a_read_maps_transport_errors_and_statuses_to_typed_codes() -> None:
     async def go(reply: httpx.Response | Exception) -> httpx.Response:
         async with client(reply) as made:
             return await read(made, "GET", "/x", code_for=lambda status: f"code_{status}")
 
     with pytest.raises(ToolFailed, match=r"^provider_unavailable$"):
-        asyncio.run(go(httpx.ReadError("arranged")))
+        await go(httpx.ReadError("arranged"))
     with pytest.raises(ToolFailed, match=r"^code_503$"):
-        asyncio.run(go(httpx.Response(503)))
-    assert asyncio.run(go(httpx.Response(200, json={}))).status_code == 200
+        await go(httpx.Response(503))
+    assert (await go(httpx.Response(200, json={}))).status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -164,38 +165,43 @@ def test_a_reply_reads_leniently_where_its_shape_allows() -> None:
 
 
 @pytest.mark.parametrize("error", [httpx.ConnectError("arranged"), httpx.ConnectTimeout("x")])
-def test_a_write_whose_connection_never_opened_failed(error: Exception) -> None:
+@pytest.mark.asyncio
+async def test_a_write_whose_connection_never_opened_failed(error: Exception) -> None:
     with pytest.raises(ToolFailed, match=r"^destination_unreachable$"):
-        asyncio.run(_write(error))
+        await _write(error)
 
 
 @pytest.mark.parametrize("status", sorted(REFUSED))
-def test_a_write_refused_by_status_failed(status: int) -> None:
+@pytest.mark.asyncio
+async def test_a_write_refused_by_status_failed(status: int) -> None:
     with pytest.raises(ToolFailed, match=rf"^github_refused_{status}$"):
-        asyncio.run(_write(httpx.Response(status)))
+        await _write(httpx.Response(status))
 
 
 @pytest.mark.parametrize("status", [200, 202, 302, 409, 500, 502, 504])
-def test_any_other_write_reply_stays_unknown(status: int) -> None:
+@pytest.mark.asyncio
+async def test_any_other_write_reply_stays_unknown(status: int) -> None:
     with pytest.raises(UnclearReply) as unclear:
-        asyncio.run(_write(httpx.Response(status)))
+        await _write(httpx.Response(status))
     assert isinstance(unclear.value, OutcomeUnknown)
     assert unclear.value.detail == f"github_unclear_{status}"
 
 
-def test_a_write_whose_reply_was_lost_after_sending_stays_unknown() -> None:
+@pytest.mark.asyncio
+async def test_a_write_whose_reply_was_lost_after_sending_stays_unknown() -> None:
     """Not a ToolFailed: the request went out, so only a readback can say."""
     with pytest.raises(httpx.ReadError):
-        asyncio.run(_write(httpx.ReadError("arranged")))
+        await _write(httpx.ReadError("arranged"))
 
 
-def test_a_created_reply_that_cant_be_read_stays_unknown() -> None:
+@pytest.mark.asyncio
+async def test_a_created_reply_that_cant_be_read_stays_unknown() -> None:
     async def go() -> Item:
         async with client(httpx.Response(201, content=b"[1]")) as made:
             return await write_json(made, "/x", {}, Item, provider="github", refused=REFUSED)
 
     with pytest.raises(UnclearReply) as unclear:
-        asyncio.run(go())
+        await go()
     assert unclear.value.detail == "github_unclear_201"
 
 

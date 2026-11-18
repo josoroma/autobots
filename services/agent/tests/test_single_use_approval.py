@@ -4,7 +4,8 @@ repeating the call waits for a person again (refactor plan R-50: PTOL-06; Decisi
 
 An effect's receipt already makes its approval single-use: a repeat finds the receipt and replays
 it. browse_goal leaves none, so its approval is consumed instead, and a consumed approval goes back
-to a person. tests/db/approval_check.py repeats an approved browse_goal call against Postgres.
+to a person. tests/db/checks/approval_check.py repeats an approved browse_goal call against
+Postgres.
 """
 
 import contextlib

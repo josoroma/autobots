@@ -1,7 +1,6 @@
 """What the API's and the worker's entry points build from their environment, without a process
 (R-64: POPS-03, XMOD-08, POPS-14)."""
 
-import asyncio
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -61,10 +60,11 @@ def test_storage_needs_both_its_address_and_its_key() -> None:
     assert isinstance(composition.object_store(both), SupabaseObjectStore)
 
 
-def test_with_no_provider_context_nothing_unattended_starts() -> None:
+@pytest.mark.asyncio
+async def test_with_no_provider_context_nothing_unattended_starts() -> None:
     check = composition.credential_check({})
     assert check is composition.no_credential
-    assert asyncio.run(check(ScriptedConnection(), uuid4())) == "credentials_required"
+    assert await check(ScriptedConnection(), uuid4()) == "credentials_required"
 
 
 def test_missing_settings_are_named_together_and_never_their_values() -> None:

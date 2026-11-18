@@ -66,7 +66,7 @@ class Ops:
 
     def fixture_worker(self, name: str, hold: float, drain: float, marker: Path, mode: str = 'fresh',
                        profile: str | None = None) -> subprocess.Popen[bytes]:
-        return self.spawn(name, [str(self.root / CHECK_PYTHON), str(self.root / 'tests/db/operations_worker.py'), self.url, name, str(hold),
+        return self.spawn(name, [str(self.root / CHECK_PYTHON), str(self.root / 'tests/db/workers/operations_worker.py'), self.url, name, str(hold),
                                  str(drain), str(marker), mode],
                           {'AUTOBOTS_TEST_ROUTE_PROFILE': profile} if profile else None)
 
@@ -75,7 +75,7 @@ class Ops:
         return result.stdout.strip().splitlines()[0] if result.returncode == 0 and result.stdout.strip() else ''
 
     def admit(self, workspace: str) -> str:
-        result = launch([str(self.root / CHECK_PYTHON), str(self.root / 'tests/db/operations_check.py'), 'admit', workspace], env=self.env,
+        result = launch([str(self.root / CHECK_PYTHON), str(self.root / 'tests/db/arrange/run_commands.py'), 'admit', workspace], env=self.env,
                         timeout=60, label='the fixture admission')
         lines = result.stdout.strip().splitlines()
         if result.returncode or not lines:

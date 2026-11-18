@@ -99,7 +99,7 @@ def scripted(*steps: Any) -> Any:
 
 
 def run_call(ledger: Ledger, dispatch: Any, retry: RetryPolicy, **options: Any) -> Any:
-    return call_with_policy(ledger, request(), dispatch, retry, **options)  # type: ignore[arg-type]
+    return call_with_policy(ledger, request(), dispatch, retry, **options)  # type: ignore[arg-type]  # an in-memory ledger for ModelAdmission
 
 
 @pytest.mark.parametrize(

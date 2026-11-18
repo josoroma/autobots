@@ -1,10 +1,7 @@
 """Decision 0023 E2: the schema check reads the applied count against what this release ships."""
 
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from autobots.application.operations import (
     REQUIRED_COLUMNS,
@@ -15,8 +12,7 @@ from autobots.application.operations import (
     schema_condition,
 )
 from autobots.application.schema_release import NEWEST_MIGRATION, SHIPPED_MIGRATIONS
-from autobots.application.sql import SqlParams
-from sql_fakes import ScriptedRows
+from sql_fakes import RuledConnection, RuledPool
 
 MIGRATIONS = Path(__file__).resolve().parents[3] / "supabase/migrations"
 
@@ -63,61 +59,33 @@ def test_the_newer_objects_are_required() -> None:
         assert column in REQUIRED_COLUMNS
 
 
-def answered(row: tuple[Any, ...] | None) -> ScriptedRows:
-    return ScriptedRows([] if row is None else [row])
+def connection_with(has_function: bool, applied: int | None) -> RuledConnection:
+    """Every object present, no hold and no qualified adapter; the counting function and its answer
+    are set per test. Any other statement fails the test (refactor plan R-66, PTST-09)."""
+    return RuledConnection(
+        ("pg_attribute", [(0,)]),
+        ("where to_regclass(r) is null", [(0,)]),
+        ("to_regprocedure", [(has_function,)]),
+        ("applied_migration_count", [(applied,)]),
+        ("installation_holds", []),
+        ("adapter_qualifications", [(0,)]),
+    )
 
 
-class Connection:
-    """Every object present; the counting function and its answer are set per test."""
-
-    def __init__(self, has_function: bool, applied: int | None) -> None:
-        self.has_function = has_function
-        self.applied = applied
-        self.statements: list[str] = []
-
-    async def execute(self, statement: str, _params: SqlParams | None = None, /) -> ScriptedRows:
-        self.statements.append(statement)
-        if "to_regprocedure" in statement:
-            return answered((self.has_function,))
-        if "applied_migration_count" in statement:
-            return answered((self.applied,))
-        if "installation_holds" in statement:
-            return answered(None)
-        return answered((0,))
-
-    @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[None]:
-        yield
-
-    async def __aenter__(self) -> "Connection":
-        return self
-
-    async def __aexit__(self, *_: Any) -> None:
-        return None
-
-
-class Pool:
-    def __init__(self, connection: Connection) -> None:
-        self._connection = connection
-
-    def connection(self) -> Connection:
-        return self._connection
-
-
-def schema_of(connection: Connection) -> str:
-    return asyncio.run(database_conditions(Pool(connection)))[1].code
+def schema_of(connection: RuledConnection) -> str:
+    return asyncio.run(database_conditions(RuledPool(connection)))[1].code
 
 
 def test_the_probe_reads_the_applied_count() -> None:
-    assert schema_of(Connection(True, SHIPPED_MIGRATIONS - 1)) == "schema_behind"
-    assert schema_of(Connection(True, SHIPPED_MIGRATIONS)) == "schema_ready"
-    assert schema_of(Connection(True, SHIPPED_MIGRATIONS + 2)) == "schema_ahead"
+    assert schema_of(connection_with(True, SHIPPED_MIGRATIONS - 1)) == "schema_behind"
+    assert schema_of(connection_with(True, SHIPPED_MIGRATIONS)) == "schema_ready"
+    assert schema_of(connection_with(True, SHIPPED_MIGRATIONS + 2)) == "schema_ahead"
 
 
 def test_without_the_counting_function_it_isnt_called() -> None:
-    connection = Connection(False, None)
+    connection = connection_with(False, None)
     assert schema_of(connection) == "schema_ready"
     assert not any(
         "applied_migration_count()" in statement and "to_regprocedure" not in statement
-        for statement in connection.statements
+        for statement, _ in connection.statements
     )

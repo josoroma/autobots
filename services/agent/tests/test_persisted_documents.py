@@ -6,8 +6,8 @@ Each fixture under fixtures/stored/policy_snapshot, run_event and receipt is wha
 captured from it through the fake database, or a shape the history shows an older release wrote,
 and says which. The captured ones came from the writers at d669265, before R-51, and the sha256 of
 each byte string those writers sent is pinned below. Postgres normalizes jsonb as it stores it, so
-tests/db/run_admission_check.py reads back what a real column holds; these pin what each writer
-sends and how each shape reads.
+tests/db/checks/run_admission_check.py reads back what a real column holds; these pin what each
+writer sends and how each shape reads.
 """
 
 import asyncio

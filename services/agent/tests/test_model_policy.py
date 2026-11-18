@@ -150,7 +150,7 @@ def test_an_unknown_profile_or_role_is_refused(arguments: dict[str, Any]) -> Non
 def test_a_policy_cannot_be_changed_after_admission() -> None:
     policy = resolve_role_policy()
     with pytest.raises(TypeError):
-        policy.bindings[ModelRole.CODER] = TERRA  # type: ignore[index]
+        policy.bindings[ModelRole.CODER] = TERRA  # type: ignore[index]  # the write the frozen mapping must refuse
 
 
 def test_the_effective_map_can_be_displayed_before_dispatch() -> None:

@@ -6,7 +6,6 @@ list and the workflow still load, the editor can say that saving replaces it, an
 it by key or saves over it (R-56, SQLI-13, Decision 0029 F3).
 """
 
-import asyncio
 import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
@@ -89,59 +88,63 @@ def _no_overview(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(workflows, "row_facts", nothing)
 
 
-def test_an_unreadable_draft_reads_as_absent_and_is_logged(
+@pytest.mark.asyncio
+async def test_an_unreadable_draft_reads_as_absent_and_is_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     flow = uuid4()
     with caplog.at_level(logging.WARNING, logger="autobots.workflows"):
-        view = asyncio.run(get_workflow(Workflows({flow: UNREADABLE}), WORKSPACE, flow))
+        view = await get_workflow(Workflows({flow: UNREADABLE}), WORKSPACE, flow)
     assert (view.draft, view.draft_unreadable) == (None, True)
     assert [record.getMessage() for record in caplog.records] == ["workflow.draft_unreadable"]
 
 
-def test_the_list_still_loads_beside_an_unreadable_draft() -> None:
+@pytest.mark.asyncio
+async def test_the_list_still_loads_beside_an_unreadable_draft() -> None:
     broken, kept = uuid4(), uuid4()
-    views = asyncio.run(list_workflows(Workflows({broken: UNREADABLE, kept: READABLE}), WORKSPACE))
+    views = await list_workflows(Workflows({broken: UNREADABLE, kept: READABLE}), WORKSPACE)
     drafts = {view.id: (view.draft is not None, view.draft_unreadable) for view in views}
     assert drafts == {broken: (False, True), kept: (True, False)}
 
 
-def test_an_unreadable_draft_is_discarded_by_its_key() -> None:
+@pytest.mark.asyncio
+async def test_an_unreadable_draft_is_discarded_by_its_key() -> None:
     flow = uuid4()
     connection = Workflows({flow: UNREADABLE})
-    view = asyncio.run(discard_draft(connection, WORKSPACE, flow))
+    view = await discard_draft(connection, WORKSPACE, flow)
     assert (view.draft, view.draft_unreadable) == (None, False)
     assert flow not in connection.drafts
     # Deleted before any read of the stored graph.
     assert connection.sent[0].startswith(DISCARD)
 
 
-def test_an_unreadable_draft_is_never_published() -> None:
+@pytest.mark.asyncio
+async def test_an_unreadable_draft_is_never_published() -> None:
     flow = uuid4()
     connection = Workflows({flow: UNREADABLE})
     with pytest.raises(WorkflowRefused) as refused:
-        asyncio.run(
-            publish_draft(
-                connection,
-                workspace_id=WORKSPACE,
-                actor_id=uuid4(),
-                workflow_id=flow,
-                idempotency_key="k",
-                expected_version=0,
-            )
+        await publish_draft(
+            connection,
+            workspace_id=WORKSPACE,
+            actor_id=uuid4(),
+            workflow_id=flow,
+            idempotency_key="k",
+            expected_version=0,
         )
     assert refused.value.code == "workflow_draft_not_found"
     assert flow in connection.drafts
 
 
-def test_discarding_with_no_draft_is_refused() -> None:
+@pytest.mark.asyncio
+async def test_discarding_with_no_draft_is_refused() -> None:
     flow = uuid4()
     with pytest.raises(WorkflowRefused) as refused:
-        asyncio.run(discard_draft(Workflows({flow: None}), WORKSPACE, flow))
+        await discard_draft(Workflows({flow: None}), WORKSPACE, flow)
     assert refused.value.code == "workflow_draft_not_found"
 
 
-def test_discarding_another_workspace_s_workflow_is_not_found() -> None:
+@pytest.mark.asyncio
+async def test_discarding_another_workspace_s_workflow_is_not_found() -> None:
     with pytest.raises(WorkflowRefused) as refused:
-        asyncio.run(discard_draft(Workflows({}), WORKSPACE, uuid4()))
+        await discard_draft(Workflows({}), WORKSPACE, uuid4())
     assert refused.value.code == "workflow_not_found"

@@ -1,7 +1,8 @@
 """A held-out replay's verdict from its runs' statuses, with plain values (Decision 0016, PPRD-16).
 
 It passes only when every run succeeded, fails as soon as any run ended otherwise, even while others
-still run, and is running until then. tests/db/improvement_check.py checks it against stored runs.
+still run, and is running until then. tests/db/checks/improvement_check.py checks it against
+stored runs.
 """
 
 import pytest

@@ -24,7 +24,7 @@ from qualification.profiles import PROFILES  # noqa: E402
 BROWSER_DIR = 'apps/web/tests/browser/'
 TEST_FILES = ('apps/web/tests/unit/**/*.test.ts', 'packages/api-client/tests/**/*.test.ts',
               'tests/toolchain/test_*.py', 'tests/harness/test_*.py', 'services/agent/tests/**/test_*.py',
-              'apps/web/tests/browser/**/*.spec.ts', 'tests/db/*_check.py')
+              'apps/web/tests/browser/**/*.spec.ts', 'tests/db/checks/*_check.py')
 # The runner that passes each project, by the suites constant naming it.
 PROJECT_RUNNERS = (('scripts/qualify_web.py', 'WEB_PROJECT'), ('scripts/qualify_identity.py', 'IDENTITY_PROJECT'),
                    ('scripts/qualify_identity.py', 'ARRANGED_PROJECT'), ('scripts/qualify_identity.py', 'SLICE_PROJECT'),
@@ -91,7 +91,7 @@ class SuiteClaims(unittest.TestCase):
             for path in ('apps/web/tests/unit/new.test.ts', 'apps/web/tests/unit/deep/newer.test.ts',
                          'tests/toolchain/test_scaffold_scope.py', 'tests/toolchain/test_new_pins.py',
                          'apps/web/tests/browser/composer.spec.ts', 'apps/web/tests/browser/zzz-new.spec.ts',
-                         'tests/db/known_check.py', 'tests/db/new_check.py', 'tests/harness/test_new.py'):
+                         'tests/db/checks/known_check.py', 'tests/db/checks/new_check.py', 'tests/harness/test_new.py'):
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
                 (root / path).write_text('')
             # The main project names composer.spec.ts, and no project names zzz-new.spec.ts.
@@ -100,14 +100,14 @@ class SuiteClaims(unittest.TestCase):
             # The db profile runs app_db.py, which imports runner.py, which names known_check, and a module
             # of a package, which names packaged_check.
             (root / 'scripts/app_db.py').write_text('import runner\nfrom qualification.tables import CHILDREN\n')
-            (root / 'scripts/runner.py').write_text("CHECKS = ['known_check.py']\n")
-            (root / 'scripts/qualification/tables.py').write_text("CHILDREN = ['packaged_check.py']\n")
-            (root / 'tests/db/packaged_check.py').write_text('')
+            (root / 'scripts/runner.py').write_text("CHECKS = ['checks/known_check.py']\n")
+            (root / 'scripts/qualification/tables.py').write_text("CHILDREN = ['checks/packaged_check.py']\n")
+            (root / 'tests/db/checks/packaged_check.py').write_text('')
             # A live qualifier that no profile runs names live_check, so it isn't claimed.
-            (root / 'tests/db/live_check.py').write_text('')
-            (root / 'scripts/qualify_live.py').write_text("CHECK = 'live_check.py'\n")
-            self.assertEqual(unclaimed(root), ['apps/web/tests/browser/zzz-new.spec.ts', 'tests/db/live_check.py',
-                                               'tests/db/new_check.py', 'tests/toolchain/test_new_pins.py'])
+            (root / 'tests/db/checks/live_check.py').write_text('')
+            (root / 'scripts/qualify_live.py').write_text("CHECK = 'checks/live_check.py'\n")
+            self.assertEqual(unclaimed(root), ['apps/web/tests/browser/zzz-new.spec.ts', 'tests/db/checks/live_check.py',
+                                               'tests/db/checks/new_check.py', 'tests/toolchain/test_new_pins.py'])
 
     def test_each_unit_test_glob_selects_files(self) -> None:
         # Node passes an empty glob with no tests, so an emptied folder must fail here.

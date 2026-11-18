@@ -1,6 +1,5 @@
 """US-14.19 offline: `cronjob` v1's input rules, approval per action and catalog entry."""
 
-import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -121,7 +120,8 @@ def test_a_schedule_becomes_the_routine_trigger_as_it_was_stored() -> None:
         ),
     ],
 )
-def test_a_routine_the_model_saves_carries_the_tools_cap(
+@pytest.mark.asyncio
+async def test_a_routine_the_model_saves_carries_the_tools_cap(
     monkeypatch: pytest.MonkeyPatch, arguments: dict[str, Any], service: str
 ) -> None:
     """Decision 0029 F2: the cronjob tool states its US$1 cap to the routine service, which the
@@ -148,7 +148,7 @@ def test_a_routine_the_model_saves_carries_the_tools_cap(
         )
 
     with pytest.raises(ToolFailed, match="routine_limit_too_high"):
-        asyncio.run(call())
+        await call()
     assert called["budget_cap"] == MAX_LIMIT_MICRO_USD == 1_000_000
 
 

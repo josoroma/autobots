@@ -72,7 +72,7 @@ def qualify(root: Path) -> int:
         cases.arrange('the disposable database seeded, with workspace A', seed(stack, root),
                       stack.migrator(f"insert into public.workspaces (id, name) values ('{WORKSPACE_A}', 'Workspace A');"))
         url = f'postgresql://autobots_runtime:{stack.runtime_password}@127.0.0.1:{db_port}/postgres'
-        run_child_check(cases, root, 'browse_goal_check.py', WORKSPACE_A, label='the browse_goal check', env=service_env(root, url), timeout=900,
+        run_child_check(cases, root, 'checks/browse_goal_check.py', WORKSPACE_A, label='the browse_goal check', env=service_env(root, url), timeout=900,
                         cwd=root, err_dir=root / REPORT.parent, err_name=REPORT.stem)
     finally:
         remove_stack(stack)

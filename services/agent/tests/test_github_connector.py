@@ -113,7 +113,8 @@ def test_one_call_resolves_its_repository_and_token_once(monkeypatch: pytest.Mon
     assert resolved == [(workspace, "github_repository"), (workspace, "github_token")]
 
 
-def test_an_attempt_without_a_valid_repository_sends_nothing() -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_without_a_valid_repository_sends_nothing() -> None:
     sent: list[httpx.Request] = []
 
     def record(request: httpx.Request) -> httpx.Response:
@@ -130,5 +131,5 @@ def test_an_attempt_without_a_valid_repository_sends_nothing() -> None:
             pass
 
     with pytest.raises(ToolFailed, match=r"^connector_not_configured$"):
-        asyncio.run(attempt())
+        await attempt()
     assert sent == []

@@ -221,7 +221,8 @@ def snapshot(deepseek_or_terra: str = DEEPSEEK.id.value) -> dict[str, Any]:
 @dataclass(frozen=True)
 class ScriptedKeys(InferenceSource):
     """`open_attempt` with keys from a list instead of a database, each an arranged key or what
-    reading it raised. The disposable check reads real rows (tests/db/product_inference_worker.py).
+    reading it raised. The disposable check reads real rows
+    (tests/db/workers/product_inference_worker.py).
     """
 
     keys: list[str | Exception] = field(default_factory=list)

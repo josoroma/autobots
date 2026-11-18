@@ -126,7 +126,7 @@ class Commands(unittest.TestCase):
 class Fixtures(unittest.TestCase):
     def test_seeds_hold_no_ddl_and_no_jobs(self):
         # R-10: the same terms as the reference seed, from one list in scripts/app_db.py.
-        text = (ROOT / 'tests/db/seeds/fixtures.sql').read_text()
+        text = (ROOT / 'tests/db/sql/h1/seeds/fixtures.sql').read_text()
         self.assertEqual(app_db.seed_violations(text), [])
         self.assertEqual(text.lower().count('on conflict'), text.lower().count('insert into'))
 

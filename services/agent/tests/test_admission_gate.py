@@ -206,7 +206,8 @@ def test_a_malformed_minimum_stops_the_api_at_startup(
     assert capsys.readouterr().err.startswith("ERROR: AUTOBOTS_MIN_FREE_BYTES must be")
 
 
-def test_the_worker_entry_point_refuses_before_it_serves(
+@pytest.mark.asyncio
+async def test_the_worker_entry_point_refuses_before_it_serves(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     async def never(*_args: object, **_options: object) -> None:
@@ -218,7 +219,7 @@ def test_the_worker_entry_point_refuses_before_it_serves(
     monkeypatch.setenv("AUTOBOTS_DATABASE_URL", "postgresql://unused")
     monkeypatch.setenv("AUTOBOTS_MIN_FREE_BYTES", "lots")
     with pytest.raises(SystemExit) as stopped:
-        asyncio.run(worker.main())
+        await worker.main()
     assert stopped.value.code == 2
     assert capsys.readouterr().err.startswith("ERROR: AUTOBOTS_MIN_FREE_BYTES must be")
 
@@ -226,7 +227,8 @@ def test_the_worker_entry_point_refuses_before_it_serves(
 # What the gate reads
 
 
-def test_the_gate_reads_database_storage_and_disk_in_admission_order(
+@pytest.mark.asyncio
+async def test_the_gate_reads_database_storage_and_disk_in_admission_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     probes = ProbeTimes()
@@ -237,8 +239,8 @@ def test_the_gate_reads_database_storage_and_disk_in_admission_order(
         return DATABASE_READY
 
     monkeypatch.setattr(readiness, "database_conditions", answers)
-    conditions = asyncio.run(
-        installation_conditions(None, Storage(up=True), ReadinessSettings(tmp_path, 0), probes)
+    conditions = await installation_conditions(
+        None, Storage(up=True), ReadinessSettings(tmp_path, 0), probes
     )
     assert [item.name for item in conditions] == [
         "database",
@@ -252,8 +254,9 @@ def test_the_gate_reads_database_storage_and_disk_in_admission_order(
     assert passed == [probes]
 
 
-def test_with_nothing_configured_the_database_is_the_refusal(tmp_path: Path) -> None:
-    conditions = asyncio.run(installation_conditions(None, None, ReadinessSettings(tmp_path, 0)))
+@pytest.mark.asyncio
+async def test_with_nothing_configured_the_database_is_the_refusal(tmp_path: Path) -> None:
+    conditions = await installation_conditions(None, None, ReadinessSettings(tmp_path, 0))
     assert [item.code for item in conditions] == [
         "database_not_configured",
         "schema_unknown",
@@ -266,12 +269,13 @@ def test_with_nothing_configured_the_database_is_the_refusal(tmp_path: Path) -> 
     assert refusal is not None and refusal.code == "database_not_configured"
 
 
-def test_a_lent_connection_is_the_one_its_holder_lent() -> None:
+@pytest.mark.asyncio
+async def test_a_lent_connection_is_the_one_its_holder_lent() -> None:
     async def borrowed() -> object:
         async with LentConnection(CONNECTION).connection() as connection:
             return connection
 
-    assert asyncio.run(borrowed()) is CONNECTION
+    assert await borrowed() is CONNECTION
 
 
 # The worker's maintenance step

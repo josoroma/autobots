@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from api_session import SETTINGS, Membership, client, headers, token
 from autobots.adapters.tool_registry import catalog, catalog_registry
 from autobots.api.app import create_app
 from autobots.api.resources import AppResources
@@ -15,7 +16,6 @@ from autobots.application.tool_gateway import Refused, resolve
 from autobots.domain.stops import GatewayCode
 from autobots.domain.tool_catalog import PLANNED_TOOLS
 from autobots.domain.tools import OperationClass
-from test_api import SETTINGS, Membership, client, headers, token
 
 FAKE_TOKEN = "zz_fixture_q8w7e6r5t4y3u2i1"
 FAKE_REPOSITORY = "zq9xv7-fixture/kq4wm2-fixture"

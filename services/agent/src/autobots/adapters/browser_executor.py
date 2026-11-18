@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from autobots.application.tool_definitions import ToolScope
 
 # Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool, browser_page
-# and tests/db/browser_executor_check.py import them from this module.
+# and tests/db/checks/browser_executor_check.py import them from this module.
 __all__ = [
     "LABEL",
     "BrowserExecutor",

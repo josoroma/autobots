@@ -1,6 +1,5 @@
 """US-14.16 offline: the live trial's refusal to repeat, its model path and its records."""
 
-import asyncio
 import json
 import os
 from pathlib import Path
@@ -58,7 +57,8 @@ def test_a_recorded_trial_refuses_to_run_again_without_the_owner(tmp_path: Path)
     refuse_repeat(tmp_path, owner_requested=True)
 
 
-def test_each_step_goes_to_sol_through_the_shared_factory_with_tools_required() -> None:
+@pytest.mark.asyncio
+async def test_each_step_goes_to_sol_through_the_shared_factory_with_tools_required() -> None:
     bodies: list[dict[str, Any]] = []
 
     def handle(request: httpx.Request) -> httpx.Response:
@@ -106,7 +106,7 @@ def test_each_step_goes_to_sol_through_the_shared_factory_with_tools_required() 
     )
     assert route.worst_case_micro_usd > 0
     bound = model.bind_tools(ACTION_TOOLS, tool_choice="any")
-    reply = asyncio.run(bound.ainvoke([HumanMessage("read")]))
+    reply = await bound.ainvoke([HumanMessage("read")])
     assert reply.tool_calls[0]["name"] == "finish"
     body = bodies[0]
     assert body["model"] == SOL.wire_id and body["tool_choice"] == "required"

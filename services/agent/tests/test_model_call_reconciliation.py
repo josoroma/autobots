@@ -6,9 +6,10 @@ lock, the oldest open call is locked, reconciled from the reported charge and th
 repeat replays the first answer without locking anything again. No database or model is used.
 """
 
-import asyncio
 import json
 from uuid import UUID
+
+import pytest
 
 from autobots.application.reconciliation import reconcile_oldest_uncertain_call
 from autobots.application.runs import request_hash
@@ -159,7 +160,8 @@ def test_effect_evidence_for_a_run_not_in_this_workspace_is_not_found(
     assert steps(api_client) == ["connect", "run exists", "release"]
 
 
-def test_the_reconciliation_runs_without_http() -> None:
+@pytest.mark.asyncio
+async def test_the_reconciliation_runs_without_http() -> None:
     """A worker, a tool or a script settles a call through the same function."""
     database = FakeDatabase([])
     database.answer(OLDEST, (CALL,))
@@ -176,5 +178,5 @@ def test_the_reconciliation_runs_without_http() -> None:
                 charged_micro_usd=1200,
             )
 
-    assert asyncio.run(settle()) == 1
+    assert await settle() == 1
     assert database.log[1] == "begin" and database.log[-2:] == ["commit", "release"]

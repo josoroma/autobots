@@ -7,7 +7,7 @@ import { objectOf, runDbHelper } from "./support/db-helpers.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { readRun } from "./support/runs.ts";
 
-// US-15.17, PRD-Studio RN-04: the side panel on Runs. tests/db/task_timing_check.py arranges a running
+// US-15.17, PRD-Studio RN-04: the side panel on Runs. tests/db/checks/task_timing_check.py arranges a running
 // run with one done, one current and one to-do task and three metered calls, and a cancelled run.
 const panelRun = arranged({
   id: "AUTOBOTS_TEST_PANEL_RUN",

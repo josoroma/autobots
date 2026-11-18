@@ -116,7 +116,7 @@ async def qualify(repository: str, token: str) -> tuple[int, dict]:
     failed = [case['id'] for case in cases if not case['passed']]
     report = {'schema_version': 'autobots.github-connector/v1', 'completed_at_utc': datetime.now(UTC).isoformat(), 'evidence_class': 'live',
               'repository': repository, 'issue': number, 'cases': cases, 'failed': failed,
-              'not_established': ['H1', 'product acceptance', 'a real lost acknowledgment, which only the fake transport arranges', 'the gateway, in tests/db/connector_check.py']}
+              'not_established': ['H1', 'product acceptance', 'a real lost acknowledgment, which only the fake transport arranges', 'the gateway, in tests/db/checks/connector_check.py']}
     return (1 if failed else 0), report
 
 
@@ -421,7 +421,7 @@ async def studio_apply(repository: str, token: str, authorization: dict, review:
               'issue': issue_number, 'pull_request': pull_number, 'branch': branch, 'outputs': outputs,
               'requests_used': transport.used, 'request_cap': cap, 'requests': list(ledger['requests']),
               'cases': cases, 'failed': failed, 'model_calls': 0,
-              'not_established': ['H1', 'product acceptance', 'the gateway, approvals table and worker, which tests/db/pull_request_check.py covers on fakes',
+              'not_established': ['H1', 'product acceptance', 'the gateway, approvals table and worker, which tests/db/checks/pull_request_check.py covers on fakes',
                                   'a real lost reply, which only a fake transport arranges', 'a moved base live, which the fake covers']}
     return (1 if failed else 0), report
 

@@ -436,13 +436,16 @@ def test_run_job_inputs_goal_event_and_receipt_commit_in_one_transaction(way: st
 
 
 @pytest.mark.parametrize("way", sorted(ADMISSIONS))
-def test_a_repeat_with_the_same_content_replays_the_receipt_and_writes_nothing(way: str) -> None:
+@pytest.mark.asyncio
+async def test_a_repeat_with_the_same_content_replays_the_receipt_and_writes_nothing(
+    way: str,
+) -> None:
     stored = (
         FINGERPRINTS["routine_expert"],
         {"run_id": str(REPLAYED), "version": 4, "status": "running"},
     )
     connection = Connection(receipt=stored)
-    result = asyncio.run(ADMISSIONS[way](connection, "routine_expert"))
+    result = await ADMISSIONS[way](connection, "routine_expert")
     assert (result.run_id, result.version, result.status, result.replayed) == (
         REPLAYED,
         4,
@@ -453,48 +456,50 @@ def test_a_repeat_with_the_same_content_replays_the_receipt_and_writes_nothing(w
 
 
 @pytest.mark.parametrize("way", sorted(ADMISSIONS))
-def test_a_repeat_with_other_content_is_refused(way: str) -> None:
+@pytest.mark.asyncio
+async def test_a_repeat_with_other_content_is_refused(way: str) -> None:
     stored = (FINGERPRINTS["api_goal"], {"run_id": str(REPLAYED), "version": 1, "status": "queued"})
     connection = Connection(receipt=stored)
     with pytest.raises(IdempotencyConflict):
-        asyncio.run(ADMISSIONS[way](connection, "routine_expert"))
+        await ADMISSIONS[way](connection, "routine_expert")
     assert connection.log[-1] == ("rollback", ())
 
 
 @pytest.mark.parametrize("way", sorted(ADMISSIONS))
 @pytest.mark.parametrize("previous", [None, "running"])
-def test_only_an_ended_run_in_the_workspace_can_be_continued(
+@pytest.mark.asyncio
+async def test_only_an_ended_run_in_the_workspace_can_be_continued(
     way: str, previous: str | None
 ) -> None:
     connection = Connection(previous=previous)
     with pytest.raises(LinkRefused):
-        asyncio.run(ADMISSIONS[way](connection, "api_continue"))
+        await ADMISSIONS[way](connection, "api_continue")
     assert not [statement for statement, _ in connection.log if statement.startswith("insert")]
 
 
 @pytest.mark.parametrize("way", sorted(ADMISSIONS))
-def test_a_repeat_needs_a_goal_run_of_its_own_before_anything_is_locked(way: str) -> None:
+@pytest.mark.asyncio
+async def test_a_repeat_needs_a_goal_run_of_its_own_before_anything_is_locked(way: str) -> None:
     connection = Connection(stored_goal=None)
     with pytest.raises(LinkRefused):
-        asyncio.run(ADMISSIONS[way](connection, "api_repeat"))
+        await ADMISSIONS[way](connection, "api_repeat")
     assert [statement for statement, _ in connection.log if statement == "begin"] == []
 
 
-def test_a_childs_inheritance_replaces_any_binding_policy_and_started_by() -> None:
+@pytest.mark.asyncio
+async def test_a_childs_inheritance_replaces_any_binding_policy_and_started_by() -> None:
     connection = Connection()
     other = SimpleNamespace(
         session_id=None, expert_id=None, version=None, instructions="ignored", tools={}
     )
-    asyncio.run(
-        admit_run(
-            connection,
-            workspace_id=WORKSPACE,
-            idempotency_key="key-child-with-extras",
-            **caller_shapes()["assignment_child"],
-            policy=resolve_role_policy(),
-            binding=other,
-            started_by=PERSON,
-        )
+    await admit_run(
+        connection,
+        workspace_id=WORKSPACE,
+        idempotency_key="key-child-with-extras",
+        **caller_shapes()["assignment_child"],
+        policy=resolve_role_policy(),
+        binding=other,
+        started_by=PERSON,
     )
     row = connection.run_row()
     assert connection.fingerprint() == FINGERPRINTS["assignment_child"]
@@ -505,12 +510,11 @@ def test_a_childs_inheritance_replaces_any_binding_policy_and_started_by() -> No
     assert connection.goal_spec()["instructions"] == "Child instructions"
 
 
-def test_a_run_needs_a_role_policy_or_an_inheritance_and_writes_nothing_without() -> None:
+@pytest.mark.asyncio
+async def test_a_run_needs_a_role_policy_or_an_inheritance_and_writes_nothing_without() -> None:
     options = dict(caller_shapes()["api_goal"])
     del options["policy"]
     connection = Connection()
     with pytest.raises(ValueError, match="a run needs a role policy or an inherited one"):
-        asyncio.run(
-            admit_run(connection, workspace_id=WORKSPACE, idempotency_key="key-none", **options)
-        )
+        await admit_run(connection, workspace_id=WORKSPACE, idempotency_key="key-none", **options)
     assert not [statement for statement, _ in connection.log if statement.startswith("insert")]

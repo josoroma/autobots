@@ -43,7 +43,6 @@ ANN401_BASELINE = frozenset({
     'tests/test_browsing_tool.py',
     'tests/test_contracts.py',
     'tests/test_execution_contract.py',
-    'tests/test_final_review.py',
     'tests/test_github_issues.py',
     'tests/test_github_reads.py',
     'tests/test_model_attempts.py',

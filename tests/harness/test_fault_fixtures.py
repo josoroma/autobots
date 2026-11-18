@@ -1,6 +1,7 @@
 """The fault set stays complete, and the outcome rule cannot be satisfied by a wrong failure."""
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 import sys
@@ -78,11 +79,15 @@ class StateChecker(unittest.TestCase):
                 self.assertIn(marker, result.stdout)
 
     def test_every_canonical_state_is_known_to_the_checker(self):
-        states = {'queued', 'running', 'waiting_input', 'waiting_approval', 'paused', 'verifying', 'cancelling',
-                  'succeeded', 'failed', 'cancelled'}
-        source = (STATE / 'check.py').read_text()
-        for state in states:
-            self.assertIn(f'"{state}"', source)
+        """The checker knows exactly the states of the generated RunStatus, read from the contract rather than typed
+        here, in both directions (THRN-13). The checker's main() runs at import, so its sets are read as literals."""
+        contract = json.loads((ROOT / 'contracts/generated/openapi.json').read_text())
+        run_status = set(contract['components']['schemas']['RunStatus']['enum'])
+        values = {target.id: ast.literal_eval(node.value) for node in ast.parse((STATE / 'check.py').read_text()).body
+                  if isinstance(node, ast.Assign) for target in node.targets
+                  if isinstance(target, ast.Name) and target.id in ('TERMINAL', 'PERMITTED')}
+        known = values['TERMINAL'] | set(values['PERMITTED']) | set().union(*values['PERMITTED'].values())
+        self.assertEqual(known, run_status)
         self.assertEqual(json.loads((STATE / 'good.json').read_text())['states'][-1], 'succeeded')
 
 

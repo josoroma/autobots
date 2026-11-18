@@ -90,7 +90,7 @@ def arrange(destination: Path, *, fixture: Path = FIXTURE, root: Path = ROOT) ->
             path = work / name
             path.write_text(path.read_text(encoding='utf-8') + appendix, encoding='utf-8')
         subprocess.run([sys.executable, str(SPECS_SCRIPT), 'render', '--project-root', str(work),
-                        '--path', 'SPECS.md'], check=True, capture_output=True, text=True,
+                        '--path', 'SPECS.md'], check=True, capture_output=True, text=True, timeout=60,
                        env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
         work.rename(target)
     return target

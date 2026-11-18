@@ -53,6 +53,7 @@ from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
     ModelRole,
     UnknownModelProfile,
+    resolve_role_policy,
 )
 from fake_openrouter import (
     ARRANGED_KEY,
@@ -118,7 +119,8 @@ def test_a_drifted_mapping_is_unavailable() -> None:
 # The catalog cache
 
 
-def test_the_catalog_is_kept_until_its_refresh_is_due() -> None:
+@pytest.mark.asyncio
+async def test_the_catalog_is_kept_until_its_refresh_is_due() -> None:
     fetched: list[int] = []
     clock = [NOW]
 
@@ -136,10 +138,11 @@ def test_the_catalog_is_kept_until_its_refresh_is_due() -> None:
         await cache.current()
         assert len(fetched) == 2
 
-    asyncio.run(go())
+    await go()
 
 
-def test_a_failed_refresh_keeps_the_last_catalog_and_its_true_age() -> None:
+@pytest.mark.asyncio
+async def test_a_failed_refresh_keeps_the_last_catalog_and_its_true_age() -> None:
     answers: list[Any] = [catalog_payload(), None]
     clock = [NOW]
 
@@ -152,23 +155,25 @@ def test_a_failed_refresh_keeps_the_last_catalog_and_its_true_age() -> None:
         clock[0] = NOW + CATALOG_REFRESH
         assert (await cache.current()).retrieved_at == first.retrieved_at
 
-    asyncio.run(go())
+    await go()
 
 
-def test_no_catalog_at_all_is_unavailable() -> None:
+@pytest.mark.asyncio
+async def test_no_catalog_at_all_is_unavailable() -> None:
     async def fetch() -> None:
         return None
 
     with pytest.raises(ModelUnavailable):
-        asyncio.run(CatalogCache(fetch).current())
+        await CatalogCache(fetch).current()
 
 
-def test_a_malformed_catalog_is_a_failed_refresh_not_a_crash() -> None:
+@pytest.mark.asyncio
+async def test_a_malformed_catalog_is_a_failed_refresh_not_a_crash() -> None:
     async def fetch() -> dict[str, Any]:
         return {"data": ["not an entry"]}
 
     with pytest.raises(ModelUnavailable):
-        asyncio.run(CatalogCache(fetch).current())
+        await CatalogCache(fetch).current()
 
 
 # Attempts, through the real adapter and SDK
@@ -236,6 +241,7 @@ def test_a_stale_catalog_stops_the_attempt_before_any_key_is_read() -> None:
     # Read six minutes ago. The refresh due now fails, which leaves only that copy to age out.
     moments = [datetime.now(UTC) - timedelta(minutes=6)]
     catalog = CatalogCache(fetch, lambda: moments[-1])
+    # asyncio.run in a sync test: `invoke` below runs its own event loop, which can't nest.
     asyncio.run(catalog.current())
     moments.append(datetime.now(UTC))
     source = source_with(fake, [ARRANGED_KEY], catalog=catalog)
@@ -358,6 +364,7 @@ def test_binding_reserves_the_worst_case_and_routes_by_the_rate_and_tier(
     assert route.tier_from_tokens == 272_000
     monkeypatch.setattr(InferenceSource, "open_attempt", recording)
     with pytest.raises(ProviderFailure):
+        # asyncio.run in a sync test: `bind_with` runs its own event loop, which can't nest.
         asyncio.run(factory().ainvoke([HumanMessage("hello")]))
     assert seen == [777]
 
@@ -436,13 +443,14 @@ def test_a_real_attempt_returns_the_client_and_what_it_used(
     assert client.model_name == DEEPSEEK_WIRE_ID
 
 
-def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_read() -> None:
+@pytest.mark.asyncio
+async def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_read() -> None:
     async def fetch() -> dict[str, Any]:
         return catalog_payload(pricing=None)
 
     source = InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
     with pytest.raises(ProviderFailure) as caught:
-        asyncio.run(source.open_attempt(uuid4(), frozen_policy(snapshot())))
+        await source.open_attempt(uuid4(), frozen_policy(snapshot()))
     assert caught.value.failure is FailureClass.COST_UNAVAILABLE
 
 
@@ -452,16 +460,15 @@ def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_read() ->
 @pytest.mark.parametrize(
     "raised", [PermissionError("arranged"), UnicodeDecodeError("utf-8", b"x", 0, 1, "arranged")]
 )
-def test_an_unreadable_configuration_refuses_a_job_rather_than_looping(
+@pytest.mark.asyncio
+async def test_an_unreadable_configuration_refuses_a_job_rather_than_looping(
     monkeypatch: pytest.MonkeyPatch, raised: Exception
 ) -> None:
     async def intent(*_: Any) -> str:
         raise raised
 
     monkeypatch.setattr(ProviderSettings, "run_intent", intent)
-    _, config = asyncio.run(
-        real_source().bind(Rows(snapshot()), lease(), LoopConfig(route=UNBOUND))
-    )
+    _, config = await real_source().bind(Rows(snapshot()), lease(), LoopConfig(route=UNBOUND))
     assert config.refusal == "credential_unavailable"
 
 
@@ -503,6 +510,7 @@ def test_browsing_binds_the_runs_frozen_researcher_route(monkeypatch: pytest.Mon
     # Its attempts open on the researcher role, reserving what the route says.
     monkeypatch.setattr(InferenceSource, "open_attempt", recording)
     with pytest.raises(ProviderFailure):
+        # asyncio.run in a sync test: `_role_route` runs its own event loop, which can't nest.
         asyncio.run(model.ainvoke([HumanMessage("read")]))
     assert opened == [(ModelRole.RESEARCHER, route.worst_case_micro_usd)]
 
@@ -519,7 +527,8 @@ def test_a_run_without_a_researcher_binding_has_no_browsing_route() -> None:
     assert _role_route(snapshot()) == "route_not_bound"
 
 
-def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tools_required() -> (
+@pytest.mark.asyncio
+async def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tools_required() -> (  # noqa: E501 - the name states the case
     None
 ):
     from autobots.application.browsing_loop import ACTION_TOOLS, admitted_steps
@@ -537,8 +546,8 @@ def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tool
             with admitted_scope():
                 return await handler(request), True
 
-    step = admitted_steps(Admits(), model, "route")  # type: ignore[arg-type]
-    asyncio.run(step([HumanMessage("read")]))
+    step = admitted_steps(Admits(), model, "route")  # type: ignore[arg-type]  # a fake for LoopMiddleware and a placeholder route
+    await step([HumanMessage("read")])
     body = fake.bodies[0]
     assert body["model"] == TERRA_WIRE_ID
     assert [item["function"]["name"] for item in body["tools"]] == [
@@ -546,3 +555,34 @@ def test_a_browsing_step_reaches_the_transport_on_the_researcher_route_with_tool
     ]
     assert body["tool_choice"] == "required"
     assert body["provider"] == {"require_parameters": True, "allow_fallbacks": False}
+
+
+@pytest.mark.asyncio
+async def test_a_price_above_the_reservation_is_refused_before_sending() -> None:
+    async def catalog() -> dict[str, Any]:
+        return catalog_payload(pricing={"prompt": "0.001", "completion": "0.001"})
+
+    source = InferenceSource("postgresql://never", provider_context(), CatalogCache(catalog))
+    policy = resolve_role_policy()
+    assert ModelRole.EXECUTOR in policy.bindings
+    with pytest.raises(ProviderFailure) as refused:
+        await source.open_attempt(uuid4(), policy, reserved_micro_usd=34_560)
+    assert refused.value.failure is FailureClass.COST_UNAVAILABLE
+
+
+@pytest.mark.asyncio
+async def test_each_attempt_passes_its_reservation_on() -> None:
+    """Without this wiring, a fresh price is never compared with what was reserved."""
+    seen: list[int | None] = []
+
+    class Source:
+        async def open_attempt(
+            self, _: Any, __: Any, reserved_micro_usd: int | None = None, **___: Any
+        ) -> Any:
+            seen.append(reserved_micro_usd)
+            raise ProviderFailure(FailureClass.COST_UNAVAILABLE)
+
+    model = AttemptModel(Source(), uuid4(), resolve_role_policy(), reserved_micro_usd=77)  # type: ignore[arg-type]  # a fake InferenceSource with only open_attempt
+    with pytest.raises(ProviderFailure):
+        await model.bind_tools([]).ainvoke([])
+    assert seen == [77]

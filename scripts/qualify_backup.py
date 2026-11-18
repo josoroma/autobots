@@ -169,7 +169,7 @@ def source_content(run: BackupRun, cases: Cases) -> None:
     exited(worker, 30)
     run.pending = ops.admit(run.workspace_a)
     run.master_key.parent.mkdir(parents=True, mode=0o700)
-    seeded = launch([str(root / PYTHON), str(root / 'tests/db/restore_check.py'), 'seed', run.workspace_a, str(run.master_key), FAKE_CREDENTIAL], env=ops.env, timeout=60, label='the credential seed')
+    seeded = launch([str(root / PYTHON), str(root / 'tests/db/checks/restore_check.py'), 'seed', run.workspace_a, str(run.master_key), FAKE_CREDENTIAL], env=ops.env, timeout=60, label='the credential seed')
     cases.arrange('a fake credential sealed with the provider key', seeded)
     cases.check('the source holds real content (arranged credential)', 'finished, paused, queued, a sealed fake key', f'{finished}, {paused}, seed exit {seeded.returncode}', finished and paused and seeded.returncode == 0)
     run.env_file.write_text(env_text(stack) + f'AUTOBOTS_MIGRATOR_PASSWORD={stack.migrator_password}\nAUTOBOTS_RUNTIME_PASSWORD={stack.runtime_password}\n')
@@ -310,7 +310,7 @@ def restore(run: BackupRun, cases: Cases) -> None:
     wrong_provider = run.work / 'wrong-provider.key'
     wrong_provider.write_bytes(secrets.token_bytes(len(run.master_key.read_bytes())))
     wrong_provider.chmod(0o600)
-    run_child_check(cases, root, 'restore_check.py', 'verify', run.workspace_a, str(run.key_dir / 'provider-master.key'), str(backup_dir / 'manifest.json'), expected_sha, str(wrong_provider),
+    run_child_check(cases, root, 'checks/restore_check.py', 'verify', run.workspace_a, str(run.key_dir / 'provider-master.key'), str(backup_dir / 'manifest.json'), expected_sha, str(wrong_provider),
                     label='the restore check', env=restored_ops.env, timeout=240, err_dir=root / ERR_DIR, err_name='restore')
 
 
@@ -343,8 +343,8 @@ def released_restore(run: BackupRun, cases: Cases) -> None:
     restored_stack, restored_ops = run.restored()
     released = restored_stack.sql('delete from app_private.installation_holds;')
     reconciled, _reply = api_call(run.api_port, restored_ops.internal, run.token_a, 'POST', f'/v1/runs/{interrupted}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
-    cancel = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'cancel', run.workspace_a, run.pending], env=restored_ops.env, timeout=60, label='the restored cancel')
-    resume = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', run.workspace_a, interrupted], env=restored_ops.env, timeout=60, label='the restored resume')
+    cancel = launch([str(root / PYTHON), str(root / 'tests/db/arrange/run_commands.py'), 'cancel', run.workspace_a, run.pending], env=restored_ops.env, timeout=60, label='the restored cancel')
+    resume = launch([str(root / PYTHON), str(root / 'tests/db/arrange/run_commands.py'), 'resume', run.workspace_a, interrupted], env=restored_ops.env, timeout=60, label='the restored resume')
     run.marker.unlink(missing_ok=True)
     worker = restored_ops.fixture_worker('restored-resume-worker', 0, 30, run.marker, 'resume')
     resumed = wait(lambda: restored_ops.sql(f"select status from public.runs where id = '{interrupted}';") == 'succeeded', 60)

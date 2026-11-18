@@ -6,7 +6,7 @@ import { objectOf } from "./support/db-helpers.ts";
 import { need } from "./support/env.ts";
 import { expect, test, type StartDbStream } from "./support/fixtures.ts";
 
-// US-15.24, PRD-Studio ST-01 and Decision 0022 D4. tests/db/result_stream_live.py admits a run in the
+// US-15.24, PRD-Studio ST-01 and Decision 0022 D4. tests/db/arrange/result_stream_live.py admits a run in the
 // ops-n workspace, prints its ID, waits for the page, then writes its result with a streaming scripted
 // model whose pieces are spaced out, and prints the outcome once the result is stored.
 const parseOutcome = objectOf({

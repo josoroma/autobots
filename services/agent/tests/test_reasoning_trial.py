@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import logging.config
 from pathlib import Path
 from typing import Any
 
@@ -210,13 +211,14 @@ def test_earlier_spend_counts_against_the_shared_cap(tmp_path: Path) -> None:
     assert route.sent == []
 
 
-def test_the_shared_cap_counts_the_reasoning_rate(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_the_shared_cap_counts_the_reasoning_rate(tmp_path: Path) -> None:
     """A route can bill reasoning above its completion rate (POPS-01, Decision 0009)."""
     worst = worst_case_cost(Pricing(1_000_000, 20_000_000), CONTEXT_TOKENS, OUTPUT_TOKENS)
     route = FakeRoute({"reasoning_details": DETAILS})
     book = ledger(tmp_path, cap=worst * trial.CALLS_PER_TRIAL - 1)
     payload = catalog(internal_reasoning="0.00002")
-    result = asyncio.run(trial.run_trial(TERRA, 1, KEY, payload, book, route.http))
+    result = await trial.run_trial(TERRA, 1, KEY, payload, book, route.http)
     assert result.outcome == "not_run"
     assert route.sent == []
     assert book.entries == []
@@ -229,11 +231,14 @@ def test_the_shared_cap_counts_the_reasoning_rate(tmp_path: Path) -> None:
         pytest.param({"request": "-1"}, id="variable-request-fee"),
     ],
 )
-def test_a_route_with_no_bounded_price_is_not_run(tmp_path: Path, terra: dict[str, str]) -> None:
+@pytest.mark.asyncio
+async def test_a_route_with_no_bounded_price_is_not_run(
+    tmp_path: Path, terra: dict[str, str]
+) -> None:
     route = FakeRoute({"reasoning_details": DETAILS})
     book = ledger(tmp_path)
-    results = asyncio.run(
-        trial.run_all(KEY, catalog(**terra), book, 1, route.http, [ModelProfileId.TERRA])
+    results = await trial.run_all(
+        KEY, catalog(**terra), book, 1, route.http, [ModelProfileId.TERRA]
     )
     assert [(result.outcome, result.reason) for result in results] == [("not_run", "Refused")]
     assert route.sent == []
@@ -249,7 +254,8 @@ def test_a_call_with_no_reported_charge_stays_held_under_one_name(tmp_path: Path
     assert book.committed() == WORST * trial.CALLS_PER_TRIAL
 
 
-def test_a_cancelled_call_stays_held_as_uncertain_and_the_cancellation_propagates(
+@pytest.mark.asyncio
+async def test_a_cancelled_call_stays_held_as_uncertain_and_the_cancellation_propagates(
     tmp_path: Path,
 ) -> None:
     book = ledger(tmp_path)
@@ -258,7 +264,7 @@ def test_a_cancelled_call_stays_held_as_uncertain_and_the_cancellation_propagate
         raise asyncio.CancelledError
 
     with pytest.raises(asyncio.CancelledError):
-        asyncio.run(trial._paid_call(book, "arranged", WORST, send))
+        await trial._paid_call(book, "arranged", WORST, send)
     assert [(entry["state"], entry["reported"]) for entry in book.entries] == [("uncertain", None)]
     assert book.committed() == WORST
 
@@ -299,7 +305,8 @@ def test_the_shared_ledger_does_not_depend_on_the_working_directory(
     assert opened == [elsewhere if given == "absolute" else shared]
 
 
-def test_a_failed_call_stays_held_at_its_worst_case(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_a_failed_call_stays_held_at_its_worst_case(tmp_path: Path) -> None:
     def refuse(_: httpx.Request) -> httpx.Response:
         return httpx.Response(500, json={"error": {"code": 500, "message": "arranged"}})
 
@@ -310,19 +317,20 @@ def test_a_failed_call_stays_held_at_its_worst_case(tmp_path: Path) -> None:
         )
 
     book = ledger(tmp_path)
-    result = asyncio.run(trial.run_trial(TERRA, 1, KEY, catalog(), book, http))
+    result = await trial.run_trial(TERRA, 1, KEY, catalog(), book, http)
     assert result.outcome == "not_exercised"
     assert book.committed() == WORST
     assert book.entries[0]["state"] == "uncertain"
 
 
-def test_no_metadata_or_key_reaches_the_report_or_the_log(
+@pytest.mark.asyncio
+async def test_no_metadata_or_key_reaches_the_report_or_the_log(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.DEBUG)
     route = FakeRoute({"reasoning": f"{MARKER}-text", "reasoning_details": DETAILS})
     book = ledger(tmp_path)
-    results = asyncio.run(trial.run_all(KEY, catalog(), book, 1, route.http))
+    results = await trial.run_all(KEY, catalog(), book, 1, route.http)
     assert {result.outcome for result in results} == {"survived"}
     assert {result.profile for result in results} == set(ModelProfileId)
     trial.write_report(tmp_path, results, book, {"usage": 1.0}, {"usage": 1.1})
@@ -332,7 +340,8 @@ def test_no_metadata_or_key_reaches_the_report_or_the_log(
     assert MARKER not in caplog.text
 
 
-def test_key_usage_keeps_only_the_three_figures() -> None:
+@pytest.mark.asyncio
+async def test_key_usage_keeps_only_the_three_figures() -> None:
     def handle(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
@@ -351,7 +360,7 @@ def test_key_usage_keeps_only_the_three_figures() -> None:
             base_url="https://x.invalid", transport=httpx.MockTransport(handle)
         )
 
-    assert asyncio.run(trial.key_usage(KEY, client)) == {
+    assert await trial.key_usage(KEY, client) == {
         "usage": 0.5,
         "limit": 1,
         "limit_remaining": 0.5,
@@ -364,3 +373,33 @@ def test_nothing_is_sent_without_paid(
     monkeypatch.setattr("sys.argv", ["reasoning_trial"])
     assert trial.main() == 0
     assert "not_sent" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_a_network_error_reading_usage_isnt_reported_as_a_figure() -> None:
+    from autobots.operations.reasoning_trial import key_usage
+
+    def client() -> httpx.AsyncClient:
+        def fail(_: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("no route")
+
+        return httpx.AsyncClient(base_url="https://x.invalid", transport=httpx.MockTransport(fail))
+
+    from pydantic import SecretStr
+
+    assert await key_usage(SecretStr("sk-or-arranged"), client) is None
+
+
+@pytest.mark.asyncio
+async def test_a_usage_reply_that_isnt_json_isnt_reported_as_a_figure() -> None:
+    from pydantic import SecretStr
+
+    from autobots.operations.reasoning_trial import key_usage
+
+    def client() -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url="https://x.invalid",
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, text="<html>")),
+        )
+
+    assert await key_usage(SecretStr("sk-or-arranged"), client) is None

@@ -183,8 +183,9 @@ def test_arbitrary_cycles_are_rejected() -> None:
             link("b", "false", "out", "value"),
         ],
     }
-    errors = codes(graph)
-    assert "cycle_not_supported" in errors or "input_linked_twice" in errors
+    # Node a's input is linked twice, which validation reports before the cycle
+    # (tests/test_workflow_validation_order.py), so the code is exact, not either one (PTST-17).
+    assert codes(graph) == ["input_linked_twice"]
     graph["links"][0] = link("in", "value", "out", "value")
     graph["links"].pop(3)
     assert codes(graph) == ["cycle_not_supported"]
@@ -325,7 +326,8 @@ def test_a_join_cannot_mix_a_foreach_with_an_outside_source() -> None:
 def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
     """A code that would release or suspend the run stops the node, which runs again on resume.
     parent_not_running is what a pause inside an assignment's creation returns (PPRD-03), and
-    tests/db/blocker_check.py reproduces that race. A code that fails the run fails the node."""
+    tests/db/checks/pause_cancel_and_fencing_check.py reproduces that race. A code that fails the
+    run fails the node."""
 
     class Returning:
         def __init__(self, result: ToolResult) -> None:
@@ -336,7 +338,8 @@ def test_a_stopped_agent_node_runs_again_instead_of_failing() -> None:
 
     def run(outcome: ToolOutcome, code: str | None, output: dict[str, Any] | None = None) -> Any:
         gateway = Returning(ToolResult(outcome, code, output))
-        # A stand-in gateway, with no connection or scope, as `call_tool` only passes them on.
+        # A stand-in gateway, with no connection or scope, as `call_tool` only passes them on. A
+        # sync helper of a sync test, so it runs its own loop.
         return asyncio.run(call_tool(gateway, None, None, "t", {}))  # type: ignore[arg-type]
 
     stops = (
@@ -402,7 +405,8 @@ def test_a_json_value_still_cant_reach_a_string_input_through_an_approval() -> N
     assert [error.code for error in validate_graph(graph)] == ["link_type_mismatch"]
 
 
-def test_equal_foreach_items_are_separate_operations() -> None:
+@pytest.mark.asyncio
+async def test_equal_foreach_items_are_separate_operations() -> None:
     seen: list[Any] = []
 
     class Recording:
@@ -415,7 +419,7 @@ def test_equal_foreach_items_are_separate_operations() -> None:
     execution = BlockExecution(Recording(), None, scope, {})  # type: ignore[arg-type]  # a stand-in gateway and no connection: the agent block only passes them on
     for iteration in (0, 1):
         step = Step(f"a#{iteration}", "a", iteration, "run", {"goal": "x"})
-        asyncio.run(run_block(execution, agent, step))
+        await run_block(execution, agent, step)
     assert seen == ["a#0", "a#1"]
     tool = SimpleNamespace(tool_id="t", version=1)
     arguments = AssignSpecialist(expert_id=str(uuid4()), goal="x")

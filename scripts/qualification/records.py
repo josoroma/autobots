@@ -2,7 +2,7 @@
 
 Verification classes and model transports are DH-09.2's, which docs/engineering/evidence/README.md
 extends with local_runtime (PRD-Development-Harness DH-09.2, SCRP-10). A child check prints ChildCase
-records (tests/db/checklib.py); a qualifier records CaseRecord ones through Cases and writes them in a
+records (tests/db/fixtures/checklib.py); a qualifier records CaseRecord ones through Cases and writes them in a
 QualificationReport. Each record keeps the DH-W04 expected-and-observed shape.
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ StepClass = TypedDict('StepClass', {'class': VerificationClass, 'model_transport
 
 
 class ChildCase(TypedDict):
-    """One case a tests/db check printed (tests/db/checklib.py Case)."""
+    """One case a tests/db check printed (tests/db/fixtures/checklib.py Case)."""
 
     id: str
     expected: str

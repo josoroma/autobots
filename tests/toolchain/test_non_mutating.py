@@ -76,7 +76,7 @@ class NoPreparedEnvironment(unittest.TestCase):
 
 
 class PreparedCopy(unittest.TestCase):
-    """N1, N2, N4, N5 and N6 on one prepared copy. Test names set the order: drift goes last."""
+    """N1, N2, N4, N5 and N6 on one prepared copy. A test that changes it restores it, so order does not matter."""
 
     root: Path
 
@@ -184,8 +184,9 @@ class PreparedCopy(unittest.TestCase):
         self.assertEqual(runtime['node']['through_package_script'], f"v{runtime['node']['pin']}")
         self.assertEqual(runtime['pnpm']['through_corepack'], runtime['pnpm']['pin'])
 
-    def test_zz_n4_drifted_environment_is_not_repaired(self) -> None:
-        # Last, because it leaves this copy's environment changed.
+    def test_n4_drifted_environment_is_not_repaired(self) -> None:
+        # The copy is bootstrapped again afterwards, so no other test sees the drift, whatever the order (THRN-16).
+        self.addCleanup(support.bootstrap_copy, self.root)
         removed = support.uv_pip(self.root, 'uninstall', 'idna')
         self.assertEqual(removed.returncode, 0, removed.stderr)
         before = self.state()

@@ -5,7 +5,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -200,3 +200,9 @@ def test_generation_needs_no_service_or_credential() -> None:
     schemas = openapi_document()["components"]["schemas"]
     assert {"RunSummary", "RunEvent", "RunStatus", "ErrorResponse"} <= set(schemas)
     assert schemas["RunSummary"]["additionalProperties"] is False
+
+
+def test_a_goal_can_be_left_out_only_when_continuing() -> None:
+    assert RunRequest.model_validate({"continues_run_id": str(uuid4())}).goal_text is None
+    with pytest.raises(ValueError, match="goal_text"):
+        RunRequest.model_validate({"limit_micro_usd": 1})

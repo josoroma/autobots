@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import harness_lib  # noqa: E402
 import verify  # noqa: E402
+from harness_support import git as fixture_git  # noqa: E402
 from qualification import profiles  # noqa: E402
 from toolchain import Step, Unavailable  # noqa: E402
 
@@ -42,12 +43,12 @@ class Profiles(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
-        git = ['git', '-C', str(self.root), '-c', 'user.name=t', '-c', 'user.email=t@invalid', '-c', 'commit.gpgsign=false']
         (self.root / '.gitignore').write_text('.checks/\n')
         (self.root / 'services/agent').mkdir(parents=True)
         (self.root / 'services/agent/code.py').write_text('x = 1\n')
+        # The shared hardened recipe: no global or system Git configuration reaches the fixture (THRN-08).
         for arguments in (('init', '-q'), ('add', '-A'), ('commit', '-q', '-m', 'fixture')):
-            subprocess.run([*git, *arguments], check=True, capture_output=True)
+            fixture_git(self.root, *arguments)
 
     def run_steps(self, profile: str, steps: list[Step], left_out: list[dict] | None = None) -> int:
         def plan(_root, _profile, _changed):
@@ -122,7 +123,7 @@ class Profiles(unittest.TestCase):
                  ('pnpm-lock.yaml',): both,
                  ('scripts/verify.py',): both,
                  ('packages/db-types/src/generated.ts',): frozenset(),
-                 ('tests/db/seeds/fixtures.sql',): frozenset(),
+                 ('tests/db/sql/h1/seeds/fixtures.sql',): frozenset(),
                  ('contracts/generated/a.json',): both}
         for changed, expected in cases.items():
             with self.subTest(changed=changed):
@@ -258,8 +259,7 @@ class Profiles(unittest.TestCase):
         self.assertEqual(self.run_steps('fast', [python_step(self.root, 'mypy', 'pass')]), 0)
         self.assertEqual(harness_lib.scope_paths(self.root), [])
         (self.root / 'services/agent/code.py').write_text('broken\n')
-        git = ['git', '-C', str(self.root), '-c', 'user.name=t', '-c', 'user.email=t@invalid', '-c', 'commit.gpgsign=false']
-        subprocess.run([*git, 'commit', '-qam', 'broken'], check=True, capture_output=True)
+        fixture_git(self.root, 'commit', '-qam', 'broken')
         self.assertEqual(harness_lib.scope_paths(self.root), ['services/agent/code.py'])
         chosen = verify.selected_steps('fast', sorted(profiles.FULL_CHECKS), harness_lib.scope_paths(self.root))
         self.assertEqual(chosen, set(verify.PYTHON_STEPS))
@@ -339,6 +339,16 @@ class Profiles(unittest.TestCase):
         (self.root / '.checks/verify.lock').write_text('1')
         with mock.patch('sys.stderr'):
             self.assertEqual(verify.run_profile(self.root, 'harness', base_checks=harness_records), 2)
+
+
+class UnknownProfile(unittest.TestCase):
+    """Moved from test_hooks.py, which tested the hook dispatcher (THRN-03)."""
+
+    def test_unknown_profile_is_not_a_pass(self):
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify.py'), '--profile', 'nonexistent'],
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 """Precedence, encryption and secret handling, on fixtures. Real rows run in scripts/app_db.py."""
 
-import asyncio
 import json
 import logging
 import pickle
@@ -129,7 +128,8 @@ class OneRow(ScriptedConnection):
         super().__init__([row])
 
 
-def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -> None:
     """The store translates the cipher's failure itself, so its callers handle only its own
     errors, and a missing or wrong key with encrypted rows stays an error (refactor plan R-41,
     POPS-09, SP-007)."""
@@ -145,7 +145,7 @@ def test_a_row_this_master_key_cant_open_is_unreadable_storage(tmp_path: Path) -
         "tag": sealed.tag,
     }
     with pytest.raises(CredentialUnreadable) as caught:
-        asyncio.run(ProviderCredentialStore(OneRow(row), path).load_active(workspace))
+        await ProviderCredentialStore(OneRow(row), path).load_active(workspace)
     assert isinstance(caught.value, CredentialStorageUnavailable)
     assert caught.value.code == "credential_storage_unavailable"
     assert isinstance(caught.value.__cause__, CredentialDecryptionError)

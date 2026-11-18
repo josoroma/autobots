@@ -2,7 +2,7 @@
 
 A child runs with the service's interpreter and exactly the arguments, environment, timeout and
 directory its qualifier gives it. Its cases are replayed only from a last stdout line that parses as
-`{"cases": [...]}` (tests/db/checklib.py). A child that could not start, outlived its timeout, exited
+`{"cases": [...]}` (tests/db/fixtures/checklib.py). A child that could not start, outlived its timeout, exited
 non-zero, printed partial output, printed after its report or printed no report adds exactly one failed
 case of its own and never raises, so a check that could not run stays visible as failed
 (PRD-Development-Harness DH-09.2). Cases a failed child printed before it stopped are kept (TDBC-04),
@@ -24,8 +24,11 @@ from qualification.errors import Unavailable
 from qualification.records import Cases, ChildCase, ChildReport
 
 CHECK_PYTHON = Path('services/agent/.venv/bin/python')
+# Each child names its script under here with its folder: `checks/`, `arrange/` or `workers/` (tests/db/README.md).
 CHECKS = Path('tests/db')
 SERVICE_SOURCE = Path('services/agent/src')
+# The modules the checks, workers and arrangements import, such as checklib (tests/db/README.md, TDBC-09).
+DB_FIXTURES = Path('tests/db/fixtures')
 CHILD_CASE_FIELDS = frozenset({'id', 'expected', 'observed', 'passed'})
 # The end of a failed child's stderr holds its exception; Cases keeps the first 400 characters it is shown.
 STDERR_SHOWN = 380
@@ -45,15 +48,17 @@ def tool_env() -> dict[str, str]:
 
 
 def service_env(root: Path, database_url: str, **extra: str) -> dict[str, str]:
-    """A child's environment: no inherited credential, the given database URL and the service's source."""
-    return {**tool_env(), 'AUTOBOTS_DATABASE_URL': database_url, **extra, 'PYTHONPATH': str(root / SERVICE_SOURCE),
-            'PYTHONDONTWRITEBYTECODE': '1'}
+    """A child's environment: no inherited credential, the given database URL, and the service's source and the
+    database checks' fixtures on its path. A worker or browser helper a child starts inherits that path."""
+    return {**tool_env(), 'AUTOBOTS_DATABASE_URL': database_url, **extra,
+            'PYTHONPATH': os.pathsep.join((str(root / SERVICE_SOURCE), str(root / DB_FIXTURES))), 'PYTHONDONTWRITEBYTECODE': '1'}
 
 
 @dataclass(frozen=True)
 class Child:
-    """One tests/db check in a qualifier's table. Each argument is a template that `run_child` formats, such
-    as '{workspace}'; `from_root` runs it from the repository root instead of the qualifier's directory."""
+    """One tests/db check in a qualifier's table, named with its folder, such as 'checks/memory_check.py'. Each
+    argument is a template that `run_child` formats, such as '{workspace}'; `from_root` runs it from the repository
+    root instead of the qualifier's directory."""
 
     script: str
     label: str
@@ -185,7 +190,8 @@ def keep_stderr(path: Path, stderr: str | None) -> None:
 def run_child_check(cases: Cases, root: Path, script: str, *args: str, label: str, env: Mapping[str, str], timeout: float,
                     err_dir: Path | None, cwd: Path | str | None = None, err_name: str | None = None,
                     answer: Answer | None = None) -> ChildRun:
-    """Run `tests/db/<script>` with the service's interpreter and record its cases (`record_child`).
+    """Run `tests/db/<script>`, such as 'checks/memory_check.py', with the service's interpreter and record its
+    cases (`record_child`).
     A failed child's stderr goes to `<err_dir>/<err_name or the script's stem>.err`."""
     argv = [str(root / CHECK_PYTHON), str(root / CHECKS / script), *args]
     returncode: int | None = None

@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -104,6 +105,23 @@ class Fixture(unittest.TestCase):
         # With no db step left, nothing here is a database change.
         (self.root / 'scripts/app_db.py').unlink()
         self.assertFalse(harness_lib.needs_profile(self.root, ('db',), {'db'}, derived=harness_lib.derived_domains(self.root)))
+
+
+class Domains(unittest.TestCase):
+    """Found by US-11.12's review of the harness (docs/engineering/evidence/US-11.12/). Moved from test_final_review.py (THRN-15)."""
+
+    def test_the_persistent_path_is_a_database_change(self) -> None:
+        for name in ('scripts/persistent_install.py', 'scripts/qualify_persistent_apply.py'):
+            self.assertIn('db', harness_lib.check_domains(name))
+
+    def test_the_db_plan_and_its_required_checks_agree(self) -> None:
+        with mock.patch('verify.find_tools'), mock.patch('verify.missing_prepared_paths', return_value=[]):
+            plan, _ = verify.tool_plan(ROOT, 'db', None)
+        self.assertEqual({step.id for step in plan.steps}, set(profiles.DB_CHECKS))
+
+    def test_steps_with_a_scripted_model_say_so(self) -> None:
+        self.assertEqual(verify.STEP_CLASSES['identity_qualification'][1], 'mock')
+        self.assertEqual(verify.STEP_CLASSES['app_db_qualification'][1], 'mock')
 
 
 if __name__ == '__main__':

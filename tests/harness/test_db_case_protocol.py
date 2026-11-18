@@ -1,4 +1,4 @@
-"""The case protocol every database check shares, tests/db/checklib.py (refactor plan R-38).
+"""The case protocol every database check shares, tests/db/fixtures/checklib.py (refactor plan R-38).
 
 The checks themselves need a disposable database, so the db profile runs them. What each one relies
 on runs here with the standard library only: a crashing check still prints what it observed, a case
@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -22,8 +23,8 @@ from unittest import mock
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKS = ROOT / 'tests/db'
-sys.path.insert(0, str(CHECKS))
+FIXTURES = ROOT / 'tests/db/fixtures'
+sys.path.insert(0, str(FIXTURES))
 import checklib  # noqa: E402
 
 SECRET = 'tvly-fixtureNeverPrinted01'
@@ -83,17 +84,20 @@ class CrashingCheck(unittest.TestCase):
                          {'cases': [{'id': 'before the crash', 'expected': 'seen', 'observed': 'seen', 'passed': True}]})
 
     def test_a_crashing_check_script_exits_non_zero_after_printing(self) -> None:
-        """Run as the qualifiers run it: a script whose own folder holds checklib, so no path insert."""
+        """Run as the qualifiers run it: a script in checks/ with fixtures/ on its path (qualification/children.py
+        service_env), so no path insert."""
         with tempfile.TemporaryDirectory() as folder:
-            shutil.copy(CHECKS / 'checklib.py', folder)
-            script = Path(folder) / 'crash_check.py'
+            (Path(folder) / 'fixtures').mkdir()
+            (Path(folder) / 'checks').mkdir()
+            shutil.copy(FIXTURES / 'checklib.py', Path(folder) / 'fixtures')
+            script = Path(folder) / 'checks/crash_check.py'
             script.write_text('from checklib import Cases, run_check\n\n\n'
                               'async def main(cases: Cases) -> None:\n'
                               "    cases.check('observed first', 'yes', 'yes', True)\n"
                               "    raise RuntimeError('arranged crash')\n\n\n"
                               'run_check(main)\n')
             result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, timeout=60,
-                                    check=False, cwd=folder)
+                                    check=False, cwd=folder, env={**os.environ, 'PYTHONPATH': str(Path(folder) / 'fixtures')})
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('arranged crash', result.stderr)
         self.assertEqual([case['id'] for case in printed(result.stdout)['cases']], ['observed first'])

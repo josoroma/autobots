@@ -18,6 +18,17 @@ from fastapi.testclient import TestClient
 from psycopg_pool import PoolTimeout
 from pydantic import SecretStr
 
+from api_session import (
+    INTERNAL,
+    SECRET,
+    SETTINGS,
+    USER_A,
+    WORKSPACE,
+    Membership,
+    client,
+    headers,
+    token,
+)
 from autobots.api.app import create_app
 from autobots.api.main import create_configured_app
 from autobots.api.pool import POOL_WAIT_SECONDS, Pool, default_pool
@@ -26,43 +37,7 @@ from autobots.api.settings import Settings, load_settings
 from autobots.application.sql import CommittingConnection
 from autobots.logs import JsonFormatter
 
-INTERNAL = "fixture-internal"
-SECRET = "fixture-jwt-secret-with-enough-length"
-USER_A = UUID("a1111111-1111-4111-8111-111111111111")
 USER_B = UUID("b2222222-2222-4222-8222-222222222222")
-WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
-SETTINGS = Settings(
-    internal_token=SecretStr(INTERNAL),
-    jwt_secret=SecretStr(SECRET),
-    allowed_hosts=("testserver",),
-)
-
-
-class Membership:
-    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
-        return user_id == USER_A and workspace_id == WORKSPACE
-
-    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
-        return [WORKSPACE] if user_id == USER_A else []
-
-    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
-        return "owner" if user_id == USER_A else None
-
-
-def token(user: UUID = USER_A, secret: str = SECRET, **overrides: object) -> str:
-    claims = {"sub": str(user), "aud": "authenticated", "exp": time.time() + 60, **overrides}
-    return jwt.encode(claims, secret, algorithm="HS256")
-
-
-def client() -> TestClient:
-    return TestClient(
-        create_app(AppResources(SETTINGS, membership=Membership())), raise_server_exceptions=False
-    )
-
-
-def headers(bearer: str | None = None, internal: str = INTERNAL) -> dict[str, str]:
-    values = {"X-Autobots-Internal": internal}
-    return values if bearer is None else {**values, "Authorization": f"Bearer {bearer}"}
 
 
 def test_health_needs_the_internal_credential() -> None:

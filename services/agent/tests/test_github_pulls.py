@@ -2,7 +2,7 @@
 
 Each write step's refused and unclear replies decide whether the call failed or stays unknown, and
 the readback decides whether trying again is safe (refactor plan R-62, PADP-18). The gateway around
-it is exercised in tests/db/pull_request_check.py.
+it is exercised in tests/db/checks/pull_request_check.py.
 """
 
 import asyncio

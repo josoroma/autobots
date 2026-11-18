@@ -1,33 +1,22 @@
 """US-15.3: member-readable readiness, with states and codes only and no model call."""
 
-import time
 from typing import Any
 from uuid import UUID
 
-import jwt
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
 
+from api_session import SETTINGS, Members, session_headers
 from autobots.api import operation_routes
 from autobots.api.app import create_app
 from autobots.api.resources import AppResources
-from autobots.api.settings import Settings
 from autobots.application.operations import Condition
 from autobots.application.provider_settings import ProviderSettings
 from fake_openrouter import provider_context
 from sql_fakes import LendingPool
 
-INTERNAL = "fixture-internal"
-SECRET = "fixture-jwt-secret-with-enough-length"
 MEMBER = UUID("c1111111-1111-4111-8111-111111111111")
 OUTSIDER = UUID("d2222222-2222-4222-8222-222222222222")
-WORKSPACE = UUID("a0000000-0000-4000-8000-000000000001")
-SETTINGS = Settings(
-    internal_token=SecretStr(INTERNAL),
-    jwt_secret=SecretStr(SECRET),
-    allowed_hosts=("testserver",),
-)
 OK = (
     Condition("database", "ok", "database_ready"),
     Condition("schema", "ok", "schema_ready"),
@@ -37,25 +26,15 @@ OK = (
 WORKER_READY = Condition("worker", "ok", "worker_ready")
 
 
-class Membership:
+class Membership(Members):
     """A member who isn't the owner, of one workspace."""
 
-    async def is_member(self, user_id: UUID, workspace_id: UUID) -> bool:
-        return user_id == MEMBER and workspace_id == WORKSPACE
-
-    async def workspaces_for(self, user_id: UUID) -> list[UUID]:
-        return [WORKSPACE] if user_id == MEMBER else []
-
-    async def role_in(self, user_id: UUID, workspace_id: UUID) -> str | None:
-        return "member" if user_id == MEMBER else None
+    def __init__(self) -> None:
+        super().__init__({MEMBER: "member"})
 
 
 def headers(user: UUID = MEMBER) -> dict[str, str]:
-    claims = {"sub": str(user), "aud": "authenticated", "exp": time.time() + 60}
-    return {
-        "X-Autobots-Internal": INTERNAL,
-        "Authorization": f"Bearer {jwt.encode(claims, SECRET, algorithm='HS256')}",
-    }
+    return session_headers(user)
 
 
 def arranged(

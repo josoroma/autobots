@@ -6,7 +6,6 @@ The version insert and the `latest_version` update keep their order: the caller 
 `next_version` and `set_latest` (tests/test_persisted_documents.py pins each writer's receipt).
 """
 
-import asyncio
 from uuid import UUID
 
 import pytest
@@ -44,28 +43,31 @@ WORKSPACE = UUID("0f100000-0000-4000-8000-000000000002")
         ),
     ],
 )
-def test_the_next_version_locks_its_row_and_follows_the_expected_one(
+@pytest.mark.asyncio
+async def test_the_next_version_locks_its_row_and_follows_the_expected_one(
     table: Versioned, statement: str
 ) -> None:
     database = FakeDatabase([])
     database.answer("select latest_version from", (4,))
-    version = asyncio.run(next_version(FakeConnection(database), table, ROW, WORKSPACE, 4))
+    version = await next_version(FakeConnection(database), table, ROW, WORKSPACE, 4)
     assert version == 5
     assert database.statements == [(statement, (ROW, WORKSPACE))]
 
 
-def test_a_missing_row_or_a_stale_version_raises_its_typed_error() -> None:
+@pytest.mark.asyncio
+async def test_a_missing_row_or_a_stale_version_raises_its_typed_error() -> None:
     database = FakeDatabase([])
     with pytest.raises(VersionedRowMissing):
-        asyncio.run(next_version(FakeConnection(database), "experts", ROW, WORKSPACE, 1))
+        await next_version(FakeConnection(database), "experts", ROW, WORKSPACE, 1)
     database.answer("select latest_version from", (2,))
     with pytest.raises(ExpectedVersionStale):
-        asyncio.run(next_version(FakeConnection(database), "experts", ROW, WORKSPACE, 1))
+        await next_version(FakeConnection(database), "experts", ROW, WORKSPACE, 1)
 
 
-def test_the_latest_version_is_set_on_its_own_table() -> None:
+@pytest.mark.asyncio
+async def test_the_latest_version_is_set_on_its_own_table() -> None:
     database = FakeDatabase([])
-    asyncio.run(set_latest(FakeConnection(database), "workflows", ROW, 5))
+    await set_latest(FakeConnection(database), "workflows", ROW, 5)
     assert database.statements == [
         ('update "public"."workflows" set latest_version = %s where id = %s', (5, ROW))
     ]

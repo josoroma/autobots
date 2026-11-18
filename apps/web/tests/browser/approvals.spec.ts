@@ -13,7 +13,7 @@ import { arranged } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
 import { readRun } from "./support/runs.ts";
 
-// Arranged by tests/db/approval_check.py through scripts/qualify_identity.py.
+// Arranged by tests/db/checks/approval_check.py through scripts/qualify_identity.py.
 const approval = arranged({
   approve: "AUTOBOTS_TEST_APPROVAL_APPROVE",
   reject: "AUTOBOTS_TEST_APPROVAL_REJECT",

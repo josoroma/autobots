@@ -212,7 +212,8 @@ class Launches(Quiet):
         self.assertNotIn('OPENROUTER_API_KEY', env)
         self.assertEqual({key: env[key] for key in ('AUTOBOTS_DATABASE_URL', 'AUTOBOTS_EXTRA', 'PYTHONPATH', 'PYTHONDONTWRITEBYTECODE', 'HOME')},
                          {'AUTOBOTS_DATABASE_URL': 'postgresql://u@127.0.0.1:55401/postgres', 'AUTOBOTS_EXTRA': 'x',
-                          'PYTHONPATH': '/repo/services/agent/src', 'PYTHONDONTWRITEBYTECODE': '1', 'HOME': '/home/fixture'})
+                          'PYTHONPATH': '/repo/services/agent/src:/repo/tests/db/fixtures', 'PYTHONDONTWRITEBYTECODE': '1',
+                          'HOME': '/home/fixture'})
 
     def test_a_child_formats_its_argument_templates(self) -> None:
         child = children.Child('loop_check.py', 'the loop check', ('{workspace}', 'literal', '{python}'), timeout=240, from_root=True)

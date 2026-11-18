@@ -97,7 +97,8 @@ class Migrations(unittest.TestCase):
             self.assertRegex(name, app_db.MIGRATION_NAME)
 
     def test_the_shipped_record_matches_the_migration_files(self):
-        """Decision 0023 E2: readiness compares the applied count with this record, so it can't drift."""
+        """Decision 0023 E2: readiness compares the applied count with this record, so it can't drift. Read as text, because
+        the harness runs without the service's environment and can't import the module (THRN-12)."""
         names = sorted(path.name for path in (ROOT / app_db.MIGRATIONS).glob('*.sql'))
         text = (ROOT / 'services/agent/src/autobots/application/schema_release.py').read_text()
         shipped = re.search(r'^SHIPPED_MIGRATIONS = (\d+)$', text, re.MULTILINE)

@@ -73,4 +73,7 @@ def test_psycopg_uses_binary_implementation_without_connecting() -> None:
 
 
 def test_no_model_is_constructed() -> None:
+    """Collected first, so a model an earlier test left in a reference cycle, such as a kept
+    traceback, can't fail this check far from its cause (refactor plan R-66, PTST-07)."""
+    gc.collect()
     assert [item for item in gc.get_objects() if isinstance(item, BaseChatModel)] == []

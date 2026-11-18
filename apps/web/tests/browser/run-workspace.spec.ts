@@ -15,7 +15,7 @@ const runs = arranged({
   loop: "AUTOBOTS_TEST_LOOP_RUN",
   gap: "AUTOBOTS_TEST_ARTIFACT_RUN",
 });
-// US-14.4, arranged by tests/db/tool_use_view_check.py.
+// US-14.4, arranged by tests/db/checks/tool_use_view_check.py.
 const tools = arranged({
   run: "AUTOBOTS_TEST_TOOL_RUN",
   execution: "AUTOBOTS_TEST_TOOL_EXECUTION",
@@ -621,7 +621,7 @@ test("US-14.4: the workflow monitor shows tool uses under the node that made the
   await expect(read.locator("[data-tool-use]")).toHaveCount(1);
 });
 
-/** The run's input files, as tests/db/run_files_probe.py reads them from the database. */
+/** The run's input files, as tests/db/arrange/run_files_probe.py reads them from the database. */
 function probe(
   runId: string,
 ): Promise<{ path: string; media_type: string; bytes: number }[]> {

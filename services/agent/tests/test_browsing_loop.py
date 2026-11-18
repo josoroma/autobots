@@ -215,17 +215,19 @@ class Middleware:
             return await handler(request), self.complete
 
 
-def test_a_step_goes_through_admission_on_the_given_route_with_tools_required() -> None:
+@pytest.mark.asyncio
+async def test_a_step_goes_through_admission_on_the_given_route_with_tools_required() -> None:
     delegate, middleware = Delegate(), Middleware()
-    step = admitted_steps(middleware, delegate, "researcher-route")  # type: ignore[arg-type]
-    message = asyncio.run(step([]))
+    step = admitted_steps(middleware, delegate, "researcher-route")  # type: ignore[arg-type]  # fakes for LoopMiddleware and the route
+    message = await step([])
     assert message.tool_calls[0]["name"] == "finish"
     assert middleware.routes == ["researcher-route"]
     assert delegate.bound[0][1] == {"tool_choice": "any"}
     assert list(middleware.requests[0].tools) == ACTION_TOOLS
 
 
-def test_an_unadmitted_call_never_reaches_the_model() -> None:
+@pytest.mark.asyncio
+async def test_an_unadmitted_call_never_reaches_the_model() -> None:
     delegate = Delegate()
 
     async def outside() -> str:
@@ -237,21 +239,22 @@ def test_an_unadmitted_call_never_reaches_the_model() -> None:
             return "unadmitted"
         return "answered"
 
-    assert asyncio.run(outside()) == "unadmitted"
+    assert await outside() == "unadmitted"
     assert delegate.calls == 0
     gc.collect()
 
 
-def test_a_cut_off_reply_stops_the_loop() -> None:
+@pytest.mark.asyncio
+async def test_a_cut_off_reply_stops_the_loop() -> None:
     async def cut_off() -> str:
-        step = admitted_steps(Middleware(complete=False), Delegate(), "route")  # type: ignore[arg-type]
+        step = admitted_steps(Middleware(complete=False), Delegate(), "route")  # type: ignore[arg-type]  # fakes for LoopMiddleware and the route
         try:
             await step([])
         except LoopStopped as stopped:
             return stopped.code
         return "continued"
 
-    assert asyncio.run(cut_off()) == "incomplete_output"
+    assert await cut_off() == "incomplete_output"
     gc.collect()
 
 
@@ -275,20 +278,21 @@ class FakeCdp:
         return {"result": {}}
 
 
-def test_the_cdp_page_reads_text_and_links_and_scrolls_its_window() -> None:
+@pytest.mark.asyncio
+async def test_the_cdp_page_reads_text_and_links_and_scrolls_its_window() -> None:
     from autobots.adapters.browser_page import READER, CdpPage
     from autobots.application.browsing_loop import TEXT_CHARS
 
     cdp = FakeCdp("a" * TEXT_CHARS + "b" * 10)
 
     async def scenario() -> tuple[PageView, PageView]:
-        page = await CdpPage.open(cdp, settle=0)  # type: ignore[arg-type]
+        page = await CdpPage.open(cdp, settle=0)  # type: ignore[arg-type]  # a fake CDP client
         await page.go("https://example.com/")
         first = await page.view()
         await page.scroll()
         return first, await page.view()
 
-    first, scrolled = asyncio.run(scenario())
+    first, scrolled = await scenario()
     assert first.title == "Example" and first.links == (
         Link(text="More", url="https://www.iana.org/"),
     )

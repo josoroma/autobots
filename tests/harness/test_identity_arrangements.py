@@ -195,7 +195,7 @@ class Registry(Arranged):
                           'AUTOBOTS_TEST_COMPOSER_EXPERT': '66666666-6666-4666-8666-000000000002',
                           'AUTOBOTS_TEST_MULTI_WORKSPACE_G': 'ws-runs-g', 'AUTOBOTS_TEST_FOREIGN_WORKSPACE': 'ws-ops-n',
                           'AUTOBOTS_TEST_MODELS_RUN': 'models-run', 'AUTOBOTS_TEST_FILES_RUN': 'keyless-1',
-                          'AUTOBOTS_TEST_OPS_HELPER': str(self.root / 'tests/db/operations_live.py')})
+                          'AUTOBOTS_TEST_OPS_HELPER': str(self.root / 'tests/db/arrange/operations_live.py')})
         self.assertEqual(fixtures['AUTOBOTS_TEST_HOME_RUNS'].split(','), [f'77777777-7777-4777-8777-00000000000{index}' for index in range(1, 8)])
         self.assertEqual(fixtures['AUTOBOTS_TEST_HOME_APPROVALS'], '77777777-7777-4777-8777-0000000000a1,77777777-7777-4777-8777-0000000000a2')
         self.assertEqual(fixtures['AUTOBOTS_TEST_FLOWS_RUNS'].split(','), [f'88888888-8888-4888-8888-00000000000{index}' for index in range(1, 4)])
@@ -252,9 +252,9 @@ class Registry(Arranged):
         helpers = [launch for launch in self.launches if 'autobots.operations.bootstrap_owner' not in launch['argv']]
         common = {'capture_output': True, 'text': True, 'errors': 'replace', 'check': False, 'cwd': self.root}
         self.assertEqual(helpers, [
-            {'argv': [python, str(checks / 'model_sources.py'), 'ws-models-i', 'user-models-i'], 'env': service, 'timeout': 120, **common},
-            {'argv': [python, str(checks / 'concept_seed_check.py'), 'ws-seed-o'], 'env': service, 'timeout': 240, **common},
-            {'argv': [python, str(checks / 'browser_runs.py'), 'ws-owner-a', 'ws-owner-e'],
+            {'argv': [python, str(checks / 'arrange/model_sources.py'), 'ws-models-i', 'user-models-i'], 'env': service, 'timeout': 120, **common},
+            {'argv': [python, str(checks / 'checks/concept_seed_check.py'), 'ws-seed-o'], 'env': service, 'timeout': 240, **common},
+            {'argv': [python, str(checks / 'arrange/browser_runs.py'), 'ws-owner-a', 'ws-owner-e'],
              'env': children.service_env(self.root, RUNTIME_URL, AUTOBOTS_STORAGE_BASE=BASE, AUTOBOTS_STORAGE_SERVICE=SERVICE_KEY),
              'timeout': 120, **common}])
 
@@ -318,13 +318,13 @@ class StorageChildren(Arranged):
         storage = children.service_env(self.root, RUNTIME_URL, AUTOBOTS_STORAGE_BASE=BASE, AUTOBOTS_STORAGE_SERVICE=SERVICE_KEY)
         common = {'capture_output': True, 'text': True, 'errors': 'replace', 'check': False, 'cwd': None}
         values = {'a': 'ws-owner-a', 'b': 'ws-owner-b', 'python': python}
-        expected = [{'argv': [python, str(checks / 'artifact_check.py'), 'ws-owner-a', 'ws-owner-b'],
+        expected = [{'argv': [python, str(checks / 'checks/artifact_check.py'), 'ws-owner-a', 'ws-owner-b'],
                      'env': children.service_env(self.root, RUNTIME_URL, AUTOBOTS_STORAGE_BASE=BASE, AUTOBOTS_STORAGE_ANON='anon-fixture',
                                                  AUTOBOTS_STORAGE_SERVICE=SERVICE_KEY, AUTOBOTS_TOKEN_A='token-a', AUTOBOTS_TOKEN_B='token-b'),
                      'timeout': 240, **common}]
         expected += [{'argv': [python, str(checks / child.script), *(argument.format_map(values) for argument in child.args)],
                       'env': storage, 'timeout': 240, **common} for child in qualify_identity.IDENTITY_CHILDREN]
-        expected += [{'argv': [python, str(checks / 'schema_release_check.py'), state], 'env': children.service_env(self.root, RUNTIME_URL),
+        expected += [{'argv': [python, str(checks / 'checks/schema_release_check.py'), state], 'env': children.service_env(self.root, RUNTIME_URL),
                       'timeout': 60, **common} for state in ('equal', 'behind', 'ahead', 'no-history', 'no-history-missing')]
         self.assertEqual(self.launches, expected)
         self.assertEqual(len(qualify_identity.IDENTITY_CHILDREN), 16)

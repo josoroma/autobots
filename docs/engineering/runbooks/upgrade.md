@@ -26,7 +26,7 @@ In `domain/execution.py`: raise the version. Old runs then stop at `incompatible
 
 ## Qualifying a framework release
 
-For a change to `langgraph-checkpoint-postgres`, on a disposable target. `tests/db/upgrade_check.py adapter` does steps 1 and 2:
+For a change to `langgraph-checkpoint-postgres`, on a disposable target. `tests/db/checks/upgrade_check.py adapter` does steps 1 and 2:
 
 1. Run the adapter's own `setup()` in a scratch schema, and compare its columns with what migrations own in `agent_runtime`. A difference needs a new migration.
 2. Check that the runtime role can't change the schema or qualify an adapter, and that the saver resolves to `agent_runtime`.

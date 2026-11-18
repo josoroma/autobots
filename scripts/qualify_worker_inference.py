@@ -42,8 +42,8 @@ from qualification.records import Cases
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/worker-inference/qualification.json')
-DRIVER = 'tests/db/product_inference_worker.py'
-HELPER = 'tests/db/product_inference_check.py'
+DRIVER = 'tests/db/workers/product_inference_worker.py'
+HELPER = 'tests/db/arrange/product_inference.py'
 DEEPSEEK = 'openrouter_deepseek_flash'
 TERRA = 'openrouter_terra'
 DEEPSEEK_WIRE = 'deepseek/deepseek-v4.1-flash-1017'

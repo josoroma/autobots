@@ -1,6 +1,7 @@
 """The gateway middleware: the only route to a tool inside a Deep Agents loop (refactor plan R-62,
 PADP-16 and PADP-18). The model sees granted tools only, every call is answered by the gateway, and
-the SDK's own tool bodies never run. tests/db/tool_gateway_check.py runs it inside a real agent.
+the SDK's own tool bodies never run. tests/db/checks/tool_gateway_check.py runs it inside a real
+agent.
 """
 
 import asyncio
@@ -103,7 +104,8 @@ def named(name: str) -> BaseTool:
     return StructuredTool.from_function(coroutine=body, name=name, description=name)
 
 
-def test_the_model_sees_granted_tools_only() -> None:
+@pytest.mark.asyncio
+async def test_the_model_sees_granted_tools_only() -> None:
     middleware = GatewayMiddleware(gateway(), CONNECTION, SCOPE)
     seen: list[ModelRequest] = []
 
@@ -116,7 +118,7 @@ def test_the_model_sees_granted_tools_only() -> None:
         messages=[],
         tools=[named("granted"), named("other"), named("write_file")],
     )
-    asyncio.run(middleware.awrap_model_call(request, model))
+    await middleware.awrap_model_call(request, model)
     [sent] = seen
     assert [getattr(tool, "name", None) for tool in sent.tools] == ["granted"]
 
@@ -129,10 +131,11 @@ def test_the_model_sees_granted_tools_only() -> None:
         (ToolResult(ToolOutcome.FAILED, "github_refused_422", operation_id="o-2"), "error"),
     ],
 )
-def test_every_tool_call_is_answered_by_the_gateway(result: ToolResult, status: str) -> None:
+@pytest.mark.asyncio
+async def test_every_tool_call_is_answered_by_the_gateway(result: ToolResult, status: str) -> None:
     answering = gateway(result)
     middleware = GatewayMiddleware(answering, CONNECTION, SCOPE)
-    reply = asyncio.run(middleware.awrap_tool_call(tool_call(), never))
+    reply = await middleware.awrap_tool_call(tool_call(), never)
     assert isinstance(reply, ToolMessage)
     assert reply.content == result.for_model()
     assert (reply.tool_call_id, reply.name, reply.status) == ("call-1", "granted", status)
@@ -144,7 +147,8 @@ def test_every_tool_call_is_answered_by_the_gateway(result: ToolResult, status: 
     assert gateway_code(reply) == code
 
 
-def test_calls_made_at_once_take_turns_on_the_connection() -> None:
+@pytest.mark.asyncio
+async def test_calls_made_at_once_take_turns_on_the_connection() -> None:
     answering = gateway()
     middleware = GatewayMiddleware(answering, CONNECTION, SCOPE)
 
@@ -154,7 +158,7 @@ def test_calls_made_at_once_take_turns_on_the_connection() -> None:
             middleware.awrap_tool_call(tool_call(call_id="b"), never),
         )
 
-    asyncio.run(both())
+    await both()
     assert len(answering.calls) == 2
 
 
@@ -167,12 +171,13 @@ def test_there_is_no_synchronous_route_to_a_tool() -> None:
     assert answering.calls == []
 
 
-def test_the_sdk_sees_granted_names_and_schemas_and_their_bodies_refuse() -> None:
+@pytest.mark.asyncio
+async def test_the_sdk_sees_granted_names_and_schemas_and_their_bodies_refuse() -> None:
     tools = visible_tools(gateway(), SCOPE)
     assert [tool.name for tool in tools] == ["granted"]
     assert tools[0].args_schema is Note
     with pytest.raises(RuntimeError, match="through the gateway only"):
-        asyncio.run(tools[0].ainvoke({"text": "hello"}))
+        await tools[0].ainvoke({"text": "hello"})
 
 
 @pytest.mark.parametrize("artifact", [None, "code", {"outcome": "succeeded"}])

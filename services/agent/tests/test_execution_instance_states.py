@@ -3,7 +3,8 @@ instance in progress and its run's status, with plain values (PPRD-04, PPRD-16, 
 
 A node with no saved row yet is waiting, or not run once the run has ended. The instance in progress
 started, so on an ended run its effect may have happened: it shows where the run stopped, never
-`not_run`. tests/db/major_check.py checks the same rule on a disposable database.
+`not_run`. tests/db/checks/effects_routines_and_retention_check.py checks the same rule on a
+disposable database.
 """
 
 import pytest

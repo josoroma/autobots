@@ -64,8 +64,8 @@ class CostUnavailable(AdmissionRefused):
 
 class AttemptAlreadySettled(ValueError):
     """Recovery settled or closed this attempt while it was out, so this step changes nothing. Also
-    a ValueError, which tests/db/admission_check.py and verification_check.py catch (refactor plan
-    R-41, PRUN-13)."""
+    a ValueError, which tests/db/checks/admission_check.py and verification_check.py catch
+    (refactor plan R-41, PRUN-13)."""
 
 
 @dataclass(frozen=True)

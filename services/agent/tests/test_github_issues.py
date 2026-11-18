@@ -1,11 +1,13 @@
-"""The GitHub connector over a fake transport. The gateway is in tests/db/connector_check.py."""
+"""The GitHub connector over a fake transport. The gateway is in
+tests/db/checks/connector_check.py."""
 
 import asyncio
 import importlib.util
 import json
 import sys
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterator
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 from uuid import uuid4
 
@@ -249,14 +251,18 @@ def test_a_failed_readback_says_nothing_about_delivery() -> None:
         read_back(FakeGithub(500))
 
 
-def qualifier() -> Any:
+@pytest.fixture(scope="module")
+def qualifier() -> Iterator[ModuleType]:
+    """scripts/qualify_github_connector.py, loaded once for this module and taken out of sys.modules
+    afterwards, so no later file sees it (refactor plan R-66, PTST-07)."""
     path = REPO_ROOT / "scripts/qualify_github_connector.py"
     spec = importlib.util.spec_from_file_location("qualify_github_connector", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return module
+    yield module
+    sys.modules.pop(spec.name, None)
 
 
 @pytest.mark.parametrize(
@@ -269,20 +275,21 @@ def qualifier() -> Any:
     ],
 )
 def test_the_live_qualifier_refuses_an_unsafe_target(
-    scopes: str | None, private: bool, refusal: str
+    scopes: str | None, private: bool, refusal: str, qualifier: ModuleType
 ) -> None:
-    assert refusal in qualifier().unsafe_target(scopes, private)
+    assert refusal in qualifier.unsafe_target(scopes, private)
 
 
 @pytest.mark.parametrize("scopes", ["", None])
 def test_the_live_qualifier_accepts_a_limited_token_on_a_private_repository(
-    scopes: str | None,
+    scopes: str | None, qualifier: ModuleType
 ) -> None:
-    assert qualifier().unsafe_target(scopes, True) == ""
+    assert qualifier.unsafe_target(scopes, True) == ""
 
 
-def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.asyncio
+async def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
+    monkeypatch: pytest.MonkeyPatch, qualifier: ModuleType
 ) -> None:
     """The first live run ended in a traceback here, with no report."""
     methods: list[str] = []
@@ -311,7 +318,7 @@ def test_the_qualifier_reports_a_failed_readback_and_still_closes_the_issue(
 
     monkeypatch.setattr(httpx, "AsyncClient", faked)
     monkeypatch.setattr(asyncio, "sleep", no_wait)
-    code, report = asyncio.run(qualifier().qualify(REPOSITORY, TOKEN))
+    code, report = await qualifier.qualify(REPOSITORY, TOKEN)
     assert code == 1
     assert report["failed"]
     assert TOKEN not in json.dumps(report)

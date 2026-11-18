@@ -6,7 +6,6 @@ otherwise writes the next version in the same transaction. A choice that isn't a
 before any connection opens. No database or model is used.
 """
 
-import asyncio
 import json
 from uuid import UUID
 
@@ -177,7 +176,8 @@ def test_a_stale_reset_writes_nothing_and_rolls_back(api_client: ApiClient) -> N
 # Without HTTP: a worker, a tool or a script saves through the same function.
 
 
-def test_a_stale_save_refuses_with_a_typed_refusal_outside_http() -> None:
+@pytest.mark.asyncio
+async def test_a_stale_save_refuses_with_a_typed_refusal_outside_http() -> None:
     database = FakeDatabase([])
     database.answer(SAVE_LOCK, (3,))
 
@@ -192,7 +192,7 @@ def test_a_stale_save_refuses_with_a_typed_refusal_outside_http() -> None:
             )
 
     with pytest.raises(PolicyChanged) as refused:
-        asyncio.run(save())
+        await save()
     assert (refused.value.code, refused.value.kind) == ("stale_version", RefusalKind.CONFLICT)
     assert database.changes() == []
 

@@ -31,7 +31,7 @@ async def resolve(host: str, _: int) -> list[str]:
 
 
 def session(**options: object) -> Session:
-    return Session(log=lambda _: None, **options)  # type: ignore[arg-type]
+    return Session(log=lambda _: None, **options)  # type: ignore[arg-type]  # each test passes the fields it needs
 
 
 @pytest.mark.parametrize(
@@ -93,7 +93,7 @@ async def test_only_connect_leaves_and_its_log_names_no_path() -> None:
     stream = Stream(
         b"GET http://example.com/secret?token=abc HTTP/1.1\r\nHost: example.com\r\n\r\n"
     )
-    await handle_egress(stream.reader, stream, plain, resolve)  # type: ignore[arg-type]
+    await handle_egress(stream.reader, stream, plain, resolve)  # type: ignore[arg-type]  # a fake stream for asyncio.StreamWriter
     assert stream.written.startswith(b"HTTP/1.1 403")
     assert [(e["event"], e["host"], e["reason"]) for e in entries] == [
         ("refused", "example.com", "scheme_refused")
@@ -112,7 +112,7 @@ async def test_a_connect_reaches_only_the_checked_address() -> None:
 
     allowed = session(allowed=("example.com",))
     client = Stream(b"CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
-    await handle_egress(client.reader, client, allowed, resolve, opener)  # type: ignore[arg-type]
+    await handle_egress(client.reader, client, allowed, resolve, opener)  # type: ignore[arg-type]  # a fake stream for asyncio.StreamWriter
     assert opened == [("93.184.215.14", 443)]
     assert client.written.startswith(b"HTTP/1.1 200")
 
@@ -136,13 +136,13 @@ async def test_the_cdp_gate_needs_the_token(path: str, forwarded: bool) -> None:
         sent.append(bytes(data))
         upstream_write(data)
 
-    upstream.write = capture  # type: ignore[method-assign]
+    upstream.write = capture  # type: ignore[method-assign]  # records what the proxy forwards
 
     async def opener(address: str, port: int) -> tuple[asyncio.StreamReader, Stream]:
         return upstream.reader, upstream
 
     client = Stream(f"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:5555\r\n\r\n".encode())
-    await handle_cdp(client.reader, client, "tok", ("browser", 9222), opener)  # type: ignore[arg-type]
+    await handle_cdp(client.reader, client, "tok", ("browser", 9222), opener)  # type: ignore[arg-type]  # a fake stream for asyncio.StreamWriter
     if forwarded:
         assert sent and sent[0].startswith(b"GET /json/version HTTP/1.1")
         assert b"Host: 127.0.0.1:9222" in sent[0] and b"tok" not in sent[0]
@@ -208,7 +208,7 @@ async def test_the_request_guard_lets_through_only_bodiless_reads_of_allowed_sch
     method: str, url: str, body: bool, answer: str
 ) -> None:
     sent = Sent()
-    guard = RequestGuard(sent)  # type: ignore[arg-type]
+    guard = RequestGuard(sent)  # type: ignore[arg-type]  # a fake CDP sender
     request = {"method": method, "url": url, "hasPostData": body}
     paused = {"requestId": "r1", "request": request}
     await guard._event({"method": "Fetch.requestPaused", "sessionId": "s1", "params": paused})

@@ -20,7 +20,7 @@ from autobots.application import tool_keys
 from autobots.application.provider_settings import InvalidKey
 from autobots.application.sql import SqlParams
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
-from autobots.application.tool_key_settings import ToolKeySettings
+from autobots.application.tool_key_settings import ToolKeySettings, checked
 from autobots.application.tool_keys import (
     ENVIRONMENT,
     ITEMS,
@@ -88,11 +88,12 @@ def test_a_relative_configuration_root_is_never_read(tmp_path: Path) -> None:
     assert environment_key("TAVILY_API_KEY", {"AUTOBOTS_CONFIG_ROOT": "relative"}) is None
 
 
-def test_without_a_database_or_any_value_the_key_is_missing() -> None:
+@pytest.mark.asyncio
+async def test_without_a_database_or_any_value_the_key_is_missing() -> None:
     context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
     with pytest.raises(ToolFailed, match=r"^tavily_key_missing$"):
-        asyncio.run(context.key("tavily", {}))
-    assert asyncio.run(attempt_value(None, uuid4(), ITEMS["tavily"], {})) is None
+        await context.key("tavily", {})
+    assert await attempt_value(None, uuid4(), ITEMS["tavily"], {}) is None
 
 
 class Saved(ScriptedConnection):
@@ -105,12 +106,13 @@ class Saved(ScriptedConnection):
         return ScriptedRows([("tavily",)])
 
 
-def test_the_availability_view_names_sources_and_never_holds_a_value(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_the_availability_view_names_sources_and_never_holds_a_value(tmp_path: Path) -> None:
     environ = {
         **config(tmp_path, {".env": "JINA_API_KEY=jina_fixtureDotenv001"}),
         "TAVILY_API_KEY": "tvly-fixtureProcess1",
     }
-    view = asyncio.run(key_sources(Saved(), uuid4(), environ))
+    view = await key_sources(Saved(), uuid4(), environ)
     assert view.sources == {"TAVILY_API_KEY": "settings", "JINA_API_KEY": "environment"}
     assert "fixture" not in json.dumps(dict(view)).replace("autobots-config", "")
     tools = {tool.tool_id: tool for tool in CATALOG.catalog(view).tools}
@@ -172,10 +174,11 @@ class Untouched(ScriptedConnection):
 
 
 @pytest.mark.parametrize("draft", ["short", "has a space", "tvly-ünicode-key"])
-def test_a_malformed_key_is_refused_by_shape_alone(draft: str) -> None:
+@pytest.mark.asyncio
+async def test_a_malformed_key_is_refused_by_shape_alone(draft: str) -> None:
     settings = ToolKeySettings(Untouched(), Path("/nonexistent/master.key"), {})
     with pytest.raises(InvalidKey):
-        asyncio.run(settings.save(uuid4(), "tavily", draft, 0))
+        await settings.save(uuid4(), "tavily", draft, 0)
 
 
 class Transaction:
@@ -207,7 +210,8 @@ class Recorded:
         return Row()
 
 
-def test_saving_seals_the_key_and_opens_no_connection(
+@pytest.mark.asyncio
+async def test_saving_seals_the_key_and_opens_no_connection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import socket
@@ -219,7 +223,7 @@ def test_saving_seals_the_key_and_opens_no_connection(
     monkeypatch.setattr(httpx.AsyncClient, "send", refuse)
     connection = Recorded()
     settings = ToolKeySettings(connection, tmp_path / "secrets/master.key", {})
-    asyncio.run(settings.save(uuid4(), "tavily", "tvly-fixtureSealed0001", 0))
+    await settings.save(uuid4(), "tavily", "tvly-fixtureSealed0001", 0)
     inserted = [
         params
         for query, params in connection.writes
@@ -260,7 +264,8 @@ class Approvals:
         ("succeeded", "GitHub repository owner/a", "GitHub repository owner/b", True),
     ],
 )
-def test_an_approved_write_runs_only_against_its_recorded_target(
+@pytest.mark.asyncio
+async def test_an_approved_write_runs_only_against_its_recorded_target(
     receipt: str | None, recorded: str | None, now: str, runs: bool
 ) -> None:
     """Decision 0025 V7 and V8. An empty recorded target fails closed. One already sent is left
@@ -269,10 +274,11 @@ def test_an_approved_write_runs_only_against_its_recorded_target(
     from autobots.application.tool_gateway import _target_unchanged
 
     approval = ApprovedRequest(recorded, None)
-    assert asyncio.run(_target_unchanged(Approvals(receipt, None), "op", approval, now)) is runs
+    assert await _target_unchanged(Approvals(receipt, None), "op", approval, now) is runs
 
 
-def test_a_write_uses_the_repository_its_approval_recorded() -> None:
+@pytest.mark.asyncio
+async def test_a_write_uses_the_repository_its_approval_recorded() -> None:
     """The gateway hands the attempt what was approved, and the adapter reads its repository from
     there, never from the database (XMOD-02)."""
     from autobots.adapters.github_connector import attempt_credentials
@@ -288,40 +294,47 @@ def test_a_write_uses_the_repository_its_approval_recorded() -> None:
     approval = ApprovedRequest("GitHub repository owner/approved", None)
     context = ToolContext(Recorded(None, None), scope, "op", approval)
     environ = {"GITHUB_REPOSITORY": "owner/now", "GITHUB_TOKEN": "github_pat_fixture0001"}
-    assert asyncio.run(attempt_credentials(context, environ)) == (
+    assert await attempt_credentials(context, environ) == (
         "owner/approved",
         "github_pat_fixture0001",
     )
 
 
 @pytest.mark.parametrize(
-    ("name", "value", "accepted"),
+    ("name", "value", "saved"),
     [
-        ("github_repository", "owner/name", True),
-        ("github_repository", " owner/name ", True),
-        ("github_repository", "owner", False),
-        ("github_repository", "../owner/name", False),
-        ("github_repository", "https://github.com/owner/name", False),
-        ("browser_executor", "enabled", True),
-        ("browser_executor", "disabled", True),
-        ("browser_executor", "Enabled", False),
-        ("browser_executor", "true", False),
-        ("github_token", "github_pat_fixture0001", True),
-        ("github_token", "short", False),
+        ("github_repository", "owner/name", "owner/name"),
+        ("github_repository", " owner/name ", "owner/name"),
+        ("browser_executor", "enabled", "enabled"),
+        ("browser_executor", "disabled", "disabled"),
+        # A secret is saved as it was given.
+        ("github_token", "github_pat_fixture0001", "github_pat_fixture0001"),
     ],
 )
-def test_each_item_has_its_own_check(name: str, value: str, accepted: bool) -> None:
-    from autobots.application.tool_key_settings import checked
-    from autobots.application.tool_keys import ITEMS
-
-    if accepted:
-        assert checked(ITEMS[name], value) == value.strip() or ITEMS[name].secret
-    else:
-        with pytest.raises(InvalidKey):
-            checked(ITEMS[name], value)
+def test_each_item_saves_what_its_check_accepts(name: str, value: str, saved: str) -> None:
+    """The exact value saved, for secrets too, where the either-or this replaced passed whatever the
+    check returned (PTST-17)."""
+    assert checked(ITEMS[name], value) == saved
 
 
-def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("github_repository", "owner"),
+        ("github_repository", "../owner/name"),
+        ("github_repository", "https://github.com/owner/name"),
+        ("browser_executor", "Enabled"),
+        ("browser_executor", "true"),
+        ("github_token", "short"),
+    ],
+)
+def test_each_item_refuses_what_its_check_refuses(name: str, value: str) -> None:
+    with pytest.raises(InvalidKey):
+        checked(ITEMS[name], value)
+
+
+@pytest.mark.asyncio
+async def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Path) -> None:
     class Both(ScriptedConnection):
         async def execute(self, query: str, params: SqlParams | None = None, /) -> ScriptedRows:
             if "tool_key_settings" in query:
@@ -331,7 +344,7 @@ def test_the_view_holds_values_and_markers_and_a_saved_switch_wins(tmp_path: Pat
             return ScriptedRows([("github",)])
 
     environ = {"AUTOBOTS_BROWSER_EXECUTOR": "enabled", "GITHUB_REPOSITORY": "owner/env"}
-    view = asyncio.run(key_sources(Both(), uuid4(), environ))
+    view = await key_sources(Both(), uuid4(), environ)
     assert view["AUTOBOTS_BROWSER_EXECUTOR"] == "disabled"
     assert view["GITHUB_REPOSITORY"] == "owner/saved"
     assert view["GITHUB_TOKEN"] == "<settings>"
@@ -389,50 +402,58 @@ def layered(tmp_path: Path, name: str, process: str, dotenv: str) -> dict[str, s
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_settings_win_then_the_process_environment_then_env_files(
+@pytest.mark.asyncio
+async def test_settings_win_then_the_process_environment_then_env_files(
     tmp_path: Path, name: str
 ) -> None:
     item = ITEMS[name]
     environ = layered(tmp_path, name, "process-value-1", "dotenv-value-01")
-    in_settings = asyncio.run(
-        resolve(item, saved_for(item, USABLE[name]), environ, unsealing(USABLE[name]))
+    in_settings = await resolve(
+        item, saved_for(item, USABLE[name]), environ, unsealing(USABLE[name])
     )
     assert in_settings == Resolved(SETTINGS, USABLE[name])
-    from_process = asyncio.run(resolve(item, NOTHING_SAVED, environ, unsealing(None)))
+    from_process = await resolve(item, NOTHING_SAVED, environ, unsealing(None))
     assert from_process == Resolved(ENVIRONMENT, "process-value-1")
     blank_process = {**environ, item.variable: "   "}
-    from_file = asyncio.run(resolve(item, NOTHING_SAVED, blank_process, unsealing(None)))
+    from_file = await resolve(item, NOTHING_SAVED, blank_process, unsealing(None))
     assert from_file == Resolved(ENVIRONMENT, "dotenv-value-01")
-    assert asyncio.run(resolve(item, NOTHING_SAVED, {}, unsealing(None))) == Resolved(None, None)
+    assert await resolve(item, NOTHING_SAVED, {}, unsealing(None)) == Resolved(None, None)
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_a_nonblank_unusable_process_value_stops_resolution(tmp_path: Path, name: str) -> None:
+@pytest.mark.asyncio
+async def test_a_nonblank_unusable_process_value_stops_resolution(
+    tmp_path: Path, name: str
+) -> None:
     """The model-gateway rule: the `.env` file's usable value is never reached."""
     item = ITEMS[name]
     environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
-    found = asyncio.run(resolve(item, NOTHING_SAVED, environ, unsealing(None)))
+    found = await resolve(item, NOTHING_SAVED, environ, unsealing(None))
     assert found == Resolved(ENVIRONMENT, UNUSABLE[name])
 
 
 @pytest.mark.parametrize("name", [name for name in NAMES if not ITEMS[name].secret])
-def test_an_attempt_treats_an_unusable_value_as_not_configured(tmp_path: Path, name: str) -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_treats_an_unusable_value_as_not_configured(
+    tmp_path: Path, name: str
+) -> None:
     item = ITEMS[name]
     environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
     context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
-    resolved = asyncio.run(context.setting(name, environ))
+    resolved = await context.setting(name, environ)
     assert resolved == UNUSABLE[name] and item.usable(resolved) is None
 
 
 @pytest.mark.parametrize("name", [name for name in NAMES if ITEMS[name].secret])
-def test_an_attempt_sends_the_unusable_process_key_never_the_env_files(
+@pytest.mark.asyncio
+async def test_an_attempt_sends_the_unusable_process_key_never_the_env_files(
     tmp_path: Path, name: str
 ) -> None:
     """A secret goes to the client as it resolved, and its provider refuses it: the `.env` file's
     usable key is never sent in its place."""
     environ = layered(tmp_path, name, UNUSABLE[name], USABLE[name])
     context = ToolContext(ScriptedConnection(), ToolScope(uuid4(), uuid4(), 1, {}), None)
-    assert asyncio.run(context.key(name, environ)) == UNUSABLE[name]
+    assert await context.key(name, environ) == UNUSABLE[name]
 
 
 def test_the_tavily_client_receives_the_process_key_over_the_env_files(tmp_path: Path) -> None:
@@ -441,7 +462,8 @@ def test_the_tavily_client_receives_the_process_key_over_the_env_files(tmp_path:
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_an_unusable_saved_item_never_falls_through_to_the_environment(
+@pytest.mark.asyncio
+async def test_an_unusable_saved_item_never_falls_through_to_the_environment(
     tmp_path: Path, name: str
 ) -> None:
     """A saved secret that can't be unsealed refuses; a saved value without its form is returned
@@ -451,26 +473,28 @@ def test_an_unusable_saved_item_never_falls_through_to_the_environment(
     saved = saved_for(item, UNUSABLE[name])
     if item.secret:
         with pytest.raises(ToolKeyUnavailable):
-            asyncio.run(resolve(item, saved, environ, refusing_to_unseal))
+            await resolve(item, saved, environ, refusing_to_unseal)
     else:
-        found = asyncio.run(resolve(item, saved, environ, unsealing(None)))
+        found = await resolve(item, saved, environ, unsealing(None))
         assert found == Resolved(SETTINGS, UNUSABLE[name])
         assert item.usable(found.value) is None
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_availability_names_a_source_and_never_unseals_or_reads_a_secret(
+@pytest.mark.asyncio
+async def test_availability_names_a_source_and_never_unseals_or_reads_a_secret(
     tmp_path: Path, name: str
 ) -> None:
     item = ITEMS[name]
     environ = layered(tmp_path, name, USABLE[name], USABLE[name])
-    saved = asyncio.run(resolve(item, saved_for(item, USABLE[name]), environ))
+    saved = await resolve(item, saved_for(item, USABLE[name]), environ)
     assert saved == Resolved(SETTINGS, None if item.secret else USABLE[name])
-    environment = asyncio.run(resolve(item, NOTHING_SAVED, environ))
+    environment = await resolve(item, NOTHING_SAVED, environ)
     assert environment == Resolved(ENVIRONMENT, None if item.secret else USABLE[name])
 
 
-def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch) -> None:
     async def forbidden(*_: object) -> str | None:
         raise AssertionError("availability never unseals a secret")
 
@@ -482,13 +506,14 @@ def test_the_workspace_view_never_unseals(monkeypatch: pytest.MonkeyPatch) -> No
                 return ScriptedRows([("github_repository", "owner/saved")])
             return ScriptedRows([("tavily",), ("jina",), ("github",)])
 
-    view = asyncio.run(key_sources(Everything(), uuid4(), {}))
+    view = await key_sources(Everything(), uuid4(), {})
     secrets = [item.variable for item in ITEMS.values() if item.secret]
     assert all(view[variable] == "<settings>" for variable in secrets)
 
 
 @pytest.mark.parametrize("name", [name for name in NAMES if ITEMS[name].secret])
-def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_environment(
+@pytest.mark.asyncio
+async def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_environment(
     monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
     """Through the tool's context, as an adapter asks: the environment's key is never sent."""
@@ -508,7 +533,7 @@ def test_a_call_with_an_unsealable_saved_key_is_refused_despite_the_environment(
     context = ToolContext(SavedKey(), ToolScope(uuid4(), uuid4(), 1, {}), "op")
     environ = {item.variable: USABLE[name]}
     with pytest.raises(ToolFailed, match=rf"^{item.credential}_key_unavailable$"):
-        asyncio.run(context.key(name, environ))
+        await context.key(name, environ)
 
 
 def test_the_adapters_requirements_name_the_items_variables() -> None:

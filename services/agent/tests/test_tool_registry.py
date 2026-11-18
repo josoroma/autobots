@@ -202,7 +202,8 @@ def test_with_no_runtime_each_definition_describes_itself(monkeypatch: pytest.Mo
 
 
 @pytest.mark.parametrize("tool_id", sorted(ARGUMENTS))
-def test_with_no_runtime_a_bound_definition_refuses_before_any_effect(
+@pytest.mark.asyncio
+async def test_with_no_runtime_a_bound_definition_refuses_before_any_effect(
     monkeypatch: pytest.MonkeyPatch, tool_id: str
 ) -> None:
     qualified(True, monkeypatch)
@@ -216,7 +217,7 @@ def test_with_no_runtime_a_bound_definition_refuses_before_any_effect(
         return await tool.handler(arguments, context)
 
     with pytest.raises(ToolFailed) as refused:
-        asyncio.run(call())
+        await call()
     assert str(refused.value) in {"tool_runtime_unbound", "browsing_unavailable"}
 
 

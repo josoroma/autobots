@@ -2,7 +2,6 @@
 (MP-07), and the ledger's refusal of an attempt recovery settled meanwhile. Split from
 test_worker_inference.py by module (PTST-04)."""
 
-import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -17,6 +16,7 @@ from autobots.adapters.models.catalog import (
 )
 from autobots.application.model_admission import (
     AttemptAlreadySettled,
+    CostUnavailable,
     ModelAdmission,
     worst_case_cost,
 )
@@ -33,7 +33,7 @@ def fresh_catalog() -> CatalogSnapshot:
 
 def test_a_variable_price_has_no_bound_so_a_reservation_refuses_it() -> None:
     pricing = parse_pricing({"pricing": {"prompt": "-1", "completion": "-1"}})
-    with pytest.raises(Exception, match="price is not known"):
+    with pytest.raises(CostUnavailable, match="price is not known"):
         worst_case_cost(pricing, 1, 1)
 
 
@@ -52,7 +52,7 @@ def test_the_worst_case_is_an_upper_bound_at_the_stated_limits() -> None:
     ],
 )
 def test_a_variable_rate_is_not_hidden_by_a_fixed_one(pricing: dict[str, Any]) -> None:
-    with pytest.raises(Exception, match="price is not known"):
+    with pytest.raises(CostUnavailable, match="price is not known"):
         worst_case_cost(parse_pricing({"pricing": pricing}), 1, 1)
 
 
@@ -70,7 +70,8 @@ class NothingOpen(ScriptedConnection):
         ("reconcile", "this attempt is not awaiting reconciliation"),
     ],
 )
-def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, message: str) -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, message: str) -> None:
     """Recovery can settle or close an attempt while it is out (refactor plan R-41, PRUN-13). The
     refusal stays a ValueError while callers move to its name."""
     ledger = ModelAdmission(NothingOpen())
@@ -82,5 +83,5 @@ def test_an_attempt_settled_elsewhere_is_refused_by_name(step: str, message: str
         "reconcile": (1,),
     }
     with pytest.raises(AttemptAlreadySettled, match=message) as caught:
-        asyncio.run(getattr(ledger, step)(uuid4(), *arguments[step]))
+        await getattr(ledger, step)(uuid4(), *arguments[step])
     assert isinstance(caught.value, ValueError)

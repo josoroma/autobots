@@ -362,6 +362,12 @@ def evidence_state(root: Path) -> tuple[bool, str]:
 
 
 def config_errors(root: Path) -> list[str]:
+    """Every way the project configuration differs from the reviewed baseline, as `project_configuration` reports it:
+    the document mappings, the hooks, the instruction files' frontmatter and links, the rules' check links and the
+    AGENTS.md mapping (PRD-Development-Harness DH-05, refactor plan R-66 THRN-05)."""
+    # Imported here, so a script that uses only this module's other helpers runs from a copy without it.
+    from instruction_checks import broken_link_errors, frontmatter_errors, parse_frontmatter
+
     errors = []
     try:
         config = json.loads((root / '.claude/autobots.json').read_text())
@@ -439,16 +445,18 @@ def config_errors(root: Path) -> list[str]:
         for path in found:
             text = path.read_text()
             if directory in {'skills', 'agents'}:
-                if not text.startswith('---\n') or '\n---\n' not in text[4:]:
+                keys = parse_frontmatter(text)
+                if keys is None:
                     errors.append(f'{path.relative_to(root)}: missing frontmatter.')
                     continue
-                header = text.split('---', 2)[1]
-                if not any(line.startswith('name:') for line in header.splitlines()):
+                if 'name' not in keys:
                     errors.append(f'{path.relative_to(root)}: missing name.')
-                if not any(line.startswith('description:') for line in header.splitlines()):
+                if 'description' not in keys:
                     errors.append(f'{path.relative_to(root)}: missing description.')
             if '${CLAUDE_PLUGIN_ROOT}' in text or 'ohmyorch:contract' in text:
                 errors.append(f'{path.relative_to(root)}: unresolved upstream plugin dependency.')
+    errors.extend(frontmatter_errors(root))
+    errors.extend(broken_link_errors(root))
     errors.extend(rule_link_errors(root))
     errors.extend(agents_mapping_errors(root))
     return errors

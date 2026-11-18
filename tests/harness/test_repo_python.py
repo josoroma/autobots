@@ -24,7 +24,7 @@ TRUST_BOUNDARY = {'.claude/hooks/dispatch.py', 'scripts/harness_lib.py', 'script
 class RepositoryPython(unittest.TestCase):
     def test_scripts_tests_and_hooks_are_repository_python(self) -> None:
         for path in ('scripts/verify.py', 'scripts/qualify_backup.py', 'tests/harness/test_hooks.py',
-                     'tests/db/memory_check.py', 'tests/toolchain/support.py', '.claude/hooks/dispatch.py'):
+                     'tests/db/checks/memory_check.py', 'tests/toolchain/support.py', '.claude/hooks/dispatch.py'):
             with self.subTest(path):
                 self.assertIn('repo_python', harness_lib.check_domains(path))
         for path in ('tests/faults/python/bad_lint/module.py', 'scripts/README.md', 'docs/note.md',

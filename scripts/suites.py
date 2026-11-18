@@ -36,12 +36,10 @@ INSTALL_PROJECT = 'install'
 MANUAL_PROJECTS = (RELEASE_PROJECT, INSTALL_CURRENT_PROJECT, INSTALL_PROJECT)
 
 MANUAL = {
-    'tests/db/browser_executor_check.py': 'Run by `qualify_browser_executor.py`, live: it needs the browser images and '
-                                          'outbound network (Decision 0018).',
-    'tests/db/browse_goal_check.py': 'Run by `qualify_browse_goal.py`, a live check of browse_goal through the real '
-                                     'gateway and the isolated browser (Decision 0020).',
-    'tests/db/product_inference_check.py': 'Run by `qualify_worker_inference.py` and `qualify_mac_sleep.py`, which '
-                                           'qualify the worker entry point and a real Mac sleep, on purpose.',
+    'tests/db/checks/browser_executor_check.py': 'Run by `qualify_browser_executor.py`, live: it needs the browser images '
+                                                 'and outbound network (Decision 0018).',
+    'tests/db/checks/browse_goal_check.py': 'Run by `qualify_browse_goal.py`, a live check of browse_goal through the '
+                                            'real gateway and the isolated browser (Decision 0020).',
     'apps/web/tests/browser/install.spec.ts': 'Read-only on the persistent install, run by hand with `--project '
                                               'install`, as US-11.3 ran it for its local app and upgrade checks.',
     'apps/web/tests/browser/install-current.spec.ts': 'Read-only on the persistent install, run by '

@@ -6,7 +6,7 @@ admin API, then drives real sign-in, the Python API, the BFF and each exposed se
 only that project. No model is called, and nothing persistent is touched.
 
 Each browser story's state is arranged by one step in ARRANGEMENTS, in order, from the synthetic SQL
-fixtures under tests/db/identity. Each step records `arranged: <label>` or raises Unavailable, so no
+fixtures under tests/db/sql/app/identity. Each step records `arranged: <label>` or raises Unavailable, so no
 browser case can pass on a fixture that never existed (refactor plan R-47, SCRP-02, SCRP-09).
 
 Exit codes: 0 passed, 1 a case failed, 2 prerequisite unavailable.
@@ -58,30 +58,30 @@ PYTHON = Path('services/agent/.venv/bin/python')
 # Where a failed child check's stderr is kept (qualification/children.py).
 ERR_DIR = Path('.checks/identity')
 # The SQL each arrangement sends, with `${name}` placeholders that `fixture` fills in.
-IDENTITY_FIXTURES = Path('tests/db/identity')
+IDENTITY_FIXTURES = Path('tests/db/sql/app/identity')
 # Its children drive runs with a scripted model, as its step in qualification/profiles.py says.
 MODEL_TRANSPORT = 'mock'
 # The checks after the artifact check, in order, against real Storage through the runtime role. Arguments
 # name workspace A, workspace B or the service's interpreter (qualification/children.py Child).
 IDENTITY_CHILDREN = (
-    Child('verification_check.py', 'the verification check', ('{a}',), timeout=240),
-    Child('assignment_check.py', 'the assignment check', ('{a}', '{python}'), timeout=240),
-    Child('approval_check.py', 'the approval check', ('{a}', '{b}'), timeout=240),
-    Child('effect_check.py', 'the effect check', ('{a}', '{b}', '{python}'), timeout=240),
-    Child('workflow_run_check.py', 'the workflow run check', ('{a}', '{python}'), timeout=240),
-    Child('blocker_check.py', 'the blocker check', ('{a}',), timeout=240),
-    Child('major_check.py', 'the major check', ('{a}', '{b}'), timeout=240),
-    Child('connector_check.py', 'the connector check', ('{a}',), timeout=240),
-    Child('pull_request_check.py', 'the pull request check', ('{a}',), timeout=240),
-    Child('wake_check.py', 'the wake check', ('{a}',), timeout=240),
-    Child('review_check.py', 'the review check', ('{a}',), timeout=240),
-    Child('improvement_check.py', 'the improvement check', ('{a}', '{b}'), timeout=240),
-    Child('provider_key_check.py', 'the provider key check', ('{a}',), timeout=240),
+    Child('checks/verification_check.py', 'the verification check', ('{a}',), timeout=240),
+    Child('checks/assignment_check.py', 'the assignment check', ('{a}', '{python}'), timeout=240),
+    Child('checks/approval_check.py', 'the approval check', ('{a}', '{b}'), timeout=240),
+    Child('checks/effect_check.py', 'the effect check', ('{a}', '{b}', '{python}'), timeout=240),
+    Child('checks/workflow_run_check.py', 'the workflow run check', ('{a}', '{python}'), timeout=240),
+    Child('checks/pause_cancel_and_fencing_check.py', 'the pause, cancel and fencing check', ('{a}',), timeout=240),
+    Child('checks/effects_routines_and_retention_check.py', 'the effects, routines and retention check', ('{a}', '{b}'), timeout=240),
+    Child('checks/connector_check.py', 'the connector check', ('{a}',), timeout=240),
+    Child('checks/pull_request_check.py', 'the pull request check', ('{a}',), timeout=240),
+    Child('checks/wake_check.py', 'the wake check', ('{a}',), timeout=240),
+    Child('checks/child_run_records_check.py', 'the child run records check', ('{a}',), timeout=240),
+    Child('checks/improvement_check.py', 'the improvement check', ('{a}', '{b}'), timeout=240),
+    Child('checks/provider_key_check.py', 'the provider key check', ('{a}',), timeout=240),
     # Last, so no later check's cleanup ends the runs they leave claimed for the browser.
     # The task timing check claims only its own runs and cleans up nothing.
-    Child('tool_use_view_check.py', 'the tool-use view check', ('{a}',), timeout=240),
-    Child('task_timing_check.py', 'the task timing check', ('{a}',), timeout=240),
-    Child('result_stream_check.py', 'the result stream check', ('{a}',), timeout=240),
+    Child('checks/tool_use_view_check.py', 'the tool-use view check', ('{a}',), timeout=240),
+    Child('checks/task_timing_check.py', 'the task timing check', ('{a}',), timeout=240),
+    Child('checks/result_stream_check.py', 'the result stream check', ('{a}',), timeout=240),
 )
 # Owners other steps read, by the email each is bootstrapped with.
 OWNER_A, OWNER_B = 'owner-a@example.invalid', 'owner-b@example.invalid'
@@ -175,7 +175,7 @@ def sql_literal(value: str) -> str:
 
 
 def fixture(root: Path, name: str, **values: str) -> str:
-    """The SQL of tests/db/identity/<name>, each `${name}` replaced by its value as one SQL literal. A
+    """The SQL of tests/db/sql/app/identity/<name>, each `${name}` replaced by its value as one SQL literal. A
     placeholder with no value, a value with no placeholder, or any other `$`, is refused."""
     template = string.Template((root / IDENTITY_FIXTURES / name).read_text())
     if not template.is_valid():
@@ -291,7 +291,7 @@ def storage_child_cases(run: IdentityRun, cases: Cases, token_a: str, token_b: s
 
 def artifact_check(run: IdentityRun, cases: Cases, token_a: str, token_b: str) -> ChildRun:
     """Publication and recovery against real Storage, through the runtime role."""
-    return run_child_check(cases, run.root, 'artifact_check.py', run.bootstrapped(OWNER_A).workspace_id, run.bootstrapped(OWNER_B).workspace_id,
+    return run_child_check(cases, run.root, 'checks/artifact_check.py', run.bootstrapped(OWNER_A).workspace_id, run.bootstrapped(OWNER_B).workspace_id,
                            label='the artifact check',
                            env=service_env(run.root, run.runtime_url, AUTOBOTS_STORAGE_BASE=run.base, AUTOBOTS_STORAGE_ANON=run.anon_key,
                                            AUTOBOTS_STORAGE_SERVICE=run.service_key, AUTOBOTS_TOKEN_A=token_a, AUTOBOTS_TOKEN_B=token_b),
@@ -313,7 +313,7 @@ def schema_state_cases(run: IdentityRun, cases: Cases) -> None:
     root, stack = run.root, run.stack
 
     def schema_state(state: str) -> None:
-        run_child_check(cases, root, 'schema_release_check.py', state, label=f'the schema check for {state}', env=service_env(root, run.runtime_url),
+        run_child_check(cases, root, 'checks/schema_release_check.py', state, label=f'the schema check for {state}', env=service_env(root, run.runtime_url),
                         timeout=60, err_dir=root / ERR_DIR, err_name=f'schema_release_check-{state}')
 
     history = 'autobots_disposable.migrations'
@@ -408,7 +408,7 @@ def arrange_reader(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 
 def arrange_run_list(run: IdentityRun, cases: Cases) -> dict[str, str]:
-    """US-15.4: 101 runs, three with spend (tests/db/identity/run_list.sql)."""
+    """US-15.4: 101 runs, three with spend (tests/db/sql/app/identity/run_list.sql)."""
     owner = run.owner(RUN_LIST_OWNER)
     cases.arrange('101 runs, three with spend', run.stack.runtime(fixture(run.root, 'run_list.sql', workspace=owner.workspace_id)))
     return {'AUTOBOTS_TEST_RUNS_EMAIL': owner.email, 'AUTOBOTS_TEST_RUNS_PASSWORD': owner.password}
@@ -416,7 +416,7 @@ def arrange_run_list(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 def arrange_experts(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.6 and US-15.7: three Experts, then an older grant and a published workflow
-    (tests/db/identity/experts.sql and older_expert_grant.sql)."""
+    (tests/db/sql/app/identity/experts.sql and older_expert_grant.sql)."""
     owner = run.owner('experts-h@example.invalid')
     ids = {'workspace': owner.workspace_id, 'user': owner.user_id}
     cases.arrange('three Experts, one with three runs', run.stack.runtime(fixture(run.root, 'experts.sql', **ids)))
@@ -426,9 +426,9 @@ def arrange_experts(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 def arrange_model_sources(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.8: a workspace that saves no default and one role override, and a run admitted with a run role
-    override, through the admission code (tests/db/model_sources.py)."""
+    override, through the admission code (tests/db/arrange/model_sources.py)."""
     owner = run.owner('models-i@example.invalid')
-    sourced = run_arrangement(cases, run.root, 'model_sources.py', owner.workspace_id, owner.user_id, label='the binding-source run',
+    sourced = run_arrangement(cases, run.root, 'arrange/model_sources.py', owner.workspace_id, owner.user_id, label='the binding-source run',
                               env=service_env(run.root, run.runtime_url), timeout=120, cwd=run.root)
     recorded = sourced.get('sources')
     sources = recorded if isinstance(recorded, dict) else {}
@@ -439,7 +439,7 @@ def arrange_model_sources(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 
 def arrange_composer(run: IdentityRun, cases: Cases) -> dict[str, str]:
-    """US-15.9: US$2.10 left of today's cap and one Expert (tests/db/identity/composer.sql). browser_cases
+    """US-15.9: US$2.10 left of today's cap and one Expert (tests/db/sql/app/identity/composer.sql). browser_cases
     grants the workspace the installation key."""
     owner = run.owner('composer-j@example.invalid')
     cases.arrange('the composer workspace', run.stack.runtime(
@@ -449,7 +449,7 @@ def arrange_composer(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 
 def arrange_home(run: IdentityRun, cases: Cases) -> dict[str, str]:
-    """US-15.10: a Costa Rica workspace whose owner is named Ada, with seven runs (tests/db/identity/home.sql)."""
+    """US-15.10: a Costa Rica workspace whose owner is named Ada, with seven runs (tests/db/sql/app/identity/home.sql)."""
     owner = run.owner('home-k@example.invalid')
     cases.arrange('the home workspace', run.stack.sql(fixture(run.root, 'home.sql', workspace=owner.workspace_id, user=owner.user_id,
                                                               **numbered('run', HOME_RUNS), **numbered('approval', HOME_APPROVALS))))
@@ -482,7 +482,7 @@ def plain_graph() -> str:
 
 def arrange_workflows(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.13: a US$10.00 daily cap, two Experts and two workflows, one with a draft and three executions
-    (tests/db/identity/workflows.sql)."""
+    (tests/db/sql/app/identity/workflows.sql)."""
     owner = run.owner(WORKFLOWS_OWNER)
     cases.arrange('the workflows workspace', run.stack.sql(fixture(
         run.root, 'workflows.sql', workspace=owner.workspace_id, user=owner.user_id, analyst=ANALYST, writer=WRITER, brief=BRIEF, plain=PLAIN,
@@ -493,19 +493,19 @@ def arrange_workflows(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 
 def arrange_operations(run: IdentityRun, cases: Cases) -> dict[str, str]:
-    """US-15.18: jobs no worker may take and published artifacts (tests/db/identity/operations.sql)."""
+    """US-15.18: jobs no worker may take and published artifacts (tests/db/sql/app/identity/operations.sql)."""
     owner = run.owner(OPERATIONS_OWNER)
     arranged = run.stack.sql(fixture(run.root, 'operations.sql', workspace=owner.workspace_id))
     # US-15.19: its jobs chart reads hours in Costa Rica's time, which has no daylight saving.
     zoned = run.stack.sql(f"update public.workspaces set timezone = 'America/Costa_Rica' where id = {sql_literal(owner.workspace_id)};\n")
     cases.arrange('the operations workspace', arranged, zoned)
     return {'AUTOBOTS_TEST_OPS_EMAIL': owner.email, 'AUTOBOTS_TEST_OPS_PASSWORD': owner.password, 'AUTOBOTS_TEST_OPS_WORKSPACE': owner.workspace_id,
-            'AUTOBOTS_TEST_OPS_HELPER': str(run.root / 'tests/db/operations_live.py')}
+            'AUTOBOTS_TEST_OPS_HELPER': str(run.root / 'tests/db/arrange/operations_live.py')}
 
 
 def arrange_two_workspace_member(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-16.3: a member of their own workspace P and of runs-g's G, with a run only in P. The ops-n workspace is
-    one they don't belong to (tests/db/identity/two_workspace_member.sql)."""
+    one they don't belong to (tests/db/sql/app/identity/two_workspace_member.sql)."""
     member = run.owner('multi-p@example.invalid')
     shared, foreign = run.bootstrapped(RUN_LIST_OWNER).workspace_id, run.bootstrapped(OPERATIONS_OWNER).workspace_id
     cases.arrange('the two-workspace member', run.stack.sql(
@@ -517,7 +517,7 @@ def arrange_two_workspace_member(run: IdentityRun, cases: Cases) -> dict[str, st
 
 def arrange_search(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.22: records named "read" in the ops-n workspace, and in the workflows workspace, which a search from
-    ops-n must not return (tests/db/identity/search.sql)."""
+    ops-n must not return (tests/db/sql/app/identity/search.sql)."""
     operator, builder = run.bootstrapped(OPERATIONS_OWNER), run.bootstrapped(WORKFLOWS_OWNER)
     cases.arrange('the search records', run.stack.sql(fixture(
         run.root, 'search.sql', workspace=operator.workspace_id, user=operator.user_id, other_workspace=builder.workspace_id,
@@ -529,17 +529,17 @@ def check_concept_seed(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.25: the concept seed, run twice into a fresh workspace with no GitHub variables. A check, not an
     arrangement, so it records its child's cases and returns nothing for the browser suites."""
     workspace = run.owner('seed-o@example.invalid').workspace_id
-    run_child_check(cases, run.root, 'concept_seed_check.py', workspace, label='the concept seed check', env=service_env(run.root, run.runtime_url),
+    run_child_check(cases, run.root, 'checks/concept_seed_check.py', workspace, label='the concept seed check', env=service_env(run.root, run.runtime_url),
                     timeout=240, cwd=run.root, err_dir=run.root / ERR_DIR)
     return {}
 
 
 def arrange_browser_runs(run: IdentityRun, cases: Cases) -> dict[str, str]:
-    """Runs no screen can reach by itself (tests/db/browser_runs.py): one waiting on an approval in workspace A,
+    """Runs no screen can reach by itself (tests/db/arrange/browser_runs.py): one waiting on an approval in workspace A,
     and one finished in a keyless workspace of its own, as the keyless-run suite asserts that the no-key
     workspace holds exactly one run."""
     keyless = run.owner('owner-e@example.invalid')
-    browser_runs = run_arrangement(cases, run.root, 'browser_runs.py', run.bootstrapped(OWNER_A).workspace_id, keyless.workspace_id, label='the browser runs',
+    browser_runs = run_arrangement(cases, run.root, 'arrange/browser_runs.py', run.bootstrapped(OWNER_A).workspace_id, keyless.workspace_id, label='the browser runs',
                                    env=service_env(run.root, run.runtime_url, AUTOBOTS_STORAGE_BASE=run.base, AUTOBOTS_STORAGE_SERVICE=run.service_key),
                                    timeout=120, cwd=run.root)
     cases.arranged('the browser runs waiting and finished', 'waiting_approval and succeeded', browser_runs.get('states'),

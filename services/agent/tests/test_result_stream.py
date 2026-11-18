@@ -87,7 +87,8 @@ class Streams:
             yield chunk
 
 
-def test_only_an_outputs_files_content_is_sent_coalesced_and_nothing_private(
+@pytest.mark.asyncio
+async def test_only_an_outputs_files_content_is_sent_coalesced_and_nothing_private(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(result_stream, "FLUSH_SECONDS", 0.05)
@@ -104,7 +105,7 @@ def test_only_an_outputs_files_content_is_sent_coalesced_and_nothing_private(
         finally:
             reset_tap(token)
 
-    message = asyncio.run(run())
+    message = await run()
     chunks = _chunks()
     assert sent, "some text was sent"
     assert {tuple(sorted(item)) for item in sent} == {("offset", "run_id", "segment", "text")}
@@ -135,15 +136,17 @@ def test_only_an_outputs_files_content_is_sent_coalesced_and_nothing_private(
     assert message.response_metadata["cost"] == 0.0001
 
 
-def test_a_stream_that_fails_after_its_first_chunk_is_a_partial_stream() -> None:
+@pytest.mark.asyncio
+async def test_a_stream_that_fails_after_its_first_chunk_is_a_partial_stream() -> None:
     with pytest.raises(ProviderFailure) as failure:
-        asyncio.run(_streamed(Streams(_chunks(), fail_after=3), []))
+        await _streamed(Streams(_chunks(), fail_after=3), [])
     assert failure.value.failure is FailureClass.PARTIAL_STREAM
     with pytest.raises(ConnectionError):
-        asyncio.run(_streamed(Streams(_chunks(), fail_after=0), []))
+        await _streamed(Streams(_chunks(), fail_after=0), [])
 
 
-def test_a_tap_that_cant_send_never_stops_the_call() -> None:
+@pytest.mark.asyncio
+async def test_a_tap_that_cant_send_never_stops_the_call() -> None:
     async def broken(_: dict[str, Any]) -> None:
         raise OSError("no database")
 
@@ -154,13 +157,14 @@ def test_a_tap_that_cant_send_never_stops_the_call() -> None:
         finally:
             reset_tap(token)
 
-    assert asyncio.run(run()).tool_calls[2]["args"]["content"] == CONTENT
+    assert (await run()).tool_calls[2]["args"]["content"] == CONTENT
 
 
-def test_a_call_cut_off_mid_argument_stays_invalid_as_without_streaming() -> None:
+@pytest.mark.asyncio
+async def test_a_call_cut_off_mid_argument_stays_invalid_as_without_streaming() -> None:
     cut = _fragments('{"path": "outputs/rep', "save_artifact", 0)
     cut.append(AIMessageChunk(content="", response_metadata={"finish_reason": "length"}))
-    message = asyncio.run(_streamed(Streams(cut), []))
+    message = await _streamed(Streams(cut), [])
     assert isinstance(message, AIMessage)
     assert message.tool_calls == []
     assert [call["name"] for call in message.invalid_tool_calls] == ["save_artifact"]
@@ -176,7 +180,8 @@ MALFORMED = {
 
 
 @pytest.mark.parametrize("arguments", MALFORMED.values(), ids=MALFORMED.keys())
-def test_a_malformed_result_call_ends_only_its_own_live_text(
+@pytest.mark.asyncio
+async def test_a_malformed_result_call_ends_only_its_own_live_text(
     monkeypatch: pytest.MonkeyPatch, arguments: str
 ) -> None:
     monkeypatch.setattr(result_stream, "FLUSH_SECONDS", 0.0)
@@ -198,7 +203,7 @@ def test_a_malformed_result_call_ends_only_its_own_live_text(
         finally:
             reset_tap(token)
 
-    message = asyncio.run(run())
+    message = await run()
     # The reply settles as it would without the tap: the malformed call is an invalid tool call.
     assert [call["name"] for call in message.invalid_tool_calls] == ["save_artifact"]
     assert [call["args"]["content"] for call in message.tool_calls] == [CONTENT]
@@ -209,7 +214,8 @@ def test_a_malformed_result_call_ends_only_its_own_live_text(
 
 
 @pytest.mark.parametrize("when", ["feed", "finish"])
-def test_a_tap_that_fails_while_reading_never_stops_the_call(
+@pytest.mark.asyncio
+async def test_a_tap_that_fails_while_reading_never_stops_the_call(
     monkeypatch: pytest.MonkeyPatch, when: str
 ) -> None:
     class Failing(ResultTap):
@@ -231,15 +237,16 @@ def test_a_tap_that_fails_while_reading_never_stops_the_call(
         finally:
             reset_tap(token)
 
-    assert asyncio.run(run()).tool_calls[2]["args"]["content"] == CONTENT
+    assert (await run()).tool_calls[2]["args"]["content"] == CONTENT
 
 
-def test_closing_a_tap_whose_connection_fails_never_raises() -> None:
+@pytest.mark.asyncio
+async def test_closing_a_tap_whose_connection_fails_never_raises() -> None:
     class Broken:
         async def close(self) -> None:
             raise OSError("the connection is gone")
 
     tap = ResultTap(uuid4())
     tap._connection = Broken()
-    asyncio.run(tap.close())
+    await tap.close()
     assert tap._connection is None

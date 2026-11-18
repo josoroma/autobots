@@ -35,8 +35,8 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
 - **Tests:**
   - `services/agent/tests/`: 40 `test_*.py` modules, plus `conftest.py` and `fake_openrouter.py`.
   - `apps/web/tests/`: 38 browser specs and 2 unit tests.
-  - `tests/db/`: disposable-stack checks and their workers.
-  - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `tests/db/checklib.py` holds the database checks' shared case protocol, and `scripts/qualification/` the qualifiers' one child-check runner and typed records; `scripts/paid_run.py` is the one paid-run session (after the analyzed revision).
+  - `tests/db/`: disposable-stack checks and their workers, grouped as `checks/`, `workers/`, `arrange/`, `fixtures/` and `sql/` (h1 and app), with a README that maps each file to its invoker. The eight largest checks run their scenarios from a `SCENARIOS` tuple (after the analyzed revision, refactor plan R-66).
+  - `tests/harness/`, `tests/web/` (fixture API, upstream and worker), `tests/faults/`, `tests/toolchain/`, `tests/qualification/`. `tests/db/fixtures/checklib.py` holds the database checks' shared case protocol, `tests/harness/harness_support.py` what the harness tests share, `scripts/instruction_checks.py` the instruction-file checks that `project_configuration` reports, and `services/agent/tests/sql_fakes.py` the one SQL fake that refuses unscripted statements, and `scripts/qualification/` the qualifiers' one child-check runner and typed records; `scripts/paid_run.py` is the one paid-run session (after the analyzed revision).
   - `contracts/fixtures/`: shared cases.
 - **Tooling:** `scripts/` (27 tracked files), `Makefile` (wraps the persistent install), and `.claude/` (7 agents, 13 skills, 9 rules, `hooks/dispatch.py`, `settings.json`, `ohmyorch/`).
 - **Operator guides:** `README-SETUP-RUN.md` (set up, start, stop) and `README-QA.md` (runtime Q&A, which describes revision `ecb34900e46c`).
@@ -352,7 +352,7 @@ These evidence classes aren't interchangeable, and later code doesn't inherit ea
 - **`full`:** every static and unit step, `next build`, `contract_drift`, `qualify_faults.py`, the offline `tests/toolchain` modules (since R-01, after the analyzed revision) (scope, manifest pins and launchers), and `qualify_web.py`. Per-story records report 41 browser tests.
 - **Selections:** since R-01, after the analyzed revision, `scripts/suites.py` names every step's tests: web and API-client unit tests by glob, the Playwright projects, and the manual files with their reasons. `tests/harness/test_suite_claims.py` fails on a test file nothing runs. `make check-fast` and `make check-full` run those profiles; `.githooks/pre-commit` is opt-in.
 - **Profile registry:** since R-65, after the analyzed revision, `scripts/qualification/profiles.py` describes each profile's steps once (arguments, timeout, class, transport, scope, not-tested list), and `verify.py`, `toolchain.py`, `report_state` and `evidence.py` read it; the Stop hook derives a script's check domains from what those steps import. `disposable_db.disposable_project` owns every disposable stack's lifecycle and cleanup cases, the operations, backup and upgrade qualifiers run ordered `SCENARIOS`, `scripts/local_app.py` holds the Makefile's process supervision, and `harness_lib.parse_dotenv` is the one dotenv reader (with `stack.env` read verbatim, Decision 0029 F11). The disposable stack pins the install overlay's database and Storage images.
-- **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` (including `tests/db/*_check.py` such as `result_stream_check`, `task_timing_check`, `pull_request_check`, `concept_seed_check`) and `qualify_persistent_apply`.
+- **`db`:** disposable targets for `disposable_db`, `supabase_stack`, `app_db`, `qualify_identity` (including `tests/db/checks/*_check.py` such as `result_stream_check`, `task_timing_check`, `pull_request_check`, `concept_seed_check`) and `qualify_persistent_apply`.
 - **`operations`:** `qualify_operations`, `qualify_backup`, `qualify_upgrade`, on disposable projects with a scripted model.
 
 **Browser specs.** Since R-58, after the analyzed revision, `apps/web/tests/browser/projects.json` assigns the 41 spec files to seven Playwright projects, and each runner passes its own with `--project`:
@@ -363,7 +363,7 @@ These evidence classes aren't interchangeable, and later code doesn't inherit ea
 
 **In no profile:** `qualify_worker_inference.py`, `qualify_github_connector.py` (`--suite studio`, review then apply, ledger-capped), `qualify_browser_executor.py`, `qualify_browse_goal.py`, `browse_trial.py`, `qualify_mac_sleep.py`, `qualify_release.py`, `live_goal.py`, and `tests/toolchain` other than its offline modules. `scripts/suites.py` lists the manual test files with their reasons.
 
-**Evidence and hooks.** `scripts/evidence.py` checks records for consistency, not correctness. The hook fixtures are in `tests/harness/test_hooks.py`. Hooks are configured but not qualified ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)).
+**Evidence and hooks.** `scripts/evidence.py` checks records for consistency, not correctness. The hook fixtures are in `tests/harness/test_hook_guard.py`, `test_hook_process.py`, `test_hook_diagnostics.py` and `test_hook_worktrees.py` (after the analyzed revision; `test_hooks.py` until R-66). Hooks are configured but not qualified ([Decision 0012](docs/engineering/decisions/0012-unqualified-hooks-in-h1.md)).
 
 ## Common Commands
 

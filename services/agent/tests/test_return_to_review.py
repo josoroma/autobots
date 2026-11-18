@@ -2,7 +2,7 @@
 transaction (refactor plan R-21: PADP-02, XMOD-02, XDUP-02; Decision 0022 D15).
 
 The database fake answers only what these paths read, and records each statement with the
-transaction it ran in. tests/db/pull_request_check.py runs the same path against Postgres.
+transaction it ran in. tests/db/checks/pull_request_check.py runs the same path against Postgres.
 """
 
 import asyncio
@@ -110,14 +110,15 @@ def kind(query: str) -> str:
     return "other"
 
 
-def test_a_returned_request_commits_in_one_fenced_transaction() -> None:
+@pytest.mark.asyncio
+async def test_a_returned_request_commits_in_one_fenced_transaction() -> None:
     """The lease first, then the attempt's receipt settled, the request back to pending with the
     standard expiry and the new detail, and approval.requested appended, all committed at once."""
     from autobots.application.approvals import DEFAULT_TTL_SECONDS, return_to_review
 
     ledger = Ledger()
-    returned = asyncio.run(
-        return_to_review(ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL)
+    returned = await return_to_review(
+        ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL
     )
     assert returned == APPROVAL
     assert [kind(query) for query, _, _ in ledger.statements] == [
@@ -148,14 +149,15 @@ def test_a_returned_request_commits_in_one_fenced_transaction() -> None:
     }
 
 
-def test_returning_to_review_makes_no_run_transition() -> None:
+@pytest.mark.asyncio
+async def test_returning_to_review_makes_no_run_transition() -> None:
     """The run keeps running, and enters the decision wait only when the call is tried again
     (Decision 0028 E1): no run status, job or obligation is written, and no status event."""
     from autobots.application.approvals import return_to_review
 
     ledger = Ledger()
-    asyncio.run(
-        return_to_review(ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL)
+    await return_to_review(
+        ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL
     )
     written = [query for query, _, _ in ledger.writes()]
     assert not [query for query in written if "public.runs set status" in query]
@@ -168,44 +170,45 @@ def test_returning_to_review_makes_no_run_transition() -> None:
     assert events == ["approval.requested"]
 
 
-def test_a_stale_generation_leaves_the_decision_untouched() -> None:
+@pytest.mark.asyncio
+async def test_a_stale_generation_leaves_the_decision_untouched() -> None:
     """A worker whose generation isn't current reads its lease and writes nothing."""
     from autobots.application.approvals import return_to_review
 
     ledger = Ledger(owned=False)
     with pytest.raises(LeaseLost):
-        asyncio.run(
-            return_to_review(
-                ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL
-            )
+        await return_to_review(
+            ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL
         )
     assert [kind(query) for query, _, _ in ledger.statements] == ["hold lease"]
     assert ledger.rolled_back == {1}
 
 
-def test_without_an_approved_request_nothing_is_written() -> None:
+@pytest.mark.asyncio
+async def test_without_an_approved_request_nothing_is_written() -> None:
     """Only an approved request goes back to review, so its receipt stays as the attempt left it."""
     from autobots.application.approvals import return_to_review
 
     ledger = Ledger(approved=False)
-    returned = asyncio.run(
-        return_to_review(ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL)
+    returned = await return_to_review(
+        ledger, SCOPE, operation_id=OPERATION, tool_id=TOOL_ID, detail=NEW_DETAIL
     )
     assert returned is None
     assert ledger.writes() == []
 
 
 @pytest.mark.parametrize("holder", [SCOPE, LEASE], ids=["tool scope", "lease"])
-def test_hold_lease_fences_a_scope_or_a_lease(holder: ToolScope | Lease) -> None:
+@pytest.mark.asyncio
+async def test_hold_lease_fences_a_scope_or_a_lease(holder: ToolScope | Lease) -> None:
     from autobots.application import tool_gateway
     from autobots.application.worker_leases import hold_lease
 
     ledger = Ledger()
-    asyncio.run(hold_lease(ledger, holder))
+    await hold_lease(ledger, holder)
     query, params, _ = ledger.statements[0]
     assert "for share" in query and params == (holder.run_id, holder.generation)
     with pytest.raises(LeaseLost):
-        asyncio.run(hold_lease(Ledger(owned=False), holder))
+        await hold_lease(Ledger(owned=False), holder)
     # One implementation: the gateway's writers fence through the same function.
     assert tool_gateway.hold_lease is hold_lease
 
@@ -223,16 +226,15 @@ def test_only_a_failed_or_missing_receipt_says_nothing_was_sent(
     assert receipt_may_have_sent(status) is may_have_sent
 
 
-def test_the_approved_request_is_read_by_its_operation() -> None:
+@pytest.mark.asyncio
+async def test_the_approved_request_is_read_by_its_operation() -> None:
     from autobots.application.approvals import ApprovedRequest, approved_request
 
     ledger = Ledger()
-    assert asyncio.run(approved_request(ledger, OPERATION)) == ApprovedRequest(
-        TARGET, APPROVED_DETAIL
-    )
+    assert await approved_request(ledger, OPERATION) == ApprovedRequest(TARGET, APPROVED_DETAIL)
     query, params, _ = ledger.statements[0]
     assert "status = 'approved'" in query and params == (OPERATION,)
-    assert asyncio.run(approved_request(Ledger(approved=False), OPERATION)) is None
+    assert await approved_request(Ledger(approved=False), OPERATION) is None
 
 
 class MovedBase:

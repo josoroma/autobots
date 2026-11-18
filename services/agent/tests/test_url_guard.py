@@ -5,7 +5,7 @@ certificate must hold (refactor plan R-62, PADP-15), so the fakes route by `Host
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import httpx
 import pytest
@@ -48,7 +48,9 @@ def named(request: httpx.Request) -> str:
 
 
 class Recorder:
-    def __init__(self, handler) -> None:  # type: ignore[no-untyped-def]
+    def __init__(
+        self, handler: Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]]
+    ) -> None:
         self.requests: list[str] = []
         self.sent: list[httpx.Request] = []
         self.handler = handler
@@ -58,9 +60,7 @@ class Recorder:
             self.requests.append(named(request))
             self.sent.append(request)
             result = self.handler(request)
-            if asyncio.iscoroutine(result):
-                result = await result
-            return result  # type: ignore[no-any-return]
+            return await result if isinstance(result, Awaitable) else result
 
         return httpx.MockTransport(answer)
 

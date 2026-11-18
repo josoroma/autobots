@@ -123,7 +123,8 @@ def at(hours: int) -> datetime:
     return MOMENT - timedelta(hours=hours)
 
 
-def test_each_workflow_shows_its_own_versions_in_order_its_draft_and_its_runs() -> None:
+@pytest.mark.asyncio
+async def test_each_workflow_shows_its_own_versions_in_order_its_draft_and_its_runs() -> None:
     database = FakeDatabase([])
     database.answer(
         "select id, name, latest_version, description from public.workflows",
@@ -159,7 +160,7 @@ def test_each_workflow_shows_its_own_versions_in_order_its_draft_and_its_runs() 
         {"workflow_id": C, "graph": empty, "saved_at": MOMENT},
     )
     database.answer("count(*) as runs", {"workflow_id": A, "runs": 3})
-    views = asyncio.run(list_workflows(FakeConnection(database), WORKSPACE))
+    views = await list_workflows(FakeConnection(database), WORKSPACE)
     shown = [
         (
             view.id,
@@ -177,7 +178,8 @@ def test_each_workflow_shows_its_own_versions_in_order_its_draft_and_its_runs() 
     ]
 
 
-def test_each_expert_shows_its_own_versions_in_order_and_its_own_runs() -> None:
+@pytest.mark.asyncio
+async def test_each_expert_shows_its_own_versions_in_order_and_its_own_runs() -> None:
     database = FakeDatabase([])
     database.answer(
         "select id, name, latest_version from public.experts",
@@ -198,7 +200,7 @@ def test_each_expert_shows_its_own_versions_in_order_and_its_own_runs() -> None:
         {"expert_id": C, "run_count": 4, "last_run_at": at(1)},
         {"expert_id": A, "run_count": 1, "last_run_at": at(9)},
     )
-    views = asyncio.run(list_experts(FakeConnection(database), WORKSPACE))
+    views = await list_experts(FakeConnection(database), WORKSPACE)
     shown = [
         (
             view.id,
@@ -215,7 +217,8 @@ def test_each_expert_shows_its_own_versions_in_order_and_its_own_runs() -> None:
     ]
 
 
-def test_each_routine_shows_its_own_configuration_and_occurrences_newest_first() -> None:
+@pytest.mark.asyncio
+async def test_each_routine_shows_its_own_configuration_and_occurrences_newest_first() -> None:
     database = FakeDatabase([])
     database.answer(
         "select id, name, enabled, latest_version from public.routines",
@@ -249,7 +252,7 @@ def test_each_routine_shows_its_own_configuration_and_occurrences_newest_first()
         occurred(B, 3),
         occurred(A, 4),
     )
-    views = asyncio.run(list_routines(FakeConnection(database), WORKSPACE))
+    views = await list_routines(FakeConnection(database), WORKSPACE)
     shown = [
         (view.id, view.config.goal, [item.occurrence_time for item in view.occurrences])
         for view in views
@@ -261,7 +264,8 @@ def test_each_routine_shows_its_own_configuration_and_occurrences_newest_first()
     ]
 
 
-def test_each_candidate_shows_its_own_latest_replay_with_its_runs_in_order() -> None:
+@pytest.mark.asyncio
+async def test_each_candidate_shows_its_own_latest_replay_with_its_runs_in_order() -> None:
     database = FakeDatabase([])
     database.answer(
         "from public.improvement_candidates where workspace_id",
@@ -294,7 +298,7 @@ def test_each_candidate_shows_its_own_latest_replay_with_its_runs_in_order() -> 
         replayed(C, third, "third", "running"),
         replayed(A, second, "second", "failed"),
     )
-    views = asyncio.run(list_candidates(FakeConnection(database), WORKSPACE))
+    views = await list_candidates(FakeConnection(database), WORKSPACE)
     shown = [
         (
             view.id,

@@ -377,7 +377,7 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
 test("US-14.5: a missing key refuses only a run or version that grants its tool", async ({
   page,
 }) => {
-  // Arranged by tests/db/provider_key_check.py: Experts saved while the GitHub variables were set.
+  // Arranged by tests/db/checks/provider_key_check.py: Experts saved while the GitHub variables were set.
   // This suite's API has none of them.
   const { keyedSession, keyedExpert, plainSession, plainExpert } = arranged({
     keyedSession: "AUTOBOTS_TEST_KEYED_SESSION",

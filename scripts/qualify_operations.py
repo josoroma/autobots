@@ -256,7 +256,7 @@ def recovery(run: OperationsRun, cases: Cases) -> None:
     code, reply = api_call(run.api_port, ops.internal, run.token_a, 'POST', f'/v1/runs/{cut}/model-calls/reconcile', json.dumps({'charged_micro_usd': 100}).encode(), {'Idempotency-Key': secrets.token_hex(8)})
     cases.check('the owner reconciles it through the API', '200, one call', f'{code} {reply[:60]}', code == 200 and '"reconciled_calls":1' in reply)
     # Arranged: the route also requires a usable key, and none exists here, so this is the command it calls.
-    resumed = launch([str(root / PYTHON), str(root / 'tests/db/operations_check.py'), 'resume', run.workspace_a, cut], env=ops.env, timeout=60, label='the arranged resume')
+    resumed = launch([str(root / PYTHON), str(root / 'tests/db/arrange/run_commands.py'), 'resume', run.workspace_a, cut], env=ops.env, timeout=60, label='the arranged resume')
     finished = wait(lambda: ops.sql(f"select status from public.runs where id = '{cut}';") == 'succeeded', 60)
     resuming.send_signal(signal.SIGTERM)
     exit_code = exited(resuming, 30)
@@ -268,7 +268,7 @@ def recovery(run: OperationsRun, cases: Cases) -> None:
 def retention(run: OperationsRun, cases: Cases) -> None:
     """Retention, on the real run `drain` finished."""
     ops, root = run.ops, run.root
-    run_child_check(cases, root, 'operations_check.py', 'retention', run.workspace_a, run.workspace_b, run.queued, label='the retention check',
+    run_child_check(cases, root, 'checks/operations_check.py', 'retention', run.workspace_a, run.workspace_b, run.queued, label='the retention check',
                     env=ops.env, timeout=240, err_dir=root / ERR_DIR, err_name='retention')
     code, _ = api_call(run.api_port, ops.internal, run.token_b, 'PUT', '/v1/operations/retention', json.dumps({'run_days': 30, 'receipt_days': 7}).encode())
     cases.check('a key window shorter than run content is refused', '422', code, code == 422)

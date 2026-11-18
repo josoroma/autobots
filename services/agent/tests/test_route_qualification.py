@@ -310,7 +310,8 @@ def test_the_ledger_stops_a_call_that_would_pass_the_cap(tmp_path: Path) -> None
     assert Ledger(tmp_path / "ledger.json", 100).committed() == 60
 
 
-def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
     fake = Fake(cost=None)
     ledger = Ledger(tmp_path / "ledger.json", 3_000)
 
@@ -324,7 +325,7 @@ def test_the_corpus_stops_cleanly_at_the_cap(tmp_path: Path) -> None:
             max_tokens=max_tokens,
         )
 
-    results = asyncio.run(fixtures.QualificationRun(build, ledger, 1_500).run())
+    results = await fixtures.QualificationRun(build, ledger, 1_500).run()
     assert results[-1].verdict == "not_run"
     assert len(fake.bodies) == 2
     assert ledger.committed() <= ledger.cap
@@ -448,13 +449,14 @@ def test_a_missing_key_refuses(tmp_path: Path) -> None:
         read_key(env_file)
 
 
-def test_nothing_is_sent_without_the_paid_flag(
+@pytest.mark.asyncio
+async def test_nothing_is_sent_without_the_paid_flag(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     arguments = type("Args", (), {"paid": False, "out": str(tmp_path), "key_file": "absent"})()
-    assert asyncio.run(rq._main(arguments)) == 0
+    assert await rq._main(arguments) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "not_sent"
-    assert list(tmp_path.iterdir()) == []
+    assert list(tmp_path.iterdir()) == []  # noqa: ASYNC240 - the test reads its own temporary folder, after the run
 
 
 def test_a_decline_is_recognized_with_either_apostrophe() -> None:
@@ -472,6 +474,7 @@ def test_a_rerun_sends_only_what_was_named_and_keeps_the_full_report(tmp_path: P
     async def fetch() -> dict[str, Any]:
         return catalog()
 
+    # asyncio.run in a sync test: `run` above drives the qualifier's own loop, which can't nest.
     report = asyncio.run(
         rq.qualify(
             "openrouter_deepseek_flash",
@@ -607,7 +610,8 @@ def test_a_rate_the_trials_prompt_could_reach_unpriced_is_refused(
         rq.preflight("openrouter_deepseek_flash", payload, ledger)
 
 
-def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
     ledger = Ledger(tmp_path / "ledger.json", 100)
 
     async def calls() -> None:
@@ -619,7 +623,7 @@ def test_a_charge_settles_from_the_reported_cost(tmp_path: Path) -> None:
         async with ledger.charge("unknown", 40) as charge:
             charge.known = False
 
-    asyncio.run(calls())
+    await calls()
     entries = json.loads((tmp_path / "ledger.json").read_text())["entries"]
     assert [(e["label"], e["reported"], e["state"]) for e in entries] == [
         ("reported", 7, "settled"),
@@ -634,7 +638,8 @@ class Interrupted(BaseException):
 
 
 @pytest.mark.parametrize("interruption", [asyncio.CancelledError, Interrupted, RuntimeError])
-def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_propagates(
+@pytest.mark.asyncio
+async def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_propagates(
     tmp_path: Path, interruption: type[BaseException]
 ) -> None:
     ledger = Ledger(tmp_path / "ledger.json", 100)
@@ -645,13 +650,14 @@ def test_an_interrupted_charge_stays_held_as_uncertain_and_the_interruption_prop
             raise interruption
 
     with pytest.raises(interruption):
-        asyncio.run(call())
+        await call()
     reread = Ledger(tmp_path / "ledger.json", 100)
     assert [(e["state"], e["reported"]) for e in reread.entries] == [("uncertain", None)]
     assert reread.committed() == 40
 
 
-def test_a_charge_past_the_cap_holds_nothing_and_never_runs(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_a_charge_past_the_cap_holds_nothing_and_never_runs(tmp_path: Path) -> None:
     ledger = Ledger(tmp_path / "ledger.json", 100)
     ran: list[str] = []
 
@@ -660,6 +666,6 @@ def test_a_charge_past_the_cap_holds_nothing_and_never_runs(tmp_path: Path) -> N
             ran.append("sent")
 
     with pytest.raises(CapReached):
-        asyncio.run(call())
+        await call()
     assert ran == []
     assert ledger.entries == []

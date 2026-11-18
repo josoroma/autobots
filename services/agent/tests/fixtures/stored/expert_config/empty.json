@@ -1,4 +1,4 @@
 {
-  "written_by": "tests/db/review_check.py inserts a version whose config is {}",
+  "written_by": "tests/db/checks/child_run_records_check.py inserts a version whose config is {}",
   "stored": {}
 }

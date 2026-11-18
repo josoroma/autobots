@@ -2,7 +2,8 @@
 
 A look notices a sleep, beats when a beat is due or the Mac just woke, revives a lease that ran out
 during a sleep, and then takes the sleep off the active time, after the beat. The database calls are
-replaced, so these cases cover the decisions; tests/db/wake_check.py covers them against a database.
+replaced, so these cases cover the decisions; tests/db/checks/wake_check.py covers them against a
+database.
 """
 
 import asyncio
@@ -115,7 +116,8 @@ LOOKS = (
 
 
 @pytest.mark.parametrize("look", LOOKS, ids=[look.name for look in LOOKS])
-def test_one_look(look: Look, caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.asyncio
+async def test_one_look(look: Look, caplog: pytest.LogCaptureFixture) -> None:
     clocks = Clocks()
     clock = clocks.clock()
     if look.woke_earlier:
@@ -152,7 +154,7 @@ def test_one_look(look: Look, caplog: pytest.LogCaptureFixture) -> None:
         patch.object(run_lifecycle, "revive_lease", revive),
         patch.object(run_lifecycle, "discount_sleep", discount),
     ):
-        keeps = asyncio.run(keeper.look(Unused()))
+        keeps = await keeper.look(Unused())
     events = tuple(record.getMessage() for record in caplog.records)
     assert (keeps, tuple(calls), keeper.since_beat, events) == (
         look.keeps,
@@ -174,7 +176,8 @@ def test_a_look_waits_a_second_or_one_heartbeat_if_that_is_shorter() -> None:
     assert (interval(20.0), interval(1.0), interval(0.1)) == (1.0, 1.0, 0.1)
 
 
-def test_a_revived_lease_and_a_sleep_are_logged_with_their_fields(
+@pytest.mark.asyncio
+async def test_a_revived_lease_and_a_sleep_are_logged_with_their_fields(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     clocks = Clocks()
@@ -194,7 +197,7 @@ def test_a_revived_lease_and_a_sleep_are_logged_with_their_fields(
         patch.object(run_lifecycle, "revive_lease", nothing),
         patch.object(run_lifecycle, "discount_sleep", nothing),
     ):
-        asyncio.run(keeper.look(Unused()))
+        await keeper.look(Unused())
     fields = [getattr(record, "fields", None) for record in caplog.records]
     assert fields == [{"seconds": SLEEP}, {"generation": LEASE.generation}]
 
@@ -220,7 +223,8 @@ class Keeper:
             self.seen.append("closed")
 
 
-def test_the_keeper_ends_before_the_block_returns() -> None:
+@pytest.mark.asyncio
+async def test_the_keeper_ends_before_the_block_returns() -> None:
     keeper = Keeper()
 
     async def block() -> None:
@@ -230,11 +234,12 @@ def test_the_keeper_ends_before_the_block_returns() -> None:
         keeper.seen.append("after")
 
     with patch.object(run_lifecycle, "LeaseKeeper", keeper):
-        asyncio.run(block())
+        await block()
     assert keeper.seen == ["started", "worked", "closed", "after"]
 
 
-def test_a_failing_block_still_ends_the_keeper_and_raises() -> None:
+@pytest.mark.asyncio
+async def test_a_failing_block_still_ends_the_keeper_and_raises() -> None:
     keeper = Keeper()
 
     async def block() -> None:
@@ -243,11 +248,12 @@ def test_a_failing_block_still_ends_the_keeper_and_raises() -> None:
             raise RuntimeError("the pass failed")
 
     with patch.object(run_lifecycle, "LeaseKeeper", keeper), pytest.raises(RuntimeError):
-        asyncio.run(block())
+        await block()
     assert keeper.seen == ["started", "closed"]
 
 
-def test_a_cancelled_caller_ends_the_keeper_and_stays_cancelled() -> None:
+@pytest.mark.asyncio
+async def test_a_cancelled_caller_ends_the_keeper_and_stays_cancelled() -> None:
     """DH-06: cleanup finishes, and the cancellation that bounds the caller still propagates."""
     keeper = Keeper()
 
@@ -263,5 +269,5 @@ def test_a_cancelled_caller_ends_the_keeper_and_stays_cancelled() -> None:
         return task.cancelled(), list(keeper.seen)
 
     with patch.object(run_lifecycle, "LeaseKeeper", keeper):
-        cancelled, seen = asyncio.run(cancel_a_pass())
+        cancelled, seen = await cancel_a_pass()
     assert (cancelled, seen) == (True, ["started", "closed"])

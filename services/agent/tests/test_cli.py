@@ -2,7 +2,6 @@
 Commands): 0 done, 1 refused, 2 a setting or argument the command can't run with."""
 
 import argparse
-import asyncio
 import sys
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -123,6 +122,7 @@ def test_a_workspace_with_no_owner_is_refused_before_anything_is_written(
     assert printed.err == "REFUSED: that workspace has no owner, so nothing was seeded\n"
 
 
-def test_the_seed_itself_raises_a_refusal_rather_than_exiting() -> None:
+@pytest.mark.asyncio
+async def test_the_seed_itself_raises_a_refusal_rather_than_exiting() -> None:
     with pytest.raises(concept_seed.NoOwner):
-        asyncio.run(concept_seed.seed(NoOwner(), UUID(WORKSPACE), {}))
+        await concept_seed.seed(NoOwner(), UUID(WORKSPACE), {})

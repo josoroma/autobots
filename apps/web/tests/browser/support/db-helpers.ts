@@ -6,7 +6,7 @@
  */
 import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 
 import { need, optional } from "./env.ts";
@@ -14,20 +14,26 @@ import { need, optional } from "./env.ts";
 type Parse<T> = (value: unknown) => T;
 
 const REPOSITORY = join(__dirname, "../../../../..");
+// The browser suites' helpers, and the modules they import (tests/db/README.md).
+const HELPERS = join(REPOSITORY, "tests/db/arrange");
+const FIXTURES = join(REPOSITORY, "tests/db/fixtures");
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-/** A tests/db helper's path, resolved from the repository as appearance.spec.ts resolves luma.css. */
+/** A tests/db/arrange helper's path, resolved from the repository as appearance.spec.ts resolves luma.css. */
 export function helperPath(name: string): string {
-  const path = join(REPOSITORY, "tests/db", name);
-  if (!existsSync(path)) throw new Error(`tests/db/${name} doesn't exist`);
+  const path = join(HELPERS, name);
+  if (!existsSync(path))
+    throw new Error(`tests/db/arrange/${name} doesn't exist`);
   return path;
 }
 
 function helperEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
+  // The runner's path, which holds the service's source, then the fixtures a helper imports.
+  const inherited = optional("AUTOBOTS_TEST_PYTHONPATH", "");
   return {
     ...process.env,
     AUTOBOTS_DATABASE_URL: need("AUTOBOTS_TEST_RUNTIME_URL"),
-    PYTHONPATH: optional("AUTOBOTS_TEST_PYTHONPATH", ""),
+    PYTHONPATH: inherited ? `${inherited}${delimiter}${FIXTURES}` : FIXTURES,
     ...extra,
   };
 }
@@ -42,7 +48,7 @@ function parseLine<T>(name: string, line: string, parse: Parse<T>): T {
     value = JSON.parse(line);
   } catch {
     throw new Error(
-      `tests/db/${name} printed a line that isn't JSON: ${line.slice(0, 300)}`,
+      `tests/db/arrange/${name} printed a line that isn't JSON: ${line.slice(0, 300)}`,
     );
   }
   return parse(value);
@@ -68,7 +74,9 @@ export function runDbHelper<T>(
           const how = error.killed
             ? `didn't finish within ${timeoutMs} ms`
             : `failed (${error.code ?? error.signal ?? "no exit code"})`;
-          reject(new Error(`tests/db/${name} ${how}:\n${tail(stderr)}`));
+          reject(
+            new Error(`tests/db/arrange/${name} ${how}:\n${tail(stderr)}`),
+          );
           return;
         }
         const last = stdout.trim().split("\n").at(-1) ?? "";
@@ -126,12 +134,12 @@ export function streamDbHelper(
     for (const waiter of waiting.splice(0)) waiter.fail(ended);
   };
   child.on("error", (error) =>
-    end(new Error(`tests/db/${name} couldn't start: ${error.message}`)),
+    end(new Error(`tests/db/arrange/${name} couldn't start: ${error.message}`)),
   );
   child.on("close", (code, signal) =>
     end(
       new Error(
-        `tests/db/${name} ended (${code ?? signal}) before printing what was awaited:\n${stderr}`,
+        `tests/db/arrange/${name} ended (${code ?? signal}) before printing what was awaited:\n${stderr}`,
       ),
     ),
   );

@@ -4,6 +4,7 @@ test_worker_inference.py by module (PTST-04)."""
 import asyncio
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from typing import cast
 
 import psycopg
@@ -13,6 +14,7 @@ from autobots.application.artifacts import PingableObjectStore
 from autobots.application.readiness import MalformedSetting
 from autobots.application.sql import SqlParams
 from autobots.operations import worker
+from autobots.operations.worker import inference_step
 from sql_fakes import ScriptedConnection, ScriptedRows
 
 URL = "postgresql://unused"
@@ -28,7 +30,8 @@ def test_the_switch_needs_its_configuration_rather_than_starting_half_ready() ->
         worker.inference_from_environment(environ, URL, None, None, None)
 
 
-def test_a_failing_first_step_does_not_starve_the_second() -> None:
+@pytest.mark.asyncio
+async def test_a_failing_first_step_does_not_starve_the_second() -> None:
     async def broken(_: object) -> bool:
         raise RuntimeError("arranged")
 
@@ -38,10 +41,11 @@ def test_a_failing_first_step_does_not_starve_the_second() -> None:
     async def go() -> bool:
         return await worker.both(broken, working)(ScriptedConnection())
 
-    assert asyncio.run(go()) is True
+    assert await go() is True
 
 
-def test_losing_the_database_still_reaches_the_serve_loop() -> None:
+@pytest.mark.asyncio
+async def test_losing_the_database_still_reaches_the_serve_loop() -> None:
     async def lost(_: object) -> bool:
         raise psycopg.OperationalError("arranged")
 
@@ -52,7 +56,7 @@ def test_losing_the_database_still_reaches_the_serve_loop() -> None:
         return await worker.both(lost, working)(ScriptedConnection())
 
     with pytest.raises(psycopg.OperationalError):
-        asyncio.run(go())
+        await go()
 
 
 def test_a_relative_configuration_root_refuses_to_start() -> None:
@@ -63,7 +67,8 @@ def test_a_relative_configuration_root_refuses_to_start() -> None:
         )
 
 
-def test_both_steps_run_and_either_one_counts_as_work() -> None:
+@pytest.mark.asyncio
+async def test_both_steps_run_and_either_one_counts_as_work() -> None:
     calls: list[str] = []
 
     def step(name: str, worked: bool) -> worker.Step:
@@ -76,13 +81,14 @@ def test_both_steps_run_and_either_one_counts_as_work() -> None:
     async def run_both(first: bool, second: bool) -> bool:
         return await worker.both(step("first", first), step("second", second))(ScriptedConnection())
 
-    assert asyncio.run(run_both(False, True)) is True
+    assert await run_both(False, True) is True
     assert calls == ["first", "second"]
-    assert asyncio.run(run_both(True, False)) is True
-    assert asyncio.run(run_both(False, False)) is False
+    assert await run_both(True, False) is True
+    assert await run_both(False, False) is False
 
 
-def test_the_entry_point_gives_the_inference_step_the_stop_its_signals_set(
+@pytest.mark.asyncio
+async def test_the_entry_point_gives_the_inference_step_the_stop_its_signals_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A stop that lands during maintenance keeps the next paid job from starting, so the step
@@ -113,7 +119,7 @@ def test_the_entry_point_gives_the_inference_step_the_stop_its_signals_set(
     monkeypatch.setattr(worker, "inference_step", inference_step)
     monkeypatch.setattr(worker, "install_signal_handlers", lambda stop: seen.update(signals=stop))
     monkeypatch.setattr(worker, "serve", serve)
-    asyncio.run(worker.main())
+    await worker.main()
     assert isinstance(seen["stop"], asyncio.Event)
     assert seen["stop"] is seen["signals"] is seen["served"]
     assert seen["source"] is source and seen["store"] is None
@@ -121,7 +127,10 @@ def test_the_entry_point_gives_the_inference_step_the_stop_its_signals_set(
     assert isinstance(config, worker.WorkerConfig) and config.claims_inference
 
 
-def test_the_entry_point_hands_the_live_environment_on(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_the_entry_point_hands_the_live_environment_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Never a copy, so a key is resolved again for each attempt (model-gateway rule)."""
     import os
 
@@ -141,7 +150,7 @@ def test_the_entry_point_hands_the_live_environment_on(monkeypatch: pytest.Monke
     monkeypatch.setattr(worker, "inference_from_environment", inference)
     monkeypatch.setattr(worker, "install_signal_handlers", lambda _stop: None)
     monkeypatch.setattr(worker, "serve", serve)
-    asyncio.run(worker.main())
+    await worker.main()
     assert given == [os.environ] and given[0] is os.environ
 
 
@@ -159,7 +168,8 @@ def test_the_entry_point_hands_the_live_environment_on(monkeypatch: pytest.Monke
         ),
     ],
 )
-def test_a_setting_it_cant_start_with_stops_it_before_it_serves_with_exit_2(
+@pytest.mark.asyncio
+async def test_a_setting_it_cant_start_with_stops_it_before_it_serves_with_exit_2(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     settings: dict[str, str],
@@ -184,7 +194,7 @@ def test_a_setting_it_cant_start_with_stops_it_before_it_serves_with_exit_2(
     monkeypatch.setattr(worker, "configure_logging", lambda: None)
     monkeypatch.setattr(worker, "serve", never)
     with pytest.raises(SystemExit) as stopped:
-        asyncio.run(worker.main())
+        await worker.main()
     assert stopped.value.code == 2
     error = capsys.readouterr().err
     assert error.startswith(said) and "soon" not in error and URL not in error
@@ -249,7 +259,8 @@ def quick_config(drain_seconds: float = 30.0) -> worker.WorkerConfig:
     )
 
 
-def test_a_lost_database_is_reconnected_and_the_last_beat_says_stopped(
+@pytest.mark.asyncio
+async def test_a_lost_database_is_reconnected_and_the_last_beat_says_stopped(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     database = FakeDatabase(failures=1)
@@ -266,7 +277,7 @@ def test_a_lost_database_is_reconnected_and_the_last_beat_says_stopped(
         await worker.serve(quick_config(), step, stop, connect=database.connect)
 
     caplog.set_level("INFO", logger="autobots.worker")
-    asyncio.run(go())
+    await go()
     events = [record.getMessage() for record in caplog.records]
     assert "worker.database_lost" in events and events[-1] == "worker.stopped"
     assert len(ran) == 1 and isinstance(ran[0], FakeConnection)
@@ -275,7 +286,8 @@ def test_a_lost_database_is_reconnected_and_the_last_beat_says_stopped(
     assert database.opened >= 4
 
 
-def test_a_step_still_running_when_the_drain_ends_is_cut_short(
+@pytest.mark.asyncio
+async def test_a_step_still_running_when_the_drain_ends_is_cut_short(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     status = worker._Status()
@@ -292,13 +304,14 @@ def test_a_step_still_running_when_the_drain_ends_is_cut_short(
         )
 
     caplog.set_level("INFO", logger="autobots.worker")
-    assert asyncio.run(go()) is False
+    assert await go() is False
     assert status.state == "draining"
     events = [record.getMessage() for record in caplog.records]
     assert events == ["worker.draining", "worker.drain_cut_short"]
 
 
-def test_a_step_that_ends_within_the_drain_keeps_its_result() -> None:
+@pytest.mark.asyncio
+async def test_a_step_that_ends_within_the_drain_keeps_its_result() -> None:
     status = worker._Status()
 
     async def quick(_connection: object) -> bool:
@@ -312,4 +325,13 @@ def test_a_step_that_ends_within_the_drain_keeps_its_result() -> None:
             quick, ScriptedConnection(), stop, quick_config(drain_seconds=5), status
         )
 
-    assert asyncio.run(go()) is True
+    assert await go() is True
+
+
+@pytest.mark.asyncio
+async def test_after_a_stop_the_step_claims_nothing() -> None:
+    stop = asyncio.Event()
+    stop.set()
+    step = inference_step(SimpleNamespace(), None, None, stop)  # type: ignore[arg-type]  # nothing is read once stopped
+    # A claim would read the unset configuration and raise. It returns having done nothing.
+    assert await step(None) is False  # type: ignore[arg-type]  # nothing is read once stopped

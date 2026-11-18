@@ -81,7 +81,6 @@ select = [
 "tests/test_browsing_tool.py" = ["ANN401"]
 "tests/test_contracts.py" = ["ANN401"]
 "tests/test_execution_contract.py" = ["ANN401"]
-"tests/test_final_review.py" = ["ANN401"]
 "tests/test_github_issues.py" = ["ANN401"]
 "tests/test_github_reads.py" = ["ANN401"]
 "tests/test_model_attempts.py" = ["ANN401"]

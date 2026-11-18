@@ -74,8 +74,8 @@ SEED_FORBIDDEN = ('create table', 'alter table', 'drop ', 'password', 'api_key',
 def seed_violations(text: str) -> list[str]:
     lowered = text.lower()
     return [term for term in SEED_FORBIDDEN if term in lowered]
-BAD_MIGRATIONS = Path('tests/db/app_bad_migrations')
-FIXTURE = Path('tests/db/app_fixture.sql')
+BAD_MIGRATIONS = Path('tests/db/sql/app/bad_migrations')
+FIXTURE = Path('tests/db/sql/app/fixture.sql')
 ROW_TYPES = Path('packages/db-types/src/generated.ts')
 # SQLI-09: the app schemas as the migrations and bootstrap files leave them, for readers. Never applied.
 SCHEMA_SNAPSHOT = Path('supabase/schema.snapshot.sql')
@@ -103,21 +103,21 @@ CHILD_VALUES = {'workspace': WORKSPACE_A, 'other': WORKSPACE_B}
 # The tool children after the gateway check, each through the runtime role and from the repository root.
 TOOL_CHILDREN = (
     # US-14.3: every dispatch is recorded, projected and fenced.
-    Child('tool_use_check.py', 'the tool-use check', ('{workspace}',), from_root=True),
+    Child('checks/tool_use_check.py', 'the tool-use check', ('{workspace}',), from_root=True),
     # US-14.15: Sol's rows, researcher's resolution and frozen runs.
-    Child('sol_profile_check.py', 'the Sol profile check', ('{workspace}',), from_root=True),
+    Child('checks/sol_profile_check.py', 'the Sol profile check', ('{workspace}',), from_root=True),
     # US-15.4: the run list's facts, groups, filters and paging, in workspaces of its own.
-    Child('run_list_check.py', 'the run list check', from_root=True),
+    Child('checks/run_list_check.py', 'the run list check', from_root=True),
     # US-14.14: the browsing loop's steps through real admission on the researcher route.
-    Child('browsing_loop_check.py', 'the browsing loop check', ('{workspace}',), from_root=True),
+    Child('checks/browsing_loop_check.py', 'the browsing loop check', ('{workspace}',), from_root=True),
     # US-14.6 onward: provider tools through the gateway and the record, with fake transports.
-    Child('web_tools_check.py', 'the web tools check', ('{workspace}',), from_root=True),
+    Child('checks/web_tools_check.py', 'the web tools check', ('{workspace}',), from_root=True),
     # US-14.17: Tavily and Jina keys from Settings, the environment and .env, with fake transports.
-    Child('tool_keys_check.py', 'the tool keys check', ('{workspace}',), from_root=True),
+    Child('checks/tool_keys_check.py', 'the tool keys check', ('{workspace}',), from_root=True),
     # US-14.18: Keys & vars, the GitHub pair, the approval binding and the browsing switch per workspace.
-    Child('keys_and_vars_check.py', 'the keys and vars check', ('{workspace}',), from_root=True),
+    Child('checks/keys_and_vars_check.py', 'the keys and vars check', ('{workspace}',), from_root=True),
     # US-14.19: the cronjob tool through the gateway, approvals and the routine service, with no model.
-    Child('cronjob_check.py', 'the cronjob check', ('{workspace}',), from_root=True),
+    Child('checks/cronjob_check.py', 'the cronjob check', ('{workspace}',), from_root=True),
 )
 TS_TYPES = {'tsvector': 'string', 'uuid': 'string', 'text': 'string', 'timestamp with time zone': 'string', 'bigint': 'number',
             'integer': 'number', 'boolean': 'boolean', 'jsonb': 'unknown'}
@@ -761,7 +761,7 @@ def runtime_url(stack: AppStack, db_port: int) -> str:
 
 def child_check(stack: AppStack, cases: Cases, root: Path, db_port: int, child: Child) -> ChildRun:
     """Run one tests/db check through the runtime role, keeping a failed run's stderr under .checks/app_db."""
-    values = {**CHILD_VALUES, 'python': str(root / CHECK_PYTHON), 'package': str(root / 'services/agent/src/autobots')}
+    values = {**CHILD_VALUES, 'python': str(root / CHECK_PYTHON)}
     return run_child(cases, root, child, values, env=service_env(root, runtime_url(stack, db_port)), err_dir=root / ERR_DIR)
 
 
@@ -775,7 +775,7 @@ def credential_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) ->
                       stack.sql(f"insert into app_private.installation_credential_grants values ('{WORKSPACE_A}');\n"))
         return '\n'
 
-    ran = run_child_check(cases, root, 'credential_store_check.py', WORKSPACE_A, WORKSPACE_B, label='the credential store check',
+    ran = run_child_check(cases, root, 'checks/credential_store_check.py', WORKSPACE_A, WORKSPACE_B, label='the credential store check',
                           env=service_env(root, runtime_url(stack, db_port)), timeout=120, err_dir=root / ERR_DIR, answer=grant)
     if not ran.completed:
         return
@@ -789,7 +789,7 @@ def credential_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) ->
 
 def admission_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Real concurrent reservations through the runtime role. Money here is fixture values."""
-    if not child_check(stack, cases, root, db_port, Child('admission_check.py', 'the admission check', ('{workspace}',), timeout=120)).completed:
+    if not child_check(stack, cases, root, db_port, Child('checks/admission_check.py', 'the admission check', ('{workspace}',), timeout=120)).completed:
         return
     cases.denied('authenticated cannot read the spend ledger',
                  stack.as_role('authenticated', USER_A, 'select * from app_private.model_invocations'), 'permission denied')
@@ -797,17 +797,17 @@ def admission_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> 
 
 def run_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Real concurrent admission and every transition, through the runtime role."""
-    if not child_check(stack, cases, root, db_port, Child('run_admission_check.py', 'the run admission check', ('{workspace}', '{other}'))).completed:
+    if not child_check(stack, cases, root, db_port, Child('checks/run_admission_check.py', 'the run admission check', ('{workspace}', '{other}'))).completed:
         return
     cases.denied('authenticated cannot read the job table', stack.as_role('authenticated', USER_A, 'select * from app_private.run_jobs'), 'permission denied')
     cases.denied('authenticated cannot read the policy snapshot', stack.as_role('authenticated', USER_A, 'select policy_snapshot from public.runs'), 'permission denied')
     # Receipts stored with the digests captured before typed admission replay, and new ones store them (refactor plan R-30).
-    child_check(stack, cases, root, db_port, Child('admission_replay_check.py', 'the admission replay check', ('{workspace}',)))
+    child_check(stack, cases, root, db_port, Child('checks/admission_replay_check.py', 'the admission replay check', ('{workspace}',)))
 
 
 def worker_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Real competing claims, stale owners and a killed process, through the runtime role."""
-    if not child_check(stack, cases, root, db_port, Child('worker_ownership_check.py', 'the worker ownership check', ('{workspace}', '{python}'))).completed:
+    if not child_check(stack, cases, root, db_port, Child('checks/worker_ownership_check.py', 'the worker ownership check', ('{workspace}', '{python}'))).completed:
         return
     cases.denied('authenticated cannot read checkpoints', stack.as_role('authenticated', USER_A, 'select * from agent_runtime.checkpoints'), 'permission denied')
     cases.denied('the runtime role cannot delete checkpoints', stack.runtime('delete from agent_runtime.checkpoints;\n'), 'permission denied')
@@ -817,7 +817,7 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """The gateway through the runtime role, and a real Deep Agents loop with a fake model."""
     url = runtime_url(stack, db_port)
     with tempfile.TemporaryDirectory() as directory:
-        gateway = run_child_check(cases, root, 'tool_gateway_check.py', WORKSPACE_A, label='the tool gateway check',
+        gateway = run_child_check(cases, root, 'checks/tool_gateway_check.py', WORKSPACE_A, label='the tool gateway check',
                                   env=service_env(root, url, AUTOBOTS_TOOL_TEMP=directory), timeout=180, cwd=directory, err_dir=root / ERR_DIR)
     if not gateway.completed:
         return
@@ -834,7 +834,7 @@ def tool_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
 
 def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """A real Deep Agents graph with a scripted model, real admission and real checkpoints."""
-    child_check(stack, cases, root, db_port, Child('goal_loop_check.py', 'the goal loop check', ('{workspace}', '{other}', '{python}'), timeout=240))
+    child_check(stack, cases, root, db_port, Child('checks/goal_loop_check.py', 'the goal loop check', ('{workspace}', '{other}', '{python}'), timeout=240))
     cases.denied('authenticated cannot read plans', stack.as_role('authenticated', USER_A, 'select * from app_private.plan_versions'), 'permission denied')
     cases.denied('the runtime role cannot rewrite a saved plan', stack.runtime("update app_private.plan_versions set revision_reason = 'x';\n"), 'permission denied')
     cases.denied('the runtime role cannot rewrite evidence', stack.runtime("delete from app_private.plan_evidence;\n"), 'permission denied')
@@ -852,42 +852,42 @@ def loop_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
 
 def recovery_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Cancellation from every state, resume, and a real stopped process for Mac sleep."""
-    child_check(stack, cases, root, db_port, Child('recovery_check.py', 'the recovery check', ('{workspace}', '{other}', '{python}'), timeout=240))
+    child_check(stack, cases, root, db_port, Child('checks/recovery_check.py', 'the recovery check', ('{workspace}', '{other}', '{python}'), timeout=240))
     # Decision 0028 E4: a pass that keeps raising is claimed a bounded number of times, then the run is paused.
-    child_check(stack, cases, root, db_port, Child('worker_failure_check.py', 'the worker failure check', ('{workspace}',), timeout=180))
+    child_check(stack, cases, root, db_port, Child('checks/worker_failure_check.py', 'the worker failure check', ('{workspace}',), timeout=180))
     cases.denied('authenticated cannot read obligations', stack.as_role('authenticated', USER_A, 'select * from app_private.run_obligations'), 'permission denied')
 
 
 def expert_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Frozen revisions and bounded routing through the runtime role."""
-    child_check(stack, cases, root, db_port, Child('expert_check.py', 'the expert check', ('{workspace}', '{other}')))
+    child_check(stack, cases, root, db_port, Child('checks/expert_check.py', 'the expert check', ('{workspace}', '{other}')))
     cases.denied('anonymous cannot read Experts', stack.as_role('anon', None, 'select * from public.experts'), 'permission denied')
 
 
 def workflow_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Immutable versions and exact bindings through the runtime role."""
-    child_check(stack, cases, root, db_port, Child('workflow_check.py', 'the workflow check', ('{workspace}', '{other}'), timeout=120))
+    child_check(stack, cases, root, db_port, Child('checks/workflow_check.py', 'the workflow check', ('{workspace}', '{other}'), timeout=120))
     # R-56 (SQLI-13): a draft the shape check admits and WorkflowGraph refuses can't break the list or its discard.
-    child_check(stack, cases, root, db_port, Child('unreadable_draft_check.py', 'the unreadable draft check', ('{workspace}',), timeout=120))
+    child_check(stack, cases, root, db_port, Child('checks/unreadable_draft_check.py', 'the unreadable draft check', ('{workspace}',), timeout=120))
     cases.denied('anonymous cannot read workflows', stack.as_role('anon', None, 'select * from public.workflows'), 'permission denied')
 
 
 def routine_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Duplicate, missed and overlapping occurrences through the runtime role."""
-    child_check(stack, cases, root, db_port, Child('routine_check.py', 'the routine check', ('{workspace}', '{other}'), timeout=120))
+    child_check(stack, cases, root, db_port, Child('checks/routine_check.py', 'the routine check', ('{workspace}', '{other}'), timeout=120))
     cases.denied('anonymous cannot read routines', stack.as_role('anon', None, 'select * from public.routines'), 'permission denied')
 
 
 def memory_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Compaction and lexical retrieval through the runtime role, with a scripted model."""
-    child_check(stack, cases, root, db_port, Child('memory_check.py', 'the memory check', ('{workspace}', '{other}', '{package}')))
+    child_check(stack, cases, root, db_port, Child('checks/memory_check.py', 'the memory check', ('{workspace}', '{other}')))
     cases.denied('authenticated cannot read stored results', stack.as_role('authenticated', USER_A, 'select * from app_private.run_offloads'), 'permission denied')
     cases.denied('authenticated cannot read the search column directly', stack.as_role('authenticated', USER_A, 'select search from public.memory_items'), 'permission denied')
 
 
 def improvement_cases(stack: AppStack, cases: Cases, root: Path, db_port: int) -> None:
     """Who can read proposals. Promotion now needs a held-out replay, whose runs are verified from
-    Storage, so `tests/db/improvement_check.py` runs in `scripts/qualify_identity.py` (US-13.2)."""
+    Storage, so `tests/db/checks/improvement_check.py` runs in `scripts/qualify_identity.py` (US-13.2)."""
     cases.denied('anonymous cannot read proposals', stack.as_role('anon', None, 'select * from public.improvement_candidates'), 'permission denied')
 
 

@@ -9,7 +9,6 @@ active-time segments take the same fence as a sleep's discount.
 """
 
 import ast
-import asyncio
 import contextlib
 import hashlib
 import re
@@ -100,16 +99,15 @@ class Database:
         return [item for item in self.statements if text in item[0]]
 
 
-def test_a_persons_command_locks_the_job_row_then_the_run_row() -> None:
+@pytest.mark.asyncio
+async def test_a_persons_command_locks_the_job_row_then_the_run_row() -> None:
     database = Database(RunStatus.RUNNING, job=("done", 3, None))
-    result = asyncio.run(
-        apply_command(
-            database,
-            workspace_id=WORKSPACE,
-            run_id=RUN,
-            command=RunCommand.PAUSE,
-            expected_version=7,
-        )
+    result = await apply_command(
+        database,
+        workspace_id=WORKSPACE,
+        run_id=RUN,
+        command=RunCommand.PAUSE,
+        expected_version=7,
     )
     assert (result.status, result.version, result.changed) == ("paused", 8, True)
     job, run = database.index(JOB_LOCK), database.index(RUN_LOCK)
@@ -125,62 +123,66 @@ def test_a_persons_command_locks_the_job_row_then_the_run_row() -> None:
     [("claimed", 4, True), ("claimed", 3, False), ("done", 3, None), None],
     ids=["a later generation", "an expired lease", "a finished job", "no job"],
 )
-def test_a_workers_command_is_refused_before_the_run_is_read(job: tuple[object, ...]) -> None:
+@pytest.mark.asyncio
+async def test_a_workers_command_is_refused_before_the_run_is_read(job: tuple[object, ...]) -> None:
     database = Database(RunStatus.RUNNING, job=job)
     with pytest.raises(LeaseLost):
-        asyncio.run(apply_worker_command(database, LEASE, RunCommand.VERIFY))
+        await apply_worker_command(database, LEASE, RunCommand.VERIFY)
     assert not database.having(RUN_LOCK) and not database.having(STATUS_WRITE)
 
 
-def test_a_workers_command_reads_its_version_before_the_locks() -> None:
+@pytest.mark.asyncio
+async def test_a_workers_command_reads_its_version_before_the_locks() -> None:
     """So a person's command that lands between the read and the locks is a version conflict,
     and a race between them still has one winner."""
     database = Database(RunStatus.RUNNING, version=9)
-    result = asyncio.run(apply_worker_command(database, LEASE, RunCommand.VERIFY))
+    result = await apply_worker_command(database, LEASE, RunCommand.VERIFY)
     first, values, depth = database.statements[0]
     assert first.startswith("select version from public.runs") and values == (RUN,)
     assert depth == 0 and (result.status, result.version) == ("verifying", 10)
 
 
-def test_a_workers_stop_reason_commits_with_its_transition() -> None:
+@pytest.mark.asyncio
+async def test_a_workers_stop_reason_commits_with_its_transition() -> None:
     database = Database(RunStatus.RUNNING)
-    asyncio.run(apply_worker_command(database, LEASE, RunCommand.FAIL, stop_reason="arranged"))
+    await apply_worker_command(database, LEASE, RunCommand.FAIL, stop_reason="arranged")
     [(statement, values, depth)] = database.having("stop_reason")
     assert statement.startswith("insert into app_private.run_usage")
     assert values == (RUN, "arranged") and depth > 0
     assert database.index(STATUS_WRITE) < database.index("insert into app_private.run_usage")
 
 
-def test_a_stop_reason_is_written_only_when_given() -> None:
+@pytest.mark.asyncio
+async def test_a_stop_reason_is_written_only_when_given() -> None:
     database = Database(RunStatus.RUNNING)
-    asyncio.run(apply_worker_command(database, LEASE, RunCommand.VERIFY))
+    await apply_worker_command(database, LEASE, RunCommand.VERIFY)
     assert database.having("stop_reason") == []
     database = Database(RunStatus.RUNNING)
-    asyncio.run(apply_worker_command(database, LEASE, RunCommand.FAIL, stop_reason=None))
+    await apply_worker_command(database, LEASE, RunCommand.FAIL, stop_reason=None)
     [(_, values, _)] = database.having("stop_reason")
     assert values == (RUN, None)
 
 
-def test_a_refused_workers_command_writes_no_stop_reason() -> None:
+@pytest.mark.asyncio
+async def test_a_refused_workers_command_writes_no_stop_reason() -> None:
     database = Database(RunStatus.PAUSED)
     with pytest.raises(CommandRefused):
-        asyncio.run(apply_worker_command(database, LEASE, RunCommand.VERIFY, stop_reason="x"))
+        await apply_worker_command(database, LEASE, RunCommand.VERIFY, stop_reason="x")
     assert database.having("stop_reason") == []
 
 
-def test_a_receipt_takes_its_actor_and_key_together_and_keeps_its_bytes() -> None:
+@pytest.mark.asyncio
+async def test_a_receipt_takes_its_actor_and_key_together_and_keeps_its_bytes() -> None:
     """The scope and fingerprint a stored receipt was written under, so it still replays."""
     database = Database(RunStatus.RUNNING, job=("done", 3, None))
     receipt = CommandReceipt(ACTOR, "key-1")
-    asyncio.run(
-        apply_command(
-            database,
-            workspace_id=WORKSPACE,
-            run_id=RUN,
-            command=RunCommand.PAUSE,
-            expected_version=7,
-            receipt=receipt,
-        )
+    await apply_command(
+        database,
+        workspace_id=WORKSPACE,
+        run_id=RUN,
+        command=RunCommand.PAUSE,
+        expected_version=7,
+        receipt=receipt,
     )
     scope = (WORKSPACE, ACTOR, "pause", str(RUN), "key-1")
     fingerprint = hashlib.sha256(
@@ -191,46 +193,42 @@ def test_a_receipt_takes_its_actor_and_key_together_and_keeps_its_bytes() -> Non
     [(_, stored, depth)] = database.having("insert into app_private.idempotency_receipts")
     assert stored[:6] == (*scope, fingerprint) and depth > 0
     plain = Database(RunStatus.RUNNING, job=("done", 3, None))
-    asyncio.run(
-        apply_command(
-            plain,
-            workspace_id=WORKSPACE,
-            run_id=RUN,
-            command=RunCommand.PAUSE,
-            expected_version=7,
-        )
+    await apply_command(
+        plain,
+        workspace_id=WORKSPACE,
+        run_id=RUN,
+        command=RunCommand.PAUSE,
+        expected_version=7,
     )
     assert plain.having("idempotency_receipts") == [] and plain.having("pg_advisory") == []
 
 
-def test_the_system_cascades_a_cancel_and_applies_no_workers_command() -> None:
+@pytest.mark.asyncio
+async def test_the_system_cascades_a_cancel_and_applies_no_workers_command() -> None:
     database = Database(RunStatus.RUNNING, job=("done", 3, None))
-    result = asyncio.run(
-        cascade_command(database, workspace_id=WORKSPACE, run_id=RUN, command=RunCommand.CANCEL)
+    result = await cascade_command(
+        database, workspace_id=WORKSPACE, run_id=RUN, command=RunCommand.CANCEL
     )
     assert result.status == "cancelled"
     assert database.statements[0][0].startswith("select version from public.runs")
     with pytest.raises(CommandRefused):
-        asyncio.run(
-            cascade_command(
-                Database(RunStatus.VERIFYING),
-                workspace_id=WORKSPACE,
-                run_id=RUN,
-                command=RunCommand.COMPLETE,
-            )
-        )
-
-
-def test_a_cancel_withdraws_waits_and_cascades_inside_its_transaction() -> None:
-    database = Database(RunStatus.WAITING_APPROVAL, job=("done", 3, None))
-    asyncio.run(
-        apply_command(
-            database,
+        await cascade_command(
+            Database(RunStatus.VERIFYING),
             workspace_id=WORKSPACE,
             run_id=RUN,
-            command=RunCommand.CANCEL,
-            expected_version=7,
+            command=RunCommand.COMPLETE,
         )
+
+
+@pytest.mark.asyncio
+async def test_a_cancel_withdraws_waits_and_cascades_inside_its_transaction() -> None:
+    database = Database(RunStatus.WAITING_APPROVAL, job=("done", 3, None))
+    await apply_command(
+        database,
+        workspace_id=WORKSPACE,
+        run_id=RUN,
+        command=RunCommand.CANCEL,
+        expected_version=7,
     )
     for text in (
         "update public.approval_requests set status = %s",
@@ -246,7 +244,8 @@ def test_a_cancel_withdraws_waits_and_cascades_inside_its_transaction() -> None:
     [(("claimed", 3, True), []), (("done", 3, None), [("done", RUN)])],
     ids=["a live owner", "no owner"],
 )
-def test_an_approval_expirys_pause_keeps_the_live_owner_rule(
+@pytest.mark.asyncio
+async def test_an_approval_expirys_pause_keeps_the_live_owner_rule(
     job: tuple[object, ...], written: list[tuple[object, ...]]
 ) -> None:
     """The system's pause leaves a live owner its job, as a person's did (Decision 0029 F5)."""
@@ -255,13 +254,14 @@ def test_an_approval_expirys_pause_keeps_the_live_owner_rule(
         job=job,
         extra={"update public.approval_requests": (APPROVAL,)},
     )
-    assert asyncio.run(approvals.expire(database, APPROVAL, RUN, WORKSPACE)) is True
+    assert await approvals.expire(database, APPROVAL, RUN, WORKSPACE) is True
     [(_, moved, _)] = database.having(STATUS_WRITE)
     assert moved[0] == RunStatus.PAUSED.value
     assert [values for _, values, _ in database.having(JOB_WRITE)] == written
 
 
-def test_an_expiry_locks_the_job_row_before_the_run_row() -> None:
+@pytest.mark.asyncio
+async def test_an_expiry_locks_the_job_row_before_the_run_row() -> None:
     """As a person's cancel does, so a racing expiry and cancel can't deadlock (SP-012). The
     request's guarded update comes after the lock, and nothing touches the run row before it."""
     database = Database(
@@ -269,7 +269,7 @@ def test_an_expiry_locks_the_job_row_before_the_run_row() -> None:
         job=("done", 3, None),
         extra={"update public.approval_requests": (APPROVAL,)},
     )
-    assert asyncio.run(approvals.expire(database, APPROVAL, RUN, WORKSPACE)) is True
+    assert await approvals.expire(database, APPROVAL, RUN, WORKSPACE) is True
     lock = database.index("select 1 from app_private.run_jobs")
     assert "for update" in database.statements[lock][0]
     assert lock == 0
@@ -279,7 +279,8 @@ def test_an_expiry_locks_the_job_row_before_the_run_row() -> None:
 
 
 @pytest.mark.parametrize("expired", [False, True], ids=["decided", "expired"])
-def test_a_decision_locks_the_job_then_the_run_then_the_request(expired: bool) -> None:
+@pytest.mark.asyncio
+async def test_a_decision_locks_the_job_then_the_run_then_the_request(expired: bool) -> None:
     """The order a person's cancel takes them in, as it withdraws pending requests after the job
     and the run, so a decision and a cancel can't deadlock (SP-012). The request's run is read
     first, without a lock."""
@@ -309,9 +310,9 @@ def test_a_decision_locks_the_job_then_the_run_then_the_request(expired: bool) -
     )
     if expired:
         with pytest.raises(approvals.ApprovalRefused):
-            asyncio.run(decision)
+            await decision
     else:
-        assert asyncio.run(decision).status == "approved"
+        assert (await decision).status == "approved"
     locks = [
         statement
         for statement, _, _ in database.statements
@@ -325,7 +326,8 @@ def test_a_decision_locks_the_job_then_the_run_then_the_request(expired: bool) -
     assert found < database.index("select 1 from app_private.run_jobs")
 
 
-def test_a_claim_moves_a_queued_run_by_claim_in_the_table(
+@pytest.mark.asyncio
+async def test_a_claim_moves_a_queued_run_by_claim_in_the_table(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: list[tuple[object, ...]] = []
@@ -353,7 +355,7 @@ def test_a_claim_moves_a_queued_run_by_claim_in_the_table(
                 "update app_private.run_jobs set status = 'claimed'": (4, 2),
             },
         )
-        lease = asyncio.run(worker_leases.claim_run(database, RUN, worker_id="w"))
+        lease = await worker_leases.claim_run(database, RUN, worker_id="w")
         assert lease is not None and lease.run_status == "running"
         writes = database.having(STATUS_WRITE)
         if moved:
@@ -422,14 +424,15 @@ def _fence(statement: str) -> str:
 
 
 @pytest.mark.parametrize("write", [run_usage.begin_segment, run_usage.end_segment])
-def test_a_segment_write_takes_the_fence_a_sleeps_discount_takes(
+@pytest.mark.asyncio
+async def test_a_segment_write_takes_the_fence_a_sleeps_discount_takes(
     write: Callable[[Any, Any], Any],
 ) -> None:
     """A worker that lost the run can't start or end the new owner's segment (PRUN-20)."""
     discount = Database(RunStatus.RUNNING)
-    asyncio.run(run_usage.discount_sleep(discount, LEASE, 5.0))
+    await run_usage.discount_sleep(discount, LEASE, 5.0)
     database = Database(RunStatus.RUNNING)
-    asyncio.run(write(database, LEASE))
+    await write(database, LEASE)
     [(statement, values, _)] = database.statements
     assert _fence(statement) == _fence(discount.statements[0][0])
     assert values[-2:] == (RUN, LEASE.generation)

@@ -1,14 +1,15 @@
 """`LoopMiddleware` through its public methods. Its guard and admission ledger are in-memory
 stand-ins passed through its seams, and every other step is its own (PTST-01). The disposable
-checks drive it over real rows (tests/db/goal_loop_check.py, memory_check.py and
+checks drive it over real rows (tests/db/checks/goal_loop_check.py, memory_check.py and
 admission_check.py)."""
 
-import asyncio
 import contextlib
 import json
 import logging
+import logging.config
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -17,18 +18,31 @@ import openrouter
 import pytest
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolCall, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolCall,
+    ToolMessage,
+)
 from langgraph.prebuilt.tool_node import ToolCallRequest, ToolRuntime
+from pydantic import BaseModel
 
 from autobots.adapters.loop_middleware import (
     MAX_FACT_CHARS,
     MAX_FACT_NAMES,
     LoopMiddleware,
     reply_facts,
+    request_bytes,
 )
 from autobots.application.compaction import CompactionPolicy
 from autobots.application.loop_admission import current_middleware
-from autobots.application.loop_policy import REPAIR_NOTE, LoopStopped, uncertain_call_fields
+from autobots.application.loop_policy import (
+    REPAIR_NOTE,
+    LoopStopped,
+    uncertain_call_fields,
+)
 from autobots.application.model_admission import (
     AdmissionRefused,
     AdmissionRequest,
@@ -208,22 +222,24 @@ def loop(
     )
 
 
-def test_a_refused_summary_stops_the_loop_with_its_reason() -> None:
+@pytest.mark.asyncio
+async def test_a_refused_summary_stops_the_loop_with_its_reason() -> None:
     """A budget that runs out during compaction pauses the run like one at any other call."""
     usage, ledger, model = Usage(), Ledger(BudgetExceeded("arranged")), Model()
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(loop(usage, ledger, goal=GOAL).awrap_model_call(history(), model))
+        await loop(usage, ledger, goal=GOAL).awrap_model_call(history(), model)
     assert caught.value.code == "budget_exceeded"
     assert [asked.role for asked in ledger.asked] == ["summarizer"]
     assert model.requests == [] and usage.summaries == []
 
 
-def test_a_busy_slot_during_a_summary_is_waited_out_like_any_other_call() -> None:
+@pytest.mark.asyncio
+async def test_a_busy_slot_during_a_summary_is_waited_out_like_any_other_call() -> None:
     usage, waits = Usage(), list[float]()
     ledger = Ledger(NoInferenceSlot("arranged"), NoInferenceSlot("arranged"))
     model = Model(reply("ARRANGED-SUMMARY"), reply("the answer"))
     middleware = loop(usage, ledger, waits, goal=GOAL)
-    response = asyncio.run(middleware.awrap_model_call(history(), model))
+    response = await middleware.awrap_model_call(history(), model)
     assert waits == [1.0, 1.0]
     assert [asked.role for asked in ledger.asked] == ["summarizer"] * 3 + ["executor"]
     assert usage.summaries == ["ARRANGED-SUMMARY"]
@@ -236,55 +252,58 @@ def test_a_busy_slot_during_a_summary_is_waited_out_like_any_other_call() -> Non
 @pytest.mark.parametrize(
     ("finish", "repairs"), [("length", 1), ("error", 0), ("content_filter", 0)]
 )
-def test_only_a_cut_off_reply_is_worth_a_repair(finish: str, repairs: int) -> None:
+@pytest.mark.asyncio
+async def test_only_a_cut_off_reply_is_worth_a_repair(finish: str, repairs: int) -> None:
     usage, model = Usage(), Model(reply("", finish))
     middleware = loop(usage, Ledger(), limits=RootLimits(repairs=0))
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.awrap_model_call(request([HumanMessage("hello")]), model))
+        await middleware.awrap_model_call(request([HumanMessage("hello")]), model)
     assert caught.value.code == "incomplete_output"
     assert usage.consumed.count("repairs") == repairs
 
 
-def test_a_cut_off_reply_is_asked_once_more_briefly() -> None:
+@pytest.mark.asyncio
+async def test_a_cut_off_reply_is_asked_once_more_briefly() -> None:
     usage, ledger = Usage(), Ledger()
     model = Model(reply("", "length"), reply("short"))
-    response = asyncio.run(
-        loop(usage, ledger).awrap_model_call(request([HumanMessage("hello")]), model)
-    )
+    response = await loop(usage, ledger).awrap_model_call(request([HumanMessage("hello")]), model)
     assert response.result[-1].content == "short"
     assert model.requests[1].messages[-1].content == REPAIR_NOTE
     assert usage.used["repairs"] == 1
     assert ledger.admitted_roles() == ["executor", "executor"]
 
 
-def test_running_out_of_model_calls_while_compacting_stops_cleanly() -> None:
+@pytest.mark.asyncio
+async def test_running_out_of_model_calls_while_compacting_stops_cleanly() -> None:
     """The summary's call counts against the run's limit. Past it, nothing is sent, and its
     reservation closes as never accepted."""
     usage, ledger, model = Usage(), Ledger(), Model()
     middleware = loop(usage, ledger, limits=RootLimits(model_calls=0), goal=GOAL)
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.awrap_model_call(history(), model))
+        await middleware.awrap_model_call(history(), model)
     assert caught.value.code == "model_calls_limit"
     assert model.requests == []
     assert ledger.events[-1] == ("failed", "other")
 
 
-def test_an_unencodable_request_stops_before_anything_is_reserved() -> None:
+@pytest.mark.asyncio
+async def test_an_unencodable_request_stops_before_anything_is_reserved() -> None:
     """A lone surrogate is no text a provider can read."""
     usage, ledger, model = Usage(), Ledger(), Model()
     unencodable = request([HumanMessage(b"before \\ud83d after".decode("unicode_escape"))])
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(loop(usage, ledger).admitted(unencodable, model, ROUTE))
+        await loop(usage, ledger).admitted(unencodable, model, ROUTE)
     assert caught.value.code == "request_unencodable"
     assert ledger.asked == [] and model.requests == []
 
 
-def test_without_a_guard_each_dispatch_reads_the_runs_ownership() -> None:
+@pytest.mark.asyncio
+async def test_without_a_guard_each_dispatch_reads_the_runs_ownership() -> None:
     """The default guard is the database's: a run it doesn't hold stops before any admission."""
     ledger = Ledger()
     middleware = LoopMiddleware(Usage(), SCOPE, RootLimits(), ROUTE, admission=lambda: ledger)
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.admitted(request([HumanMessage("hello")]), Model(), ROUTE))
+        await middleware.admitted(request([HumanMessage("hello")]), Model(), ROUTE)
     assert caught.value.code == "run_not_found"
     assert ledger.asked == []
 
@@ -303,24 +322,26 @@ class SettledMeanwhile(Ledger):
         raise self.error
 
 
-def test_an_attempt_recovery_settled_stops_as_lost_and_keeps_its_late_charge() -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_recovery_settled_stops_as_lost_and_keeps_its_late_charge() -> None:
     """The charge the reply reported is late evidence for the attempt recovery classified."""
     ledger = SettledMeanwhile(AttemptAlreadySettled("this attempt has already been settled"))
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(
-            loop(Usage(), ledger).admitted(request([HumanMessage("hello")]), Model(reply()), ROUTE)
+        await loop(Usage(), ledger).admitted(
+            request([HumanMessage("hello")]), Model(reply()), ROUTE
         )
     assert caught.value.code == "lease_lost"
     assert ledger.events[-1] == ("reconciled", 100)
 
 
-def test_any_other_value_error_while_settling_is_a_defect_not_a_lost_lease() -> None:
+@pytest.mark.asyncio
+async def test_any_other_value_error_while_settling_is_a_defect_not_a_lost_lease() -> None:
     """Only the ledger's own refusal means recovery got there first (refactor plan R-41,
     PADP-11)."""
     ledger = SettledMeanwhile(ValueError("arranged defect"))
     with pytest.raises(ValueError, match="arranged defect"):
-        asyncio.run(
-            loop(Usage(), ledger).admitted(request([HumanMessage("hello")]), Model(reply()), ROUTE)
+        await loop(Usage(), ledger).admitted(
+            request([HumanMessage("hello")]), Model(reply()), ROUTE
         )
     assert ("reconciled", 100) not in ledger.events
 
@@ -478,33 +499,36 @@ def answered(code: str | None) -> Callable[[ToolCallRequest], Awaitable[ToolMess
     ("code", "stops", "repairs"),
     [(None, None, 0), ("lease_lost", "lease_lost", 0), ("invalid_arguments", None, 1)],
 )
-def test_the_gateways_code_decides_whether_the_loop_goes_on(
+@pytest.mark.asyncio
+async def test_the_gateways_code_decides_whether_the_loop_goes_on(
     code: str | None, stops: str | None, repairs: int
 ) -> None:
     usage = Usage()
     middleware = loop(usage, Ledger())
     if stops is None:
-        reply = asyncio.run(middleware.awrap_tool_call(tool_request(), answered(code)))
+        reply = await middleware.awrap_tool_call(tool_request(), answered(code))
         assert reply.artifact["code"] == code
     else:
         with pytest.raises(LoopStopped) as caught:
-            asyncio.run(middleware.awrap_tool_call(tool_request(), answered(code)))
+            await middleware.awrap_tool_call(tool_request(), answered(code))
         assert caught.value.code == stops
     assert usage.consumed.count("tool_dispatches") == 1
     assert usage.consumed.count("repairs") == repairs
 
 
-def test_a_tool_call_past_the_dispatch_limit_never_reaches_the_gateway() -> None:
+@pytest.mark.asyncio
+async def test_a_tool_call_past_the_dispatch_limit_never_reaches_the_gateway() -> None:
     async def never(_: ToolCallRequest) -> ToolMessage:
         raise AssertionError("dispatched past the limit")
 
     middleware = loop(Usage(), Ledger(), limits=RootLimits(tool_dispatches=0))
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.awrap_tool_call(tool_request(), never))
+        await middleware.awrap_tool_call(tool_request(), never)
     assert caught.value.code == "tool_dispatches_limit"
 
 
-def test_a_stop_a_tools_own_model_call_met_stops_the_loop_after_it() -> None:
+@pytest.mark.asyncio
+async def test_a_stop_a_tools_own_model_call_met_stops_the_loop_after_it() -> None:
     """Browsing's model calls go through this loop's admission; a stop there ends the loop too."""
     ledger = Ledger(BudgetExceeded("arranged"))
     middleware = loop(Usage(), ledger)
@@ -517,11 +541,12 @@ def test_a_stop_a_tools_own_model_call_met_stops_the_loop_after_it() -> None:
         return await answered(None)(tool_request())
 
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.awrap_tool_call(tool_request(), browsing))
+        await middleware.awrap_tool_call(tool_request(), browsing)
     assert caught.value.code == "budget_exceeded"
 
 
-def test_a_guard_that_refuses_at_dispatch_closes_the_reservation_as_never_sent() -> None:
+@pytest.mark.asyncio
+async def test_a_guard_that_refuses_at_dispatch_closes_the_reservation_as_never_sent() -> None:
     """A stop met after admission, before sending, is the loop's stop, not the failure class."""
     checks: list[int] = []
 
@@ -536,6 +561,53 @@ def test_a_guard_that_refuses_at_dispatch_closes_the_reservation_as_never_sent()
         Usage(), SCOPE, RootLimits(), ROUTE, guard=owned_once, admission=lambda: ledger
     )
     with pytest.raises(LoopStopped) as caught:
-        asyncio.run(middleware.admitted(request([HumanMessage("hello")]), model, ROUTE))
+        await middleware.admitted(request([HumanMessage("hello")]), model, ROUTE)
     assert caught.value.code == "run_not_running"
     assert ledger.events[-1] == ("failed", "other") and model.requests == []
+
+
+class Lookup(BaseModel):
+    """A tool's schema, which goes in the request too."""
+
+    item: str
+
+
+def test_the_size_counts_the_system_prompt_and_tool_schemas() -> None:
+    """Compaction counts neither, and instructions plus skills can be very large."""
+    base = SimpleNamespace(messages=[HumanMessage("hi")], system_message=None, tools=[])
+    long_prompt = SimpleNamespace(
+        messages=[HumanMessage("hi")], system_message=SystemMessage("x" * 50_000), tools=[]
+    )
+    tools = SimpleNamespace(messages=[HumanMessage("hi")], system_message=None, tools=[Lookup])
+    assert request_bytes(long_prompt) >= request_bytes(base) + 50_000
+    assert request_bytes(tools) > request_bytes(base)
+
+
+def test_a_request_counts_its_real_bytes() -> None:
+    text = "\u6f22" * 1_000
+    request = SimpleNamespace(messages=[HumanMessage(text)], system_message=None, tools=[])
+    # Three bytes each in UTF-8, where an escaped form would count six.
+    assert 3_000 <= request_bytes(request) < 4_000
+
+
+def test_a_lone_surrogate_is_refused_before_any_reservation() -> None:
+    request = SimpleNamespace(
+        messages=[HumanMessage(b"before \\ud83d after".decode("unicode_escape"))],
+        system_message=None,
+        tools=[],
+    )
+    # The middleware stops on it before reserving (tests/test_loop_middleware.py).
+    with pytest.raises(UnicodeEncodeError):
+        request_bytes(request)
+
+
+def test_a_tools_real_bytes_count_too() -> None:
+    def tool(description: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            messages=[],
+            system_message=None,
+            tools=[{"type": "function", "function": {"description": description}}],
+        )
+
+    # Three bytes each in UTF-8, where an escaped form would count six.
+    assert request_bytes(tool("\u6f22" * 100)) - request_bytes(tool("")) == 300

@@ -4,8 +4,7 @@
 gates run as production runs them (PTST-01).
 """
 
-import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, date, datetime
@@ -45,14 +44,18 @@ def client_for(handler: httpx.MockTransport) -> httpx.AsyncClient:
     return httpx.AsyncClient(base_url="https://openrouter.ai/api/v1", transport=handler)
 
 
-def validator(status: int) -> object:
+def validator(status: int) -> Callable[[SecretStr], Awaitable[KeyCheck]]:
     def handle(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/v1/key", "only the key metadata route"
         assert request.method == "GET"
         return httpx.Response(status, json={"data": {}})
 
     transport = httpx.MockTransport(handle)
-    return key_validator(lambda: client_for(transport))
+    # key_validator is typed Any in the adapter; this is the shape settings call it with.
+    validate: Callable[[SecretStr], Awaitable[KeyCheck]] = key_validator(
+        lambda: client_for(transport)
+    )
+    return validate
 
 
 @pytest.mark.asyncio
@@ -68,7 +71,7 @@ def validator(status: int) -> object:
 )
 async def test_key_metadata_results(status: int, expected: KeyCheck) -> None:
     validate = validator(status)
-    assert await validate(SecretStr("sk-or-arranged")) is expected  # type: ignore[operator]
+    assert await validate(SecretStr("sk-or-arranged")) is expected
 
 
 @pytest.mark.asyncio
@@ -188,42 +191,48 @@ def settings_over(
     )
 
 
-def test_a_401_marks_the_key_that_received_it_while_it_is_current() -> None:
+@pytest.mark.asyncio
+async def test_a_401_marks_the_key_that_received_it_while_it_is_current() -> None:
     rows = Rows()
     settings = settings_over(stored_key(2), rows)
-    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
+    await settings.mark_invalid(uuid4(), CredentialReference("app", None, 2))
     assert rows.recorded == ["invalid"]
 
 
-def test_a_401_for_a_key_replaced_mid_call_leaves_its_successor_alone() -> None:
+@pytest.mark.asyncio
+async def test_a_401_for_a_key_replaced_mid_call_leaves_its_successor_alone() -> None:
     rows = Rows()
     settings = settings_over(stored_key(3), rows)
-    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
+    await settings.mark_invalid(uuid4(), CredentialReference("app", None, 2))
     assert rows.recorded == []
 
 
-def test_a_key_that_wont_decrypt_reads_as_unavailable_not_an_error() -> None:
+@pytest.mark.asyncio
+async def test_a_key_that_wont_decrypt_reads_as_unavailable_not_an_error() -> None:
     settings = settings_over(CredentialUnreadable("arranged"))
-    assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
+    assert await settings.run_intent(uuid4()) == "credential_unavailable"
 
 
-def test_a_damaged_key_still_gives_the_version_needed_to_replace_it() -> None:
-    status = asyncio.run(settings_over(CredentialUnreadable("arranged")).status(uuid4()))
+@pytest.mark.asyncio
+async def test_a_damaged_key_still_gives_the_version_needed_to_replace_it() -> None:
+    status = await settings_over(CredentialUnreadable("arranged")).status(uuid4())
     assert (status.auth_status, status.settings_version) == ("unavailable", 1)
 
 
-def test_rechecking_a_damaged_key_says_storage_not_an_error() -> None:
+@pytest.mark.asyncio
+async def test_rechecking_a_damaged_key_says_storage_not_an_error() -> None:
     settings = settings_over(CredentialUnreadable("arranged"))
     with pytest.raises(CredentialStorageUnavailable):
-        asyncio.run(settings.revalidate(uuid4()))
+        await settings.revalidate(uuid4())
 
 
-def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
+@pytest.mark.asyncio
+async def test_a_stored_failed_check_blocks_an_environment_key_too() -> None:
     rows = Rows(stored="unavailable")
     settings = settings_over(CredentialUnreadable("arranged"), rows, environment_key=ARRANGED_KEY)
-    assert asyncio.run(settings.run_intent(uuid4())) == "credential_unavailable"
+    assert await settings.run_intent(uuid4()) == "credential_unavailable"
     rows.stored = "configured"
-    assert asyncio.run(settings.run_intent(uuid4())) == "ready"
+    assert await settings.run_intent(uuid4()) == "ready"
 
 
 class Statements:
@@ -242,31 +251,36 @@ class Statements:
         yield
 
 
-def test_reading_a_workspace_with_no_settings_row_writes_nothing_and_gives_the_defaults() -> None:
+@pytest.mark.asyncio
+async def test_reading_a_workspace_with_no_settings_row_writes_nothing_and_gives_the_defaults() -> (
+    None
+):
     """POPS-12: every status read and run-intent check reads; only a writer creates the row, with
     the table's own defaults (supabase/migrations/20261105000005_provider_settings.sql)."""
     connection = Statements(None)
     rows = StoredSettingsRows(connection)
-    assert asyncio.run(rows.read(uuid4())) == (0, "missing", None)
-    assert asyncio.run(rows.read(uuid4(), lock=True)) == (0, "missing", None)
+    assert await rows.read(uuid4()) == (0, "missing", None)
+    assert await rows.read(uuid4(), lock=True) == (0, "missing", None)
     assert [query.split()[0] for query in connection.sent] == ["select", "select"]
     assert connection.sent[1].endswith(" for update")
-    asyncio.run(rows.ensure(uuid4()))
+    await rows.ensure(uuid4())
     assert connection.sent[2].startswith("insert into app_private.provider_settings")
 
 
-def test_a_stored_row_is_read_as_it_is() -> None:
+@pytest.mark.asyncio
+async def test_a_stored_row_is_read_as_it_is() -> None:
     checked = datetime(2026, 11, 15, 9, 0, tzinfo=UTC)
     rows = StoredSettingsRows(
         Statements({"version": 4, "auth_status": "invalid", "validated_at": checked})
     )
-    assert asyncio.run(rows.read(uuid4())) == (4, "invalid", checked)
+    assert await rows.read(uuid4()) == (4, "invalid", checked)
 
 
-def test_each_writer_makes_sure_the_row_exists_before_it_records() -> None:
+@pytest.mark.asyncio
+async def test_each_writer_makes_sure_the_row_exists_before_it_records() -> None:
     rows = Rows()
     settings = settings_over(stored_key(2), rows)
-    asyncio.run(settings.mark_invalid(uuid4(), CredentialReference("app", None, 2)))
+    await settings.mark_invalid(uuid4(), CredentialReference("app", None, 2))
     assert rows.calls == ["ensure", "record invalid"]
 
     async def valid(_key: SecretStr) -> KeyCheck:
@@ -279,15 +293,16 @@ def test_each_writer_makes_sure_the_row_exists_before_it_records() -> None:
         store=Keys(stored_key(2)),
         rows=rows,
     )
-    asyncio.run(checked.revalidate(uuid4()))
+    await checked.revalidate(uuid4())
     assert rows.calls == ["ensure", "record configured"]
 
 
-def test_the_gate_and_the_status_only_read_the_row() -> None:
+@pytest.mark.asyncio
+async def test_the_gate_and_the_status_only_read_the_row() -> None:
     rows = Rows()
     settings = settings_over(stored_key(2), rows)
-    asyncio.run(settings.run_intent(uuid4()))
-    asyncio.run(settings.auth_status(uuid4()))
+    await settings.run_intent(uuid4())
+    await settings.auth_status(uuid4())
     assert set(rows.calls) == {"read"}
 
 
@@ -303,17 +318,19 @@ def catalog_limits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
     return limits
 
 
-def test_settings_wait_for_the_catalog_as_long_as_the_http_client_does(
+@pytest.mark.asyncio
+async def test_settings_wait_for_the_catalog_as_long_as_the_http_client_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     limits = catalog_limits(monkeypatch)
     settings = settings_over(stored_key(2))
-    asyncio.run(settings.status(uuid4()))
-    asyncio.run(settings.models())
+    await settings.status(uuid4())
+    await settings.models()
     assert limits == [SETTINGS_SECONDS, SETTINGS_SECONDS] == [15.0, 15.0]
 
 
-def test_a_catalog_reply_that_isnt_json_reads_as_unavailable_in_settings_and_the_model_list() -> (
+@pytest.mark.asyncio
+async def test_a_catalog_reply_that_isnt_json_reads_as_unavailable_in_settings_and_the_model_list() -> (  # noqa: E501 - the name states the case
     None
 ):
     """POPS-13: the fetcher raises ValueError for a 200 whose body isn't JSON. Operations already
@@ -328,7 +345,7 @@ def test_a_catalog_reply_that_isnt_json_reads_as_unavailable_in_settings_and_the
         store=Keys(stored_key(2)),
         rows=Rows(),
     )
-    assert asyncio.run(settings.status(uuid4())).catalog_status == "unavailable"
-    listed = asyncio.run(settings.models())
+    assert (await settings.status(uuid4())).catalog_status == "unavailable"
+    listed = await settings.models()
     assert listed.catalog_status == "unavailable" and listed.fetched_at is None
     assert not any(model.available for model in listed.models)

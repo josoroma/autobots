@@ -1,7 +1,9 @@
 """Preflight, rendering and vendoring guards. The real stack runs only in the `db` profile."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import re
@@ -132,8 +134,14 @@ class Vendoring(unittest.TestCase):
         self.assertNotEqual(stack.generated_values(55400, 55401)['JWT_SECRET'], generated['JWT_SECRET'])
 
     def test_no_persistent_start_exists(self):
-        source = (ROOT / 'scripts/supabase_stack.py').read_text()
-        self.assertIn("choices=('preflight', 'qualify')", source)
+        """Only preflight and qualify are verbs: `start` is refused by the parser before anything runs (THRN-12)."""
+        for verb in ('start', 'up', 'reset'):
+            error = io.StringIO()
+            with self.subTest(verb=verb), self.assertRaises(SystemExit) as raised, contextlib.redirect_stderr(error):
+                stack.main([verb])
+            self.assertEqual(raised.exception.code, 2)
+            # The parser names every verb it offers: exactly these two.
+            self.assertIn('{preflight,qualify}', error.getvalue())
 
 
 if __name__ == '__main__':

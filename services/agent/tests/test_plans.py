@@ -36,9 +36,14 @@ def proposal(*tasks: PlanTask, reason: str | None = None) -> PlanProposal:
     return PlanProposal(tasks=list(tasks), revision_reason=reason)
 
 
-def rejected(*arguments: object) -> str:
+def rejected(
+    goal: GoalSpec,
+    plan: PlanProposal,
+    previous: list[PlanTask] | None,
+    completed: frozenset[str],
+) -> str:
     with pytest.raises(PlanRejected) as caught:
-        validate_proposal(*arguments)  # type: ignore[arg-type]
+        validate_proposal(goal, plan, previous, completed)
     return caught.value.code
 
 

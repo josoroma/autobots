@@ -41,8 +41,8 @@ from qualification.owners import bootstrap_owner, password_token
 from supabase_stack import generated_values, require_images, require_rendered
 
 OUT = Path('.checks/mac-sleep')
-DRIVER = 'tests/db/sleep_inference_worker.py'
-HELPER = 'tests/db/product_inference_check.py'
+DRIVER = 'tests/db/workers/sleep_inference_worker.py'
+HELPER = 'tests/db/arrange/product_inference.py'
 KEY = 'sk-or-arranged-sleep-key'
 GOAL = 'Write the report [sleep-proof]'
 # Long enough to notice a sleep, and short enough that a lid closed for a moment isn't called one.

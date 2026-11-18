@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -164,6 +165,34 @@ class Generation(unittest.TestCase):
                                     capture_output=True, text=True, timeout=20)
             self.assertEqual(result.returncode, 2)
             self.assertIn('prepared Python environment', result.stderr)
+
+
+class ContractDrift(unittest.TestCase):
+    """The real `check`, on a tree whose artifact has really drifted. Found by US-11.12's review of the harness (docs/engineering/evidence/US-11.12/). Moved from test_final_review.py (THRN-15)."""
+
+    def run_check(self, drift: bool) -> int:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = json.loads((ROOT / generate.OPENAPI).read_text())
+            (root / generate.PYTHON).parent.mkdir(parents=True)
+            (root / generate.PYTHON).write_text('')
+            # The runtime lists the schema keywords it enforces, which `check` reads (R-03).
+            (root / generate.RUNTIME).parent.mkdir(parents=True, exist_ok=True)
+            (root / generate.RUNTIME).write_text((ROOT / generate.RUNTIME).read_text())
+            for path, content in ((generate.OPENAPI, json.dumps(document, indent=2, sort_keys=True) + '\n'),
+                                  (generate.CLIENT, generate.typescript_client(document))):
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(content + ('// drifted\n' if drift else ''))
+            with mock.patch.object(generate, 'project_root', return_value=root), \
+                 mock.patch.object(generate, 'export_document', return_value=document), \
+                 mock.patch.object(sys, 'argv', ['generate_contracts.py', 'check']):
+                return generate.main()
+
+    def test_matching_artifacts_pass(self) -> None:
+        self.assertEqual(self.run_check(drift=False), 0)
+
+    def test_a_drifted_artifact_fails(self) -> None:
+        self.assertEqual(self.run_check(drift=True), 1)
 
 
 if __name__ == '__main__':

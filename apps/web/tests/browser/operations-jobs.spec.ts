@@ -7,7 +7,7 @@ import { need } from "./support/env.ts";
 import { objectOf, runDbHelper } from "./support/db-helpers.ts";
 import { expect, test } from "./support/fixtures.ts";
 
-// US-15.19, PRD-Studio OP-03 and Decision 0022 D14. tests/db/operations_live.py gives the ops-n workspace,
+// US-15.19, PRD-Studio OP-03 and Decision 0022 D14. tests/db/arrange/operations_live.py gives the ops-n workspace,
 // in Costa Rica's time, runs whose status changes fall a set number of hours before now:
 //   1 hour: one failed and one cancelled; 2 hours: one succeeded and one waiting for approval;
 //   3 hours: one paused and one running, at their latest change; 5 hours: one waiting for input;

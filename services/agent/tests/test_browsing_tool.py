@@ -225,9 +225,9 @@ def call(replies: list[Any], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Exec
     monkeypatch.setattr(browsing_tool, "RequestGuard", Guard)
     monkeypatch.setattr(CdpPage, "open", opened)
     runtime = browsing_tool.BrowsingRuntime(
-        executor,  # type: ignore[arg-type]
+        executor,  # type: ignore[arg-type]  # a fake BrowserExecutor
         Delegate(),
-        "route",  # type: ignore[arg-type]
+        "route",  # type: ignore[arg-type]  # a placeholder route the fakes never read
         settle=0,
     )
     tool = browsing_tool.browse_tool(runtime, qualified=lambda: True)
@@ -267,7 +267,8 @@ def test_a_stop_inside_the_loop_is_reported_and_still_removes_the_session(
     assert output == "budget_exceeded" and len(executor.stopped) == 1
 
 
-def test_no_runtime_or_no_loop_fails_before_any_container() -> None:
+@pytest.mark.asyncio
+async def test_no_runtime_or_no_loop_fails_before_any_container() -> None:
     tool = browsing_tool.browse_tool(None, qualified=lambda: True)
     scope = ToolScope(uuid4(), uuid4(), 1, {"browse_goal": 1})
 
@@ -280,4 +281,4 @@ def test_no_runtime_or_no_loop_fails_before_any_container() -> None:
             return str(failed)
         return "ran"
 
-    assert asyncio.run(go()) == "browsing_unavailable"
+    assert await go() == "browsing_unavailable"

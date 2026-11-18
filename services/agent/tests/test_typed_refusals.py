@@ -7,7 +7,6 @@ run without a goal and a defect while approving a role are told apart from the c
 to be caught as. test_refusal_responses.py holds what each route answers.
 """
 
-import asyncio
 from uuid import uuid4
 
 import pytest
@@ -146,13 +145,15 @@ def test_an_unknown_role_is_refused_but_a_defect_while_checking_one_is_not(
         validate_config(config, CATALOG, {})
 
 
-def test_a_run_without_a_goal_is_named_as_such() -> None:
+@pytest.mark.asyncio
+async def test_a_run_without_a_goal_is_named_as_such() -> None:
     with pytest.raises(GoalMissing) as caught:
-        asyncio.run(load_goal(ScriptedConnection(), uuid4()))
+        await load_goal(ScriptedConnection(), uuid4())
     assert isinstance(caught.value, LookupError)
 
 
-def test_a_defect_reading_a_goal_is_not_shown_as_a_run_without_one(
+@pytest.mark.asyncio
+async def test_a_defect_reading_a_goal_is_not_shown_as_a_run_without_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Only a missing goal leaves the objective empty. A KeyError is a defect, and surfaces."""
@@ -167,4 +168,4 @@ def test_a_defect_reading_a_goal_is_not_shown_as_a_run_without_one(
     monkeypatch.setattr(run_workspace, "summary_of", lambda _row: None)
     monkeypatch.setattr(run_workspace, "load_goal", defect)
     with pytest.raises(KeyError, match="arranged defect"):
-        asyncio.run(run_workspace.read_workspace(ScriptedConnection(), uuid4(), uuid4()))
+        await run_workspace.read_workspace(ScriptedConnection(), uuid4(), uuid4())

@@ -8,7 +8,6 @@ connection: a key comes from the context's own `key` and `setting` (refactor pla
 """
 
 import ast
-import asyncio
 import contextlib
 import json
 import re
@@ -159,12 +158,15 @@ class Recorder:
 @pytest.mark.parametrize(
     "status", [ReceiptStatus.SUCCEEDED, ReceiptStatus.FAILED, ReceiptStatus.UNKNOWN]
 )
-def test_recording_an_outcome_admits_only_its_moves_starting_states(status: ReceiptStatus) -> None:
+@pytest.mark.asyncio
+async def test_recording_an_outcome_admits_only_its_moves_starting_states(
+    status: ReceiptStatus,
+) -> None:
     """A success is kept whoever owns the run now; anything else speaks only for the attempt on
     record, at this generation or an earlier one."""
     connection = Recorder()
     outcome = receipts.Outcome(status, {"ok": True}, "code", "detail")
-    asyncio.run(receipts.record(connection, OPERATION, outcome, 3))
+    await receipts.record(connection, OPERATION, outcome, 3)
     query, params = connection.only()
     assert query.startswith("update app_private.tool_receipts set status = %s")
     assert params[:5] == (status.value, json.dumps({"ok": True}), "code", "detail", OPERATION)
@@ -174,16 +176,16 @@ def test_recording_an_outcome_admits_only_its_moves_starting_states(status: Rece
     assert params[6:] == ((3,) if fenced else ())
 
 
-def test_an_attempt_records_no_return_to_started() -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_records_no_return_to_started() -> None:
     with pytest.raises(ValueError, match="makes no move"):
-        asyncio.run(
-            receipts.record(Recorder(), OPERATION, receipts.Outcome(ReceiptStatus.STARTED), 3)
-        )
+        await receipts.record(Recorder(), OPERATION, receipts.Outcome(ReceiptStatus.STARTED), 3)
 
 
-def test_reopening_starts_a_new_attempt_from_anything_but_a_success() -> None:
+@pytest.mark.asyncio
+async def test_reopening_starts_a_new_attempt_from_anything_but_a_success() -> None:
     connection = Recorder()
-    assert asyncio.run(receipts.reopen(connection, OPERATION, 4)) is True
+    assert await receipts.reopen(connection, OPERATION, 4) is True
     query, params = connection.only()
     assert "returning operation_id" in query
     assert params == (
@@ -192,12 +194,13 @@ def test_reopening_starts_a_new_attempt_from_anything_but_a_success() -> None:
         OPERATION,
         receipt_sources(ReceiptCommand.REOPEN, ReceiptStatus.STARTED),
     )
-    assert asyncio.run(receipts.reopen(Recorder(default=None), OPERATION, 4)) is False
+    assert await receipts.reopen(Recorder(default=None), OPERATION, 4) is False
 
 
-def test_a_lost_workers_started_attempts_become_unknown() -> None:
+@pytest.mark.asyncio
+async def test_a_lost_workers_started_attempts_become_unknown() -> None:
     connection = Recorder()
-    asyncio.run(receipts.mark_unknown(connection, RUN, 5))
+    await receipts.mark_unknown(connection, RUN, 5)
     query, params = connection.only()
     assert "generation < %s" in query
     assert params == (
@@ -212,11 +215,12 @@ def test_a_lost_workers_started_attempts_become_unknown() -> None:
     ("status", "result"),
     [(ReceiptStatus.SUCCEEDED, {"reconciled": "operator"}), (ReceiptStatus.FAILED, None)],
 )
-def test_a_ruling_settles_only_an_unknown_outcome(
+@pytest.mark.asyncio
+async def test_a_ruling_settles_only_an_unknown_outcome(
     status: ReceiptStatus, result: dict[str, str] | None
 ) -> None:
     connection = Recorder()
-    asyncio.run(receipts.rule(connection, OPERATION, receipts.Ruling(status, "Seen it.", ACTOR)))
+    await receipts.rule(connection, OPERATION, receipts.Ruling(status, "Seen it.", ACTOR))
     query, params = connection.only()
     assert "reconciled_by = %s, reconciled_at = now()" in query
     assert params == (
@@ -229,10 +233,11 @@ def test_a_ruling_settles_only_an_unknown_outcome(
     )
 
 
-def test_an_attempt_starts_its_receipt_once() -> None:
+@pytest.mark.asyncio
+async def test_an_attempt_starts_its_receipt_once() -> None:
     connection = Recorder()
     attempt = receipts.Attempt(OPERATION, RUN, WORKSPACE, "send_note", 1, "hash", 3, True)
-    assert asyncio.run(receipts.start(connection, attempt)) is True
+    assert await receipts.start(connection, attempt) is True
     query, params = connection.only()
     assert "on conflict (operation_id) do nothing" in query
     assert params == (
@@ -246,12 +251,13 @@ def test_an_attempt_starts_its_receipt_once() -> None:
         3,
         True,
     )
-    assert asyncio.run(receipts.start(Recorder(default=None), attempt)) is False
+    assert await receipts.start(Recorder(default=None), attempt) is False
 
 
-def test_cancelling_withdraws_only_pending_requests() -> None:
+@pytest.mark.asyncio
+async def test_cancelling_withdraws_only_pending_requests() -> None:
     connection = Recorder()
-    asyncio.run(approvals.withdraw_pending(connection, RUN))
+    await approvals.withdraw_pending(connection, RUN)
     query, params = connection.only()
     assert query.startswith("update public.approval_requests set status = %s")
     assert params == (
@@ -261,12 +267,13 @@ def test_cancelling_withdraws_only_pending_requests() -> None:
     )
 
 
-def test_an_expiry_never_overwrites_a_decision_or_a_withdrawal() -> None:
+@pytest.mark.asyncio
+async def test_an_expiry_never_overwrites_a_decision_or_a_withdrawal() -> None:
     """An expiry pass that read the request as pending before a person decided or the run was
     cancelled matches no row, so it writes nothing else: no met obligation, no event, no pause.
     Only the job row lock that every transition takes first comes before it."""
     connection = Recorder({"update public.approval_requests": None})
-    assert asyncio.run(approvals.expire(connection, APPROVAL, RUN, WORKSPACE)) is False
+    assert await approvals.expire(connection, APPROVAL, RUN, WORKSPACE) is False
     [(lock, locked), (query, params)] = connection.statements
     assert lock.startswith("select 1 from app_private.run_jobs") and "for update" in lock
     assert locked == (RUN,)
@@ -278,9 +285,10 @@ def test_an_expiry_never_overwrites_a_decision_or_a_withdrawal() -> None:
     )
 
 
-def test_an_expiry_of_a_pending_request_meets_its_wait() -> None:
+@pytest.mark.asyncio
+async def test_an_expiry_of_a_pending_request_meets_its_wait() -> None:
     connection = Recorder({"select status from public.runs": ("running",)})
-    assert asyncio.run(approvals.expire(connection, APPROVAL, RUN, WORKSPACE)) is True
+    assert await approvals.expire(connection, APPROVAL, RUN, WORKSPACE) is True
     written = [query for query, _ in connection.statements]
     assert any("run_obligations set status = 'met'" in query for query in written)
     assert any(query.startswith("insert into public.run_events") for query in written)
