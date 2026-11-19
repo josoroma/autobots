@@ -20,6 +20,10 @@
 </p>
 
 <p align="center">
+  ▶ Watch on YouTube: <a href="https://www.youtube.com/watch?v=i6JhWdaDm98">Autonomous agents that do real work, on your own Mac</a>
+</p>
+
+<p align="center">
   <img src="docs/assets/readme/hero.svg" alt="A goal to fix a flaky test and open a pull request becomes a run that reads the test, patches the fix and then waits for a person to approve opening the pull request." width="100%">
 </p>
 
@@ -86,7 +90,7 @@ One app for the whole loop, dark by default in the shadcn Luma theme:
 
 Give the Deep research writer a topic and it works like [Deep-Research-Content-Writer](https://github.com/josoroma/Deep-Research-Content-Writer): up to 30 Google results, the best pages read and numbered as sources, and one cited guide with a report on how well it went. As a workflow, a second agent then reads that work back, checks every citation against the saved excerpts and corrects what they don't support, and the result waits for your approval.
 
-On this Mac, for "langchain for deep agents", the Expert wrote a 12-source guide for US$0.52, and the workflow a 17-source guide, checked and corrected, for US$0.45. It took five attempts, and each failure led to a fix. [Deep research, live](README-Deep-Research-Content-Writer.md) tells the whole story, with every count and cost as observed.
+On this Mac, for "langchain for deep agents", the Expert wrote a 12-source guide for US$0.52, and the workflow a 17-source guide, checked and corrected, for US$0.45. It took five attempts, and each failure led to a fix. [Deep research, live](README-Deep-Research-Content-Writer.md) tells the whole story, with every count and cost as observed. The video [Autonomous agents that do real work, on your own Mac](https://www.youtube.com/watch?v=i6JhWdaDm98) shows these runs in the Studio, from the Expert to the approval.
 
 ## By the numbers
 
