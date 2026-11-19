@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-19. **Status:** a draft for the owner. Nothing here is implemented, and nothing may be until the owner decides [section 12](#12-decisions-the-owner-makes): today's rules forbid a local model server (see [section 3](#3-why-this-needs-a-decision-first)). Like the other plans in this folder, it is input for a decision and a backlog addition. [Section 13](#13-draft-stories-in-specs-style) holds stories in SPECS style, ready for ingestion once the owner approves.
 
-The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged. A workspace setting chooses where every model call goes: **OpenRouter**, with today's profiles and defaults, or **Local**, on qualified local models only, never mixed ([section 7.1](#71-the-model-source-setting)). [Section 9](#9-browsing-with-browser-use-locally) adds browsing (`browse_goal`) on [browser-use](https://github.com/browser-use/browser-use), open source and run locally, with a small model.
+The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged. A workspace setting chooses where every model call goes: **OpenRouter**, with today's profiles and defaults, or **Local**, on qualified local models only, never mixed ([section 7.1](#71-the-model-source-setting)). [Section 9](#9-browsing-with-browser-use-locally) adds browsing (`browse_goal`) on [browser-use](https://github.com/browser-use/browser-use), open source and run locally, with a small model. [The browser typing plan](browser-typing-and-flights.md) lets it start without approval and type and submit, behind a Settings checkbox that is on by default, and prices flights with it.
 
 ## Contents
 
@@ -298,11 +298,16 @@ browse_goal (worker) ── starts ──▶ isolated executor (Decision 0018)
 browser-use never sees a key or a runtime address, and it reaches the internet only through the egress proxy.
 
 **What stays enforced:**
-- **Read only (B5)**, now enforced outside the model, because the model writes code:
-  - The egress proxy allows only `GET` and `HEAD` to the allowed domains, so form posts, sign-ins and uploads fail at the network.
+- **Typing and submitting follow the owner's YOLO setting**, a Settings checkbox that is on by default ([the browser typing plan](browser-typing-and-flights.md), T1):
+  - With it on, browser-use may type, click and submit on the allowed domains.
+  - With it off, browsing runs on Autobots' read-only loop (that plan's T4), so the proxy never has to see methods inside TLS.
+
+  Either way:
+  - The egress proxy connects only to the allowed domains.
   - Chromium's policy disables downloads.
-  - The profile is fresh, with no cookies, no host folders and the box's `tmpfs` only.
-- **Approval** on every call (B6), the **step and time caps** (B2) and the **URL guard** (B3).
+  - The profile is fresh, with no cookies, no host folders and the box's `tmpfs` only, so there is nothing to sign in or pay with.
+- **Approval** on every call (B6) only with YOLO off. With it on, a browse starts without approval (that plan's T2), and its domains must fall within the list the owner set in the Expert's grant (that plan's T10).
+- The **step and time caps** (B2) and the **URL guard** (B3), always.
 - **Stop reasons:** browser-use's outcome maps onto `browse_goal`'s own (`done`, `max_steps`, `max_seconds`, `refused_action`, `invalid_action`, `cancelled`).
 - **Nothing reaches Browser Use's cloud.** Its gateway, cloud browser, telemetry and sync hosts are denied by the proxy, and a test proves none is attempted.
 - **The same contract.** `browse_goal`'s public contract is unchanged (task, start URL, allowed domains, steps, seconds, summary), so Experts and runs don't change.
@@ -326,7 +331,7 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 |---|---|---|
 | Reach | Text and links. Pages that render through scripts, or need clicks on non-link elements, may be out of reach | Clicks anything, runs page scripts, can read screenshots |
 | Model | One tool call per step. A 4B model is likely enough | Writes Python. Likely 9B, or a model with vision |
-| Read only | By its fixed action set | By the network and browser policy |
+| Read only | By its fixed action set | No: it types and submits under the YOLO setting, within the allowed domains ([the browser typing plan](browser-typing-and-flights.md)) |
 | Dependencies | None added | Its own pinned environment in the box, reviewed |
 | Work | A local profile on the `researcher` route | US-17.6 and US-17.7, plus qualifying the executor for model-written code |
 
@@ -359,7 +364,7 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 | **P2. Local route** | US-17.1, US-17.2 and US-17.3 | A local profile qualified, and the Model source setting switching between OpenRouter and Local |
 | **P3. Fit the run** | US-17.4: the frozen replay and the local Expert or workflow versions | Q2 passes for one model |
 | **P4. Live** | US-17.5: Q3, then a "Deep research, local" section in the README and optionally a film | R1 to R9 observed |
-| **P5. Browsing** | US-17.6 and US-17.7 after D8 and D9. A scripted model first, then one live browse of `example.com` and `iana.org` on the local `researcher` route, as Decision 0019 S6 did | `browse_goal` on browser-use returns its summary with read-only holding and nothing sent to Browser Use's cloud |
+| **P5. Browsing** | US-17.6 and US-17.7 after D8 and D9. A scripted model first, then one live browse of `example.com` and `iana.org` on the local `researcher` route, as Decision 0019 S6 did | `browse_goal` on browser-use returns its summary with the allowed domains holding and nothing sent to Browser Use's cloud |
 
 ## 12. Decisions the owner makes
 
@@ -372,8 +377,8 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 | D5 | Limits for local routes | **Set per route from P0's measurements:** call time (L4, 300 s today), active minutes (L2, 45 today) and context (L6, 64K today) |
 | D6 | A citation and anchor gate in code? | **Not now:** the check step stays responsible, and Q2 shows whether that holds · add one as its own story |
 | D7 | Does a local Expert or workflow version count as "the same"? | **Yes, if its tool grant and outputs are unchanged** · no, the instructions must be identical |
-| D8 | Which browsing engine? | **browser-use 1.0 in the isolated box beside Autobots' loop, chosen per Expert or per call** · replace the loop with browser-use · keep only the loop |
-| D9 | May model-written code run inside the box? | **Yes, inside the isolated executor only, with read only enforced by the egress proxy (`GET` and `HEAD` only) and Chromium's policy**. This amends Decision 0018 B5 and needs the executor qualified for it · no, which rules out browser-use 1.0 |
+| D8 | Which browsing engine? | **browser-use 1.0 in the isolated box beside Autobots' loop, chosen per Expert or per call.** If [the browser typing plan's](browser-typing-and-flights.md#10-decisions-the-owner-makes) T4 is taken, the YOLO setting chooses instead · replace the loop with browser-use · keep only the loop |
+| D9 | May model-written code run inside the box? | **Yes, inside the isolated executor only, limited to the allowed domains by the egress proxy and to no downloads by Chromium's policy.** Typing and submitting follow the owner's YOLO setting, on by default ([the browser typing plan](browser-typing-and-flights.md), T1), which amends Decision 0018 B5. It needs the executor qualified for it · no, which rules out browser-use 1.0 |
 | D10 | What happens to a run started before a switch of Model source? | **Its calls on the switched-off source are refused as `model_source_disabled`, and it waits until the owner switches back, cancels or starts a linked new run** · it finishes on its frozen source |
 | D11 | Local role defaults | **One general model for every role, and a small model for `researcher` once one qualifies for browsing**, all set from Q1 and Q2 · one model for every role |
 
@@ -539,14 +544,14 @@ Dependencies:
 
 As a workspace owner
 I want browse_goal able to run browser-use inside the isolated executor
-So that pages Autobots' text loop can't reach are readable without giving up read-only browsing.
+So that pages Autobots' text loop can't reach are readable, within the allowed domains.
 
 Acceptance Criteria:
 
 ```gherkin
-Scenario: Read only holds at the network
+Scenario: The domains and the box hold
   Given browser-use is driving the box's Chromium on an allowed domain
-  When a page submits a form, signs in, uploads or downloads
+  When a page or the model goes to a host outside the allowed domains, or starts a download
   Then the egress proxy or Chromium's policy refuses it, and the browse continues or stops with refused_action
 
 Scenario: Nothing reaches Browser Use's cloud
@@ -557,7 +562,7 @@ Scenario: Nothing reaches Browser Use's cloud
 Scenario: The contract is unchanged
   Given an Expert granted browse_goal
   When it browses on browser-use
-  Then the call takes the same inputs, waits for the same approval, and returns a summary and one of the same stop reasons
+  Then the call takes the same inputs, waits for approval as the YOLO setting says, and returns a summary and one of the same stop reasons
 ```
 
 Dependencies:
@@ -575,7 +580,7 @@ Dependencies:
 | **Local exposure** | Any process on this Mac can call a loopback server | One-owner Mac. No key in the workspace. Untrusted page text reaches prompts exactly as it does today |
 | **"Local" covers models only** | An owner may read Local as "nothing leaves the Mac", but search and page reads still do | The setting and the composer's disclosure say tool calls still leave the Mac |
 | **"Free" is partial** | SerpApi and Jina still charge per call | R9 counts tool spend separately |
-| **Model-written code in the box** | browser-use 1.0 runs Python the model writes, steered by page text | The box's isolation is the only guard: no host folders, no keys, egress through the proxy, `GET` and `HEAD` only (D9) |
+| **Model-written code in the box** | browser-use 1.0 runs Python the model writes, steered by page text | The box's isolation is the only guard: no host folders, no keys, and egress through the proxy to the allowed domains only (D9). With YOLO on, it may also type and submit there ([the browser typing plan](browser-typing-and-flights.md#12-risks)) |
 | **Cloud by default** | A missing `llm` or `Browser(...)` sends work to Browser Use's gateway or cloud browser | The proxy denies those hosts, and US-17.7 proves none is attempted |
 | **browser-use churn** | Five releases in a week, and a 1.0 rewrite | Pin the exact version in the box's environment, and qualify again on every change |
 
