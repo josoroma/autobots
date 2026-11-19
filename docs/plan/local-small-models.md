@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-19. **Status:** a draft for the owner. Nothing here is implemented, and nothing may be until the owner decides [section 12](#12-decisions-the-owner-makes): today's rules forbid a local model server (see [section 3](#3-why-this-needs-a-decision-first)). Like the other plans in this folder, it is input for a decision and a backlog addition. [Section 13](#13-draft-stories-in-specs-style) holds stories in SPECS style, ready for ingestion once the owner approves.
 
-The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged. [Section 9](#9-browsing-with-browser-use-locally) adds browsing (`browse_goal`) on [browser-use](https://github.com/browser-use/browser-use), open source and run locally, with a small model.
+The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged. A workspace setting chooses where every model call goes: **OpenRouter**, with today's profiles and defaults, or **Local**, on qualified local models only, never mixed ([section 7.1](#71-the-model-source-setting)). [Section 9](#9-browsing-with-browser-use-locally) adds browsing (`browse_goal`) on [browser-use](https://github.com/browser-use/browser-use), open source and run locally, with a small model.
 
 ## Contents
 
@@ -56,7 +56,10 @@ No model judges another model's output: `AGENTS.md` forbids an implicit evaluato
 
 **Unchanged:** the Studio, the API, the worker with its leases, fencing and checkpoints, the LangGraph and Deep Agents loop, the tools and their keys, approvals, artifacts, budgets and receipts, compaction, and the pinned plan (US-16.9).
 
-**Changed:** only what answers each model call. A run gets a **local route**: a model served on `127.0.0.1` by a runtime the owner starts, the way they start Supabase. Tool calls still leave the Mac, since search and page reads are what the run is for.
+**Changed:** only what answers each model call.
+- **A local route:** a model served on `127.0.0.1` by a runtime the owner starts, the way they start Supabase.
+- **A Model source setting** picks OpenRouter or Local for the whole workspace. OpenRouter stays the default, with today's profiles and role defaults.
+- **Tool calls still leave the Mac** in either source, since search and page reads are what the run is for.
 
 Kokoro and faster-whisper in `~/Models` are already local, but they produced the film's voice and checked it. They are not part of the app.
 
@@ -67,6 +70,7 @@ Kokoro and faster-whisper in `~/Models` are already local, but they produced the
 | Model boundary | [`AGENTS.md`](../../AGENTS.md), "Boundaries that matter" | "All application model calls use the approved OpenRouter profiles (three, by Decision 0019) and the shared gateway. No fallback, local model server, implicit evaluator, hosted tracing or alternative provider." |
 | Gateway rule | [`.claude/rules/model-gateway.md`](../../.claude/rules/model-gateway.md) | "Exactly three approved profiles … No alternate provider, local model, hidden model default or fallback." |
 | Approved profiles | [SP-006](../engineering/option-b-contract.md#sp-006--approved-model-profiles), [MP-01](../PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection), [Decision 0019](../engineering/decisions/0019-sol-profile-and-browser-use.md) S2 | Three OpenRouter profiles. One is offered for new runs only once its route is qualified |
+| Provider PRD | [PRD-Model-Providers.md](../PRD/PRD-Model-Providers.md) intro and MP-01 | "There is no local inference runtime or local-only model profile in scope." "Reject local endpoints …" "There is no optional-cloud toggle" |
 | Catalog contract | [MP-02](../PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract) | A paid attempt needs a fresh, exact association with OpenRouter's public catalog |
 | Single factory | `adapters/models/factory.py` | "The one OpenRouter factory … Nothing else builds a model client." |
 
@@ -96,6 +100,7 @@ A new decision (0035) would amend SP-006, MP-01, MP-02 and MP-07, `AGENTS.md` an
 **Speed.** The run is mostly reading: 1.11M input tokens against 25K output.
 - **Prefill** (processing the prompt) decides the time. With no reuse, at an assumed 500 tokens per second, 1.11M tokens is 37 minutes of prefill alone. A **prefix cache** keeps the processed start of each prompt (instructions, tool schemas, earlier turns), so each call processes mostly its new tokens. This is the most important serving requirement.
 - **Decode** (writing the reply): 25,335 tokens take 10 to 21 minutes at an assumed 20 to 40 tokens per second.
+- **Measured here before:** Qwen3.8-27B at 4 bits on llama.cpp decoded at about **7.5 tokens per second**, and took about 10 seconds to its first token on a short prompt ([section 5.3](#53-what-this-repository-already-measured)). At that rate, 25,335 output tokens alone take 56 minutes, past L2's 45 active minutes. A 27B model needs multi-token prediction to be fast enough (Bonsai's MTPLX pack has it), or the run needs a model of 9B or less.
 - **Expect 20 to 60 minutes per run tree**, against about 9 today. Phase 0 replaces these assumptions with measurements.
 
 **Today's limits would bind:**
@@ -123,11 +128,13 @@ At 27B parameters it is not a *small* model. At 8.8 GB it has a small footprint,
 
 ### 5.2 Candidates to download
 
-These are the ones a search on 2026-11-19 surfaced. Phase 0 surveys the Hub again, and a model is chosen by qualification ([section 10](#10-qualifying-without-guessing)), not by its name.
+These come from [the repository's earlier survey](../../research/HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md#4-smaller-open-weight-models-worth-evaluating) and a search on 2026-11-19. Phase 0 surveys the Hub again, and a model is chosen by qualification ([section 10](#10-qualifying-without-guessing)), not by its name.
 
 | Tier | Candidate | Why | Watch |
 |---|---|---|---|
-| Small | Qwen3.5 4B and 9B | Apache-2.0, tool calling, long context | Thinking is on by default under some servers and spends the reply's tokens |
+| Small | Qwen3.5 4B and 9B | Apache-2.0, tool calling, long context. Both have MTPLX packs, so one runtime serves them and Bonsai. The 9B is 5.95 GB as MLX 4-bit, or about 8.67 GB as an MTPLX pack | Thinking is on by default under some servers and spends the reply's tokens |
+| Small | Granite 4.2 3B | Apache-2.0, tool use and structured-output training, a different family from Qwen. IBM's official q4 MLX is 2.06 GB | Needs explicit sampling and template settings |
+| Small | SmolLM3-3B | Apache-2.0, documented tool formats, open training. 1.73 GB as MLX 4-bit | Its Python-style tool format must never be executed. Use a parser-based format |
 | Small | Gemma 4 E4B | 4.5B effective parameters, 128K context, native function calling | One hands-on MLX test reported no tool calls in a multi-turn task. Qualify before trusting |
 | Small, older | Qwen3-8B, Qwen3-4B | The most tested tool calling at these sizes | Less context headroom |
 | Mid (MoE) | Gemma 4 26B A4B | About 4B active parameters, so a small model's speed with a larger model's knowledge | Memory like a 26B |
@@ -141,6 +148,16 @@ These are the ones a search on 2026-11-19 surfaced. Phase 0 surveys the Hub agai
 - A fit within the memory budget.
 
 Each download is approved by the owner (D3), with its size.
+
+### 5.3 What this repository already measured
+
+Two local experiments ran on this Mac on 2026-11-04, before the OpenRouter-only decision. Their reports are marked historical, but their observations stand.
+
+| Experiment | Observed | What it means for this plan |
+|---|---|---|
+| [Bonsai through MTPLX](../../research/LOCAL-MODEL-EVIDENCE.md), 8K context | Automatic and forced tool calls passed, with tool-result continuation and streamed text. **Strict JSON schema failed (HTTP 400)**: the optional `llguidance` dependency was missing, and MTPLX refused rather than return unconstrained output. A background warmup hit memory pressure, and a later one succeeded | Install and pin MTPLX's `server` extra (`llguidance`) in an isolated environment before Q1, or use tool-call results with server-side validation. Measure memory with the whole Studio running |
+| [Qwen3.8-27B Q4_K_M through llama.cpp](../../research/QWEN38-GGUF-TEST-RESULTS.md), 8K context, one slot | 14 of 15 protocol cases passed, including nested strict JSON. Native named `tool_choice` was **unsupported** (only `auto`, `none` and `required`). A bounded invoice audit **failed its semantic check**: the call's shape was valid, but its arithmetic was wrong. Decode about **7.5 tokens per second**, first content about **10 s**. Peak resident memory **16.6 GiB**, with no swap | Valid syntax doesn't mean correct reasoning, so the semantic checks in Q2 matter. A dense 27B is too slow for this run. Use `required` with one permitted tool in place of named choice |
+| [Hugging Face SLM survey](../../research/HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md) | Recommended keeping Bonsai first, qualifying structured output separately, and shortlisting Qwen3.5-4B and Granite 4.2 3B for cheaper work. It found no official Qwen3.8 below 27B | The candidates in 5.2 |
 
 **Roles.** The run page says "Only the executor's binding dispatches in this release", so one model answers all 45 calls. One local model per route is enough for this run. The other roles can follow once this one works. Browsing runs on the `researcher` route, and [section 9](#9-browsing-with-browser-use-locally) covers it.
 
@@ -171,6 +188,30 @@ Each download is approved by the owner (D3), with its size.
 
 Where the stories would change code. Nothing here is done now.
 
+### 7.1 The model source setting
+
+Settings → Models gains one workspace setting, **Model source**, that only an owner or admin can change (MP-05):
+
+| | **OpenRouter** (the default) | **Local** |
+|---|---|---|
+| Profiles offered | Exactly today's: Terra, and Sol once offered. DeepSeek stays not offered | Qualified local profiles only |
+| Role defaults | Today's: every role on Terra, `researcher` on Sol | Set per role from the qualified local profiles (D11), e.g. the deep research model for `executor` and a small model for `researcher` |
+| Resolution order | MP-01's, unchanged: run role override, run-wide profile, workspace role override, workspace default, built-in default | The same order, over local profiles only |
+| Needs | The OpenRouter key | A running local runtime. No key, and none is read |
+| Never sends | Anything to a local runtime | Anything to OpenRouter, including its catalog fetch |
+| Home's Services panel | "OpenRouter authenticated" | "Local model ready" from the runtime's health and `/v1/models` |
+| Disclosure in the composer | "Sent to OpenRouter: …" as today | "Sent to the local model on this Mac. Nothing goes to OpenRouter." Tool calls still leave the Mac, and it says so |
+| Spend | As today | US$0 reserved per model call. Token, call, tool and time limits still apply. Tool spend (SerpApi, Jina) is unchanged |
+
+**Rules that hold in both:**
+- **One source at a time.** A run never mixes sources, and neither source ever falls back to the other.
+- **A new install starts on OpenRouter** with today's defaults, so nothing changes until the owner switches.
+- **Switching to Local is refused** until a qualified local profile covers every role that dispatches: today `executor`, and `researcher` when an Expert grants `browse_goal`. The refusal says what is missing.
+- **Saved choices are kept per source.** The workspace default and role overrides are stored for each source, so switching back restores what was there.
+- **Runs started before a switch:** recommended is that the source is a hard boundary. A model call whose frozen route is on the source now switched off is refused at dispatch as `model_source_disabled`. The run waits with that reason until the owner switches back, cancels, or starts a linked new run on the active source (MP-01's rule for changed routes). D10 decides.
+
+### 7.2 Where code changes
+
 | Area | File | Change |
 |---|---|---|
 | Profiles | `domain/models.py` | One `ModelProfileId` per qualified local model (e.g. `local_bonsai_2_27b`). The canonical ID is the Hugging Face repository at its revision, and the wire ID is the served model ID. Offering waits on qualification, as `OFFERED_FOR_NEW_RUNS` does for Sol. A local `ModelRoute` costs nothing |
@@ -178,7 +219,8 @@ Where the stories would change code. Nothing here is done now.
 | Identity | `adapters/models/catalog.py` | OpenRouter's catalog proves identity and parameters today. For a local route, a manifest snapshot does: the served ID from `/v1/models`, the weights' SHA-256 and the chat template's hash. A mismatch refuses the call, with no substitute |
 | Budgets | `application/run_admission.py`, `application/loop_policy.py` | Reserve US$0 per local call, and keep the token, call, tool and time limits. Show "US$0.00, local" with the tokens |
 | Qualification | `operations/route_qualification.py` | US-3.4's suite (plain text, automatic and required tool calls, flat structured output and streamed text, three trials each) runs against a local route. It needs no `--paid` flag, since nothing is spent, and it gates offering |
-| Settings and disclosure | `apps/web` Settings → Models, the composer's disclosure (`components/runs/disclosure/`) | Local profiles with their qualification and limits. "Sent to the local model on this Mac" in place of "Sent to OpenRouter" for model calls. Tool calls still leave the Mac, and the text says so |
+| Model source | `contracts/settings.py`, `application/provider_settings.py`, `application/run_admission.py`, `application/worker_inference.py` | The setting, with the default profile and role overrides stored per source. Admission resolves roles over the active source's profiles and freezes the source with the route. Dispatch refuses a call whose source is switched off |
+| Settings and disclosure | `apps/web` Settings → Models, the composer's disclosure (`components/runs/disclosure/`) | The Model source control, and local profiles with their qualification and limits. The disclosure follows the source, as in 7.1. Tool calls still leave the Mac, and the text says so |
 | Credentials | none | A local route has no key. Its URL is ordinary non-secret configuration |
 | Tests | services/agent tests | Fake transports stay the default. A local smoke test runs only on request against a running server, like live qualification |
 
@@ -286,7 +328,7 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 | Model | One tool call per step. A 4B model is likely enough | Writes Python. Likely 9B, or a model with vision |
 | Read only | By its fixed action set | By the network and browser policy |
 | Dependencies | None added | Its own pinned environment in the box, reviewed |
-| Work | A local profile on the `researcher` route | US-17.5 and US-17.6, plus qualifying the executor for model-written code |
+| Work | A local profile on the `researcher` route | US-17.6 and US-17.7, plus qualifying the executor for model-written code |
 
 **Recommended:**
 1. Run browser-use 1.0 in the box as the engine for pages the text loop can't reach.
@@ -314,17 +356,17 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 |---|---|---|
 | **P0. Decide and measure** (no app code) | Decision 0035. Download the chosen candidates with pinned revisions. Serve each and measure Q1's throughput and memory by hand. The owner lowers Docker's memory limit | A table of measurements and a shortlist of at most three models |
 | **P1. Backlog** | Ingest [section 13](#13-draft-stories-in-specs-style) with `autobots-spec-ingest` from the decision | Stories READY in `SPECS.md` |
-| **P2. Local route** | US-17.1 and US-17.2 | A local profile qualified and offered |
-| **P3. Fit the run** | US-17.3: the frozen replay and the local Expert or workflow versions | Q2 passes for one model |
-| **P4. Live** | US-17.4: Q3, then a "Deep research, local" section in the README and optionally a film | R1 to R9 observed |
-| **P5. Browsing** | US-17.5 and US-17.6 after D8 and D9. A scripted model first, then one live browse of `example.com` and `iana.org` on the local `researcher` route, as Decision 0019 S6 did | `browse_goal` on browser-use returns its summary with read-only holding and nothing sent to Browser Use's cloud |
+| **P2. Local route** | US-17.1, US-17.2 and US-17.3 | A local profile qualified, and the Model source setting switching between OpenRouter and Local |
+| **P3. Fit the run** | US-17.4: the frozen replay and the local Expert or workflow versions | Q2 passes for one model |
+| **P4. Live** | US-17.5: Q3, then a "Deep research, local" section in the README and optionally a film | R1 to R9 observed |
+| **P5. Browsing** | US-17.6 and US-17.7 after D8 and D9. A scripted model first, then one live browse of `example.com` and `iana.org` on the local `researcher` route, as Decision 0019 S6 did | `browse_goal` on browser-use returns its summary with read-only holding and nothing sent to Browser Use's cloud |
 
 ## 12. Decisions the owner makes
 
 | # | Question | Options, recommended first |
 |---|---|---|
-| D1 | Allow local models? | **Local profiles beside the OpenRouter ones, never as a fallback** · local only for this install · no |
-| D2 | Which runtimes? | **MTPLX for Bonsai, plus one of mlx-lm or llama.cpp for the small models, chosen by P0's measurements** · one runtime only |
+| D1 | Allow local models, and how? | **A Model source setting: OpenRouter (the default, today's profiles and role defaults) or Local (qualified local profiles only). One source at a time, never mixed, never a fallback** · local profiles beside OpenRouter's, chosen per run · no |
+| D2 | Which runtimes? | **MTPLX for Bonsai and the Qwen3.5 packs, with its `server` extra (`llguidance`) pinned in an isolated environment.** mlx-lm or llama.cpp only for a model with no MTPLX pack · one runtime per model |
 | D3 | Which downloads? | **Bonsai (on disk), plus at most two small models from section 5.2**, each with its size and license shown first |
 | D4 | Memory | **Lower Docker's VM limit to what Supabase uses, plus headroom.** Leave the GPU's wired limit at the default unless P0 shows it binds. Both are the owner's own settings |
 | D5 | Limits for local routes | **Set per route from P0's measurements:** call time (L4, 300 s today), active minutes (L2, 45 today) and context (L6, 64K today) |
@@ -332,6 +374,8 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 | D7 | Does a local Expert or workflow version count as "the same"? | **Yes, if its tool grant and outputs are unchanged** · no, the instructions must be identical |
 | D8 | Which browsing engine? | **browser-use 1.0 in the isolated box beside Autobots' loop, chosen per Expert or per call** · replace the loop with browser-use · keep only the loop |
 | D9 | May model-written code run inside the box? | **Yes, inside the isolated executor only, with read only enforced by the egress proxy (`GET` and `HEAD` only) and Chromium's policy**. This amends Decision 0018 B5 and needs the executor qualified for it · no, which rules out browser-use 1.0 |
+| D10 | What happens to a run started before a switch of Model source? | **Its calls on the switched-off source are refused as `model_source_disabled`, and it waits until the owner switches back, cancels or starts a linked new run** · it finishes on its frozen source |
+| D11 | Local role defaults | **One general model for every role, and a small model for `researcher` once one qualifies for browsing**, all set from Q1 and Q2 · one model for every role |
 
 ## 13. Draft stories in SPECS style
 
@@ -388,7 +432,45 @@ Scenario: An unqualified local profile isn't offered
 Dependencies:
 - US-17.1
 
-### US-17.3: A frozen-web replay of the deep research workflow
+### US-17.3: A model source setting: OpenRouter or local
+
+As a workspace owner
+I want one setting that sends every model call to OpenRouter or to local models only
+So that I choose where prompts go, with today's OpenRouter defaults unless I switch.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: OpenRouter is the default, as today
+  Given a new workspace
+  When its model policy is shown
+  Then Model source is OpenRouter, and every role resolves as MP-01 says today: Terra, with researcher on Sol once Sol is offered
+
+Scenario: Local can't be chosen before a local model qualifies
+  Given no qualified local profile covers the executor role
+  When the owner switches Model source to Local
+  Then the switch is refused with the roles that have no qualified local model, and the source stays OpenRouter
+
+Scenario: Local sends nothing to OpenRouter
+  Given Model source is Local and the local runtime is serving its pinned model
+  When a run runs to the end
+  Then every model call went to the local runtime, no request reached OpenRouter, including its catalog, and the composer said so before Run
+
+Scenario: A run on a switched-off source waits
+  Given a run admitted on an OpenRouter route is waiting for an approval
+  When the owner switches Model source to Local and approves
+  Then its next model call is refused as model_source_disabled, the run waits with that reason, and nothing is sent to either source
+
+Scenario: Switching back restores saved choices
+  Given role overrides saved under OpenRouter
+  When the owner switches to Local and back to OpenRouter
+  Then the OpenRouter overrides are as they were
+```
+
+Dependencies:
+- US-17.2
+
+### US-17.4: A frozen-web replay of the deep research workflow
 
 As a workspace owner
 I want candidate models compared on the same recorded web pages
@@ -404,9 +486,9 @@ Scenario: A replay scores a run without a model judge
 ```
 
 Dependencies:
-- US-17.2
+- US-17.3
 
-### US-17.4: Deep research on a local model, live and documented
+### US-17.5: Deep research on a local model, live and documented
 
 As a workspace owner
 I want the deep research workflow run once live on the qualified local model
@@ -422,9 +504,9 @@ Scenario: The live run is compared with run 5
 ```
 
 Dependencies:
-- US-17.3
+- US-17.4
 
-### US-17.5: An admitted model endpoint for the browser box
+### US-17.6: An admitted model endpoint for the browser box
 
 As a workspace owner
 I want every model call browser-use makes to be an admitted call of the run
@@ -453,7 +535,7 @@ Dependencies:
 - US-17.1
 - Decision 0018 and Decision 0020 as amended by D8 and D9
 
-### US-17.6: browse_goal on browser-use in the isolated executor
+### US-17.7: browse_goal on browser-use in the isolated executor
 
 As a workspace owner
 I want browse_goal able to run browser-use inside the isolated executor
@@ -479,7 +561,7 @@ Scenario: The contract is unchanged
 ```
 
 Dependencies:
-- US-17.5
+- US-17.6
 
 ## 14. Risks
 
@@ -491,9 +573,10 @@ Dependencies:
 | **Runtime churn** | MTPLX and MLX change quickly | Pin the runtime and weights versions in a manifest, and qualify again after any change |
 | **Licenses** | Terms differ by model | Show each license before a download (D3) |
 | **Local exposure** | Any process on this Mac can call a loopback server | One-owner Mac. No key in the workspace. Untrusted page text reaches prompts exactly as it does today |
+| **"Local" covers models only** | An owner may read Local as "nothing leaves the Mac", but search and page reads still do | The setting and the composer's disclosure say tool calls still leave the Mac |
 | **"Free" is partial** | SerpApi and Jina still charge per call | R9 counts tool spend separately |
 | **Model-written code in the box** | browser-use 1.0 runs Python the model writes, steered by page text | The box's isolation is the only guard: no host folders, no keys, egress through the proxy, `GET` and `HEAD` only (D9) |
-| **Cloud by default** | A missing `llm` or `Browser(...)` sends work to Browser Use's gateway or cloud browser | The proxy denies those hosts, and US-17.6 proves none is attempted |
+| **Cloud by default** | A missing `llm` or `Browser(...)` sends work to Browser Use's gateway or cloud browser | The proxy denies those hosts, and US-17.7 proves none is attempted |
 | **browser-use churn** | Five releases in a week, and a 1.0 rewrite | Pin the exact version in the box's environment, and qualify again on every change |
 
 ## 15. Sources consulted
@@ -503,6 +586,8 @@ Dependencies:
   - Decisions [0019](../engineering/decisions/0019-sol-profile-and-browser-use.md) and [0034](../engineering/decisions/0034-deep-research-like-content-writer.md).
   - `services/agent/src/autobots/domain/models.py`, `adapters/models/factory.py`, `adapters/models/catalog.py`, `operations/route_qualification.py` and `services/agent/uv.lock`.
   - [README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md).
+  - The earlier local research: [LOCAL-MODEL-EVIDENCE.md](../../research/LOCAL-MODEL-EVIDENCE.md), [QWEN38-GGUF-TEST-RESULTS.md](../../research/QWEN38-GGUF-TEST-RESULTS.md) and [HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md](../../research/HUGGINGFACE-SLM-STRUCTURED-OUTPUT.md).
+  - `contracts/settings.py` and `application/provider_settings.py`.
   - The run pages captured for the film on 2026-11-19: Budgets and Usage of runs `91961372`, `2b92ee84` and `36377769`.
 - **This Mac:**
   - `~/Models/README-MODELS.md`, `DOWNLOAD-MANIFEST.json` and `SMOKE-TESTS.json`.
