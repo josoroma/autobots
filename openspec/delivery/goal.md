@@ -7,19 +7,19 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-14.24 |
+| Target | US-16.7 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
 | Reason | - |
-| Started | 2026-11-18 |
-| Updated | 2026-11-18 |
+| Started | 2026-11-19 |
+| Updated | 2026-11-19 |
 
 ## Stories
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-14.24 | us-14-24-tool-switches-tools-page | DONE | Tool switches on the Tools page |
+| 1 | US-16.7 | us-16-7-live-deep-research-install | DONE | Live deep research on the install, documented |
 
 ## Next Action
 
