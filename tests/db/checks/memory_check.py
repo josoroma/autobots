@@ -119,6 +119,17 @@ async def main() -> None:
         await db.execute("insert into app_private.run_obligations (id, run_id, kind, detail) values (%s, %s, 'input', 'Which quarter?')", (uuid4(), run2))
         block = await state_block(db, run2, await load_goal(db, run2))
         check('an open wait is part of the state, from its record', 'Which quarter?', 'Which quarter?' in block, 'Which quarter?' in block)
+        # US-16.9, Decision 0034 C1: the plan is pinned too, each task done or open, read fresh from its records.
+        check('a run without a plan is told it has none', 'Plan: none yet', 'Plan: none yet' in block, 'Plan: none yet' in block)
+        tasks = [{'id': 'search', 'title': 'Search Google', 'depends_on': [], 'criteria': ['c1'], 'expected_evidence': 'results', 'tools': []},
+                 {'id': 'write', 'title': 'Write the document', 'depends_on': ['search'], 'criteria': ['c1'], 'expected_evidence': 'a file', 'tools': []}]
+        await db.execute('insert into app_private.plan_versions (run_id, version, tasks, revision_reason) values (%s, 1, %s, null)', (run2, json.dumps(tasks)))
+        await db.execute("insert into app_private.plan_evidence (run_id, task_id, evidence, summary) values (%s, 'search', '[]', 'searched')", (run2,))
+        block = await state_block(db, run2, await load_goal(db, run2))
+        pinned = ['Plan version 1, still in force:', '- search (done): Search Google [criteria: c1]', '- write (open): Write the document [criteria: c1]',
+                  'complete each open task with complete_task']
+        check('a compacted call sees the run\'s plan, each task done or open', 'version 1, search done, write open, continue it',
+              [line for line in pinned if line not in block] or 'all there', all(line in block for line in pinned))
         await db.execute("update app_private.run_obligations set status = 'met' where run_id = %s", (run2,))
 
         # A summary that comes back cut off isn't used.

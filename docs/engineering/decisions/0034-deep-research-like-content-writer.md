@@ -15,7 +15,7 @@ This amends:
 - [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md#tool-use-record) TU-06;
 - [PRD-Studio](../../PRD/PRD-Studio.md#seed) SD-01 and SD-02.
 
-It schedules US-16.6, US-16.7 and US-16.8. The owner can change any choice.
+It schedules US-16.6 to US-16.9. The owner can change any choice.
 
 ## What the reference does, and why today's limits can't
 
@@ -45,6 +45,14 @@ The first live run of the Deep research writer (US-16.7) failed at its 64-model-
 | **L6. Context** | **64K** tokens, from 8K. Compaction works toward 192,000 characters, keeping the earlier 3 characters a token |
 | **L7. Tool output in view** | Output up to **48,000** characters stays in the model's view, from 4,000. Longer output is offloaded as before and read back 4,000 characters a page, and the latest **16** pages stay in view, from 2, so anything offloaded can be read whole |
 | **L8. Reservation** | Each call reserves **64,000** prompt tokens, from 32,000, so a full view is covered, and a larger request still reserves for its bytes. A view of 192,000 characters stays below Terra's 272,000-token long-prompt rate |
+
+## The plan survives compaction (US-16.9)
+
+The second live run (US-16.7), on the 64K context, searched three times, read five batches of pages and saved its sources five times for US$0.23. At its first compaction it then proposed a new plan, first without a reason and then rewriting a task it had completed, and the plan guard refused both: "repair limit: plan changes completed". The state block that a compacted call reads ahead of the summary held the goal, criteria, tools, paths, open waits and pending approvals, but not the plan. So the model no longer knew it had one.
+
+| # | Choice |
+|---|---|
+| **C1. The plan is pinned** | A compacted call's state block also holds the run's current plan: its version, and each task's ID, title and criteria, marked done or open. It says to continue that plan, completing open tasks with `complete_task`, and to revise it only with a reason that keeps completed tasks unchanged. Like the rest of the block, it is read fresh from the run's records, outside the lossy summary. This extends PRD-LangChain-Deep-Agents 8.4's pinned goal, permissions, approvals and criteria to the plan the guard enforces |
 
 ## Reading a published artifact (US-16.6)
 

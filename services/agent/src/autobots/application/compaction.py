@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
+from autobots.application.plans import completed_tasks, latest_plan
 from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.contracts.plans import GoalSpec
 from autobots.persistence.rows import RunSummaryRow
@@ -127,8 +128,28 @@ def pairing_is_valid(messages: Sequence[Any]) -> bool:
     return True
 
 
+async def _plan_lines(connection: SqlConnection, run_id: UUID) -> str:
+    """The run's plan as the guard enforces it, so a compacted call continues it instead of
+    proposing one the guard refuses (Decision 0034 C1)."""
+    plan = await latest_plan(connection, run_id)
+    if plan is None:
+        return "Plan: none yet. Propose one with propose_plan."
+    done = await completed_tasks(connection, run_id)
+    tasks = "\n".join(
+        f"- {task.id} ({'done' if task.id in done else 'open'}): {task.title}"
+        + (f" [criteria: {', '.join(task.criteria)}]" if task.criteria else "")
+        for task in plan.tasks
+    )
+    return (
+        f"Plan version {plan.version}, still in force:\n{tasks}\n"
+        "Continue this plan: complete each open task with complete_task once its evidence is "
+        "saved. Revise it only if a task can't be done, with a revision_reason, and keep completed "
+        "tasks unchanged."
+    )
+
+
 async def state_block(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -> str:
-    """Read fresh, so a summary can't lose or change any of this."""
+    """Read fresh, so a summary can't lose or change any of this, the plan included."""
     cursor = await connection.execute(
         "select kind, detail from app_private.run_obligations "
         "where run_id = %s and status = 'open' order by created_at",
@@ -148,6 +169,7 @@ async def state_block(connection: SqlConnection, run_id: UUID, goal: GoalSpec) -
         f"Criteria:\n{criteria}",
         f"Allowed tools: {', '.join(sorted(goal.allowed_tools))}",
         f"Allowed paths: {', '.join(goal.allowed_paths)}",
+        await _plan_lines(connection, run_id),
     ]
     if obligations:
         lines.append(

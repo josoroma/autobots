@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.8 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.9 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 
@@ -143,6 +143,7 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-16.6: Deep research runs like Deep-Research-Content-Writer](#us-166-deep-research-runs-like-deep-research-content-writer)
   - [US-16.7: Live deep research on the install, documented](#us-167-live-deep-research-on-the-install-documented)
   - [US-16.8: A 64K working context for deep research](#us-168-a-64k-working-context-for-deep-research)
+  - [US-16.9: The plan survives compaction](#us-169-the-plan-survives-compaction)
 
 ## Work Item Status
 
@@ -678,6 +679,10 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-16.8#1 | Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them. | DONE | US-16.8 |
 | US-16.8#2 | Cover the scenarios with unit tests of compaction and the reservation. | DONE | US-16.8 |
 | US-16.8#3 | Update `CODEBASE.md` and the runbooks that state the context. | DONE | US-16.8 |
+| US-16.9 | The plan survives compaction | DONE | EPIC-16 |
+| US-16.9#1 | Add the run's plan, with each task done or open, to `state_block`. | DONE | US-16.9 |
+| US-16.9#2 | Cover the scenarios with unit tests and the memory check on a disposable database. | DONE | US-16.9 |
+| US-16.9#3 | Update `CODEBASE.md`. | DONE | US-16.9 |
 
 ## Dependency Diagram
 
@@ -835,6 +840,7 @@ flowchart TD
     US_16_6["US-16.6: Deep research runs like Deep-Research-Content-Writer"]
     US_16_7["US-16.7: Live deep research on the install, documented"]
     US_16_8["US-16.8: A 64K working context for deep research"]
+    US_16_9["US-16.9: The plan survives compaction"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1175,7 +1181,9 @@ flowchart TD
   US_14_23 -.-> US_16_6
   US_16_6 -.-> US_16_7
   US_16_8 -.-> US_16_7
+  US_16_9 -.-> US_16_7
   US_16_6 -.-> US_16_8
+  US_16_8 -.-> US_16_9
 ```
 
 ```mermaid
@@ -2178,6 +2186,13 @@ flowchart TD
     US_16_8 --> T_16_8_2
     T_16_8_3["US-16.8#3: Update `CODEBASE.md` and the runbooks that state the context."]
     US_16_8 --> T_16_8_3
+    US_16_9["US-16.9: The plan survives compaction"]
+    T_16_9_1["US-16.9#1: Add the run&#x27;s plan, with each task done or open, to `state_block`."]
+    US_16_9 --> T_16_9_1
+    T_16_9_2["US-16.9#2: Cover the scenarios with unit tests and the memory check on a disposable database."]
+    US_16_9 --> T_16_9_2
+    T_16_9_3["US-16.9#3: Update `CODEBASE.md`."]
+    US_16_9 --> T_16_9_3
   end
 ```
 
@@ -8396,7 +8411,7 @@ Open Questions:
 
 # EPIC-16: A current install with real examples
 
-Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)). [Decision 0034](docs/engineering/decisions/0034-deep-research-like-content-writer.md) adds US-16.6 to US-16.8, deep research runs like Deep-Research-Content-Writer: raised run limits, an Expert and a workflow, a 64K working context after the first live run looped, then two live runs on the install that a README documents.
+Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)). [Decision 0034](docs/engineering/decisions/0034-deep-research-like-content-writer.md) adds US-16.6 to US-16.9, deep research runs like Deep-Research-Content-Writer: raised run limits, an Expert and a workflow, a 64K working context after the first live run looped, a plan pinned through compaction after the second lost it, then two live runs on the install that a README documents.
 
 ### US-16.1: Sober control borders
 
@@ -8765,6 +8780,7 @@ Scenario: The README documents the runs
 Dependencies:
 - US-16.6
 - US-16.8
+- US-16.9
 
 Tasks:
 - [ ] Have the owner rebuild and restart the install with inference on, and run the concept seed.
@@ -8817,6 +8833,48 @@ Tasks:
 - [x] Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them.
 - [x] Cover the scenarios with unit tests of compaction and the reservation.
 - [x] Update `CODEBASE.md` and the runbooks that state the context.
+
+Open Questions:
+- None.
+
+### US-16.9: The plan survives compaction
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-19-us-16-9-plan-survives-compaction/`
+
+As a workspace owner
+I want a long run to keep its plan after its conversation is compacted
+So that it finishes the plan it started instead of trying to start over and being refused.
+
+Source:
+- [Decision 0034, C1](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-plan-survives-compaction-us-169)
+- [8.4 Memory and context design](docs/PRD/PRD-LangChain-Deep-Agents.md#84-memory-and-context-design)
+- [SP-011](docs/engineering/option-b-contract.md#sp-011--plans-graph-state-and-events)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): `application/compaction.state_block` is read fresh ahead of the summary on every compacted call, and `application/plans.py` holds `latest_plan` and `completed_tasks`. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A compacted call sees the run's plan
+  Given a run with plan version 1 of search, collect and write, whose search task is complete
+  When its state block is built for a compacted call
+  Then it lists plan version 1 with search done and collect and write open, each with its title and criteria, and says to continue the plan with complete_task and to revise it only with a reason that keeps completed tasks
+
+Scenario: A run without a plan says so
+  Given a run that hasn't proposed a plan
+  When its state block is built
+  Then it says there is no plan yet, and lists the goal, criteria, tools and paths as before
+```
+
+Dependencies:
+- US-16.8
+
+Tasks:
+- [x] Add the run's plan, with each task done or open, to `state_block`.
+- [x] Cover the scenarios with unit tests and the memory check on a disposable database.
+- [x] Update `CODEBASE.md`.
 
 Open Questions:
 - None.
