@@ -55,6 +55,8 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 **HM-05. Service chips.** Home shows the readiness of the API, worker and database (SH-04), and the OpenRouter authentication status.
 
+**HM-06. YOLO notice.** The first time the owner opens Home with browsing's YOLO setting on, a notice says so and links to Settings → Browsing. It shows once (Decision 0035 Y1).
+
 ## Runs
 
 **RN-01. List projection.** Each row returns:
@@ -198,7 +200,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 
 ## Settings
 
-**SE-02. Sub-navigation.** Appearance, Notifications, Account, Data on this Mac and Keyboard, plus links to Models and Operations.
+**SE-02. Sub-navigation.** Appearance, Notifications, Browsing, Account, Data on this Mac and Keyboard, plus links to Models and Operations. Browsing holds the workspace's "Let browsing type and submit (YOLO)" checkbox, on by default, which every member sees and only the owner changes (Decision 0035 Y1).
 
 **SE-03. Appearance.**
 - Theme: **System**, **Light** or **Dark** (DS-02 as amended).

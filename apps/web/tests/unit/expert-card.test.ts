@@ -46,7 +46,8 @@ const catalog: CatalogTools = new Map([
     "github_open_pull_request",
     { operation_class: "consequential_external_write", approval: "always" },
   ],
-  ["browse_goal", { operation_class: "read_only", approval: "always" }],
+  // Decision 0035 Y2: browse_goal waits for a person only while YOLO is off.
+  ["browse_goal", { operation_class: "read_only", approval: "unless_yolo" }],
 ]);
 
 const triager = expert("Issue triager", {
@@ -156,7 +157,7 @@ test("the approval note names what one always-approved tool decides on", () => {
   );
   assert.equal(
     approvalNote(["browse_goal"], catalog),
-    "Approval on every call",
+    "Approval on every call, while YOLO is off",
   );
   assert.equal(
     approvalNote(["create_github_issue", "browse_goal"], catalog),

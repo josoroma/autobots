@@ -65,6 +65,9 @@ def slow(seconds: float, message: AIMessage) -> Any:
 
 async def main() -> None:
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
+        # This check goes through approval, which a browse waits for only while YOLO is off (Decision 0035 Y2).
+        await db.execute('insert into app_private.browsing_settings (workspace_id, yolo) values (%s, false) '
+                         'on conflict (workspace_id) do update set yolo = false', (WORKSPACE,))
         async def value(sql: str, *values: object) -> Any:
             return (await (await db.execute(sql, values)).fetchone())[0]
 

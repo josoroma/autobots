@@ -22,6 +22,7 @@ test("Settings lists its sections and links to Models, Keys & vars and Operation
   await expect(nav.locator('[data-field="settings-sections"] a')).toHaveText([
     "Appearance",
     "Notifications",
+    "Browsing",
     "Account",
     "Data on this Mac",
     "Keyboard",
@@ -37,6 +38,7 @@ test("Settings lists its sections and links to Models, Keys & vars and Operation
   ]);
   for (const [name, path] of [
     ["Notifications", "/settings/notifications"],
+    ["Browsing", "/settings/browsing"],
     ["Account", "/settings/account"],
     ["Data on this Mac", "/settings/data"],
     ["Keyboard", "/settings/keyboard"],

@@ -9,6 +9,7 @@ import {
 } from "@autobots/api-client";
 import { useState } from "react";
 
+import { BrowseDomainsField } from "@/components/expert-editor/browse-domains-field";
 import { ExecutorField } from "@/components/expert-editor/executor-field";
 import { GrantSummary } from "@/components/expert-editor/grant-summary";
 import { GroupGrants } from "@/components/expert-editor/group-grants";
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle, InitialTile } from "@/components/ui/card";
 import { LoadState } from "@/components/ui/load-state";
 import { initialOf } from "@/lib/experts/card";
+import { grantsBrowsing } from "@/lib/experts/draft";
 import { expansion } from "@/lib/experts/grants";
 import { readOf } from "@/lib/load";
 import { profileChoice } from "@/lib/model-profile";
@@ -83,6 +85,9 @@ function EditorLayout({
             granted={expansion(catalog.value, draft)}
             groups={draft.groups}
           />
+          {grantsBrowsing(draft) ? (
+            <BrowseDomainsField draft={draft} held={held} onChange={setDraft} />
+          ) : null}
           <ExecutorField
             value={draft.executor}
             models={models}

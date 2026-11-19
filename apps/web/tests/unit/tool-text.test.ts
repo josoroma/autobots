@@ -82,6 +82,7 @@ test("every contract value has its label", () => {
   ]);
   assert.deepEqual(APPROVAL_TEXT, {
     always: "Every call waits for a person",
+    unless_yolo: "Every call waits for a person, unless YOLO is on",
     by_action: "Some actions wait for a person",
     never: "Not needed",
   });

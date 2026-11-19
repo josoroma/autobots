@@ -794,6 +794,64 @@ export const schemas = {
     "title": "BlockView",
     "type": "object"
   },
+  "BrowsingSettingsDraft": {
+    "additionalProperties": false,
+    "description": "The owner's change, at the version they last read.",
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "yolo": {
+        "title": "Yolo",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "yolo",
+      "expected_version"
+    ],
+    "title": "BrowsingSettingsDraft",
+    "type": "object"
+  },
+  "BrowsingSettingsView": {
+    "additionalProperties": false,
+    "description": "Whether a `browse_goal` call may start without approval and type and submit, within its\nExpert's browse domains. `version` is 0 until the setting is first saved. `notice_pending` is\ntrue only for the owner, until Home's one-time notice has been shown (Y1).",
+    "properties": {
+      "notice_pending": {
+        "title": "Notice Pending",
+        "type": "boolean"
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "version": {
+        "minimum": 0.0,
+        "title": "Version",
+        "type": "integer"
+      },
+      "viewer_can_change": {
+        "title": "Viewer Can Change",
+        "type": "boolean"
+      },
+      "yolo": {
+        "title": "Yolo",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "schema_version",
+      "yolo",
+      "version",
+      "notice_pending",
+      "viewer_can_change"
+    ],
+    "title": "BrowsingSettingsView",
+    "type": "object"
+  },
   "BudgetCounters": {
     "additionalProperties": false,
     "properties": {
@@ -1625,6 +1683,14 @@ export const schemas = {
   "ExpertConfig": {
     "additionalProperties": false,
     "properties": {
+      "browse_domains": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 10,
+        "title": "Browse Domains",
+        "type": "array"
+      },
       "instructions": {
         "default": "",
         "maxLength": 20000,
@@ -1692,6 +1758,13 @@ export const schemas = {
     "additionalProperties": false,
     "description": "A saved version as stored. It has no request limits, since tool groups can expand a saved\nversion past one.",
     "properties": {
+      "browse_domains": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Browse Domains",
+        "type": "array"
+      },
       "instructions": {
         "default": "",
         "title": "Instructions",
@@ -6134,6 +6207,7 @@ export const schemas = {
         "enum": [
           "never",
           "always",
+          "unless_yolo",
           "by_action"
         ],
         "title": "Approval",
@@ -8027,6 +8101,27 @@ export function parseBlockView(value: unknown): BlockView {
   return parseWith(schemas, "BlockView", value) as BlockView;
 }
 
+export interface BrowsingSettingsDraft {
+  expected_version: number;
+  yolo: boolean;
+}
+
+export function parseBrowsingSettingsDraft(value: unknown): BrowsingSettingsDraft {
+  return parseWith(schemas, "BrowsingSettingsDraft", value) as BrowsingSettingsDraft;
+}
+
+export interface BrowsingSettingsView {
+  notice_pending: boolean;
+  schema_version: 1;
+  version: number;
+  viewer_can_change: boolean;
+  yolo: boolean;
+}
+
+export function parseBrowsingSettingsView(value: unknown): BrowsingSettingsView {
+  return parseWith(schemas, "BrowsingSettingsView", value) as BrowsingSettingsView;
+}
+
 export interface BudgetCounters {
   limit_micro_usd: number;
   reserved_micro_usd: number;
@@ -8267,6 +8362,7 @@ export function parseExpertBinding(value: unknown): ExpertBinding {
 }
 
 export interface ExpertConfig {
+  browse_domains?: string[];
   instructions?: string;
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;
@@ -8280,6 +8376,7 @@ export function parseExpertConfig(value: unknown): ExpertConfig {
 }
 
 export interface ExpertConfigView {
+  browse_domains?: string[];
   instructions?: string;
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;
@@ -9435,7 +9532,7 @@ export function parseToolCatalog(value: unknown): ToolCatalog {
 }
 
 export interface ToolDescriptor {
-  approval: "never" | "always" | "by_action";
+  approval: "never" | "always" | "unless_yolo" | "by_action";
   availability: "available" | "key_missing" | "disabled_by_policy" | "not_qualified";
   availability_reason: string | null;
   cost_class: "free_local" | "metered_provider";
@@ -10126,6 +10223,18 @@ export async function createWorkSession(options: ClientOptions, body: SessionCre
 
 export async function getWorkSession(options: ClientOptions, session_id: string, request?: RequestOptions): Promise<SessionView> {
   return parseSessionView(await requestJson(options, "GET", `/v1/sessions/${encodeURIComponent(session_id)}`, undefined, request, parseErrorResponse));
+}
+
+export async function getBrowsingSettings(options: ClientOptions, request?: RequestOptions): Promise<BrowsingSettingsView> {
+  return parseBrowsingSettingsView(await requestJson(options, "GET", `/v1/settings/browsing`, undefined, request, parseErrorResponse));
+}
+
+export async function putBrowsingSettings(options: ClientOptions, body: BrowsingSettingsDraft, request?: RequestOptions): Promise<BrowsingSettingsView> {
+  return parseBrowsingSettingsView(await requestJson(options, "PUT", `/v1/settings/browsing`, body, request, parseErrorResponse));
+}
+
+export async function markBrowsingNoticeSeen(options: ClientOptions, request?: RequestOptions): Promise<BrowsingSettingsView> {
+  return parseBrowsingSettingsView(await requestJson(options, "POST", `/v1/settings/browsing/notice`, undefined, request, parseErrorResponse));
 }
 
 export async function getKeysAndVars(options: ClientOptions, request?: RequestOptions): Promise<KeysAndVars> {

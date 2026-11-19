@@ -23,6 +23,8 @@ export interface Draft extends Grants {
   instructions: string;
   /** A profile, or WORKSPACE_SETTING. */
   executor: ModelProfileId | typeof WORKSPACE_SETTING;
+  /** The browse domains as typed, one per line or comma-separated (Decision 0035 Y3). */
+  browseDomains: string;
 }
 
 /** The executor choice that binds no profile, so runs use the workspace's setting. */
@@ -37,7 +39,24 @@ export function draftOf(expert: ExpertView): Draft {
     tools: latest.tools ?? [],
     groups: latest.tool_groups ?? [],
     executor: latest.role_bindings?.executor ?? WORKSPACE_SETTING,
+    browseDomains: (latest.browse_domains ?? []).join("\n"),
   };
+}
+
+/** The typed browse domains as a list: split on lines and commas, trimmed, lowercase, once each. */
+export function domainsOf(text: string): string[] {
+  const listed = text
+    .split(/[\n,]/)
+    .map((domain) => domain.trim().toLowerCase())
+    .filter((domain) => domain !== "");
+  return [...new Set(listed)];
+}
+
+/** Whether the draft grants browse_goal, directly or by its group, so its domains matter (Y3). */
+export function grantsBrowsing(draft: Draft): boolean {
+  return (
+    draft.tools.includes("browse_goal") || draft.groups.includes("browsing")
+  );
 }
 
 /** Whether new runs may use a profile, or null while the models aren't read. */
@@ -88,6 +107,7 @@ export function revisionBody(
       instructions: draft.instructions,
       tools: [...draft.tools],
       tool_groups: [...draft.groups],
+      browse_domains: domainsOf(draft.browseDomains),
       role_bindings: {
         ...kept,
         ...(draft.executor === WORKSPACE_SETTING

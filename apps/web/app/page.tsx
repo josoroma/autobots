@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AboutServices } from "@/components/about-services";
+import { BrowsingNotice } from "@/components/browsing-notice";
 import { GoalComposer } from "@/components/composer/goal-composer";
 import { HomeActivity } from "@/components/home-activity";
 import { HomeGreeting } from "@/components/home-greeting";
@@ -100,6 +101,7 @@ export default async function HomePage() {
         </p>
       </header>
       <GoalComposer />
+      {session === null ? null : <BrowsingNotice />}
       {/* What needs the person streams in after the composer, which needs none of it (WCMP-07). */}
       {session === null ? null : (
         <Suspense

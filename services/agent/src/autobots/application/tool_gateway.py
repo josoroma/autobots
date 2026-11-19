@@ -276,6 +276,10 @@ async def hold_for_approval(
     if not policy.applies(tool.operation_class, call.parsed):
         return Released()
     reviewing = ToolContext(connection, scope, call.operation_id)
+    # Decision 0035 Y2: a waiver, such as browsing's YOLO, releases the call before any request.
+    waived = policy.waived if policy.waivable(tool.operation_class) else None
+    if waived is not None and await waived(reviewing):
+        return Released()
     target = policy.resource_target(call.parsed)
     if policy.target_resolver is not None:
         try:

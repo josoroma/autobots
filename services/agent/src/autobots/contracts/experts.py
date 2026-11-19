@@ -2,10 +2,11 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from autobots.contracts.primitives import LAX_CONTRACT, Identifier, UtcTimestamp, Version
 from autobots.contracts.tool_catalog import ToolGroupName
+from autobots.contracts.tool_fields import DomainName
 from autobots.domain.models import ModelProfileId
 from autobots.domain.tool_catalog import ToolGroup
 
@@ -24,6 +25,19 @@ class ExpertConfig(BaseModel):
     tool_groups: list[ToolGroupName] = Field(default_factory=list, max_length=len(ToolGroup))
     skills: list[str] = Field(default_factory=list, max_length=50)
     role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
+    # Decision 0035 Y3: where a `browse_goal` call of this Expert may go while YOLO is on. The
+    # cap is a call's own `allowed_domains` cap. Left out while empty, so a request or receipt
+    # without it keeps the bytes it always had (XDUP-04).
+    browse_domains: list[DomainName] = Field(
+        default_factory=list, max_length=10, exclude_if=lambda domains: not domains
+    )
+
+    @field_validator("browse_domains")
+    @classmethod
+    def _once_each(cls, domains: list[str]) -> list[str]:
+        if len(set(domains)) != len(domains):
+            raise ValueError("browse_domains repeats a domain")
+        return domains
 
 
 class ExpertCreate(BaseModel):
@@ -54,6 +68,7 @@ class ExpertConfigView(BaseModel):
     tool_groups: list[ToolGroupName] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
+    browse_domains: list[str] = Field(default_factory=list, exclude_if=lambda domains: not domains)
 
 
 class ExpertVersionView(BaseModel):

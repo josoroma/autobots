@@ -41,6 +41,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `checks/goal_loop_check.py` | check; starts `workers/goal_loop_worker.py` | `scripts/app_db.py` |
 | `checks/improvement_check.py` | check | `scripts/qualify_identity.py` |
 | `checks/keys_and_vars_check.py` | check | `scripts/app_db.py` |
+| `checks/browsing_yolo_check.py` | check | `scripts/app_db.py` |
 | `checks/memory_check.py` | check | `scripts/app_db.py` |
 | `checks/operations_check.py` | check: `retention` | `scripts/qualify_operations.py` |
 | `checks/pause_cancel_and_fencing_check.py` | check | `scripts/qualify_identity.py` |

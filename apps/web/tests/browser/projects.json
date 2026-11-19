@@ -24,6 +24,7 @@
     "run-workspace.spec.ts",
     "runs.spec.ts",
     "search.spec.ts",
+    "settings-browsing.spec.ts",
     "settings-keys-and-vars.spec.ts",
     "settings-sections.spec.ts",
     "settings.spec.ts",

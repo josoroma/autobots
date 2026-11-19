@@ -10,8 +10,10 @@ import { test } from "node:test";
 import type { ExpertView, ModelList } from "@autobots/api-client";
 
 import {
+  domainsOf,
   draftOf,
   executorOptions,
+  grantsBrowsing,
   offeredFor,
   revisionBody,
   revisionText,
@@ -68,6 +70,7 @@ const draft = (changes: Partial<Draft> = {}): Draft => ({
   tools: ["calculate"],
   groups: [],
   executor: WORKSPACE_SETTING,
+  browseDomains: "",
   ...changes,
 });
 
@@ -78,6 +81,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
     tools: [],
     groups: [],
     executor: "",
+    browseDomains: "",
   });
   assert.deepEqual(
     draftOf(
@@ -90,6 +94,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
           executor: "openrouter_terra",
           coder: "openrouter_sol",
         },
+        browse_domains: ["youtube.com", "ytimg.com"],
       }),
     ),
     {
@@ -98,6 +103,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
       tools: ["read_csv"],
       groups: ["files"],
       executor: "openrouter_terra",
+      browseDomains: "youtube.com\nytimg.com",
     },
   );
 });
@@ -149,6 +155,7 @@ test("a revision keeps what the form doesn't edit, and binds the executor only w
         instructions: "Be brief.",
         tools: ["calculate"],
         tool_groups: [],
+        browse_domains: [],
         role_bindings: { reviewer: "openrouter_terra" },
       },
     },
@@ -160,6 +167,12 @@ test("a revision keeps what the form doesn't edit, and binds the executor only w
   );
   assert.deepEqual(chosen.config.role_bindings, { executor: "openrouter_sol" });
   assert.deepEqual(chosen.config.tool_groups, ["files"]);
+  const browsing = revisionBody(
+    saved,
+    draft({ browseDomains: "en.wikivoyage.org" }),
+    {},
+  );
+  assert.deepEqual(browsing.config.browse_domains, ["en.wikivoyage.org"]);
 });
 
 test("each reply has its words, from one table of refusals", () => {
@@ -250,4 +263,18 @@ test("a version's summary names its tools and groups", () => {
     versionToolsText({ tool_groups: ["files"] }),
     "no tools (groups: files)",
   );
+});
+
+test("browse domains are typed one per line or by commas, and saved once each", () => {
+  assert.deepEqual(
+    domainsOf(" en.wikivoyage.org\nYouTube.com, ytimg.com,\n\nyoutube.com "),
+    ["en.wikivoyage.org", "youtube.com", "ytimg.com"],
+  );
+  assert.deepEqual(domainsOf(""), []);
+});
+
+test("the browse domains matter only while the draft grants browse_goal", () => {
+  assert.equal(grantsBrowsing(draft()), false);
+  assert.equal(grantsBrowsing(draft({ tools: ["browse_goal"] })), true);
+  assert.equal(grantsBrowsing(draft({ groups: ["browsing"] })), true);
 });

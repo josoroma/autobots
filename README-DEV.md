@@ -313,7 +313,10 @@ make browser-images && python3.12 scripts/qualify_browser_executor.py
 - **The check:** it runs 25 cases on a disposable database. Among them: only named hosts are reached; private addresses, files, downloads and request bodies are refused; the memory, process and time caps end a session; and a crashed worker's containers are swept.
 - **The report:** it goes to `.checks/browser-executor/qualification.json`.
 - **No restart:** the running API and worker read the report each time they decide whether browsing is available, and re-check the image labels at least every 30 seconds.
-- **Each call:** waits for approval, then runs on the run's researcher model. With paid inference on, that costs money.
+- **Each call:** runs on the run's researcher model. With paid inference on, that costs money.
+- **Approval and YOLO:** Settings → Browsing holds the workspace's YOLO setting, on by default ([Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y1 to Y4). The setting lives in `app_private.browsing_settings`, where no row means on, and each run freezes it in `runs.browsing_yolo` at admission. A call counts as YOLO only while both the frozen value and the current one are on.
+  - **A YOLO call** starts without approval, but only on domains inside its Expert's `browse_domains`. It is refused `browse_domain_not_granted` or `browse_domains_missing` before any container starts.
+  - **Any other call** waits for approval.
 
 [The operations runbook](docs/engineering/runbooks/operations.md#turning-on-browse_goal) covers browsing in full.
 

@@ -116,6 +116,8 @@ TOOL_CHILDREN = (
     Child('checks/tool_keys_check.py', 'the tool keys check', ('{workspace}',), from_root=True),
     # US-14.18: Keys & vars, the GitHub pair, the approval binding and the browsing switch per workspace.
     Child('checks/keys_and_vars_check.py', 'the keys and vars check', ('{workspace}',), from_root=True),
+    # US-17.1: browsing's YOLO setting, its freezing, the approval waiver and the Expert's browse domains.
+    Child('checks/browsing_yolo_check.py', 'the browsing YOLO check', ('{workspace}',), from_root=True),
     # US-14.19: the cronjob tool through the gateway, approvals and the routine service, with no model.
     Child('checks/cronjob_check.py', 'the cronjob check', ('{workspace}',), from_root=True),
 )

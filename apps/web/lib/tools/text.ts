@@ -57,6 +57,8 @@ export const APPROVAL_TEXT: Readonly<
   Record<ToolDescriptor["approval"], string>
 > = {
   always: "Every call waits for a person",
+  // Decision 0035 Y2: browse_goal, whose calls start without asking while YOLO is on.
+  unless_yolo: "Every call waits for a person, unless YOLO is on",
   by_action: "Some actions wait for a person",
   never: "Not needed",
 };

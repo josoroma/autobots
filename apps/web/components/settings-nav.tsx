@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const SECTIONS = [
   { href: "/settings", label: "Appearance" },
   { href: "/settings/notifications", label: "Notifications" },
+  { href: "/settings/browsing", label: "Browsing" },
   { href: "/settings/account", label: "Account" },
   { href: "/settings/data", label: "Data on this Mac" },
   { href: "/settings/keyboard", label: "Keyboard" },

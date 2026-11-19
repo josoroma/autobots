@@ -252,6 +252,12 @@ export const SURFACES: readonly Surface[] = [
     ready: shows('[data-field="notify-permission"]'),
   },
   {
+    name: "settings-browsing",
+    context: "owner",
+    path: () => "/settings/browsing",
+    ready: shows('[data-field="browsing-yolo"] input:enabled'),
+  },
+  {
     name: "settings-account",
     context: "owner",
     path: () => "/settings/account",

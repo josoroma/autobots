@@ -42,7 +42,8 @@ class StoredRecord(BaseModel):
 
 
 class ExpertConfigRecord(StoredRecord):
-    """`public.expert_versions.config`. Without `tool_groups` before US-14.2."""
+    """`public.expert_versions.config`. Without `tool_groups` before US-14.2, and without
+    `browse_domains` before US-17.1, which reads as none (Decision 0035 Y3)."""
 
     purpose: str = ""
     instructions: str = ""
@@ -50,6 +51,8 @@ class ExpertConfigRecord(StoredRecord):
     tool_groups: tuple[str, ...] = ()
     skills: tuple[str, ...] = ()
     role_bindings: Mapping[str, str] = Field(default_factory=dict)
+    # Left out while empty, so a version saved without it keeps its stored bytes.
+    browse_domains: tuple[str, ...] = Field(default=(), exclude_if=lambda domains: not domains)
 
 
 def _trigger(value: object) -> SavedTrigger:

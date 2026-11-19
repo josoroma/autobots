@@ -123,7 +123,8 @@ class ToolDescriptor(BaseModel):
     cost_note: str | None
     key_requirement: KeyRequirementView | None
     # Decision 0026 C9: `by_action` when only some of a tool's actions wait for a person.
-    approval: Literal["never", "always", "by_action"]
+    # Decision 0035 Y2: `unless_yolo` when every call waits only while browsing's YOLO is off.
+    approval: Literal["never", "always", "unless_yolo", "by_action"]
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
     fields: list[FieldDescriptor]

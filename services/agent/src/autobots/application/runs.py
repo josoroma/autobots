@@ -392,11 +392,16 @@ async def _insert_run_and_job(
     snapshot, parent, root, started_by = _lineage(admission.origin)
     grant = admission.origin.grant
     await connection.execute(
+        # browsing_yolo freezes the YOLO setting (Decision 0035 Y4): a child keeps its parent's,
+        # and a fresh run takes the workspace's, where no settings row means on (Y1).
         "insert into public.runs (id, workspace_id, status, limit_micro_usd, goal_text, "
         "goal_summary, version, policy_snapshot, continues_run_id, session_id, expert_id, "
-        "expert_version, parent_run_id, root_run_id, execution_contract, started_by) "
+        "expert_version, parent_run_id, root_run_id, execution_contract, started_by, "
+        "browsing_yolo) "
         "values (%s, %s, %s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s, %s, "
-        "coalesce(%s, (select started_by from public.runs where id = %s)))",
+        "coalesce(%s, (select started_by from public.runs where id = %s)), "
+        "coalesce((select browsing_yolo from public.runs where id = %s), "
+        "(select yolo from app_private.browsing_settings where workspace_id = %s), true))",
         (
             run_id,
             admission.workspace_id,
@@ -414,6 +419,8 @@ async def _insert_run_and_job(
             json.dumps(current_contract()),
             started_by,
             parent,
+            parent,
+            admission.workspace_id,
         ),
     )
     await connection.execute(

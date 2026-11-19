@@ -8,6 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from autobots.api.approval_routes import router as approval_router
 from autobots.api.artifact_routes import router as artifact_router
+from autobots.api.browsing_routes import router as browsing_router
 from autobots.api.errors import ERROR_RESPONSES, register_error_handlers
 from autobots.api.event_routes import router as event_router
 from autobots.api.expert_routes import router as expert_router
@@ -67,6 +68,7 @@ def create_app(
     app.include_router(router, responses=ERROR_RESPONSES)
     app.include_router(provider_router, responses=ERROR_RESPONSES)
     app.include_router(keys_and_vars_router, responses=ERROR_RESPONSES)
+    app.include_router(browsing_router, responses=ERROR_RESPONSES)
     app.include_router(model_policy_router, responses=ERROR_RESPONSES)
     app.include_router(run_router, responses=ERROR_RESPONSES)
     app.include_router(run_command_router, responses=ERROR_RESPONSES)

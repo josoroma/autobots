@@ -143,13 +143,17 @@ docker ps -a --filter label=autobots.browser=1
 
 ### Turning on `browse_goal`
 
-`browse_goal` (US-14.12, [Decision 0020](../decisions/0020-own-browsing-loop.md)) is Autobots' own read-only browsing loop on that executor. It's off until both are true: the executor is qualified as above, and the owner turns it on for the API and the worker:
+`browse_goal` (US-14.12, [Decision 0020](../decisions/0020-own-browsing-loop.md)) is Autobots' own read-only browsing loop on that executor. Whether a call waits for approval is the workspace's YOLO setting in Settings → Browsing, which needs migration 65 ([Decision 0035](../decisions/0035-browser-use-typing-and-transcripts.md) Y1 to Y4):
+- **While it is on,** the default, a call starts without asking, only on the domains its Expert lists in its editor.
+- **While it is off,** every call waits for approval.
+
+An Expert that grants `browse_goal` with no browse domains can't browse under YOLO. `browse_goal` is off until both are true: the executor is qualified as above, and the owner turns it on for the API and the worker:
 
 ```sh
 AUTOBOTS_BROWSER_EXECUTOR=enabled
 ```
 
-Then restart both. A workspace can also save `enabled` or `disabled` at Settings → Keys & vars, which wins over the environment for that workspace ([Decision 0025](../decisions/0025-keys-and-vars.md) V4). On the persistent install, set it in the repository's `.env`: `make start` passes it to the API and the worker when it is exactly `enabled` ([Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md) K7), then `make stop && make start`. The Tools screen lists it as available, and an Expert can grant it. Plain goals and workflows can't, and a run with no Expert behind it is refused `expert_grant_required`. Every call waits for a person's approval, which shows its task, start URL, domains and limits, before any container starts. Each step is a paid model call on the run's `researcher` route, admitted against the run's budget, and the call counts as one metered tool call. Unset the variable, or let the qualification go stale, and it is disabled again at the next call.
+Then restart both. A workspace can also save `enabled` or `disabled` at Settings → Keys & vars, which wins over the environment for that workspace ([Decision 0025](../decisions/0025-keys-and-vars.md) V4). On the persistent install, set it in the repository's `.env`: `make start` passes it to the API and the worker when it is exactly `enabled` ([Decision 0024](../decisions/0024-tool-keys-from-env-and-settings.md) K7), then `make stop && make start`. The Tools screen lists it as available, and an Expert can grant it. Plain goals and workflows can't, and a run with no Expert behind it is refused `expert_grant_required`. While YOLO is off, every call waits for a person's approval, which shows its task, start URL, domains and limits, before any container starts. Each step is a paid model call on the run's `researcher` route, admitted against the run's budget, and the call counts as one metered tool call. Unset the variable, or let the qualification go stale, and it is disabled again at the next call.
 
 To check it end to end without a model, on a disposable database, against `https://example.com/`:
 

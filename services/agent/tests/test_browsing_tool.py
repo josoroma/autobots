@@ -16,7 +16,7 @@ from autobots.application.loop_admission import active_middleware
 from autobots.application.loop_policy import LoopStopped
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolRegistry, ToolScope
 from autobots.contracts.browsing import BrowseGoalInput
-from sql_fakes import ScriptedConnection
+from sql_fakes import RuledConnection
 
 # PRD-Tool-Catalog TC-03, with serpapi by Decision 0032 and direct by Decision 0033.
 TC_03_PROVIDERS = {
@@ -45,6 +45,11 @@ def browse_descriptor() -> Any:
     return next(item for item in CATALOG.descriptors({}) if item.tool_id == "browse_goal")
 
 
+def not_yolo() -> RuledConnection:
+    """A run whose browsing isn't YOLO (Decision 0035 Y2), every other statement answering none."""
+    return RuledConnection(("browsing_yolo", [(False,)]), ("", []))
+
+
 def test_unqualified_it_is_planned_disabled_and_unregistered(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -59,7 +64,7 @@ def test_unqualified_it_is_planned_disabled_and_unregistered(
     assert {tool.provider for tool in CATALOG.catalog({}).tools} <= TC_03_PROVIDERS
 
 
-def test_qualified_it_is_registered_expert_only_metered_and_always_approved(
+def test_qualified_it_is_registered_expert_only_metered_and_approved_unless_yolo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     qualified(True, monkeypatch)
@@ -74,7 +79,8 @@ def test_qualified_it_is_registered_expert_only_metered_and_always_approved(
         "autobots",
         "browsing",
     )
-    assert (item.cost_class, item.approval) == ("metered_provider", "always")
+    # Decision 0035 Y2: every call waits for a person while the workspace's YOLO setting is off.
+    assert (item.cost_class, item.approval) == ("metered_provider", "unless_yolo")
     public = {(field.direction, field.path) for field in item.fields if field.public}
     assert public == {
         ("input", "start_url"),
@@ -248,7 +254,7 @@ def call(replies: list[Any], monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Exec
             with active_middleware(Middleware(replies)):
                 return await tool.handler(
                     BrowseGoalInput.model_validate(ARGS),
-                    ToolContext(ScriptedConnection(), scope, None),
+                    ToolContext(not_yolo(), scope, None),
                 )
         except ToolFailed as failed:
             return str(failed)
@@ -285,7 +291,7 @@ async def test_no_runtime_or_no_loop_fails_before_any_container() -> None:
     async def go() -> str:
         try:
             await tool.handler(
-                BrowseGoalInput.model_validate(ARGS), ToolContext(ScriptedConnection(), scope, None)
+                BrowseGoalInput.model_validate(ARGS), ToolContext(not_yolo(), scope, None)
             )
         except ToolFailed as failed:
             return str(failed)

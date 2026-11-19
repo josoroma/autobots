@@ -15,7 +15,7 @@ from uuid import UUID
 
 from autobots.application.runs import LeaseLost, append_event
 from autobots.application.sql import SqlConnection, all_rows, one
-from autobots.application.tool_definitions import ToolDefinition, ToolResult, ToolScope
+from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolResult, ToolScope
 from autobots.application.tool_gateway import Call, Refused, hold_lease
 from autobots.contracts.runs import ToolUseCompleted, ToolUseList, ToolUseStarted, ToolUseView
 from autobots.domain.tool_catalog import CostClass
@@ -112,6 +112,9 @@ async def begin_use(
     version = scope.tools.get(name)
     tool = resolved.tool
     parsed = _public_arguments(resolved)
+    shown = public_projection(parsed, tool.public_input_fields if tool else ())
+    if tool is not None and tool.public_context is not None:
+        shown |= await tool.public_context(ToolContext(connection, scope, None))
     plan_version, task_id = await served_task(connection, scope.run_id, name, arguments)
     try:
         async with connection.transaction():
@@ -140,7 +143,7 @@ async def begin_use(
                     plan_version,
                     task_id,
                     input_digest(arguments),
-                    json.dumps(public_projection(parsed, tool.public_input_fields if tool else ())),
+                    json.dumps(shown),
                     scope.generation,
                     scope.instance,
                     scope.run_id,

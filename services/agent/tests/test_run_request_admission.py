@@ -159,7 +159,7 @@ def run_row(client: ApiClient) -> dict[str, Any]:
     assert isinstance(values, tuple)
     names = (
         "id workspace status limit goal summary snapshot continues session expert version "
-        "parent root contract started_by parent_again"
+        "parent root contract started_by parent_again yolo_parent yolo_workspace"
     ).split()
     return dict(zip(names, values, strict=True))
 

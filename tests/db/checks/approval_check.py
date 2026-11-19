@@ -271,34 +271,40 @@ async def approval_does_not_carry_to_a_changed_scope(ctx: Approving) -> None:
 async def repeated_approved_browse_goal_waits_again(ctx: Approving) -> None:
     """Decisions 0018 B6 and 0020 L5: browse_goal leaves no receipt, so the call an approval releases uses it up, and
     the same call again waits for a person (PTOL-06). With no runtime bound, a released call fails
-    browsing_unavailable before any container starts, so no executor or model is reached."""
+    browsing_unavailable before any container starts, so no executor or model is reached. A call waits for a person
+    only while the workspace's YOLO setting is off (Decision 0035 Y2), so the run is admitted with it off."""
     cases, check, d, db, state = ctx.cases, ctx.cases.check, ctx.d, ctx.db, ctx.state
     with cases.scenario('a repeated approved browse_goal call'):
-        browse = ToolRegistry()
-        browse.register(browsing_tool.browse_tool(None, qualified=lambda: True))
-        browsing = ToolGateway(browse)
-        browser_expert = uuid4()
-        await db.execute('insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)',
-                         (browser_expert, WORKSPACE, f'Browser {browser_expert.hex[:6]}'))
-        # A run names an Expert version that exists (migration 60's composite key).
-        await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s)", (browser_expert, uuid4()))
-        run = await d.admit('Browse twice', tools={'browse_goal': 1}, expert=(browser_expert, 1))
-        lease = await d.claim(run)
-        first = await browsing.execute(db, ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1}), 'browse_goal', BROWSE)
-        await d.approve(run)
-        lease = await d.claim(run)
-        scope = ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1})
-        released = await browsing.execute(db, scope, 'browse_goal', BROWSE)
-        used = await d.row('select status, consumed_at is not null from public.approval_requests where run_id = %s', run)
-        repeated = await browsing.execute(db, scope, 'browse_goal', BROWSE)
-        after = await d.row('select status, consumed_at is null, decided_by is null, count(*) over () '
-                            'from public.approval_requests where run_id = %s', run)
-        check('repeating an approved browse_goal call waits for a person again',
-              'approval_pending; released once (failed browsing_unavailable), its approval approved and consumed; '
-              'then approval_pending, the one request pending, undecided and unconsumed, and the run waiting_approval',
-              (first.code, released.outcome.value, released.code, used, repeated.code, after, await state(run)),
-              lambda seen: seen == ('approval_pending', 'failed', 'browsing_unavailable', ('approved', True),
-                                    'approval_pending', ('pending', True, True, 1), 'waiting_approval'))
+        await db.execute('insert into app_private.browsing_settings (workspace_id, yolo) values (%s, false) '
+                         'on conflict (workspace_id) do update set yolo = false', (WORKSPACE,))
+        try:
+            browse = ToolRegistry()
+            browse.register(browsing_tool.browse_tool(None, qualified=lambda: True))
+            browsing = ToolGateway(browse)
+            browser_expert = uuid4()
+            await db.execute('insert into public.experts (id, workspace_id, name, latest_version) values (%s, %s, %s, 1)',
+                             (browser_expert, WORKSPACE, f'Browser {browser_expert.hex[:6]}'))
+            # A run names an Expert version that exists (migration 60's composite key).
+            await db.execute("insert into public.expert_versions (expert_id, version, config, created_by) values (%s, 1, '{}', %s)", (browser_expert, uuid4()))
+            run = await d.admit('Browse twice', tools={'browse_goal': 1}, expert=(browser_expert, 1))
+            lease = await d.claim(run)
+            first = await browsing.execute(db, ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1}), 'browse_goal', BROWSE)
+            await d.approve(run)
+            lease = await d.claim(run)
+            scope = ToolScope(WORKSPACE, run, lease.generation, {'browse_goal': 1})
+            released = await browsing.execute(db, scope, 'browse_goal', BROWSE)
+            used = await d.row('select status, consumed_at is not null from public.approval_requests where run_id = %s', run)
+            repeated = await browsing.execute(db, scope, 'browse_goal', BROWSE)
+            after = await d.row('select status, consumed_at is null, decided_by is null, count(*) over () '
+                                'from public.approval_requests where run_id = %s', run)
+            check('repeating an approved browse_goal call waits for a person again',
+                  'approval_pending; released once (failed browsing_unavailable), its approval approved and consumed; '
+                  'then approval_pending, the one request pending, undecided and unconsumed, and the run waiting_approval',
+                  (first.code, released.outcome.value, released.code, used, repeated.code, after, await state(run)),
+                  lambda seen: seen == ('approval_pending', 'failed', 'browsing_unavailable', ('approved', True),
+                                        'approval_pending', ('pending', True, True, 1), 'waiting_approval'))
+        finally:
+            await db.execute('update app_private.browsing_settings set yolo = true where workspace_id = %s', (WORKSPACE,))
 
 
 async def expiry_racing_a_decision_changes_nothing(ctx: Approving) -> None:

@@ -176,6 +176,9 @@ class ApprovalPolicy:
     # PRD-Studio GH-06: what the reviewer sees beyond the arguments, read before the approval
     # request exists. It may read the destination, never write it.
     review_detail: Callable[[Any, ToolContext], Awaitable[dict[str, Any]]] | None = None
+    # Decision 0035 Y2: when this holds for a call, read at the call, it starts without approval.
+    # A consequential external write never takes it (`waivable`).
+    waived: Callable[[ToolContext], Awaitable[bool]] | None = None
 
     def _every_call(self, operation_class: OperationClass) -> bool:
         return self.always or operation_class is OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
@@ -184,10 +187,19 @@ class ApprovalPolicy:
         """Whether this call, with these parsed arguments, waits for a person."""
         return self._every_call(operation_class) or (self.when is not None and self.when(parsed))
 
-    def label(self, operation_class: OperationClass) -> Literal["always", "by_action", "never"]:
-        """How the catalog shows the policy (Decision 0026 C9)."""
+    def waivable(self, operation_class: OperationClass) -> bool:
+        """Whether a waiver may release a call of this class (Decision 0035 Y2)."""
+        return (
+            self.waived is not None
+            and operation_class is not OperationClass.CONSEQUENTIAL_EXTERNAL_WRITE
+        )
+
+    def label(
+        self, operation_class: OperationClass
+    ) -> Literal["always", "unless_yolo", "by_action", "never"]:
+        """How the catalog shows the policy (Decision 0026 C9, Decision 0035 Y2)."""
         if self._every_call(operation_class):
-            return "always"
+            return "unless_yolo" if self.waivable(operation_class) else "always"
         return "by_action" if self.when is not None else "never"
 
     def rule(self, operation_class: OperationClass) -> str:
@@ -244,6 +256,9 @@ class ToolDefinition:
     # Top-level fields a run's screens may show, TU-04. The default shows none.
     public_input_fields: tuple[str, ...] = ()
     public_output_fields: tuple[str, ...] = ()
+    # Public fields read from the call's context rather than its arguments, added to the tool row's
+    # public input when it is recorded, such as browsing's `typing` (Decision 0035 Y2).
+    public_context: Callable[[ToolContext], Awaitable[Mapping[str, Any]]] | None = None
     # AB-02: an `arbitrary_execution` tool exists only while its executor reports qualified.
     qualified: Callable[[], bool] | None = None
     # Granted only through an Expert, so a run with no Expert behind it is refused (AB-02).

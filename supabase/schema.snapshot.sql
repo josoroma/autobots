@@ -363,6 +363,19 @@ CREATE TABLE app_private.assignments (
 );
 
 --
+-- Name: browsing_settings; Type: TABLE; Schema: app_private; Owner: -
+--
+
+CREATE TABLE app_private.browsing_settings (
+    workspace_id uuid NOT NULL,
+    yolo boolean DEFAULT true NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    notice_seen_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT browsing_settings_version_check CHECK ((version >= 1))
+);
+
+--
 -- Name: goal_specs; Type: TABLE; Schema: app_private; Owner: -
 --
 
@@ -1116,6 +1129,7 @@ CREATE TABLE public.runs (
     content_purged_at timestamp with time zone,
     execution_contract jsonb,
     started_by uuid,
+    browsing_yolo boolean DEFAULT false NOT NULL,
     CONSTRAINT runs_lease_generation_check CHECK ((lease_generation >= 0)),
     CONSTRAINT runs_limit_micro_usd_check CHECK ((limit_micro_usd >= 0)),
     CONSTRAINT runs_reserved_micro_usd_check CHECK ((reserved_micro_usd >= 0)),
@@ -1326,6 +1340,13 @@ ALTER TABLE ONLY app_private.assignments
 
 ALTER TABLE ONLY app_private.assignments
     ADD CONSTRAINT assignments_pkey PRIMARY KEY (id);
+
+--
+-- Name: browsing_settings browsing_settings_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browsing_settings
+    ADD CONSTRAINT browsing_settings_pkey PRIMARY KEY (workspace_id);
 
 --
 -- Name: goal_specs goal_specs_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
@@ -1994,6 +2015,13 @@ ALTER TABLE ONLY app_private.assignments
 
 ALTER TABLE ONLY app_private.assignments
     ADD CONSTRAINT assignments_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
+
+--
+-- Name: browsing_settings browsing_settings_workspace_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browsing_settings
+    ADD CONSTRAINT browsing_settings_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
 
 --
 -- Name: goal_specs goal_specs_run_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
@@ -3068,6 +3096,12 @@ GRANT SELECT ON TABLE agent_runtime.route_qualifications TO autobots_runtime;
 --
 
 GRANT SELECT,INSERT,UPDATE ON TABLE app_private.assignments TO autobots_runtime;
+
+--
+-- Name: TABLE browsing_settings; Type: ACL; Schema: app_private; Owner: -
+--
+
+GRANT SELECT,INSERT,UPDATE ON TABLE app_private.browsing_settings TO autobots_runtime;
 
 --
 -- Name: TABLE goal_specs; Type: ACL; Schema: app_private; Owner: -

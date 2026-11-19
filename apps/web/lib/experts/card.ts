@@ -95,20 +95,28 @@ const APPROVAL_NOUN: Readonly<Record<string, string>> = {
   github_open_pull_request: "pull request",
 };
 
-/** What waits for a person, when the latest version grants an always-approved tool; else null. */
+/**
+ * What waits for a person, when the latest version grants an always-approved tool; else null. A
+ * tool approved only while YOLO is off says so (Decision 0035 Y2).
+ */
 export function approvalNote(
   tools: readonly string[],
   catalog: CatalogTools | null,
 ): string | null {
-  const approvals = tools.filter(
-    (tool) => catalog?.get(tool)?.approval === "always",
-  );
+  const approvalOf = (tool: string) => catalog?.get(tool)?.approval;
+  const approvals = tools.filter((tool) => {
+    const approval = approvalOf(tool);
+    return approval === "always" || approval === "unless_yolo";
+  });
   if (approvals.length === 0) return null;
   const noun =
     approvals.length === 1
       ? (APPROVAL_NOUN[approvals[0] ?? ""] ?? "call")
       : "call to these tools";
-  return `Approval on every ${noun}`;
+  const onlyWithoutYolo = approvals.every(
+    (tool) => approvalOf(tool) === "unless_yolo",
+  );
+  return `Approval on every ${noun}${onlyWithoutYolo ? ", while YOLO is off" : ""}`;
 }
 
 /** The tool chips a card shows. */
