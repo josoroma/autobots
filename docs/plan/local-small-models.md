@@ -1,8 +1,8 @@
 # Plan: the deep research run on local Hugging Face small models
 
-**Date:** 2026-11-19. **Status:** a draft for the owner. Nothing here is implemented, and nothing may be until the owner decides [section 11](#11-decisions-the-owner-makes): today's rules forbid a local model server (see [section 3](#3-why-this-needs-a-decision-first)). Like the other plans in this folder, it is input for a decision and a backlog addition. [Section 12](#12-draft-stories-in-specs-style) holds stories in SPECS style, ready for ingestion once the owner approves.
+**Date:** 2026-11-19. **Status:** a draft for the owner. Nothing here is implemented, and nothing may be until the owner decides [section 12](#12-decisions-the-owner-makes): today's rules forbid a local model server (see [section 3](#3-why-this-needs-a-decision-first)). Like the other plans in this folder, it is input for a decision and a backlog addition. [Section 13](#13-draft-stories-in-specs-style) holds stories in SPECS style, ready for ingestion once the owner approves.
 
-The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged.
+The aim: repeat the run shown in the video, the Deep research content writer workflow on "langchain for deep agents" ([run 5 of README-Deep-Research-Content-Writer.md](../../README-Deep-Research-Content-Writer.md#the-workflow-execution)), with every model call answered by an open-weight model from Hugging Face served on this Mac, and get the same result. No OpenRouter call, and everything else unchanged. [Section 9](#9-browsing-with-browser-use-locally) adds browsing (`browse_goal`) on [browser-use](https://github.com/browser-use/browser-use), open source and run locally, with a small model.
 
 ## Contents
 
@@ -14,12 +14,13 @@ The aim: repeat the run shown in the video, the Deep research content writer wor
 6. [Serving them](#6-serving-them)
 7. [The local route in Autobots](#7-the-local-route-in-autobots)
 8. [Making small models do this run](#8-making-small-models-do-this-run)
-9. [Qualifying without guessing](#9-qualifying-without-guessing)
-10. [Phases](#10-phases)
-11. [Decisions the owner makes](#11-decisions-the-owner-makes)
-12. [Draft stories in SPECS style](#12-draft-stories-in-specs-style)
-13. [Risks](#13-risks)
-14. [Sources consulted](#14-sources-consulted)
+9. [Browsing with browser-use, locally](#9-browsing-with-browser-use-locally)
+10. [Qualifying without guessing](#10-qualifying-without-guessing)
+11. [Phases](#11-phases)
+12. [Decisions the owner makes](#12-decisions-the-owner-makes)
+13. [Draft stories in SPECS style](#13-draft-stories-in-specs-style)
+14. [Risks](#14-risks)
+15. [Sources consulted](#15-sources-consulted)
 
 ## 1. The result to match
 
@@ -122,7 +123,7 @@ At 27B parameters it is not a *small* model. At 8.8 GB it has a small footprint,
 
 ### 5.2 Candidates to download
 
-These are the ones a search on 2026-11-19 surfaced. Phase 0 surveys the Hub again, and a model is chosen by qualification ([section 9](#9-qualifying-without-guessing)), not by its name.
+These are the ones a search on 2026-11-19 surfaced. Phase 0 surveys the Hub again, and a model is chosen by qualification ([section 10](#10-qualifying-without-guessing)), not by its name.
 
 | Tier | Candidate | Why | Watch |
 |---|---|---|---|
@@ -141,7 +142,7 @@ These are the ones a search on 2026-11-19 surfaced. Phase 0 surveys the Hub agai
 
 Each download is approved by the owner (D3), with its size.
 
-**Roles.** The run page says "Only the executor's binding dispatches in this release", so one model answers all 45 calls. One local model per route is enough for this run. The other roles, such as `researcher` for `browse_goal`, can follow once this one works.
+**Roles.** The run page says "Only the executor's binding dispatches in this release", so one model answers all 45 calls. One local model per route is enough for this run. The other roles can follow once this one works. Browsing runs on the `researcher` route, and [section 9](#9-browsing-with-browser-use-locally) covers it.
 
 ## 6. Serving them
 
@@ -196,7 +197,104 @@ The five attempts with Terra failed in ways small models make more likely:
 5. **Split the research step.** A new workflow version with separate "collect" and "write" agent steps gives each child run a shorter history, with no code change.
 6. **A citation gate in code.** The reference project repairs citations in code, while Autobots relies on the model and the check step. A gate in code would be new behavior, so it waits for D6.
 
-## 9. Qualifying without guessing
+## 9. Browsing with browser-use, locally
+
+`browse_goal`, the Autonomous browsing tool, is the Studio's other model-driven loop. The owner wants it on [browser-use](https://github.com/browser-use/browser-use), open source and run on this Mac, with a small model.
+
+### 9.1 Where browsing stands
+
+- **[Decision 0018](../engineering/decisions/0018-browser-executor.md) planned browser-use inside an isolated executor:**
+  - Chromium in a Playwright image pinned by digest (B1), with per-call caps of 1 CPU, 1 GiB and 300 seconds (B2).
+  - An egress proxy that applies the URL guard to every request (B3).
+  - The `researcher` route (B4).
+  - Read-only actions (B5), and approval on every call (B6).
+- **[Decision 0020](../engineering/decisions/0020-own-browsing-loop.md) replaced browser-use with Autobots' own loop** when browser-use 0.13.14 couldn't be installed. It pinned `pydantic==2.13.5`, and `openrouter==0.11.46`, the SDK every route was qualified on, requires `pydantic<2.13`.
+- **What that loop does** (`application/browsing_loop.py`):
+  - It shows the model the page as text: up to 6,000 characters, 60 numbered links and the last 20 steps.
+  - It requires exactly one tool call per step: open a link, go to a URL, scroll, or finish.
+  - By default it runs 10 steps in 120 seconds, at most 20 steps in 300.
+
+### 9.2 browser-use today
+
+From PyPI and its README, read on 2026-11-19:
+
+| | browser-use |
+|---|---|
+| Release | **1.0.6**, 2026-11-16. Five releases since 1.0.2 on 2026-11-11 |
+| Engine | `browser-harness` 0.1.13. The model writes **Python** against helpers (`new_tab`, `page_info`, `bu.click(41)`, `js(...)`) and raw CDP, and can save new helpers in a workspace. That is model-written code, steered by page content |
+| Defaults that leave the Mac | `Agent(...)` uses the hosted `bu-4.0` model on Browser Use's gateway, and `Browser()` is a Browser Use Cloud browser. A local setup names both: `ChatOpenAI(model, base_url=...)` and `Browser('chromium', headless=True)` |
+| Modes | `mode='ultrafast'` acts on accessibility-tree IDs, so it works from text. The default mode's judge reads screenshots unless `use_vision=False` |
+| Telemetry | Its README names no switch for 1.0 (0.x used `ANONYMIZED_TELEMETRY=false`). It is checked in P0, and the egress proxy refuses its hosts whatever the setting |
+| Pins | `pydantic==2.14.3`, `mcp==2.3.0`, `pydantic-ai-slim[anthropic,google,openai]==2.66.0`, `google-genai==2.34.0`, `browser-harness==0.1.13`. Python 3.11 or later |
+
+### 9.3 Why not in the worker's environment
+
+| Package | browser-use 1.0.6 | Locked today | What blocks it |
+|---|---|---|---|
+| `pydantic` | `==2.14.3` | 2.12.5 | `openrouter==0.11.46` requires `<2.13`. Its latest, 1.3.194, allows `<3`, but moving to it means qualifying every route again, which Decision 0020 declined |
+| `mcp` | `==2.3.0` | 1.30.0 | `langchain-mcp-adapters==0.3.2` holds `mcp<2` |
+| New | `pydantic-ai-slim`, `google-genai`, `httpx2`, `browser-harness` | none | A wider tree inside the worker that runs every goal |
+
+The worker must also never run model-written Python. PRD 9.1 disables arbitrary execution outside a qualified isolated executor.
+
+### 9.4 The shape: browser-use in the box, its model calls admitted
+
+```text
+browse_goal (worker) ── starts ──▶ isolated executor (Decision 0018)
+                                    ├─ Chromium, headless, fresh profile
+                                    └─ browser-use 1.0.x, its own pinned environment
+                                         │ ChatOpenAI(base_url = admitted endpoint)
+                                         ▼
+       admitted model endpoint (worker, box network only)
+         one admitted call per request on the run's frozen researcher route:
+         reservation, invocation ticket, receipt, budget, model_calls (Decision 0020 L3)
+                                         │
+                                         ▼
+       local runtime on 127.0.0.1 (section 6), or OpenRouter for an OpenRouter route
+```
+
+browser-use never sees a key or a runtime address, and it reaches the internet only through the egress proxy.
+
+**What stays enforced:**
+- **Read only (B5)**, now enforced outside the model, because the model writes code:
+  - The egress proxy allows only `GET` and `HEAD` to the allowed domains, so form posts, sign-ins and uploads fail at the network.
+  - Chromium's policy disables downloads.
+  - The profile is fresh, with no cookies, no host folders and the box's `tmpfs` only.
+- **Approval** on every call (B6), the **step and time caps** (B2) and the **URL guard** (B3).
+- **Stop reasons:** browser-use's outcome maps onto `browse_goal`'s own (`done`, `max_steps`, `max_seconds`, `refused_action`, `invalid_action`, `cancelled`).
+- **Nothing reaches Browser Use's cloud.** Its gateway, cloud browser, telemetry and sync hosts are denied by the proxy, and a test proves none is attempted.
+- **The same contract.** `browse_goal`'s public contract is unchanged (task, start URL, allowed domains, steps, seconds, summary), so Experts and runs don't change.
+
+### 9.5 Small models for browser-use
+
+| Mode | What the model must do | Candidates |
+|---|---|---|
+| `ultrafast` (accessibility tree, text) | Act from text quickly, and write short Python | **Qwen3.5 4B** first, **Qwen3.5 9B** if it misreads pages, and Phi-4-mini with constrained decoding |
+| Default (screenshots) | Read screenshots and write Python helpers | **Gemma 4 E4B** (takes images), with **Bonsai 2 27B** (on disk, has vision) as the baseline |
+
+browser-use 1.0 asks for code, so code quality matters more than in Autobots' loop, and a coder-tuned small model may beat a general one. Q1 measures that.
+
+Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B and 8B, don't plug into browser-use. They would need their own loop and their own decision.
+
+**Memory.** A 4B model (about 3.5 GB) beside Bonsai (about 13 GB) fits section 4's budget, as two local profiles on two ports. The box's 1 GiB cap (B2) covers Chromium and browser-use. The model runs on the host.
+
+### 9.6 Compared with Autobots' own loop
+
+| | Autobots' loop (Decision 0020) | browser-use 1.0 in the box |
+|---|---|---|
+| Reach | Text and links. Pages that render through scripts, or need clicks on non-link elements, may be out of reach | Clicks anything, runs page scripts, can read screenshots |
+| Model | One tool call per step. A 4B model is likely enough | Writes Python. Likely 9B, or a model with vision |
+| Read only | By its fixed action set | By the network and browser policy |
+| Dependencies | None added | Its own pinned environment in the box, reviewed |
+| Work | A local profile on the `researcher` route | US-17.5 and US-17.6, plus qualifying the executor for model-written code |
+
+**Recommended:**
+1. Run browser-use 1.0 in the box as the engine for pages the text loop can't reach.
+2. Keep the text loop as the default for read-mostly tasks.
+3. Let the owner pick the engine per Expert or per call (D8).
+4. Try a small model on the text loop first, since it needs no new dependency and gives a baseline for browser-use to beat.
+
+## 10. Qualifying without guessing
 
 | Tier | What runs | Passes when |
 |---|---|---|
@@ -210,17 +308,18 @@ The five attempts with Terra failed in ways small models make more likely:
 - It's **offered** after Q1.
 - It **matches run 5** after Q3.
 
-## 10. Phases
+## 11. Phases
 
 | Phase | Work | Exit |
 |---|---|---|
 | **P0. Decide and measure** (no app code) | Decision 0035. Download the chosen candidates with pinned revisions. Serve each and measure Q1's throughput and memory by hand. The owner lowers Docker's memory limit | A table of measurements and a shortlist of at most three models |
-| **P1. Backlog** | Ingest [section 12](#12-draft-stories-in-specs-style) with `autobots-spec-ingest` from the decision | Stories READY in `SPECS.md` |
+| **P1. Backlog** | Ingest [section 13](#13-draft-stories-in-specs-style) with `autobots-spec-ingest` from the decision | Stories READY in `SPECS.md` |
 | **P2. Local route** | US-17.1 and US-17.2 | A local profile qualified and offered |
 | **P3. Fit the run** | US-17.3: the frozen replay and the local Expert or workflow versions | Q2 passes for one model |
 | **P4. Live** | US-17.4: Q3, then a "Deep research, local" section in the README and optionally a film | R1 to R9 observed |
+| **P5. Browsing** | US-17.5 and US-17.6 after D8 and D9. A scripted model first, then one live browse of `example.com` and `iana.org` on the local `researcher` route, as Decision 0019 S6 did | `browse_goal` on browser-use returns its summary with read-only holding and nothing sent to Browser Use's cloud |
 
-## 11. Decisions the owner makes
+## 12. Decisions the owner makes
 
 | # | Question | Options, recommended first |
 |---|---|---|
@@ -231,8 +330,10 @@ The five attempts with Terra failed in ways small models make more likely:
 | D5 | Limits for local routes | **Set per route from P0's measurements:** call time (L4, 300 s today), active minutes (L2, 45 today) and context (L6, 64K today) |
 | D6 | A citation and anchor gate in code? | **Not now:** the check step stays responsible, and Q2 shows whether that holds · add one as its own story |
 | D7 | Does a local Expert or workflow version count as "the same"? | **Yes, if its tool grant and outputs are unchanged** · no, the instructions must be identical |
+| D8 | Which browsing engine? | **browser-use 1.0 in the isolated box beside Autobots' loop, chosen per Expert or per call** · replace the loop with browser-use · keep only the loop |
+| D9 | May model-written code run inside the box? | **Yes, inside the isolated executor only, with read only enforced by the egress proxy (`GET` and `HEAD` only) and Chromium's policy**. This amends Decision 0018 B5 and needs the executor qualified for it · no, which rules out browser-use 1.0 |
 
-## 12. Draft stories in SPECS style
+## 13. Draft stories in SPECS style
 
 For ingestion after Decision 0035. The identifiers are proposals, and ingestion assigns the real ones.
 
@@ -323,7 +424,64 @@ Scenario: The live run is compared with run 5
 Dependencies:
 - US-17.3
 
-## 13. Risks
+### US-17.5: An admitted model endpoint for the browser box
+
+As a workspace owner
+I want every model call browser-use makes to be an admitted call of the run
+So that browsing spends, counts and stops under the same budgets and receipts as everything else.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A request from the box is one admitted call
+  Given a browse_goal call running browser-use in the isolated executor on a run's frozen researcher route
+  When browser-use sends a chat completion to the endpoint
+  Then it is admitted as one call of the run, with a reservation, an invocation ticket and a receipt, counted in model_calls, and answered by that route only
+
+Scenario: A request past the run's limits is refused
+  Given the run's budget, model calls or time is exhausted, or the run is cancelled
+  When browser-use sends another request
+  Then the endpoint refuses it with a typed reason, browser-use stops, and browse_goal reports its stop reason
+
+Scenario: Only the box can reach the endpoint
+  Given the endpoint is serving a browse
+  When a request reaches it from anywhere but that browse's executor network
+  Then it is refused
+```
+
+Dependencies:
+- US-17.1
+- Decision 0018 and Decision 0020 as amended by D8 and D9
+
+### US-17.6: browse_goal on browser-use in the isolated executor
+
+As a workspace owner
+I want browse_goal able to run browser-use inside the isolated executor
+So that pages Autobots' text loop can't reach are readable without giving up read-only browsing.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Read only holds at the network
+  Given browser-use is driving the box's Chromium on an allowed domain
+  When a page submits a form, signs in, uploads or downloads
+  Then the egress proxy or Chromium's policy refuses it, and the browse continues or stops with refused_action
+
+Scenario: Nothing reaches Browser Use's cloud
+  Given a browse on the local researcher route
+  When it runs to the end
+  Then the proxy log shows no request to Browser Use's gateway, cloud browser, telemetry or sync hosts
+
+Scenario: The contract is unchanged
+  Given an Expert granted browse_goal
+  When it browses on browser-use
+  Then the call takes the same inputs, waits for the same approval, and returns a summary and one of the same stop reasons
+```
+
+Dependencies:
+- US-17.5
+
+## 14. Risks
 
 | Risk | Effect | Mitigation |
 |---|---|---|
@@ -334,8 +492,11 @@ Dependencies:
 | **Licenses** | Terms differ by model | Show each license before a download (D3) |
 | **Local exposure** | Any process on this Mac can call a loopback server | One-owner Mac. No key in the workspace. Untrusted page text reaches prompts exactly as it does today |
 | **"Free" is partial** | SerpApi and Jina still charge per call | R9 counts tool spend separately |
+| **Model-written code in the box** | browser-use 1.0 runs Python the model writes, steered by page text | The box's isolation is the only guard: no host folders, no keys, egress through the proxy, `GET` and `HEAD` only (D9) |
+| **Cloud by default** | A missing `llm` or `Browser(...)` sends work to Browser Use's gateway or cloud browser | The proxy denies those hosts, and US-17.6 proves none is attempted |
+| **browser-use churn** | Five releases in a week, and a 1.0 rewrite | Pin the exact version in the box's environment, and qualify again on every change |
 
-## 14. Sources consulted
+## 15. Sources consulted
 
 - **This repository:**
   - `AGENTS.md`, `.claude/rules/model-gateway.md`, the [option B contract](../engineering/option-b-contract.md) and [PRD-Model-Providers.md](../PRD/PRD-Model-Providers.md).
@@ -354,3 +515,9 @@ Dependencies:
   - [A hands-on survey of Gemma 4 E4B and Qwen3.5 against Qwen3-8B under mlx_lm.server](https://github.com/changtimwu/livekit-nv-models/issues/8).
   - [Small Language Models for Agentic Systems: a survey](https://arxiv.org/pdf/2510.03847).
   - [Bonsai's model card](https://huggingface.co/Youssofal/Ternary-Bonsai-2-27B-MTPLX-Optimized-Speed).
+- **Browsing:**
+  - [browser-use on GitHub](https://github.com/browser-use/browser-use) and [on PyPI](https://pypi.org/project/browser-use/), version 1.0.6 and its pins, read on 2026-11-19.
+  - [browser-harness](https://github.com/browser-use/browser-harness).
+  - [The openrouter SDK on PyPI](https://pypi.org/project/openrouter/), 1.3.194, `pydantic<3,>=2.11.2`.
+  - [MolmoWeb (Ai2)](https://allenai.org/blog/molmoweb).
+  - Decisions [0018](../engineering/decisions/0018-browser-executor.md) and [0020](../engineering/decisions/0020-own-browsing-loop.md), `application/browsing_loop.py`, `contracts/browsing.py`, and `services/agent/pyproject.toml` and `uv.lock`.
