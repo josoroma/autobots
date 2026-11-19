@@ -702,13 +702,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-17.1#7 | Keep these true to Y2, saying approval on every call applies only with YOLO off: `browse_goal`'s guide, the approval the Tools page shows for it, and the Expert cards' approval note (EX-03). The guide also says that an Expert browsing a wiki or forum tells it in its instructions never to edit or post (Y13). Checked by pytest under `services/agent/tests` and the Tools and Experts browser suites under `apps/web/tests/browser`. | DONE | US-17.1 |
 | US-17.1#8 | Amend PRD-Tool-Catalog AB-01, AB-02 and TC-02, and PRD-Studio SE-02 and Home, as Decision 0035's "Requirements revised" lists. Checked by reading each against Decision 0035 Y1 to Y4. | DONE | US-17.1 |
 | US-17.1#9 | Update `README.md`, whose opening paragraph and "Asks before it acts" say browsing always waits for approval, plus `README-DEV.md`, the operations runbook's "Turning on browse_goal" and `CODEBASE.md`. Checked by reading each against Decision 0035 Y1 to Y4. | DONE | US-17.1 |
-| US-17.2 | An admitted model endpoint for the browser box | READY | EPIC-17 |
-| US-17.2#1 | Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | TODO | US-17.2 |
-| US-17.2#2 | Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | TODO | US-17.2 |
-| US-17.2#3 | Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | TODO | US-17.2 |
-| US-17.2#4 | Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key. | TODO | US-17.2 |
-| US-17.2#5 | Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7. | TODO | US-17.2 |
-| US-17.3 | browse_goal on browser-use in the isolated executor | BLOCKED | EPIC-17 |
+| US-17.2 | An admitted model endpoint for the browser box | DONE | EPIC-17 |
+| US-17.2#1 | Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | DONE | US-17.2 |
+| US-17.2#2 | Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | DONE | US-17.2 |
+| US-17.2#3 | Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | DONE | US-17.2 |
+| US-17.2#4 | Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key. | DONE | US-17.2 |
+| US-17.2#5 | Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7. | DONE | US-17.2 |
+| US-17.3 | browse_goal on browser-use in the isolated executor | READY | EPIC-17 |
 | US-17.3#1 | Add `services/browser-use/` with its own `pyproject.toml` and `uv.lock`, pinning browser-use 1.0.6 apart from the worker's lock. Record its resolved dependency tree in the change, and ignore its local environment. Checked by a harness test under `tests/harness` that reads the lock's pin. | TODO | US-17.3 |
 | US-17.3#2 | Build the browser-use image from the digest-pinned Playwright image (B1) with that environment, and add it to the images' source fingerprint. Start one container per call, with BX-01's caps and hardening, nothing of the worker's environment, and Chromium's policy turning downloads off. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | TODO | US-17.3 |
 | US-17.3#3 | Run browser-use inside the container with a local headless Chromium, a fresh profile, the call's `allowed_domains`, vision and its judge off (Y16), and the US-17.2 endpoint as its only model. It never uses Browser Use Cloud, its gateway or `sensitive_data`. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack. | TODO | US-17.3 |
@@ -9133,7 +9133,8 @@ Open Questions:
 
 ### US-17.2: An admitted model endpoint for the browser box
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-19-us-17-2-admitted-model-endpoint-browser/`
 
 As a workspace owner
 I want every model call browser-use makes to be an admitted call of the run
@@ -9182,18 +9183,18 @@ Dependencies:
 - US-14.14
 
 Tasks:
-- [ ] Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model.
-- [ ] Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
-- [ ] Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
-- [ ] Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key.
-- [ ] Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7.
+- [x] Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model.
+- [x] Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
+- [x] Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
+- [x] Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key.
+- [x] Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7.
 
 Open Questions:
 - None.
 
 ### US-17.3: browse_goal on browser-use in the isolated executor
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want browse_goal to run browser-use inside the isolated executor while YOLO is on

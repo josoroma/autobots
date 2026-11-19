@@ -239,6 +239,11 @@ By Decision 0018 B4 and Decision 0020, which replaced browser-use with Autobots'
 
 **BM-04.** No package is added for it: the loop drives the executor over CDP with the locked `websockets` client, and it is tested offline with a scripted model.
 
+**BM-05.** browser-use, which runs only under YOLO (Decision 0035 Y5), calls a model through a per-browse endpoint the worker serves on the Mac's loopback (Decision 0035 Y7).
+- **Admitted like a loop step.** Each chat completion it sends is one admitted call of the run on its frozen `researcher` route, as BM-01 to BM-03 require of a loop step: a reservation, an invocation ticket and receipt, `model_calls` and the shared transport. The model a request names is ignored.
+- **Refused before anything is sent.** A request past the run's budget, model calls or time, from a cancelled run, or carrying content the route isn't qualified for, such as an image (Y16), is refused with a typed code.
+- **Reached only through the relay.** The endpoint answers only the session's token. Only the browse's egress sidecar holds it, and relays `POST /v1/chat/completions` from the box's network, so the box reaches no other part of the host and holds no key or token.
+
 ## Autonomous browsing
 
 `browse_goal` (Autobots' browsing loop) stays `disabled_by_policy` and unregistered until the isolated browser executor is qualified and the admitted browser model exists (Decision 0017 C3 and C4). Then, by Decision 0018 B5 and B6:

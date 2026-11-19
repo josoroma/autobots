@@ -43,6 +43,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `checks/keys_and_vars_check.py` | check | `scripts/app_db.py` |
 | `checks/browsing_yolo_check.py` | check | `scripts/app_db.py` |
 | `checks/memory_check.py` | check | `scripts/app_db.py` |
+| `checks/model_endpoint_check.py` | check | `scripts/app_db.py` |
 | `checks/operations_check.py` | check: `retention` | `scripts/qualify_operations.py` |
 | `checks/pause_cancel_and_fencing_check.py` | check | `scripts/qualify_identity.py` |
 | `checks/provider_key_check.py` | check, with `browser_env` for `experts.spec.ts` | `scripts/qualify_identity.py` |

@@ -19,10 +19,12 @@ from autobots.adapters.browser_executor import (
     BrowserSession,
     Cdp,
     ExecutorConfig,
+    ModelLink,
     RequestGuard,
     attempt_alive,
     lease_alive,
 )
+from autobots.adapters.model_endpoint import ModelEndpoint, Reply
 from autobots.application.runs import admit_run, apply_command
 from autobots.application.tool_definitions import ToolScope
 from autobots.application.worker_leases import claim_next
@@ -233,6 +235,37 @@ async def isolation() -> None:
         await executor.stop(session)
 
 
+async def relay() -> None:
+    """Decision 0035 Y7: the box reaches the worker's model endpoint only through the sidecar's relay, which adds the token.
+    The endpoint answers a fixed reply, so no model is called."""
+    async def fixed(body: Any) -> Reply:
+        return Reply({'object': 'chat.completion', 'relayed': True})
+
+    async with ModelEndpoint(fixed) as endpoint:
+        executor = BrowserExecutor(environ={**os.environ, **WORKER_SECRETS})
+        session = await executor.start('qualification', 1, HOSTS, ModelLink(endpoint.port, endpoint.token))
+        try:
+            async def from_box(url: str) -> str:
+                script = (f"fetch({json.dumps(url)},{{method:'POST',headers:{{'content-type':'application/json'}},body:'{{}}'}})"
+                          ".then(r=>r.text().then(t=>console.log(r.status+' '+t))).catch(e=>console.log('unreachable '+e.message))")
+                return (await executor._docker('exec', f'{session.name}-browser', 'node', '-e', script)).strip()
+
+            relayed = await from_box('http://proxy:9300/v1/chat/completions')
+            other = await from_box('http://proxy:9300/v1/models')
+            direct = await from_box(f'http://host.docker.internal:{endpoint.port}/v1/chat/completions')
+            browser_env = json.dumps((await executor.inspect(session))['browser']['Config']['Env'])
+            async with httpx.AsyncClient(trust_env=False, timeout=10) as client:
+                stranger = (await client.post(f'http://127.0.0.1:{endpoint.port}/v1/chat/completions', json={})).status_code
+            check('the box reaches the model endpoint only through the relay, which adds the token it never holds',
+                  '200 relayed through proxy:9300; 404 for another path; the host port unreachable from the box; 401 without the token; '
+                  'no token in the browser container',
+                  (relayed, other[:3], direct[:11], stranger),
+                  relayed.startswith('200 ') and '"relayed": true' in relayed and other.startswith('404') and direct.startswith('unreachable')
+                  and stranger == 401 and endpoint.token not in browser_env)
+        finally:
+            await executor.stop(session)
+
+
 async def ownership(db: Any) -> None:
     async def scoped() -> ToolScope:
         await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
@@ -304,6 +337,7 @@ async def main() -> None:
     executor = BrowserExecutor(environ=dict(os.environ))
     await containment(executor)
     await isolation()
+    await relay()
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:
         await ownership(db)
     check('no host outside the qualification hosts was reached', 'only example.com or example.org allowed', sorted(set(everything_allowed)),

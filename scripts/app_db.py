@@ -110,6 +110,8 @@ TOOL_CHILDREN = (
     Child('checks/run_list_check.py', 'the run list check', from_root=True),
     # US-14.14: the browsing loop's steps through real admission on the researcher route.
     Child('checks/browsing_loop_check.py', 'the browsing loop check', ('{workspace}',), from_root=True),
+    # US-17.2: the browser box's model endpoint, each request one admitted call on the researcher route.
+    Child('checks/model_endpoint_check.py', 'the model endpoint check', ('{workspace}',), from_root=True),
     # US-14.6 onward: provider tools through the gateway and the record, with fake transports.
     Child('checks/web_tools_check.py', 'the web tools check', ('{workspace}',), from_root=True),
     # US-14.17: Tavily and Jina keys from Settings, the environment and .env, with fake transports.

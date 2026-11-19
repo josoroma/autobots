@@ -11,6 +11,10 @@ Autobots. Two listeners:
 - **CDP gate (port 9223)**, published on the Mac's loopback only. A connection must name the session
   token as the first path segment; the gate strips it, rewrites `Host` to an address Chromium
   accepts, and forwards the bytes to the browser's DevTools port. Anything else is refused.
+- **Model relay (port 9300)**, only when the call has a model endpoint (Decision 0035 Y7). It
+  forwards `POST /v1/chat/completions` from the box to the worker's admitted endpoint, replacing any
+  `Authorization` with the session's token, which only this sidecar holds. It reaches that one port
+  and path only, so nothing else of the host is open to the box.
 
 The same checks run in the worker's tests, against fake resolvers and sockets.
 """
@@ -214,6 +218,52 @@ async def handle_cdp(
     await asyncio.gather(_pipe(reader, upstream_writer, None), _pipe(upstream_reader, writer, None))
 
 
+MODEL_PATH = "/v1/chat/completions"
+
+
+async def handle_model(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    token: str,
+    upstream: tuple[str, int],
+    opener: Opener = system_opener,
+) -> None:
+    try:
+        head = await _head(reader)
+    except (ValueError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
+        await _refuse(writer, "400 Bad Request")
+        return
+    lines = head.decode("latin-1").split("\r\n")
+    method, _, rest = lines[0].partition(" ")
+    path = rest.partition(" ")[0]
+    if not token or method != "POST" or path != MODEL_PATH:
+        await _refuse(writer, "404 Not Found")
+        return
+    # Header lines the relay sets itself, matched by their name and colon.
+    replaced = ("authorization:", "host:", "connection:", "proxy-authorization:")
+    forwarded = [lines[0]]
+    forwarded += [line for line in lines[1:] if line and not line.lower().startswith(replaced)]
+    forwarded += [
+        f"Host: {upstream[0]}:{upstream[1]}",
+        f"Authorization: Bearer {token}",
+        "Connection: close",
+    ]
+    try:
+        upstream_reader, upstream_writer = await opener(*upstream)
+    except OSError:
+        await _refuse(writer, "502 Bad Gateway")
+        return
+    upstream_writer.write(("\r\n".join(forwarded) + "\r\n\r\n").encode("latin-1"))
+    await upstream_writer.drain()
+    await asyncio.gather(_pipe(reader, upstream_writer, None), _pipe(upstream_reader, writer, None))
+
+
+def model_upstream(value: str) -> tuple[str, int] | None:
+    """`host:port` from the environment, or None when the call has no model endpoint."""
+    host, _, port = value.rpartition(":")
+    return (host, int(port)) if host and port.isdigit() else None
+
+
 async def serve() -> None:
     token = os.environ["AUTOBOTS_CDP_TOKEN"]
     session = Session(
@@ -232,9 +282,20 @@ async def serve() -> None:
     gate = await asyncio.start_server(
         lambda r, w: handle_cdp(r, w, token, browser), "0.0.0.0", 9223, limit=HEAD_LIMIT * 2
     )
+    servers = [egress, gate]
+    upstream = model_upstream(os.environ.get("AUTOBOTS_MODEL_UPSTREAM", ""))
+    model_token = os.environ.get("AUTOBOTS_MODEL_TOKEN", "")
+    if upstream is not None and model_token:
+        servers.append(
+            await asyncio.start_server(
+                lambda r, w: handle_model(r, w, model_token, upstream),
+                "0.0.0.0",
+                9300,
+                limit=HEAD_LIMIT * 2,
+            )
+        )
     session.record(event="ready")
-    async with egress, gate:
-        await asyncio.gather(egress.serve_forever(), gate.serve_forever())
+    await asyncio.gather(*(server.serve_forever() for server in servers))
 
 
 if __name__ == "__main__":  # pragma: no cover - the sidecar's entry point.

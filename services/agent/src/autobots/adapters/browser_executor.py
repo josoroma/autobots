@@ -75,6 +75,15 @@ class ExecutorConfig:
 
 
 @dataclass(frozen=True)
+class ModelLink:
+    """The worker's admitted model endpoint for one browse: its loopback port and the token only the
+    sidecar's relay holds (Decision 0035 Y7)."""
+
+    port: int
+    token: str
+
+
+@dataclass(frozen=True)
 class BrowserSession:
     name: str
     token: str
@@ -128,9 +137,14 @@ class BrowserExecutor:
         return out.decode()
 
     async def start(
-        self, run_id: UUID | str, generation: int, allowed_hosts: tuple[str, ...]
+        self,
+        run_id: UUID | str,
+        generation: int,
+        allowed_hosts: tuple[str, ...],
+        model: ModelLink | None = None,
     ) -> BrowserSession:
-        """`allowed_hosts` are the only hosts the browser may reach, with their subdomains."""
+        """`allowed_hosts` are the only hosts the browser may reach, with their subdomains. With
+        `model`, the sidecar also relays the box's chat completions to the worker's endpoint."""
         for host in allowed_hosts:
             if not host or any(mark in host for mark in "/, \t") or host.startswith("."):
                 raise ExecutorUnavailable("allowed_host_malformed")
@@ -152,11 +166,22 @@ class BrowserExecutor:
             await self._docker("network", "create", "--internal", *labels, f"{name}-net")
             # The proxy's own way out, a network of its own so Docker's DNS finds the browser.
             await self._docker("network", "create", *labels, f"{name}-out")
+            # The relay reaches the worker's loopback endpoint through Docker's host gateway.
+            relay = (
+                [
+                    "--add-host", "host.docker.internal:host-gateway",
+                    "-e", f"AUTOBOTS_MODEL_UPSTREAM=host.docker.internal:{model.port}",
+                    "-e", f"AUTOBOTS_MODEL_TOKEN={model.token}",
+                ]
+                if model is not None
+                else []
+            )  # fmt: skip
             await self._docker(
                 "run", "-d", "--name", f"{name}-proxy", *labels, *hardening,
                 "--network", f"{name}-out",
                 "--publish", "127.0.0.1::9223",
                 "--memory", "256m", "--cpus", "0.5",
+                *relay,
                 "-e", f"AUTOBOTS_CDP_TOKEN={token}",
                 "-e", f"AUTOBOTS_BROWSER_HOST={name}-browser",
                 "-e", f"AUTOBOTS_MAX_REQUESTS={self.config.max_requests}",

@@ -15,7 +15,7 @@ import pytest
 from autobots.adapters import browser_cdp, browser_executor, browser_qualification, egress_proxy
 from autobots.adapters.browser_cdp import RequestGuard
 from autobots.adapters.browser_executor import BrowserExecutor, ExecutorConfig, ExecutorUnavailable
-from autobots.adapters.egress_proxy import Session, decide, handle_cdp, handle_egress
+from autobots.adapters.egress_proxy import Session, decide, handle_cdp, handle_egress, handle_model
 
 NAMES = {
     "example.com": ["93.184.215.14"],
@@ -215,3 +215,74 @@ async def test_the_request_guard_lets_through_only_bodiless_reads_of_allowed_sch
     assert [(command, session) for command, _, session in sent.commands] == [(answer, "s1")]
     assert bool(guard.refused) == (answer == "Fetch.failRequest")
     assert all("/" not in entry["host"] for entry in guard.refused)
+
+
+@pytest.mark.parametrize(
+    ("request_head", "forwarded"),
+    [
+        (
+            "POST /v1/chat/completions HTTP/1.1\r\nHost: proxy:9300\r\n"
+            "Authorization: Bearer from-the-box\r\nContent-Length: 2\r\n\r\n{}",
+            True,
+        ),
+        ("GET /v1/chat/completions HTTP/1.1\r\nHost: proxy:9300\r\n\r\n", False),
+        ("POST /v1/models HTTP/1.1\r\nHost: proxy:9300\r\nContent-Length: 0\r\n\r\n", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_the_model_relay_forwards_only_chat_completions_with_the_session_token(
+    request_head: str, forwarded: bool
+) -> None:
+    """Decision 0035 Y7: the box reaches the endpoint only here, and never holds the token."""
+    sent: list[bytes] = []
+    upstream = Stream(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+    upstream_write = upstream.write
+
+    def capture(data: bytes) -> None:
+        sent.append(bytes(data))
+        upstream_write(data)
+
+    upstream.write = capture  # type: ignore[method-assign]  # records what the relay forwards
+    opened: list[tuple[str, int]] = []
+
+    async def opener(address: str, port: int) -> tuple[asyncio.StreamReader, Stream]:
+        opened.append((address, port))
+        return upstream.reader, upstream
+
+    client = Stream(request_head.encode())
+    await handle_model(client.reader, client, "secret", ("host.docker.internal", 4321), opener)  # type: ignore[arg-type]  # a fake stream for asyncio.StreamWriter
+    if forwarded:
+        head = sent[0]
+        assert head.startswith(b"POST /v1/chat/completions HTTP/1.1\r\n")
+        assert b"Authorization: Bearer secret" in head and b"from-the-box" not in head
+        assert b"Host: host.docker.internal:4321" in head
+        assert opened == [("host.docker.internal", 4321)]
+        assert b"".join(sent).endswith(b"{}") and client.written.startswith(b"HTTP/1.1 200 OK")
+    else:
+        assert not sent and not opened and client.written.startswith(b"HTTP/1.1 404")
+
+
+@pytest.mark.asyncio
+async def test_a_session_with_a_model_link_gives_only_the_sidecar_its_upstream_and_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    async def docker(self: BrowserExecutor, *arguments: str, check: bool = True) -> str:
+        calls.append(arguments)
+        return "127.0.0.1:5555" if arguments[0] == "port" else ""
+
+    async def ready(self: BrowserExecutor, session: object, seconds: float = 20.0) -> None:
+        return None
+
+    monkeypatch.setattr(BrowserExecutor, "_docker", docker)
+    monkeypatch.setattr(BrowserExecutor, "_ready", ready)
+    link = browser_executor.ModelLink(port=4321, token="model-token")
+    await BrowserExecutor(environ={}).start("run", 1, ("en.wikivoyage.org",), link)
+    started = {call[3]: call for call in calls if call[:2] == ("run", "-d")}
+    proxy = next(call for name, call in started.items() if name.endswith("-proxy"))
+    browser = next(call for name, call in started.items() if name.endswith("-browser"))
+    assert "host.docker.internal:host-gateway" in proxy
+    assert "AUTOBOTS_MODEL_UPSTREAM=host.docker.internal:4321" in proxy
+    assert "AUTOBOTS_MODEL_TOKEN=model-token" in proxy
+    assert not any("model-token" in part or "MODEL" in part for part in browser)
