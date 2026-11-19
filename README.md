@@ -14,6 +14,7 @@
   <b>Product overview</b> ·
   <a href="README-DEV.md">Developer guide</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>
@@ -37,14 +38,14 @@ Autobots is a studio for autonomous agents that runs on your Mac. You describe a
 ## Superpowers
 
 <p align="center">
-  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 37 tools in 14 groups, Experts and workflows, local by design." width="100%">
+  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 38 tools in 14 groups, Experts and workflows, local by design." width="100%">
 </p>
 
 - **Runs that survive.** A worker claims each run under a lease. Every checkpoint is fenced to that lease, so a crash, a restart or a sleeping Mac resumes the run instead of forking it. Each request carries a receipt, so a retry never starts a second run.
 - **Spending you control.** Pick US$0.25 to US$5.00 per run, never above what's left of the daily cap. Every model call reserves its worst-case cost before it's sent, and a call that can't be priced doesn't go out.
 - **Asks before it acts.** Opening a pull request, filing an issue and browsing need an approval every time. The approval binds the exact arguments and diffs you saw, and a changed request needs a new one.
-- **37 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
-- **Experts and workflows.** Six ready Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer and Google bot. Four workflows: Weekly competitor brief, Nightly test triage, Interview synthesis and Vendor due diligence. An agent can hand work to a specialist, and a routine can run a goal on a schedule.
+- **38 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
+- **Experts and workflows.** Seven Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer. Seven workflows: Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer. An agent can hand work to a specialist, a workflow's agent steps read each other's published work, and a routine can run a goal on a schedule.
 - **Local by design.** The web app, API and worker run natively on your Mac, and Supabase runs in Docker, every port on loopback. Stored keys are encrypted. What leaves your Mac is what OpenRouter needs, to validate your key and run the model calls, and the calls of the tools you granted.
 
 ## How it works
@@ -81,13 +82,19 @@ One app for the whole loop, dark by default in the shadcn Luma theme:
 - **Build:** Experts, Workflows with drafts and executions, and Tools with the catalog and its switches.
 - **System:** Operations health, Models for the OpenRouter key and the model each role uses, and Settings for Keys & vars, appearance, notifications and your account.
 
+## See it work: deep research
+
+Give the Deep research writer a topic and it works like [Deep-Research-Content-Writer](https://github.com/josoroma/Deep-Research-Content-Writer): up to 30 Google results, the best pages read and numbered as sources, and one cited guide with a report on how well it went. As a workflow, a second agent then reads that work back, checks every citation against the saved excerpts and corrects what they don't support, and the result waits for your approval.
+
+On this Mac, for "langchain for deep agents", the Expert wrote a 12-source guide for US$0.52, and the workflow a 17-source guide, checked and corrected, for US$0.45. It took five attempts, and each failure led to a fix. [Deep research, live](README-Deep-Research-Content-Writer.md) tells the whole story, with every count and cost as observed.
+
 ## By the numbers
 
 <p align="center">
-  <img src="docs/assets/readme/by-the-numbers.svg" alt="118 of 118 stories delivered, 37 agent tools in 14 groups, 6 ready Experts plus 4 workflows, 70 API paths, 64 SQL migrations, 44 browser suites with accessibility checks." width="100%">
+  <img src="docs/assets/readme/by-the-numbers.svg" alt="122 of 122 stories delivered, 38 agent tools in 14 groups, 7 Experts plus 7 workflows, 70 API paths, 64 SQL migrations, 44 browser suites with accessibility checks." width="100%">
 </p>
 
-Counted from the repository on 2026-11-18. Every story in [SPECS.md](SPECS.md) traces to its source requirements and was delivered as one [OpenSpec](openspec/) change, with its scenarios checked.
+Counted from the repository on 2026-11-19. Every story in [SPECS.md](SPECS.md) traces to its source requirements and was delivered as one [OpenSpec](openspec/) change, with its scenarios checked.
 
 ## Quick start
 
@@ -130,6 +137,7 @@ The engineering is held to the same standard as the agents:
 | Read | For |
 |---|---|
 | [README-DEV.md](README-DEV.md) | The developer guide: install, local URLs, architecture, conventions and how work is delivered |
+| [Deep research, live](README-Deep-Research-Content-Writer.md) | How Autobots researches and writes like Deep-Research-Content-Writer, as an Expert and as a workflow, and what its live runs did |
 | [SPECS.md](SPECS.md) | The backlog: epics, stories, acceptance scenarios and status |
 | [CODEBASE.md](CODEBASE.md) | What the repository contains today |
 | [Option B engineering contract](docs/engineering/option-b-contract.md) | Run states, transitions and recovery guarantees |
@@ -139,4 +147,4 @@ The engineering is held to the same standard as the agents:
 
 ## Status
 
-All 118 stories in [SPECS.md](SPECS.md) are delivered and checked on this Mac. The [US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads the H1 baseline as met, with its stated limits, and release stays the owner's decision. Passing a check profile is not product acceptance, and the docs say which is which. [research/](research/) keeps the evaluations behind earlier designs, including local models that the current design doesn't use.
+All 122 stories in [SPECS.md](SPECS.md) are delivered and checked on this Mac. The [US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads the H1 baseline as met, with its stated limits, and release stays the owner's decision. Passing a check profile is not product acceptance, and the docs say which is which. [research/](research/) keeps the evaluations behind earlier designs, including local models that the current design doesn't use.

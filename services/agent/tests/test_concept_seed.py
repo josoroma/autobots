@@ -99,6 +99,11 @@ def test_the_deep_research_writer_is_decision_0034s() -> None:
     ):
         assert path in DEEP_RESEARCH_INSTRUCTIONS, path
     assert "artifact_ids" in DEEP_RESEARCH_INSTRUCTIONS
+    # Tuned from the live runs (Decision 0034 E3): one plan, a document that fits one reply, and
+    # never the document in a reply.
+    assert "Never propose another" in DEEP_RESEARCH_INSTRUCTIONS
+    assert "1,800 to 2,400 words" in DEEP_RESEARCH_INSTRUCTIONS
+    assert "Never put the document in a reply" in DEEP_RESEARCH_INSTRUCTIONS
     assert "outputs/child-1/" in DEEP_RESEARCH_INSTRUCTIONS
     assert "read_artifact" in DEEP_RESEARCH_INSTRUCTIONS
     others = [item for item in EXPERTS if item.name != "Deep research writer"]

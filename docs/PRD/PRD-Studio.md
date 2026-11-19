@@ -180,7 +180,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
 | Code maintainer | Reads the repository, edits copies in the run's files, and proposes a pull request that waits for you | `github_read_file`, `search_files`, `read_code_file`, `patch_code_file`, `write_code_file`, `github_open_pull_request` |
 | Google bot | Searches Google through SerpApi for up to 30 ranked results, reads the most relevant pages and cites each source (Decision 0032 G8) | `google_search`, `google_map`, `google_extract`, `google_crawl`, `save_artifact`, `publish_artifact` (Decision 0033 K8) |
-| Deep research writer | Researches a topic the way Deep-Research-Content-Writer does: up to 30 Google results, the best pages read and numbered as sources, and one cited document of 2,000 to 3,000 words with references (Decision 0034 E1, with its instructions, E3 and E4) | `google_search`, `google_extract`, `search_web`, `extract_website_content`, `read_artifact`, `read_run_file`, `save_artifact`, `publish_artifact` |
+| Deep research writer | Researches a topic the way Deep-Research-Content-Writer does: up to 30 Google results, the best pages read and numbered as sources, and one cited document of 1,800 to 2,400 words with references (Decision 0034 E1, with its instructions, E3 and E4) | `google_search`, `google_extract`, `search_web`, `extract_website_content`, `read_artifact`, `read_run_file`, `save_artifact`, `publish_artifact` |
 
 | Workflow | Steps (agent steps name their Expert) | Seeded as |
 |---|---|---|

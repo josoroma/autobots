@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">The Deep research content writer workflow</title>
+  <desc id="desc">Six steps from left to right. Input: the topic and the reader's goal. Research and write: the Deep research writer Expert plans, searches Google, reads pages, synthesizes, writes, checks and publishes sources.md, synthesis.md, content.md and report.md. To string: the first step's result, with its artifact IDs, becomes the next step's goal. Check and report: the same Expert as reviewer reads those artifacts with read_artifact, checks every citation and publishes a corrected content.md and review.md. Approval: the owner decides. Output: the result. In the live execution on 2026-11-19 the research step made 37 tool calls for US$0.40 and the check step 12 for US$0.05, and the owner approved the gate, so the execution succeeded.</desc>
+  <style>
+    svg { --bg: #ffffff; --fg: #0a0a0a; --mfg: #737373; --line: #e5e5e5; --surface: #f5f5f5; --brand: #155dfc; --deep: #1447e6; --on: #eff6ff; --ok: #009966; --att: #a05000; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #171717; --fg: #fafafa; --mfg: #a1a1a1; --line: #333333; --surface: #262626; --brand: #2b7fff; --deep: #193cb8; --on: #162456; --ok: #00bc7d; --att: #ffb900; }
+    }
+    text { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .frame { fill: var(--bg); stroke: var(--line); }
+    .card { fill: var(--bg); stroke: var(--line); }
+    .agent { fill: var(--bg); stroke: var(--brand); stroke-width: 1.5; }
+    .appr { fill: var(--bg); stroke: var(--att); stroke-width: 1.5; }
+    .band { fill: var(--surface); }
+    .chip { fill: var(--on); }
+    .fg { fill: var(--fg); } .mfg { fill: var(--mfg); } .ok { fill: var(--ok); } .att { fill: var(--att); } .brandf { fill: var(--brand); }
+    .title { font-size: 14px; font-weight: 600; fill: var(--fg); }
+    .line { font-size: 12px; fill: var(--mfg); }
+    .small { font-size: 11px; fill: var(--mfg); }
+    .label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; fill: var(--brand); }
+    .arrow { fill: none; stroke: var(--mfg); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .tie { fill: none; stroke: var(--brand); stroke-width: 1.5; stroke-dasharray: 3 4; }
+    .head { fill: var(--mfg); } .headb { fill: var(--brand); }
+    @media (prefers-reduced-motion: no-preference) {
+      .arrow, .tie { animation: flow 1.2s linear infinite; }
+    }
+    @keyframes flow { to { stroke-dashoffset: -18; } }
+  </style>
+
+  <rect class="frame" x="0.5" y="0.5" width="959" height="429" rx="16"/>
+  <text class="title" x="30" y="40" font-size="16">One topic in, a checked and cited document out</text>
+  <text class="line" x="30" y="60">Deep research content writer, as executed live on 2026-11-19 for “langchain for deep agents”</text>
+
+  <!-- Step cards -->
+  <rect class="card" x="30.5" y="84.5" width="90" height="96" rx="12"/>
+  <text class="label" x="44" y="106">INPUT</text>
+  <text class="title" x="44" y="128">Topic</text>
+  <text class="small" x="44" y="148">and the</text>
+  <text class="small" x="44" y="164">reader’s goal</text>
+
+  <rect class="agent" x="148.5" y="84.5" width="190" height="96" rx="12"/>
+  <text class="label" x="162" y="106">AGENT</text>
+  <text class="title" x="162" y="128">Research and write</text>
+  <text class="small" x="162" y="148">Deep research writer</text>
+  <text class="mfg mono" x="162" y="166" font-size="10.5">37 tool calls · US$0.40</text>
+
+  <rect class="card" x="366.5" y="84.5" width="100" height="96" rx="12"/>
+  <text class="label" x="380" y="106">TRANSFORM</text>
+  <text class="title" x="380" y="128">To string</text>
+  <text class="small" x="380" y="148">result becomes</text>
+  <text class="small" x="380" y="164">the next goal</text>
+
+  <rect class="agent" x="494.5" y="84.5" width="180" height="96" rx="12"/>
+  <text class="label" x="508" y="106">AGENT</text>
+  <text class="title" x="508" y="128">Check and report</text>
+  <text class="small" x="508" y="148">the same Expert, reviewing</text>
+  <text class="mfg mono" x="508" y="166" font-size="10.5">12 tool calls · US$0.05</text>
+
+  <rect class="appr" x="702.5" y="84.5" width="110" height="96" rx="12"/>
+  <text class="label" x="716" y="106" style="fill: var(--att)">APPROVAL</text>
+  <text class="title" x="716" y="128">The owner</text>
+  <text class="small" x="716" y="148">decides in</text>
+  <text class="small" x="716" y="164">Approvals</text>
+
+  <rect class="card" x="840.5" y="84.5" width="90" height="96" rx="12"/>
+  <text class="label" x="854" y="106">OUTPUT</text>
+  <text class="title" x="854" y="128">Result</text>
+  <text class="small" x="854" y="148">references</text>
+  <text class="small" x="854" y="164">to artifacts</text>
+
+  <!-- Arrows between steps -->
+  <path class="arrow" d="M121 132 H141"/><polygon class="head" points="141,128 148,132 141,136"/>
+  <path class="arrow" d="M339 132 H359"/><polygon class="head" points="359,128 366,132 359,136"/>
+  <path class="arrow" d="M467 132 H487"/><polygon class="head" points="487,128 494,132 487,136"/>
+  <path class="arrow" d="M675 132 H695"/><polygon class="head" points="695,128 702,132 695,136"/>
+  <path class="arrow" d="M813 132 H833"/><polygon class="head" points="833,128 840,132 833,136"/>
+
+  <!-- Research band -->
+  <rect class="band" x="148" y="200" width="191" height="178" rx="12"/>
+  <text class="label" x="162" y="222" style="fill: var(--mfg)">ONE PLAN, SIX TASKS</text>
+  <text class="fg" x="162" y="244" font-size="12">search · collect · synthesize</text>
+  <text class="fg" x="162" y="262" font-size="12">write · check · publish</text>
+  <text class="label" x="162" y="292" style="fill: var(--mfg)">PUBLISHES</text>
+  <text class="fg mono" x="162" y="312" font-size="10.5">research/sources.md</text>
+  <text class="fg mono" x="162" y="328" font-size="10.5">research/synthesis.md</text>
+  <text class="fg mono" x="162" y="344" font-size="10.5">content.md</text>
+  <text class="fg mono" x="162" y="360" font-size="10.5">report.md</text>
+
+  <!-- Artifact IDs carried to the reviewer -->
+  <path class="tie" d="M339 336 C 410 336, 430 252, 487 252"/><polygon class="headb" points="487,248 494,252 487,256"/>
+  <text class="brandf mono" x="352" y="372" font-size="10.5">artifact IDs only,</text>
+  <text class="brandf mono" x="352" y="388" font-size="10.5">read back whole</text>
+
+  <!-- Check band -->
+  <rect class="band" x="494" y="200" width="181" height="178" rx="12"/>
+  <text class="label" x="508" y="222" style="fill: var(--mfg)">READS AND CHECKS</text>
+  <text class="fg mono" x="508" y="244" font-size="10.5">read_artifact × 4</text>
+  <text class="fg" x="508" y="262" font-size="12">every [S-NN] against</text>
+  <text class="fg" x="508" y="278" font-size="12">the saved excerpts</text>
+  <text class="label" x="508" y="308" style="fill: var(--mfg)">PUBLISHES</text>
+  <text class="fg mono" x="508" y="328" font-size="10.5">content.md, corrected</text>
+  <text class="fg mono" x="508" y="344" font-size="10.5">review.md</text>
+
+  <!-- Observed totals -->
+  <rect class="band" x="702" y="200" width="228" height="178" rx="12"/>
+  <text class="label" x="716" y="222" style="fill: var(--mfg)">OBSERVED</text>
+  <circle class="ok" cx="720" cy="240" r="4"/>
+  <text class="fg" x="732" y="244" font-size="12">owner approved, succeeded</text>
+  <circle class="ok" cx="720" cy="260" r="4"/>
+  <text class="fg" x="732" y="264" font-size="12">45 model calls, 49 tool calls</text>
+  <circle class="ok" cx="720" cy="280" r="4"/>
+  <text class="fg" x="732" y="284" font-size="12">US$0.45 of a US$3.75 budget</text>
+  <circle class="ok" cx="720" cy="300" r="4"/>
+  <text class="fg" x="732" y="304" font-size="12">17 sources cited, S-01 to S-17</text>
+  <circle class="att" cx="720" cy="320" r="4"/>
+  <text class="fg" x="732" y="324" font-size="12">degraded: 18 of 30 pages read</text>
+  <circle class="ok" cx="720" cy="340" r="4"/>
+  <text class="fg" x="732" y="344" font-size="12">no key in any artifact</text>
+  <text class="small" x="716" y="368">One live execution, not a benchmark.</text>
+
+  <!-- Grant note -->
+  <text class="small" x="30" y="222">Each agent step</text>
+  <text class="small" x="30" y="238">is a child run</text>
+  <text class="small" x="30" y="254">with its Expert’s</text>
+  <text class="small" x="30" y="270">tools, granted to</text>
+  <text class="small" x="30" y="286">the execution</text>
+  <text class="small" x="30" y="302">(Decision 0034 F3).</text>
+</svg>

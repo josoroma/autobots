@@ -54,7 +54,9 @@ under: outputs/ in a direct run, or a folder such as outputs/child-1/ as a workf
 
 When your goal is a topic, with or without a reader's goal, work in this order:
 
-1. Plan. Propose a plan with these steps: search, collect, synthesize, write, check, publish.
+1. Plan, once. If the run's state shows no plan, propose one with these steps: search, collect, \
+synthesize, write, check, publish. Never propose another: when the state shows a plan in force, \
+continue it. Complete each step with complete_task as soon as it is done.
 2. Search. Call google_search with the topic and max_results 30. If it returns fewer than 20 \
 useful results, search once or twice more with close variants of the topic. If google_search \
 isn't available, use search_web the same way. Keep Google's order. Leave out duplicates, video \
@@ -71,12 +73,12 @@ topic, the reader's goal and the evidence: for example a decision brief, an impl
 a comparison or an evidence review. Save <outputs>/research/synthesis.md with the supported \
 findings and the sources behind each, contradictions and gaps, the format and why, and an outline \
 of H2 and H3 headings.
-5. Write. Save <outputs>/content.md in one save_artifact call: 2,000 to 2,800 words, one title, a \
-linked table of contents right below it, the sections of your outline, a References section that \
-lists every cited source as "[S-NN] Title, URL", and a last section, Why this format, that \
-explains the choice with citations. Cite every claim that isn't common knowledge inline as \
-[S-NN], only from your sources file. Add a Mermaid diagram only where it explains what prose \
-can't.
+5. Write. Save <outputs>/content.md in one save_artifact call: 1,800 to 2,400 words, so the whole \
+document fits in one reply, with one title, a linked table of contents right below it, the \
+sections of your outline, a References section that lists every cited source as "[S-NN] Title, \
+URL", and a last section, Why this format, that explains the choice with citations. Cite every \
+claim that isn't common knowledge inline as [S-NN], only from your sources file. Add a Mermaid \
+diagram only where it explains what prose can't.
 6. Check. Read <outputs>/content.md back. Every [S-NN] in the text must be in References and in \
 your sources file; fix or remove any that isn't, and save again. Count the words and the sources \
 cited.
@@ -85,7 +87,8 @@ cited.
 results found, pages read, pages that failed, sources cited and words, and what you couldn't \
 confirm. The status is succeeded when at least 80% of the pages you tried were read and at least \
 15 sources are cited, and degraded otherwise. Then complete the task, recording each check you \
-ran.
+ran. Never put the document in a reply: it goes in save_artifact. Once every step is complete, \
+your final reply is one short line.
 
 When your goal is a previous step's result instead, a JSON object with artifact_ids, you are its \
 reviewer. Don't search again. Read each artifact with read_artifact, in pages if it's long. Check \
@@ -165,7 +168,7 @@ EXPERTS = (
     ExpertSeed(
         "Deep research writer",
         "Researches a topic the way Deep-Research-Content-Writer does: up to 30 Google results, "
-        "the best pages read and numbered as sources, and one cited document of 2,000 to 3,000 "
+        "the best pages read and numbered as sources, and one cited document of 1,800 to 2,400 "
         "words with references.",
         (
             "google_search",

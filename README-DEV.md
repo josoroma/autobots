@@ -6,6 +6,7 @@
   <a href="README.md">Product overview</a> ·
   <b>Developer guide</b> ·
   <a href="README.md#quick-start">Quick start</a> ·
+  <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>
@@ -14,7 +15,7 @@
 
 The onboarding guide for new developers, architects and AI coding agents. It covers how to install, set up and run the Autobots backend and frontend on a Mac, how the system is built, and how work gets done in this repository.
 
-For what Autobots is and why, start with [the product overview](README.md). This guide summarizes and links. The documents it links to are the authority. If this guide and one of them disagree, follow the linked document, and fix this guide.
+For what Autobots is and why, start with [the product overview](README.md). To follow one real piece of work end to end, from the Expert and its tools to a workflow's agent steps, its limits and its costs, read [Deep research, live](README-Deep-Research-Content-Writer.md). This guide summarizes and links. The documents it links to are the authority. If this guide and one of them disagree, follow the linked document, and fix this guide.
 
 ## Start here
 

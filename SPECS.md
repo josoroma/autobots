@@ -671,10 +671,10 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-16.6#4 | Grant a workflow execution its agent steps' Experts' tools (Decision 0034 F3). | DONE | US-16.6 |
 | US-16.6#5 | Cover the scenarios with unit tests and disposable database checks, including a scripted run of the workflow. | DONE | US-16.6 |
 | US-16.6#6 | Update `CODEBASE.md` and the runbooks that state the limits. | DONE | US-16.6 |
-| US-16.7 | Live deep research on the install, documented | READY | EPIC-16 |
-| US-16.7#1 | Have the owner rebuild and restart the install with inference on, and run the concept seed. | TODO | US-16.7 |
-| US-16.7#2 | Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs. | TODO | US-16.7 |
-| US-16.7#3 | Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`. | TODO | US-16.7 |
+| US-16.7 | Live deep research on the install, documented | DONE | EPIC-16 |
+| US-16.7#1 | Have the owner rebuild and restart the install with inference on, and run the concept seed. | DONE | US-16.7 |
+| US-16.7#2 | Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs. | DONE | US-16.7 |
+| US-16.7#3 | Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`. | DONE | US-16.7 |
 | US-16.8 | A 64K working context for deep research | DONE | EPIC-16 |
 | US-16.8#1 | Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them. | DONE | US-16.8 |
 | US-16.8#2 | Cover the scenarios with unit tests of compaction and the reservation. | DONE | US-16.8 |
@@ -8738,7 +8738,8 @@ Open Questions:
 
 ### US-16.7: Live deep research on the install, documented
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-19-us-16-7-live-deep-research-install/`
 
 As an owner
 I want the Deep research writer and its workflow to research "langchain for deep agents" for real on my install
@@ -8783,9 +8784,9 @@ Dependencies:
 - US-16.9
 
 Tasks:
-- [ ] Have the owner rebuild and restart the install with inference on, and run the concept seed.
-- [ ] Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs.
-- [ ] Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`.
+- [x] Have the owner rebuild and restart the install with inference on, and run the concept seed.
+- [x] Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs.
+- [x] Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`.
 
 Open Questions:
 - None.
