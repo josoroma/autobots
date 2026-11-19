@@ -4,6 +4,8 @@ CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-h
 
 CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.9 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `bd6008a` and `528e6b3`; refreshing the whole analysis is separate work.
 
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-17.1 to US-17.5 on 2026-11-19. Facts marked "checked at HEAD" were read at `0d407fa`; refreshing the whole analysis is separate work.
+
 ## Table of Contents
 
 - [EPIC-1: Development foundation and Gate 0](#epic-1-development-foundation-and-gate-0)
@@ -144,6 +146,12 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-16.7: Live deep research on the install, documented](#us-167-live-deep-research-on-the-install-documented)
   - [US-16.8: A 64K working context for deep research](#us-168-a-64k-working-context-for-deep-research)
   - [US-16.9: The plan survives compaction](#us-169-the-plan-survives-compaction)
+- [EPIC-17: Browsing that types and submits under YOLO, and a Transcript reader](#epic-17-browsing-that-types-and-submits-under-yolo-and-a-transcript-reader)
+  - [US-17.1: The YOLO setting and the Expert's browse domains](#us-171-the-yolo-setting-and-the-experts-browse-domains)
+  - [US-17.2: An admitted model endpoint for the browser box](#us-172-an-admitted-model-endpoint-for-the-browser-box)
+  - [US-17.3: browse_goal on browser-use in the isolated executor](#us-173-browse_goal-on-browser-use-in-the-isolated-executor)
+  - [US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots](#us-174-pressing-typing-and-submitting-under-yolo-with-bot_check-typed-results-and-step-screenshots)
+  - [US-17.5: The Transcript reader Expert and workflow](#us-175-the-transcript-reader-expert-and-workflow)
 
 ## Work Item Status
 
@@ -683,6 +691,47 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-16.9#1 | Add the run's plan, with each task done or open, to `state_block`. | DONE | US-16.9 |
 | US-16.9#2 | Cover the scenarios with unit tests and the memory check on a disposable database. | DONE | US-16.9 |
 | US-16.9#3 | Update `CODEBASE.md`. | DONE | US-16.9 |
+| EPIC-17 | Browsing that types and submits under YOLO, and a Transcript reader | — | — |
+| US-17.1 | The YOLO setting and the Expert's browse domains | READY | EPIC-17 |
+| US-17.1#1 | Add the workspace's YOLO setting in a migration with its traceability header. It is on for every workspace, including existing ones, and only the owner changes it through the API and the BFF. Checked by the db profile's disposable fixtures and `tests/harness/test_migration_headers.py`. | TODO | US-17.1 |
+| US-17.1#2 | Freeze the setting in the run's snapshot at admission. A run admitted before this change reads as off. A call counts as YOLO only while both the frozen and the current setting are on (Y4). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-17.1 |
+| US-17.1#3 | Start a `browse_goal` call without approval while the call is YOLO, and keep approval on every call otherwise (Decision 0018 B6, Y15). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model. | TODO | US-17.1 |
+| US-17.1#4 | Add a browse domain list to each Expert version that grants `browse_goal`, edited by the owner in the Expert editor, where a change makes a new version. Under YOLO, refuse before any container starts a call naming a domain outside the list, or from an Expert with no list, with a typed reason naming the list. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures and the Experts browser suite under `apps/web/tests/browser`. | TODO | US-17.1 |
+| US-17.1#5 | Add Settings → Browsing with the checkbox and its line, the one-time notice on Home, and `typing` with the domains among `browse_goal`'s public fields in the tool row. Checked by the Settings, Home and run workspace browser suites under `apps/web/tests/browser`, with axe. | TODO | US-17.1 |
+| US-17.1#6 | Update the Pydantic contracts, then regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile. | TODO | US-17.1 |
+| US-17.1#7 | Keep these true to Y2, saying approval on every call applies only with YOLO off: `browse_goal`'s guide, the approval the Tools page shows for it, and the Expert cards' approval note (EX-03). The guide also says that an Expert browsing a wiki or forum tells it in its instructions never to edit or post (Y13). Checked by pytest under `services/agent/tests` and the Tools and Experts browser suites under `apps/web/tests/browser`. | TODO | US-17.1 |
+| US-17.1#8 | Amend PRD-Tool-Catalog AB-01, AB-02 and TC-02, and PRD-Studio SE-02 and Home, as Decision 0035's "Requirements revised" lists. Checked by reading each against Decision 0035 Y1 to Y4. | TODO | US-17.1 |
+| US-17.1#9 | Update `README.md`, whose opening paragraph and "Asks before it acts" say browsing always waits for approval, plus `README-DEV.md`, the operations runbook's "Turning on browse_goal" and `CODEBASE.md`. Checked by reading each against Decision 0035 Y1 to Y4. | TODO | US-17.1 |
+| US-17.2 | An admitted model endpoint for the browser box | READY | EPIC-17 |
+| US-17.2#1 | Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | TODO | US-17.2 |
+| US-17.2#2 | Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | TODO | US-17.2 |
+| US-17.2#3 | Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport. | TODO | US-17.2 |
+| US-17.2#4 | Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key. | TODO | US-17.2 |
+| US-17.2#5 | Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7. | TODO | US-17.2 |
+| US-17.3 | browse_goal on browser-use in the isolated executor | BLOCKED | EPIC-17 |
+| US-17.3#1 | Add `services/browser-use/` with its own `pyproject.toml` and `uv.lock`, pinning browser-use 1.0.6 apart from the worker's lock. Record its resolved dependency tree in the change, and ignore its local environment. Checked by a harness test under `tests/harness` that reads the lock's pin. | TODO | US-17.3 |
+| US-17.3#2 | Build the browser-use image from the digest-pinned Playwright image (B1) with that environment, and add it to the images' source fingerprint. Start one container per call, with BX-01's caps and hardening, nothing of the worker's environment, and Chromium's policy turning downloads off. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | TODO | US-17.3 |
+| US-17.3#3 | Run browser-use inside the container with a local headless Chromium, a fresh profile, the call's `allowed_domains`, vision and its judge off (Y16), and the US-17.2 endpoint as its only model. It never uses Browser Use Cloud, its gateway or `sensitive_data`. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack. | TODO | US-17.3 |
+| US-17.3#4 | Choose the engine per call: browser-use while the call is YOLO and its image reports qualified, Autobots' loop otherwise, capped to the loop's limits (Y15). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model. | TODO | US-17.3 |
+| US-17.3#5 | Map browser-use's outcome onto `browse_goal`'s stop reasons. End the call on a refused action the model chose, and count a page's own refused request (Decision 0018). Apply Y9's limits, with the box's 600-second cap for browser-use sessions only. Checked by pytest under `services/agent/tests` with a scripted model. | TODO | US-17.3 |
+| US-17.3#6 | Make sure no request reaches Browser Use's gateway, cloud browser, telemetry or sync hosts. Turn off the pinned version's telemetry and update check. The egress proxy keeps its host rules and filters no methods (Y6). Checked by pytest under `services/agent/tests` and by the proxy log that `scripts/qualify_browser_executor.py` records. | TODO | US-17.3 |
+| US-17.3#7 | Extend the executor's qualification with the browser-use image, BX-05's refusals and the container's inspection, and report browser-use qualified only after every one is observed. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model, reaching only the qualification host (Y18). | TODO | US-17.3 |
+| US-17.3#8 | Amend PRD-Tool-Catalog BX-01 for the 600-second browser-use cap. Update `README-DEV.md`, the operations runbook's browser executor section (building and qualifying the image) and `CODEBASE.md`. Checked by reading them against Decision 0035 Y5 to Y9. | TODO | US-17.3 |
+| US-17.4 | Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots | BLOCKED | EPIC-17 |
+| US-17.4#1 | Let browser-use type, pick from menus, click, press Enter and submit by GET or POST within the call's domains while the call is YOLO. Record each submit's domain and path among the tool use's public fields, never the typed value or the query. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack. | TODO | US-17.4 |
+| US-17.4#2 | Add `bot_check` to `stopped`, recognised in the box from the page itself (Y16), ending the call. No stealth setting, no changed user agent, no retry, and no Browser Use Cloud or solver. Checked by pytest under `services/agent/tests` with a scripted model. | TODO | US-17.4 |
+| US-17.4#3 | Add an optional output schema to `browse_goal`'s input: a JSON Schema object of at most 8 KB whose top-level `x-link-fields` names its link fields (Y19). Validate the result against it, keep the query only in those fields, and stop with `invalid_action` when the result doesn't validate. Follow the catalog's versioning and pinned schema digests (SP-013). Checked by pytest under `services/agent/tests`. | TODO | US-17.4 |
+| US-17.4#4 | Keep one screenshot per browser-use step in the run's private storage, readable only by the workspace's members through the authorized download path. Show the screenshots, with each submit's domain and path, in the run's tool row. Checked by the db profile's disposable fixtures and the run workspace browser suite under `apps/web/tests/browser`, with axe. | TODO | US-17.4 |
+| US-17.4#5 | Show that the box holds no key, password, cookie or card, that Chromium refuses downloads, and that a file chooser sees only the box's empty `tmpfs`. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | TODO | US-17.4 |
+| US-17.4#6 | Update the Pydantic contracts and `browse_goal`'s guide, and regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile and pytest under `services/agent/tests`. | TODO | US-17.4 |
+| US-17.4#7 | Amend PRD-Tool-Catalog's "Autonomous browsing" for `bot_check` and the output schema, and BX-03 for submits under YOLO. Update `README.md`, `README-DEV.md` and `CODEBASE.md` to say browsing presses, types and submits under YOLO, and that a bot check stops it. Checked by reading them against Decision 0035 Y5, Y10 to Y12 and Y19. | TODO | US-17.4 |
+| US-17.5 | The Transcript reader Expert and workflow | BLOCKED | EPIC-17 |
+| US-17.5#1 | Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`). | TODO | US-17.5 |
+| US-17.5#2 | Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures. | TODO | US-17.5 |
+| US-17.5#3 | Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-17.5 |
+| US-17.5#4 | Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures. | TODO | US-17.5 |
+| US-17.5#5 | Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`. | TODO | US-17.5 |
+| US-17.5#6 | Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17. | TODO | US-17.5 |
 
 ## Dependency Diagram
 
@@ -841,6 +890,13 @@ flowchart TD
     US_16_7["US-16.7: Live deep research on the install, documented"]
     US_16_8["US-16.8: A 64K working context for deep research"]
     US_16_9["US-16.9: The plan survives compaction"]
+  end
+  subgraph EPIC_17["EPIC-17: Browsing that types and submits under YOLO, and a Transcript reader"]
+    US_17_1["US-17.1: The YOLO setting and the Expert&#x27;s browse domains"]
+    US_17_2["US-17.2: An admitted model endpoint for the browser box"]
+    US_17_3["US-17.3: browse_goal on browser-use in the isolated executor"]
+    US_17_4["US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots"]
+    US_17_5["US-17.5: The Transcript reader Expert and workflow"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1184,6 +1240,14 @@ flowchart TD
   US_16_9 -.-> US_16_7
   US_16_6 -.-> US_16_8
   US_16_8 -.-> US_16_9
+  US_14_12 -.-> US_17_1
+  US_14_18 -.-> US_17_1
+  US_14_13 -.-> US_17_2
+  US_14_14 -.-> US_17_2
+  US_17_1 -.-> US_17_3
+  US_17_2 -.-> US_17_3
+  US_17_3 -.-> US_17_4
+  US_17_4 -.-> US_17_5
 ```
 
 ```mermaid
@@ -2193,6 +2257,87 @@ flowchart TD
     US_16_9 --> T_16_9_2
     T_16_9_3["US-16.9#3: Update `CODEBASE.md`."]
     US_16_9 --> T_16_9_3
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_17["EPIC-17 tasks"]
+    US_17_1["US-17.1: The YOLO setting and the Expert&#x27;s browse domains"]
+    T_17_1_1["US-17.1#1: Add the workspace&#x27;s YOLO setting in a migration with its traceability header. It is on for every workspace, including existing ones, and only the owner changes it through the API and the BFF. Checked by the db profile&#x27;s disposable fixtures and `tests/harness/test_migration_headers.py`."]
+    US_17_1 --> T_17_1_1
+    T_17_1_2["US-17.1#2: Freeze the setting in the run&#x27;s snapshot at admission. A run admitted before this change reads as off. A call counts as YOLO only while both the frozen and the current setting are on (Y4). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_17_1 --> T_17_1_2
+    T_17_1_3["US-17.1#3: Start a `browse_goal` call without approval while the call is YOLO, and keep approval on every call otherwise (Decision 0018 B6, Y15). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures with a scripted model."]
+    US_17_1 --> T_17_1_3
+    T_17_1_4["US-17.1#4: Add a browse domain list to each Expert version that grants `browse_goal`, edited by the owner in the Expert editor, where a change makes a new version. Under YOLO, refuse before any container starts a call naming a domain outside the list, or from an Expert with no list, with a typed reason naming the list. Checked by pytest under `services/agent/tests`, the db profile&#x27;s disposable fixtures and the Experts browser suite under `apps/web/tests/browser`."]
+    US_17_1 --> T_17_1_4
+    T_17_1_5["US-17.1#5: Add Settings → Browsing with the checkbox and its line, the one-time notice on Home, and `typing` with the domains among `browse_goal`&#x27;s public fields in the tool row. Checked by the Settings, Home and run workspace browser suites under `apps/web/tests/browser`, with axe."]
+    US_17_1 --> T_17_1_5
+    T_17_1_6["US-17.1#6: Update the Pydantic contracts, then regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile."]
+    US_17_1 --> T_17_1_6
+    T_17_1_7["US-17.1#7: Keep these true to Y2, saying approval on every call applies only with YOLO off: `browse_goal`&#x27;s guide, the approval the Tools page shows for it, and the Expert cards&#x27; approval note (EX-03). The guide also says that an Expert browsing a wiki or forum tells it in its instructions never to edit or post (Y13). Checked by pytest under `services/agent/tests` and the Tools and Experts browser suites under `apps/web/tests/browser`."]
+    US_17_1 --> T_17_1_7
+    T_17_1_8["US-17.1#8: Amend PRD-Tool-Catalog AB-01, AB-02 and TC-02, and PRD-Studio SE-02 and Home, as Decision 0035&#x27;s &quot;Requirements revised&quot; lists. Checked by reading each against Decision 0035 Y1 to Y4."]
+    US_17_1 --> T_17_1_8
+    T_17_1_9["US-17.1#9: Update `README.md`, whose opening paragraph and &quot;Asks before it acts&quot; say browsing always waits for approval, plus `README-DEV.md`, the operations runbook&#x27;s &quot;Turning on browse_goal&quot; and `CODEBASE.md`. Checked by reading each against Decision 0035 Y1 to Y4."]
+    US_17_1 --> T_17_1_9
+    US_17_2["US-17.2: An admitted model endpoint for the browser box"]
+    T_17_2_1["US-17.2#1: Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse&#x27;s executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model."]
+    US_17_2 --> T_17_2_1
+    T_17_2_2["US-17.2#2: Send each request through model admission on the run&#x27;s frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run&#x27;s budget and `model_calls`, the shared transport with MP-02&#x27;s request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport."]
+    US_17_2 --> T_17_2_2
+    T_17_2_3["US-17.2#3: Refuse a request with a typed reason before anything is sent when it is past the run&#x27;s budget, model calls or time, comes from a cancelled run, or carries content the route isn&#x27;t qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport."]
+    US_17_2 --> T_17_2_3
+    T_17_2_4["US-17.2#4: Keep the OpenRouter key on the worker&#x27;s side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key."]
+    US_17_2 --> T_17_2_4
+    T_17_2_5["US-17.2#5: Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook&#x27;s browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7."]
+    US_17_2 --> T_17_2_5
+    US_17_3["US-17.3: browse_goal on browser-use in the isolated executor"]
+    T_17_3_1["US-17.3#1: Add `services/browser-use/` with its own `pyproject.toml` and `uv.lock`, pinning browser-use 1.0.6 apart from the worker&#x27;s lock. Record its resolved dependency tree in the change, and ignore its local environment. Checked by a harness test under `tests/harness` that reads the lock&#x27;s pin."]
+    US_17_3 --> T_17_3_1
+    T_17_3_2["US-17.3#2: Build the browser-use image from the digest-pinned Playwright image (B1) with that environment, and add it to the images&#x27; source fingerprint. Start one container per call, with BX-01&#x27;s caps and hardening, nothing of the worker&#x27;s environment, and Chromium&#x27;s policy turning downloads off. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model."]
+    US_17_3 --> T_17_3_2
+    T_17_3_3["US-17.3#3: Run browser-use inside the container with a local headless Chromium, a fresh profile, the call&#x27;s `allowed_domains`, vision and its judge off (Y16), and the US-17.2 endpoint as its only model. It never uses Browser Use Cloud, its gateway or `sensitive_data`. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack."]
+    US_17_3 --> T_17_3_3
+    T_17_3_4["US-17.3#4: Choose the engine per call: browser-use while the call is YOLO and its image reports qualified, Autobots&#x27; loop otherwise, capped to the loop&#x27;s limits (Y15). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures with a scripted model."]
+    US_17_3 --> T_17_3_4
+    T_17_3_5["US-17.3#5: Map browser-use&#x27;s outcome onto `browse_goal`&#x27;s stop reasons. End the call on a refused action the model chose, and count a page&#x27;s own refused request (Decision 0018). Apply Y9&#x27;s limits, with the box&#x27;s 600-second cap for browser-use sessions only. Checked by pytest under `services/agent/tests` with a scripted model."]
+    US_17_3 --> T_17_3_5
+    T_17_3_6["US-17.3#6: Make sure no request reaches Browser Use&#x27;s gateway, cloud browser, telemetry or sync hosts. Turn off the pinned version&#x27;s telemetry and update check. The egress proxy keeps its host rules and filters no methods (Y6). Checked by pytest under `services/agent/tests` and by the proxy log that `scripts/qualify_browser_executor.py` records."]
+    US_17_3 --> T_17_3_6
+    T_17_3_7["US-17.3#7: Extend the executor&#x27;s qualification with the browser-use image, BX-05&#x27;s refusals and the container&#x27;s inspection, and report browser-use qualified only after every one is observed. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model, reaching only the qualification host (Y18)."]
+    US_17_3 --> T_17_3_7
+    T_17_3_8["US-17.3#8: Amend PRD-Tool-Catalog BX-01 for the 600-second browser-use cap. Update `README-DEV.md`, the operations runbook&#x27;s browser executor section (building and qualifying the image) and `CODEBASE.md`. Checked by reading them against Decision 0035 Y5 to Y9."]
+    US_17_3 --> T_17_3_8
+    US_17_4["US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots"]
+    T_17_4_1["US-17.4#1: Let browser-use type, pick from menus, click, press Enter and submit by GET or POST within the call&#x27;s domains while the call is YOLO. Record each submit&#x27;s domain and path among the tool use&#x27;s public fields, never the typed value or the query. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack."]
+    US_17_4 --> T_17_4_1
+    T_17_4_2["US-17.4#2: Add `bot_check` to `stopped`, recognised in the box from the page itself (Y16), ending the call. No stealth setting, no changed user agent, no retry, and no Browser Use Cloud or solver. Checked by pytest under `services/agent/tests` with a scripted model."]
+    US_17_4 --> T_17_4_2
+    T_17_4_3["US-17.4#3: Add an optional output schema to `browse_goal`&#x27;s input: a JSON Schema object of at most 8 KB whose top-level `x-link-fields` names its link fields (Y19). Validate the result against it, keep the query only in those fields, and stop with `invalid_action` when the result doesn&#x27;t validate. Follow the catalog&#x27;s versioning and pinned schema digests (SP-013). Checked by pytest under `services/agent/tests`."]
+    US_17_4 --> T_17_4_3
+    T_17_4_4["US-17.4#4: Keep one screenshot per browser-use step in the run&#x27;s private storage, readable only by the workspace&#x27;s members through the authorized download path. Show the screenshots, with each submit&#x27;s domain and path, in the run&#x27;s tool row. Checked by the db profile&#x27;s disposable fixtures and the run workspace browser suite under `apps/web/tests/browser`, with axe."]
+    US_17_4 --> T_17_4_4
+    T_17_4_5["US-17.4#5: Show that the box holds no key, password, cookie or card, that Chromium refuses downloads, and that a file chooser sees only the box&#x27;s empty `tmpfs`. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model."]
+    US_17_4 --> T_17_4_5
+    T_17_4_6["US-17.4#6: Update the Pydantic contracts and `browse_goal`&#x27;s guide, and regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile and pytest under `services/agent/tests`."]
+    US_17_4 --> T_17_4_6
+    T_17_4_7["US-17.4#7: Amend PRD-Tool-Catalog&#x27;s &quot;Autonomous browsing&quot; for `bot_check` and the output schema, and BX-03 for submits under YOLO. Update `README.md`, `README-DEV.md` and `CODEBASE.md` to say browsing presses, types and submits under YOLO, and that a bot check stops it. Checked by reading them against Decision 0035 Y5, Y10 to Y12 and Y19."]
+    US_17_4 --> T_17_4_7
+    US_17_5["US-17.5: The Transcript reader Expert and workflow"]
+    T_17_5_1["US-17.5#1: Seed the Transcript reader with a purpose and instructions. They open the watch address, press &quot;...more&quot; and &quot;Show transcript&quot;, read every line, and publish `transcript.md` with the video&#x27;s title, its source address and each line&#x27;s timestamp, noting that the lines are YouTube&#x27;s own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube&#x27;s terms. Checked by the db profile&#x27;s disposable fixtures (`concept_seed_check`)."]
+    US_17_5 --> T_17_5_1
+    T_17_5_2["US-17.5#2: Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile&#x27;s disposable fixtures."]
+    US_17_5 --> T_17_5_2
+    T_17_5_3["US-17.5#3: Let a workflow&#x27;s `string` input declare a pattern, and refuse an execution whose value doesn&#x27;t match before it starts, naming the input (Y17). The Transcript workflow&#x27;s `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_17_5 --> T_17_5_3
+    T_17_5_4["US-17.5#4: Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile&#x27;s disposable fixtures."]
+    US_17_5 --> T_17_5_4
+    T_17_5_5["US-17.5#5: Show the Transcript reader&#x27;s empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`."]
+    US_17_5 --> T_17_5_5
+    T_17_5_6["US-17.5#6: Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17."]
+    US_17_5 --> T_17_5_6
   end
 ```
 
@@ -8876,6 +9021,403 @@ Tasks:
 - [x] Add the run's plan, with each task done or open, to `state_block`.
 - [x] Cover the scenarios with unit tests and the memory check on a disposable database.
 - [x] Update `CODEBASE.md`.
+
+Open Questions:
+- None.
+
+# EPIC-17: Browsing that types and submits under YOLO, and a Transcript reader
+
+Scheduled by [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision), from the owner's answers of 2026-11-19 (T1, T2 and T10) and the choices they delegated. It amends Decision 0018 B5 and B6 while YOLO is on, and Decision 0020 L1. A workspace setting, "Let browsing type and submit (YOLO)", is on by default. While it is on, a `browse_goal` call starts without approval, but only on the domains its Expert lists. With it off, every call waits for a person and runs on Autobots' read-only loop, as today. With it on, the call runs browser-use 1.0.6 in the isolated executor, from its own image and uv-locked environment. Every model call browser-use makes is admitted on the run's frozen `researcher` route through an endpoint the worker serves on the box's network only. A bot check ends the call with `bot_check`, a call may name an output schema, and each step keeps one screenshot with the run. A seeded Transcript reader turns a YouTube watch address into `transcript.md`. Its browse domain list starts empty, so it can't browse until the owner adds YouTube's hosts. The plan's flight-price items (T8, T9) aren't scheduled. Each story's checks use scripted models, and one live run is a separate step the owner starts and caps. No story establishes H1 or product acceptance ([what Decision 0035 doesn't establish](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#what-this-doesnt-establish)).
+
+### US-17.1: The YOLO setting and the Expert's browse domains
+
+Status: READY
+
+As a workspace owner
+I want one checkbox that lets browsing start without asking and type, click and submit, within the domains I list for each Expert
+So that goals that need a search form run without stopping to ask, while the domains and the box's limits stay in force.
+
+Source:
+- [Decision 0035, Y1 to Y4, Y13 and Y15](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, requirements revised](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#requirements-revised)
+- [Decision 0035, what this gives up](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#what-this-gives-up)
+- [Decision 0035, reversal](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#reversal)
+- [Decision 0018, B5 and B6, which hold only while YOLO is off](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0025, V4, the browsing switch that YOLO stays apart from](docs/engineering/decisions/0025-keys-and-vars.md#decision)
+- [Autonomous browsing, AB-02](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Tools screen, TS-02 and TS-04](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Tool-use record, TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
+- [Settings, SE-02](docs/PRD/PRD-Studio.md#settings)
+- [Home](docs/PRD/PRD-Studio.md#home)
+- [Experts, EX-03](docs/PRD/PRD-Studio.md#experts)
+- [Approval contract and replay](docs/PRD/PRD-LangChain-Deep-Agents.md#92-approval-contract-and-replay)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [Browser typing plan, the setting, the analysis behind Y1 to Y4](docs/plan/browser-typing-and-flights.md#3-the-setting)
+- [Browser typing plan, risks, on the README's approval promise](docs/plan/browser-typing-and-flights.md#12-risks)
+- [Browser typing plan, draft US-17.8, ingested here](docs/plan/browser-typing-and-flights.md#us-178-typing-and-submitting-in-browsing-a-settings-checkbox)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `browse_goal` (`application/browsing_tool.py`) is registered only while the browsing switch is `enabled` and the executor's qualification is current. It waits for approval on every call and runs the read-only loop in `browsing_loop.py`. Settings has no Browsing page (checked in `apps/web/app/settings/` at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): the run's frozen snapshot is `PolicySnapshot` (`contracts/persisted.py`), and stored Expert configurations are read through `persistence/records.py`. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: On by default
+  Given a new workspace
+  When the owner opens Settings → Browsing
+  Then "Let browsing type and submit (YOLO)" is checked, with one line saying what it allows
+
+Scenario: Existing workspaces get it on, with a notice once
+  Given a workspace that existed before the setting shipped
+  When its owner opens Home after the change, and again later
+  Then the setting is on, and Home shows a notice saying so the first time only
+
+Scenario: No approval while it is on
+  Given the checkbox is on when a run is admitted, and an Expert whose browse domains include every domain its call names
+  When the Expert's browse_goal call is made
+  Then it starts without waiting for approval, and the tool row shows typing on and its domains
+
+Scenario: The domains come from the Expert
+  Given the checkbox is on, and an Expert whose grant allows browsing google.com and gstatic.com
+  When its browse_goal call names any other domain
+  Then the call is refused before any container starts
+
+Scenario: An Expert with no domains can't browse
+  Given the checkbox is on, and an Expert that grants browse_goal with no domains listed
+  When its browse_goal call is made
+  Then the call is refused before any container starts, with a reason that names the missing list
+
+Scenario: The owner lists an Expert's browse domains
+  Given an Expert that grants browse_goal
+  When the owner adds en.wikivoyage.org to its browse domains in the Expert editor and saves
+  Then a new Expert version holds the list, and the earlier version is unchanged
+
+Scenario: Turning it off is immediate
+  Given a run admitted with the checkbox on
+  When the owner unchecks it and the run makes another browse_goal call
+  Then that call waits for approval and runs read-only on Autobots' own loop
+
+Scenario: Turning it on applies to new runs
+  Given a run admitted with the checkbox off
+  When the owner checks it, the run makes another browse_goal call, and a new run is admitted and makes one
+  Then the first run's call waits for approval, and the new run's call starts without approval
+
+Scenario: Only the owner changes it
+  Given a signed-in workspace member who isn't the owner
+  When they try to change the checkbox
+  Then the request is refused and the setting is unchanged
+```
+
+Dependencies:
+- US-14.12
+- US-14.18
+
+Tasks:
+- [ ] Add the workspace's YOLO setting in a migration with its traceability header. It is on for every workspace, including existing ones, and only the owner changes it through the API and the BFF. Checked by the db profile's disposable fixtures and `tests/harness/test_migration_headers.py`.
+- [ ] Freeze the setting in the run's snapshot at admission. A run admitted before this change reads as off. A call counts as YOLO only while both the frozen and the current setting are on (Y4). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [ ] Start a `browse_goal` call without approval while the call is YOLO, and keep approval on every call otherwise (Decision 0018 B6, Y15). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model.
+- [ ] Add a browse domain list to each Expert version that grants `browse_goal`, edited by the owner in the Expert editor, where a change makes a new version. Under YOLO, refuse before any container starts a call naming a domain outside the list, or from an Expert with no list, with a typed reason naming the list. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures and the Experts browser suite under `apps/web/tests/browser`.
+- [ ] Add Settings → Browsing with the checkbox and its line, the one-time notice on Home, and `typing` with the domains among `browse_goal`'s public fields in the tool row. Checked by the Settings, Home and run workspace browser suites under `apps/web/tests/browser`, with axe.
+- [ ] Update the Pydantic contracts, then regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile.
+- [ ] Keep these true to Y2, saying approval on every call applies only with YOLO off: `browse_goal`'s guide, the approval the Tools page shows for it, and the Expert cards' approval note (EX-03). The guide also says that an Expert browsing a wiki or forum tells it in its instructions never to edit or post (Y13). Checked by pytest under `services/agent/tests` and the Tools and Experts browser suites under `apps/web/tests/browser`.
+- [ ] Amend PRD-Tool-Catalog AB-01, AB-02 and TC-02, and PRD-Studio SE-02 and Home, as Decision 0035's "Requirements revised" lists. Checked by reading each against Decision 0035 Y1 to Y4.
+- [ ] Update `README.md`, whose opening paragraph and "Asks before it acts" say browsing always waits for approval, plus `README-DEV.md`, the operations runbook's "Turning on browse_goal" and `CODEBASE.md`. Checked by reading each against Decision 0035 Y1 to Y4.
+
+Open Questions:
+- None.
+
+### US-17.2: An admitted model endpoint for the browser box
+
+Status: READY
+
+As a workspace owner
+I want every model call browser-use makes to be an admitted call of the run
+So that browsing spends, counts and stops under the same budgets and receipts as everything else.
+
+Source:
+- [Decision 0035, Y7 and Y16](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, requirements revised for "Admitted browser model"](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#requirements-revised)
+- [Decision 0020, L3](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
+- [Decision 0018, B4](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Admitted browser model, BM-01 and BM-02](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
+- [Isolated browser executor, BX-02 and BX-03](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [MP-02 request contract](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-06 secrets stay out of execution](docs/PRD/PRD-Model-Providers.md#mp-06-secret-storage-and-durable-execution)
+- [MP-07 spend](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Local small models plan, the shape of browser-use in the box](docs/plan/local-small-models.md#94-the-shape-browser-use-in-the-box-its-model-calls-admitted)
+- [Local small models plan, draft US-17.6, ingested here without its local-route dependency](docs/plan/local-small-models.md#us-176-an-admitted-model-endpoint-for-the-browser-box)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): `ModelAdmission` (`application/model_admission.py`) is the only writer of the invocation ledger, and every admitted call streams through the shared transport. Not product intent.
+- [Integration points](CODEBASE.md#integration-points): the browser container's way out is `egress_proxy.py`, which allows only `CONNECT` to named hosts. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A request from the box is one admitted call
+  Given the endpoint serving a browse's isolated executor network for a run whose researcher route is frozen, and a fake OpenRouter transport
+  When a client on that network sends a chat completion to the endpoint
+  Then it is admitted as one call of the run, with a reservation, an invocation ticket and a receipt, counted in model_calls, answered by that route only whatever model the request names, and the client is given no key
+
+Scenario: A request past the run's limits is refused
+  Given the run's budget, model calls or time is exhausted, or the run is cancelled
+  When a client on the browse's executor network sends another request to the endpoint
+  Then the endpoint refuses it with a typed reason, and nothing reaches the transport
+
+Scenario: Only the box can reach the endpoint
+  Given the endpoint is serving a browse
+  When a request reaches it from anywhere but that browse's executor network
+  Then it is refused
+```
+
+Dependencies:
+- US-14.13
+- US-14.14
+
+Tasks:
+- [ ] Serve an OpenAI-compatible chat completions endpoint from the worker for each browse, answering a streamed request as a stream. Only that browse's executor network can reach it, and serving it opens neither the Docker host nor any other private address to the box (BX-02, BX-03). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model.
+- [ ] Send each request through model admission on the run's frozen `researcher` route, as a browsing-loop step is sent (Decision 0020 L3). That means a reservation, an invocation ticket and receipt, the run's budget and `model_calls`, the shared transport with MP-02's request contract, and settled spend. Uncertain outcomes are left for reconciliation (BM-01). The endpoint has no model client of its own. Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
+- [ ] Refuse a request with a typed reason before anything is sent when it is past the run's budget, model calls or time, comes from a cancelled run, or carries content the route isn't qualified for, such as an image (MP-02, SP-008, Y16). Checked by pytest under `services/agent/tests` with a fake OpenRouter transport.
+- [ ] Keep the OpenRouter key on the worker's side. The endpoint answers the box without a key, and nothing it logs or records holds one. Checked by pytest under `services/agent/tests` with a planted fake key.
+- [ ] Amend PRD-Tool-Catalog BM-01 to BM-04 for the endpoint. Update the operations runbook's browser executor section and `CODEBASE.md`. Checked by reading them against Decision 0035 Y7.
+
+Open Questions:
+- None.
+
+### US-17.3: browse_goal on browser-use in the isolated executor
+
+Status: BLOCKED
+
+As a workspace owner
+I want browse_goal to run browser-use inside the isolated executor while YOLO is on
+So that pages Autobots' text loop can't reach are usable, within the allowed domains, with nothing of this Mac in reach.
+
+Source:
+- [Decision 0035, Y5, Y6, Y8, Y9, Y15, Y16 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, requirements revised for "Isolated browser executor"](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#requirements-revised)
+- [Decision 0035, reversal](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#reversal)
+- [Decision 0018, B1 to B3](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
+- [Decision 0020, L1 as amended, with L2 to L6 standing for the loop](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
+- [Isolated browser executor, BX-01 to BX-05](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Autonomous browsing, AB-02 and AB-03](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Filesystem and execution boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [Local small models plan, draft US-17.7, ingested here](docs/plan/local-small-models.md#us-177-browse_goal-on-browser-use-in-the-isolated-executor)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `adapters/browser_executor.py` runs one hardened Chromium container per call behind `egress_proxy.py`, which allows only `CONNECT` to named hosts, and `browser_page.py` reads pages over CDP from the worker. Not product intent.
+- [Runtime and Tooling](CODEBASE.md#runtime-and-tooling): `infra/browser/browser.Dockerfile` uses the Playwright image by digest, and the Python service is locked by its `uv.lock`. `contracts/browsing.py` caps `max_steps` at 20 and `max_seconds` at 300 in the schema (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: YOLO chooses the engine
+  Given an Expert granted browse_goal with its browse domains, and a run admitted with YOLO on
+  When the run makes a browse_goal call, and makes another after the owner turns YOLO off
+  Then the first runs on browser-use in the isolated executor without approval, and the second waits for approval and runs on Autobots' read-only loop
+
+Scenario: The contract is unchanged
+  Given an Expert granted browse_goal, YOLO on and a scripted model
+  When it browses on browser-use from the qualification host https://example.com/ until the model reports done
+  Then the call takes the same inputs and starts without approval, every model call browser-use makes is one admitted call of the run through the endpoint, and it returns a summary labelled third-party, visited URLs without query or fragment, steps, model_calls and one of the same stop reasons
+
+Scenario: The domains and the box hold
+  Given browser-use is driving the box's Chromium on an allowed domain
+  When a page or the model goes to a host outside the allowed domains, or starts a download
+  Then the egress proxy or Chromium's policy refuses it, a request the page makes on its own is counted and the browse continues, and a navigation or download the model chose ends the call with refused_action
+
+Scenario: Nothing reaches Browser Use's cloud
+  Given a browse on browser-use on the run's frozen researcher route, driven by a scripted model through the endpoint
+  When it runs to the end
+  Then the proxy log shows no request to Browser Use's gateway, cloud browser, telemetry or sync hosts
+
+Scenario: Longer limits for browser-use only
+  Given a run admitted with YOLO on
+  When one browse_goal call on browser-use names no limits, another names 40 steps and 600 seconds, and after YOLO is turned off a call runs on Autobots' loop
+  Then the first runs with at most 25 steps and 300 seconds, the second with at most 40 steps and 600 seconds and a box cap of 600 seconds for its session only, and the loop's call runs at most 20 steps and 300 seconds
+
+Scenario: A refused model request ends the browse
+  Given a browse on browser-use whose run's budget, model calls or time runs out, or whose run is cancelled
+  When browser-use sends its next request to the endpoint
+  Then the endpoint refuses it with a typed reason, browser-use stops, and browse_goal reports its stop reason
+
+Scenario: Qualified again for browser-use
+  Given the executor's qualification check on a disposable stack with a scripted model, for the browser-use image built from the digest-pinned Playwright image with browser-use 1.0.6 from its own lock
+  When any refusal it lists is not observed or the container holds a key, cookie, host folder or credential, and then when every refusal is observed and the container holds none
+  Then the executor reports browser-use not qualified in the first case, with no call run on browser-use, and qualified only in the second
+```
+
+Dependencies:
+- US-17.1
+- US-17.2
+
+Tasks:
+- [ ] Add `services/browser-use/` with its own `pyproject.toml` and `uv.lock`, pinning browser-use 1.0.6 apart from the worker's lock. Record its resolved dependency tree in the change, and ignore its local environment. Checked by a harness test under `tests/harness` that reads the lock's pin.
+- [ ] Build the browser-use image from the digest-pinned Playwright image (B1) with that environment, and add it to the images' source fingerprint. Start one container per call, with BX-01's caps and hardening, nothing of the worker's environment, and Chromium's policy turning downloads off. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model.
+- [ ] Run browser-use inside the container with a local headless Chromium, a fresh profile, the call's `allowed_domains`, vision and its judge off (Y16), and the US-17.2 endpoint as its only model. It never uses Browser Use Cloud, its gateway or `sensitive_data`. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack.
+- [ ] Choose the engine per call: browser-use while the call is YOLO and its image reports qualified, Autobots' loop otherwise, capped to the loop's limits (Y15). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model.
+- [ ] Map browser-use's outcome onto `browse_goal`'s stop reasons. End the call on a refused action the model chose, and count a page's own refused request (Decision 0018). Apply Y9's limits, with the box's 600-second cap for browser-use sessions only. Checked by pytest under `services/agent/tests` with a scripted model.
+- [ ] Make sure no request reaches Browser Use's gateway, cloud browser, telemetry or sync hosts. Turn off the pinned version's telemetry and update check. The egress proxy keeps its host rules and filters no methods (Y6). Checked by pytest under `services/agent/tests` and by the proxy log that `scripts/qualify_browser_executor.py` records.
+- [ ] Extend the executor's qualification with the browser-use image, BX-05's refusals and the container's inspection, and report browser-use qualified only after every one is observed. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model, reaching only the qualification host (Y18).
+- [ ] Amend PRD-Tool-Catalog BX-01 for the 600-second browser-use cap. Update `README-DEV.md`, the operations runbook's browser executor section (building and qualifying the image) and `CODEBASE.md`. Checked by reading them against Decision 0035 Y5 to Y9.
+
+Open Questions:
+- None.
+
+### US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots
+
+Status: BLOCKED
+
+As a workspace owner
+I want browser-use to press, type and submit on the allowed domains when YOLO is on, and to show me afterwards what it did
+So that a browse can use a search form, stops at the edge of the domains its Expert allows, and leaves a record a person can check.
+
+Source:
+- [Decision 0035, Y5, Y10, Y11, Y12, Y16 and Y19](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, requirements revised for "Autonomous browsing"](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#requirements-revised)
+- [Decision 0035, what this gives up](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#what-this-gives-up)
+- [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
+- [Autonomous browsing, AB-03](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Isolated browser executor, BX-01](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Tool-use record, TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool-use views, TV-01](docs/PRD/PRD-Tool-Catalog.md#tool-use-views)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [Browser typing plan, what YOLO opens and what stays](docs/plan/browser-typing-and-flights.md#2-what-yolo-opens-and-what-stays)
+- [Browser typing plan, draft US-17.9, ingested here](docs/plan/browser-typing-and-flights.md#us-179-browse_goal-types-and-submits-on-browser-use)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): every gateway dispatch writes a `tool_uses` row, served by `GET /v1/runs/{id}/tool-uses`. `browse_goal`'s `stopped` values are `done`, `max_steps`, `max_seconds`, `refused_action`, `invalid_action` and `cancelled` (`contracts/browsing.py`, checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Types and submits within the allowed domains
+  Given YOLO on, and a browse_goal call on browser-use within its Expert's domains
+  When its task needs a form typed into and submitted
+  Then it types, clicks and submits on those domains, and the run records each submit's domain and path, without the typed values or the query
+
+Scenario: Leaving the domains ends the call
+  Given the same call
+  When a click or a submit leads to a host outside the allowed domains
+  Then the egress proxy refuses it and the call stops with refused_action
+
+Scenario: Nothing to sign in or pay with
+  Given any browse on browser-use
+  When it runs
+  Then the box holds no key, password, cookie or card, Chromium refuses downloads, and a file chooser offers no host file
+
+Scenario: A bot check stops the call
+  Given a site answers with a bot check or a CAPTCHA
+  When browser-use meets it
+  Then nothing tries to solve it, hide from it or retry around it, and the call stops with bot_check
+
+Scenario: What it saw is kept
+  Given a browse on browser-use under YOLO
+  When it finishes, however it stops
+  Then each of its steps has one screenshot kept in the run's private storage, and the run's tool row shows them with each submit's domain and path
+
+Scenario: A typed result
+  Given the call names an output schema
+  When browser-use finishes
+  Then the output carries a result valid against that schema whose declared link fields keep their query while visited URLs stay bare, or the call stops with invalid_action
+```
+
+Dependencies:
+- US-17.3
+
+Tasks:
+- [ ] Let browser-use type, pick from menus, click, press Enter and submit by GET or POST within the call's domains while the call is YOLO. Record each submit's domain and path among the tool use's public fields, never the typed value or the query. Checked by pytest under `services/agent/tests` with a scripted model, and by `scripts/qualify_browse_goal.py` on a disposable stack.
+- [ ] Add `bot_check` to `stopped`, recognised in the box from the page itself (Y16), ending the call. No stealth setting, no changed user agent, no retry, and no Browser Use Cloud or solver. Checked by pytest under `services/agent/tests` with a scripted model.
+- [ ] Add an optional output schema to `browse_goal`'s input: a JSON Schema object of at most 8 KB whose top-level `x-link-fields` names its link fields (Y19). Validate the result against it, keep the query only in those fields, and stop with `invalid_action` when the result doesn't validate. Follow the catalog's versioning and pinned schema digests (SP-013). Checked by pytest under `services/agent/tests`.
+- [ ] Keep one screenshot per browser-use step in the run's private storage, readable only by the workspace's members through the authorized download path. Show the screenshots, with each submit's domain and path, in the run's tool row. Checked by the db profile's disposable fixtures and the run workspace browser suite under `apps/web/tests/browser`, with axe.
+- [ ] Show that the box holds no key, password, cookie or card, that Chromium refuses downloads, and that a file chooser sees only the box's empty `tmpfs`. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model.
+- [ ] Update the Pydantic contracts and `browse_goal`'s guide, and regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile and pytest under `services/agent/tests`.
+- [ ] Amend PRD-Tool-Catalog's "Autonomous browsing" for `bot_check` and the output schema, and BX-03 for submits under YOLO. Update `README.md`, `README-DEV.md` and `CODEBASE.md` to say browsing presses, types and submits under YOLO, and that a bot check stops it. Checked by reading them against Decision 0035 Y5, Y10 to Y12 and Y19.
+
+Open Questions:
+- None.
+
+### US-17.5: The Transcript reader Expert and workflow
+
+Status: BLOCKED
+
+As a workspace owner
+I want an Expert and a workflow that turn a YouTube video into its transcript as Markdown
+So that I get a video's words as a clean, timestamped file I can read, search and reuse.
+
+Source:
+- [Decision 0035, Y3, Y10, Y13, Y14, Y17 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, what this gives up, on YouTube's terms and another creator's work](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#what-this-gives-up)
+- [Decision 0034, S1, a seed that carries instructions and keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Workflows](docs/PRD/PRD-Studio.md#workflows)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+- [Browser typing plan, a video's transcript](docs/plan/browser-typing-and-flights.md#72-a-second-example-a-videos-transcript)
+- [Browser typing plan, draft US-17.13, ingested here](docs/plan/browser-typing-and-flights.md#us-1713-the-transcript-reader-expert-and-workflow)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): the concept seed keeps anything already named, strips unavailable tools and says so in the Expert's purpose, saves workflows that need them as drafts, and since Decision 0034 seeds Experts with instructions. Workflow inputs are typed `string`, `number`, `boolean`, `json` or `list`, with no address check (`domain/workflows.py`, checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A watch address in, transcript.md out
+  Given YOLO on, the Transcript reader with youtube.com, ytimg.com, ggpht.com and gstatic.com as its domains, the Transcript workflow, a disposable stack, a scripted model, and a scripted browse that returns a video's title and its transcript lines with their timestamps
+  When the workflow is executed with that video's https watch address
+  Then transcript.md is published with the video's title, its source address and every transcript line with its timestamp, and its line count equals the transcript's
+
+Scenario: The video host isn't allowed
+  Given the same execution
+  When its browse_goal call is made
+  Then the call starts without approval, and its allowed domains are within the Transcript reader's, none of them googlevideo.com
+
+Scenario: Seeded with no domains
+  Given a workspace where browse_goal is available
+  When the concept seed runs, the owner opens the Transcript reader, and a run of it makes its browse_goal call
+  Then its browse domain list is empty, and the call is refused before any container starts, naming the missing list
+
+Scenario: Seeded once, and as a draft without browsing
+  Given a workspace where browse_goal isn't available, and another where it is
+  When the concept seed runs twice in each
+  Then in the first the Transcript reader is saved without browse_goal and says so in its purpose, and the Transcript workflow is a draft, in the second the workflow is published, and the second seed run adds or changes nothing in either
+
+Scenario: Only a YouTube watch address is accepted
+  Given the Transcript workflow
+  When its video input is not an https YouTube watch or youtu.be address
+  Then the execution is refused before it starts, naming the input
+
+Scenario: No transcript offered
+  Given a video whose description has no transcript section
+  When the Transcript reader browses it
+  Then the run ends saying no transcript is offered, and publishes no file
+
+Scenario: A bot check stops it
+  Given YouTube answers with a bot check
+  When the Transcript reader meets it
+  Then the browse stops with bot_check, nothing tries to pass it, and no file is published
+```
+
+Dependencies:
+- US-17.4
+
+Tasks:
+- [ ] Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`).
+- [ ] Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures.
+- [ ] Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [ ] Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures.
+- [ ] Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`.
+- [ ] Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17.
 
 Open Questions:
 - None.

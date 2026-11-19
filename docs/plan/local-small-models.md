@@ -359,7 +359,7 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 
 | Phase | Work | Exit |
 |---|---|---|
-| **P0. Decide and measure** (no app code) | Decision 0035. Download the chosen candidates with pinned revisions. Serve each and measure Q1's throughput and memory by hand. The owner lowers Docker's memory limit | A table of measurements and a shortlist of at most three models |
+| **P0. Decide and measure** (no app code) | The owner's decision record. Download the chosen candidates with pinned revisions. Serve each and measure Q1's throughput and memory by hand. The owner lowers Docker's memory limit | A table of measurements and a shortlist of at most three models |
 | **P1. Backlog** | Ingest [section 13](#13-draft-stories-in-specs-style) with `autobots-spec-ingest` from the decision | Stories READY in `SPECS.md` |
 | **P2. Local route** | US-17.1, US-17.2 and US-17.3 | A local profile qualified, and the Model source setting switching between OpenRouter and Local |
 | **P3. Fit the run** | US-17.4: the frozen replay and the local Expert or workflow versions | Q2 passes for one model |
@@ -384,7 +384,7 @@ Screenshot web agents with their own action format, such as Ai2's MolmoWeb 4B an
 
 ## 13. Draft stories in SPECS style
 
-For ingestion after Decision 0035. The identifiers are proposals, and ingestion assigns the real ones.
+For ingestion after the owner's decision record on section 12. The identifiers are proposals, and ingestion assigns the real ones.
 
 ### US-17.1: A local model route
 
@@ -412,7 +412,7 @@ Scenario: A stopped runtime blocks inference only
 ```
 
 Dependencies:
-- Decision 0035
+- The owner's decision record on section 12
 
 ### US-17.2: Local route qualification and offering
 
@@ -537,7 +537,7 @@ Scenario: Only the box can reach the endpoint
 ```
 
 Dependencies:
-- US-17.1
+- US-17.1, for a local route only. An OpenRouter route needs none ([the browser typing plan](browser-typing-and-flights.md#10-decisions-the-owner-makes), T11)
 - Decision 0018 and Decision 0020 as amended by D8 and D9
 
 ### US-17.7: browse_goal on browser-use in the isolated executor
