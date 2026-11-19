@@ -70,7 +70,7 @@ def guarded_connect(event: str, args: tuple) -> None:
 sys.addaudithook(guarded_connect)
 
 from autobots.adapters.models.factory import default_sdk_client  # noqa: E402
-from autobots.application.compaction import SUMMARY_MARKER  # noqa: E402
+from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy  # noqa: E402
 from autobots.domain.models import PROFILES, ModelProfileId  # noqa: E402
 from autobots.operations.fake_stream import completion_to_sse  # noqa: E402
 from autobots.operations.reasoning_trial import continuation_result  # noqa: E402
@@ -88,8 +88,8 @@ STEPS = (('propose_plan', {'tasks': [TASK]}),
          ('save_artifact', {'path': 'outputs/report.md', 'content': CONTENT}),
          ('publish_artifact', {'path': 'outputs/report.md', 'version': 1}),
          ('complete_task', {'task_id': 'report', 'evidence': EVIDENCE, 'summary': 'Wrote and published the report.'}))
-# Long enough in tool arguments to pass the compaction budget, which counts them.
-LONG = 'x' * 6_000
+# Long enough in tool arguments that six of them pass the compaction budget, which counts them.
+LONG = 'x' * (CompactionPolicy().context_chars // 5)
 COMPACT_STEPS = (STEPS[0], *(('save_artifact', {'path': f'outputs/part-{n}.md', 'content': LONG}) for n in range(6)), STEPS[1], STEPS[2], STEPS[3])
 SUMMARY = 'ARRANGED-SUMMARY: six parts were saved.'
 PART = {'id': 'k', 'title': 'Part', 'criteria': ['c1'], 'expected_evidence': 'a file'}

@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.7 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.8 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 
@@ -142,6 +142,7 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-16.5: Real examples on the install](#us-165-real-examples-on-the-install)
   - [US-16.6: Deep research runs like Deep-Research-Content-Writer](#us-166-deep-research-runs-like-deep-research-content-writer)
   - [US-16.7: Live deep research on the install, documented](#us-167-live-deep-research-on-the-install-documented)
+  - [US-16.8: A 64K working context for deep research](#us-168-a-64k-working-context-for-deep-research)
 
 ## Work Item Status
 
@@ -673,6 +674,10 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-16.7#1 | Have the owner rebuild and restart the install with inference on, and run the concept seed. | TODO | US-16.7 |
 | US-16.7#2 | Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs. | TODO | US-16.7 |
 | US-16.7#3 | Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`. | TODO | US-16.7 |
+| US-16.8 | A 64K working context for deep research | DONE | EPIC-16 |
+| US-16.8#1 | Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them. | DONE | US-16.8 |
+| US-16.8#2 | Cover the scenarios with unit tests of compaction and the reservation. | DONE | US-16.8 |
+| US-16.8#3 | Update `CODEBASE.md` and the runbooks that state the context. | DONE | US-16.8 |
 
 ## Dependency Diagram
 
@@ -829,6 +834,7 @@ flowchart TD
     US_16_5["US-16.5: Real examples on the install"]
     US_16_6["US-16.6: Deep research runs like Deep-Research-Content-Writer"]
     US_16_7["US-16.7: Live deep research on the install, documented"]
+    US_16_8["US-16.8: A 64K working context for deep research"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1168,6 +1174,8 @@ flowchart TD
   US_16_5 -.-> US_16_6
   US_14_23 -.-> US_16_6
   US_16_6 -.-> US_16_7
+  US_16_8 -.-> US_16_7
+  US_16_6 -.-> US_16_8
 ```
 
 ```mermaid
@@ -2163,6 +2171,13 @@ flowchart TD
     US_16_7 --> T_16_7_2
     T_16_7_3["US-16.7#3: Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`."]
     US_16_7 --> T_16_7_3
+    US_16_8["US-16.8: A 64K working context for deep research"]
+    T_16_8_1["US-16.8#1: Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them."]
+    US_16_8 --> T_16_8_1
+    T_16_8_2["US-16.8#2: Cover the scenarios with unit tests of compaction and the reservation."]
+    US_16_8 --> T_16_8_2
+    T_16_8_3["US-16.8#3: Update `CODEBASE.md` and the runbooks that state the context."]
+    US_16_8 --> T_16_8_3
   end
 ```
 
@@ -8381,7 +8396,7 @@ Open Questions:
 
 # EPIC-16: A current install with real examples
 
-Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)). [Decision 0034](docs/engineering/decisions/0034-deep-research-like-content-writer.md) adds US-16.6 and US-16.7, deep research runs like Deep-Research-Content-Writer: raised run limits, an Expert and a workflow, then two live runs on the install that a README documents.
+Scheduled by [Decision 0023](docs/engineering/decisions/0023-install-current-and-real-examples.md#decision), from the owner's four requests of 2026-11-08 and the two risks the refreshed `CODEBASE.md` recorded. Three stories change the product: control borders, schema readiness and workspace choice. Two act on the persistent install, which needs its own backup first and only the guarded apply. Spend is capped per story, and no story establishes H1 or product acceptance ([what Decision 0023 doesn't establish](docs/engineering/decisions/0023-install-current-and-real-examples.md#what-this-doesnt-establish)). [Decision 0034](docs/engineering/decisions/0034-deep-research-like-content-writer.md) adds US-16.6 to US-16.8, deep research runs like Deep-Research-Content-Writer: raised run limits, an Expert and a workflow, a 64K working context after the first live run looped, then two live runs on the install that a README documents.
 
 ### US-16.1: Sober control borders
 
@@ -8749,11 +8764,59 @@ Scenario: The README documents the runs
 
 Dependencies:
 - US-16.6
+- US-16.8
 
 Tasks:
 - [ ] Have the owner rebuild and restart the install with inference on, and run the concept seed.
 - [ ] Start the Expert run and the workflow execution from the Studio, each with a US$5.00 budget, and record their outcomes, artifacts and costs.
 - [ ] Write `README-Deep-Research-Content-Writer.md` from the runs, and link it from `README.md` and `README-DEV.md`.
+
+Open Questions:
+- None.
+
+### US-16.8: A 64K working context for deep research
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-18-us-16-8-64k-working-context-deep/`
+
+As a workspace owner
+I want a run to keep its search results and the pages it reads in view
+So that a deep research run reads its sources instead of re-reading them until it runs out of calls.
+
+Source:
+- [Decision 0034, L6 to L8](docs/engineering/decisions/0034-deep-research-like-content-writer.md#a-64k-working-context-us-168)
+- [MP-07 initial limits](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): `application/compaction.py` offloads tool output over `LARGE_TOOL_CHARS` and keeps `READ_PAGES_IN_VIEW` read-back pages, `CompactionPolicy.context_chars` is the target, and `domain/models.py` sets `CONTEXT_TOKENS` and `RESERVED_PROMPT_TOKENS`. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Every run works in a 64K-token context
+  Given the worker's defaults
+  When a run's view is compacted and a model call is reserved
+  Then the view is compacted toward 192,000 characters, tool output of up to 48,000 characters stays in view, the latest 16 read-back pages stay in view, and the call reserves 64,000 prompt tokens with its 4,096-token reply
+
+Scenario: Search results stay in view
+  Given a run whose google_search returned 28 results of about 14,000 characters, as the first live run's did
+  When its next model call is prepared
+  Then the results are in the model's view whole, not offloaded
+
+Scenario: An offloaded output can be read back whole
+  Given a tool output of 60,000 characters, offloaded
+  When the model reads it back in 15 pages of 4,000 characters
+  Then all 15 pages are in its view on the next call
+```
+
+Dependencies:
+- US-16.6
+
+Tasks:
+- [x] Raise `CONTEXT_TOKENS`, `RESERVED_PROMPT_TOKENS`, the compaction target, `LARGE_TOOL_CHARS` and `READ_PAGES_IN_VIEW` to Decision 0034 L6 to L8, and update the tests that pin them.
+- [x] Cover the scenarios with unit tests of compaction and the reservation.
+- [x] Update `CODEBASE.md` and the runbooks that state the context.
 
 Open Questions:
 - None.

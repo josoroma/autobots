@@ -19,7 +19,7 @@ from typing import Any
 import psycopg
 from autobots.adapters import tool_registry
 from autobots.adapters.object_storage import SupabaseObjectStore
-from autobots.application.compaction import SUMMARY_MARKER
+from autobots.application.compaction import SUMMARY_MARKER, CompactionPolicy
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.domain.models import ModelRoute
 from autobots.operations.job_dispatch import process_next
@@ -49,7 +49,8 @@ def replies(messages: Any, name: str) -> list[dict[str, Any]]:
     return [json.loads(message.content) for message in messages if message.type == 'tool' and message.name == name]
 
 
-LONG = 'x' * 6_000
+# Long enough in tool arguments that six of them pass the compaction budget, which counts them.
+LONG = 'x' * (CompactionPolicy().context_chars // 5)
 COMPACT_TASKS = [{'id': 'report', 'title': 'Write the long report', 'criteria': ['c1'], 'expected_evidence': 'the published report'}]
 COMPACT_STEPS = (('propose_plan', {'tasks': COMPACT_TASKS}),
                  *(('save_artifact', {'path': f'outputs/part-{n}.md', 'content': LONG}) for n in range(6)),

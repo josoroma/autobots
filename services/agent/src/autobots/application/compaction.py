@@ -16,19 +16,23 @@ from autobots.application.sql import SqlConnection, one, optional_row
 from autobots.contracts.plans import GoalSpec
 from autobots.persistence.rows import RunSummaryRow
 
-LARGE_TOOL_CHARS = 4_000
+# Decision 0034 L7: output up to this stays in view, and longer output is offloaded.
+LARGE_TOOL_CHARS = 48_000
 PREVIEW_CHARS = 300
 READ_BACK_TOOL = "read_offload"
-READ_PAGES_IN_VIEW = 2
+# Decision 0034 L7: 16 pages of 4,000 characters, so anything offloaded can be read back whole.
+READ_PAGES_IN_VIEW = 16
 KEEP_RECENT = 6
 SUMMARY_MARKER = "Summarize the earlier work below"
 
 
 @dataclass(frozen=True)
 class CompactionPolicy:
-    """A rough character budget, since no tokenizer is pinned. 8K tokens is about 32K characters."""
+    """A rough character budget, since no tokenizer is pinned. 64K tokens at 3 characters a token,
+    as 8K was 24,000 (Decision 0034 L6). It stays below Terra's 272,000-token long-prompt rate even
+    counted a token a byte."""
 
-    context_chars: int = 24_000
+    context_chars: int = 192_000
     large_tool_chars: int = LARGE_TOOL_CHARS
     keep_recent: int = KEEP_RECENT
 

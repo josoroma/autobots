@@ -15,7 +15,7 @@ This amends:
 - [PRD-Tool-Catalog](../../PRD/PRD-Tool-Catalog.md#tool-use-record) TU-06;
 - [PRD-Studio](../../PRD/PRD-Studio.md#seed) SD-01 and SD-02.
 
-It schedules US-16.6 and US-16.7. The owner can change any choice.
+It schedules US-16.6, US-16.7 and US-16.8. The owner can change any choice.
 
 ## What the reference does, and why today's limits can't
 
@@ -35,6 +35,16 @@ Autobots couldn't do this with its limits as they were:
 | **L3. Metered calls** | A root run tree may make at most **40** metered tool calls, from 20. TU-06's refusal, `tool_budget_exceeded`, is unchanged |
 | **L4. Call time** | One model call may take up to **300** seconds, from 120, so a 4,096-token reply can finish streaming. A cancel still interrupts it at once |
 | **L5. Spending** | Every call still reserves its worst case before it's sent, and the larger reply makes that reservation larger. The run's budget (US$0.25 to US$5.00) and the daily cap still bound what a run spends. The new limits apply to every pass a worker drives after it restarts with this code |
+
+## A 64K working context (US-16.8)
+
+The first live run of the Deep research writer (US-16.7) failed at its 64-model-call limit after US$0.51, with nothing written. Its one Google search returned 28 results, which were offloaded because they were longer than 4,000 characters. Reading them back took three pages, but only two read-back pages stayed in the model's view, so it re-read pages 0, 4,000 and 8,000 in turn until it ran out of calls. The owner chose a 64K working context ("use 64k").
+
+| # | Choice |
+|---|---|
+| **L6. Context** | **64K** tokens, from 8K. Compaction works toward 192,000 characters, keeping the earlier 3 characters a token |
+| **L7. Tool output in view** | Output up to **48,000** characters stays in the model's view, from 4,000. Longer output is offloaded as before and read back 4,000 characters a page, and the latest **16** pages stay in view, from 2, so anything offloaded can be read whole |
+| **L8. Reservation** | Each call reserves **64,000** prompt tokens, from 32,000, so a full view is covered, and a larger request still reserves for its bytes. A view of 192,000 characters stays below Terra's 272,000-token long-prompt rate |
 
 ## Reading a published artifact (US-16.6)
 

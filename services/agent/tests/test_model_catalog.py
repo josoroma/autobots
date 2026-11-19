@@ -50,8 +50,9 @@ def test_the_real_catalog_prices_both_profiles_within_a_runs_default_cap() -> No
         wire: worst_case_cost(price, RESERVED_PROMPT_TOKENS, MAX_OUTPUT_TOKENS)
         for wire, price in prices.items()
     }
-    # A 4,096-token reply (Decision 0034 L1): Terra reserves US$0.06048 a call, well within US$1.
-    assert worst == {DEEPSEEK_WIRE_ID: 14_516, TERRA_WIRE_ID: 60_480}
+    # A 64,000-token prompt and a 4,096-token reply (Decision 0034 L1, L8): Terra reserves
+    # US$0.10048 a call, well within US$1.
+    assert worst == {DEEPSEEK_WIRE_ID: 24_116, TERRA_WIRE_ID: 100_480}
 
 
 def test_an_override_this_app_can_reach_still_counts() -> None:

@@ -601,10 +601,11 @@ def test_a_rate_the_trials_prompt_could_reach_unpriced_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     payload = catalog()
+    # Above what each call reserves for (Decision 0034 L8), and within the trial's prompt.
     payload["data"][0]["pricing"]["overrides"] = [
-        {"min_prompt_tokens": 40_000, "prompt": "0.01", "completion": "0.01"}
+        {"min_prompt_tokens": 80_000, "prompt": "0.01", "completion": "0.01"}
     ]
-    monkeypatch.setattr(paid_pricing, "CONTEXT_TOKENS", 64_000)
+    monkeypatch.setattr(paid_pricing, "CONTEXT_TOKENS", 100_000)
     ledger = Ledger(tmp_path / "ledger.json", 500_000)
     with pytest.raises(Refused, match="no usable price"):
         rq.preflight("openrouter_deepseek_flash", payload, ledger)

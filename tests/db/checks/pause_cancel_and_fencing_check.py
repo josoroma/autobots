@@ -27,7 +27,7 @@ from autobots.application.approvals import (
     exceeds_review_limit,
     list_approvals,
 )
-from autobots.application.compaction import CompactionPolicy, offload_large
+from autobots.application.compaction import READ_PAGES_IN_VIEW, CompactionPolicy, offload_large
 from autobots.application.experts import create_expert
 from autobots.application.memory_tools import READ_OFFLOAD
 from autobots.application.plans import load_goal
@@ -365,7 +365,8 @@ async def main() -> None:
         # Stored evidence reads back whole, in pages, through the tool a model calls (US-8.1).
         run = await admit()
         lease = await claim_next(db, worker_id='b9')
-        long_text = ''.join(f'line {index}\n' for index in range(3_000))
+        # Longer than the offload threshold, 48,000 characters since Decision 0034 L7.
+        long_text = ''.join(f'line {index}\n' for index in range(8_000))
         policy = CompactionPolicy()
         message = ToolMessage(content=long_text, tool_call_id='call-b9', name='read_run_file')
         view = await offload_large(db, run, [message], policy)
@@ -389,11 +390,12 @@ async def main() -> None:
         import hashlib
         check('its hash matches what was stored', 'equal', hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'], hashlib.sha256(collected.encode()).hexdigest() == page.output['sha256'])
 
-        # A long read can't resend every page: only the latest two stay in view (US-8.1).
-        replies = [ToolMessage(content='p' * 5_000, tool_call_id=f'many-{index}', name='read_offload') for index in range(5)]
+        # A long read can't resend every page: only the latest READ_PAGES_IN_VIEW stay in view (US-8.1), 16 since
+        # Decision 0034 L7.
+        replies = [ToolMessage(content='p' * 5_000, tool_call_id=f'many-{index}', name='read_offload') for index in range(READ_PAGES_IN_VIEW + 3)]
         seen = await offload_large(db, run, replies, policy)
         whole = [item.content == 'p' * 5_000 for item in seen]
-        check('only the latest pages stay in view', 'the last two', whole, whole == [False, False, False, True, True])
+        check('only the latest pages stay in view', f'the last {READ_PAGES_IN_VIEW}', whole, whole == [False] * 3 + [True] * READ_PAGES_IN_VIEW)
 
         # The improvement tool is granted per Expert, so a run with no Expert lacks it (US-8.2).
         check('a run with no Expert has no proposal tool', 'absent', LOOP_TOOL_GRANTS.get('propose_improvement'), 'propose_improvement' not in LOOP_TOOL_GRANTS)

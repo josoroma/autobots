@@ -73,18 +73,19 @@ PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
 )
 DEFAULT_PROFILE = ModelProfileId.TERRA
 # MP-07's budgets. Output is sent on every call, and is 4,096 tokens so one save holds a 2,000 to
-# 3,000-word document (Decision 0034 L1). Context is the budget compaction works to.
+# 3,000-word document (Decision 0034 L1). Context is the budget compaction works to: 64K tokens, so
+# a run keeps its search results and the pages it reads in view (L6).
 MAX_OUTPUT_TOKENS = 4_096
-CONTEXT_TOKENS = 8_000
+CONTEXT_TOKENS = 64_000
 # How long one model call may stream before it's interrupted, long enough for a full reply
 # (Decision 0034 L4). A cancel still interrupts it at once.
 MODEL_CALL_SECONDS = 300.0
 # What one call reserves for its prompt, an estimate since no tokenizer is pinned. Compaction keeps
-# messages near 24K characters, and the system prompt and tool schemas add some. Mostly Latin text
-# stays under this, but text with more than a token per character can pass it, and nothing refuses
-# that. The reported cost settles each call either way. A route's worst case assumes it, and the
-# loop reserves past it for a larger request (application/loop_policy.py).
-RESERVED_PROMPT_TOKENS = 32_000
+# messages near 192K characters (Decision 0034 L8), and the system prompt and tool schemas add
+# some. Mostly Latin text stays under this, but text with more than a token per character can pass
+# it, and nothing refuses that. The reported cost settles each call either way. A route's worst
+# case assumes it, and the loop reserves past it for a larger request (application/loop_policy.py).
+RESERVED_PROMPT_TOKENS = 64_000
 ROLE_POLICY_VERSION = 1
 
 

@@ -21,10 +21,10 @@ from autobots.domain.stops import StopCode
 
 
 def test_a_model_call_asks_for_4096_output_tokens_and_may_take_300_seconds() -> None:
-    """L1 and L4. Context and the prompt reservation are unchanged."""
+    """L1 and L4. The context and the prompt reservation are L6 and L8 (test_working_context.py)."""
     assert MAX_OUTPUT_TOKENS == 4_096
     assert OPTIONS["max_tokens"] == MAX_OUTPUT_TOKENS
-    assert (CONTEXT_TOKENS, RESERVED_PROMPT_TOKENS) == (8_000, 32_000)
+    assert (CONTEXT_TOKENS, RESERVED_PROMPT_TOKENS) == (64_000, 64_000)
     assert MODEL_CALL_SECONDS == 300.0
     assert LoopSettings().model_call_seconds == MODEL_CALL_SECONDS
     default = inspect.signature(LoopMiddleware).parameters["model_call_seconds"].default
