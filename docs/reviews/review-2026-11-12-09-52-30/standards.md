@@ -1,6 +1,6 @@
 # Proposed standards
 
-Code quality review of 2026-11-12 09:52:30, revision 156534d. [Back to the review](README.md)
+Code quality review of 2026-11-12 09:52:30, revision d0d85d3. [Back to the review](README.md)
 
 [DH-06](../../PRD/PRD-Development-Harness.md#dh-06-coding-and-layer-standards) states the principles: explicit ownership, narrow interfaces, small cohesive modules, validated boundaries, centralized errors, no swallowed exceptions and no duplicated business rules. This document turns them into rules that a tool or a named check can hold, calibrated to the code as it is today. It cites the project's rules instead of restating them: [AGENTS.md](../../../AGENTS.md), [.claude/rules/](../../../.claude/rules/), [DH-03](../../PRD/PRD-Development-Harness.md#dh-03-required-repository-structure), [DH-05](../../PRD/PRD-Development-Harness.md#dh-05-hooks-and-portable-enforcement), [DH-09](../../PRD/PRD-Development-Harness.md#dh-09-verification-profiles-and-completion-rules) and [PRD-Design-System.md](../../PRD/PRD-Design-System.md). Refactoring work lives in [refactor-plan.md](refactor-plan.md), named here by topic.
 
@@ -941,7 +941,7 @@ max_line_length = 80
 
 ### Counts added for this document
 
-Read-only, at revision 156534d with the two untracked review folders. Scratch configuration files lived outside the repository; nothing in the repository was written except this file.
+Read-only, at revision d0d85d3 with the two untracked review folders. Scratch configuration files lived outside the repository; nothing in the repository was written except this file.
 
 ```sh
 # Python, from services/agent (stage 1 selection and starting thresholds)

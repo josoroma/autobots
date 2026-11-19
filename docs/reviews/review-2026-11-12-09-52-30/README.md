@@ -1,12 +1,12 @@
 # Code quality review, 2026-11-12 09:52:30
 
-A repository-wide review of code quality and maintainability at revision `156534d`: 545 tracked files in 19 areas, read again across 7 lenses, with 493 verified findings (70 high, 269 medium, 154 low), [51 proposed standards](standards.md) and a [68-item refactor plan](refactor-plan.md). The review changed no source and edits no backlog.
+A repository-wide review of code quality and maintainability at revision `d0d85d3`: 545 tracked files in 19 areas, read again across 7 lenses, with 493 verified findings (70 high, 269 medium, 154 low), [51 proposed standards](standards.md) and a [68-item refactor plan](refactor-plan.md). The review changed no source and edits no backlog.
 
 > **Evidence class.** This review is static. Its metrics come from installed tools, and its findings come from reading code. It is not runtime evidence, and it establishes no H1 and no product acceptance.
 
 ## Scope and method
 
-- **Revision.** `156534da0bd5b19417f05d313077d767804b175b` on `main`, "Add a narrated usage film for Autobots". HEAD had not moved when this README was written.
+- **Revision.** `d0d85d3863b996e7cfbdb564d6670a7f0c9c8685` on `main`, "Add a narrated usage film for Autobots". HEAD had not moved when this README was written. On 2026-11-19 the owner had `docs/video` purged from `main`'s history. That gave this commit and every later one a new hash, so this README and its findings cite the new one. The commit now adds nothing. Every file the review read is unchanged, since none was under `docs/video`.
 - **Working tree.** Two paths were untracked when this invocation started, `.claude/workflows/` and `docs/reviews/`, which hold the review's own workflow and output. The review read tracked files as they were on disk.
 - **Scope.** 545 tracked files and 88,682 lines in `apps/web`, `packages/api-client` and `packages/db-types` (without generated files), `services/agent`, `scripts`, `.claude/hooks`, `tests`, `supabase` and non-vendored `infra`, plus the `Makefile` and the root `package.json`. The generated files, the vendored `infra/supabase/upstream/`, `openspec/`, `docs/`, `research/`, the PRDs and `SPECS.md` were out of scope for style and size; the review judged only how generated code is consumed.
 - **Areas and lenses.** The workflow assigned every file to exactly one of 19 areas, and no file was left unclaimed. Seven lenses then read across all areas for patterns that span files: module boundaries, duplication, types, comments and naming, errors, tooling, and web architecture.

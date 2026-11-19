@@ -4,7 +4,7 @@
   "title": "SQL, infrastructure and Makefile",
   "kind": "area",
   "timestamp": "2026-11-12-09-52-30",
-  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "revision": "d0d85d3863b996e7cfbdb564d6670a7f0c9c8685",
   "summary": "The SQL and infrastructure layer is small, consistent and well explained. Its 53 migrations are short (the largest is 136 lines). None was edited after it was added, and the installer enforces names and checksums. All 24 public tables enable RLS, the private schemas are closed to browser roles, and all nine functions pin search_path. Fencing and approval immutability raise typed SQLSTATEs, the reference seed is version-guarded and proven repeatable, and the Compose overlay is digest-pinned, loopback-only and checked on its merged result. The Makefile states its safety rules. The weaknesses are privilege gaps the tests can't see and coordination costs that grow with every migration. The runtime role keeps an unused DELETE on runs, and deleting a run cascades into the receipt ledger that migration 23 says is never removed. Browser images are qualified by a hash of their sources, while the image that actually runs is whatever `:local` tag exists. Each profile change restates the approved profiles in three CHECK constraints, and the Storage policies sit in a frozen superuser file with no forward path. Route limits are prose concatenated across migrations, and that has already dropped a shared caveat for Sol. The generated db-types have no consumer and don't reflect grants. RLS and grant conventions are checked one case at a time rather than from the catalog. Few migrations that rewrite data state their locks or a recovery path, although database.md requires it.",
   "scores": [
     {

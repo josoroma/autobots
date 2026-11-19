@@ -7,7 +7,7 @@ Measurement step only. These are tool outputs, not findings or opinions.
 | Item | Value |
 |---|---|
 | Timestamp | 2026-11-12-09-52-30 |
-| Revision | 156534da0bd5b19417f05d313077d767804b175b |
+| Revision | d0d85d3863b996e7cfbdb564d6670a7f0c9c8685 |
 | Working tree | 2 porcelain entries, both untracked: `.claude/workflows/`, `docs/reviews/` |
 | ruff | 0.17.3 (services/agent/.venv) |
 | Python | 3.12.16 |

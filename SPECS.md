@@ -2,7 +2,7 @@
 
 CODEBASE Context: consumed [CODEBASE.md](CODEBASE.md) (2026-11-04; development-harness work only, product unimplemented). Current-state evidence does not create product requirements or passing test claims.
 
-CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.9 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `05bdb6f` and `2f3f8e4`; refreshing the whole analysis is separate work.
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-14.21 to US-14.24 and US-16.6 to US-16.9 on 2026-11-18. The sections their Codebase Context cites were checked against the adapters, Keys & vars and the concept seed at `bd6008a` and `528e6b3`; refreshing the whole analysis is separate work.
 
 ## Table of Contents
 

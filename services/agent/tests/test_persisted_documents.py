@@ -4,7 +4,7 @@ PRUN-08, XDUP-04).
 
 Each fixture under fixtures/stored/policy_snapshot, run_event and receipt is what a writer stores,
 captured from it through the fake database, or a shape the history shows an older release wrote,
-and says which. The captured ones came from the writers at d669265, before R-51, and the sha256 of
+and says which. The captured ones came from the writers at 09d6f59, before R-51, and the sha256 of
 each byte string those writers sent is pinned below. Postgres normalizes jsonb as it stores it, so
 tests/db/checks/run_admission_check.py reads back what a real column holds; these pin what each
 writer sends and how each shape reads.
@@ -743,7 +743,7 @@ def test_the_sql_that_reads_a_snapshot_names_keys_the_snapshot_stores() -> None:
 # Run events
 
 
-# The sha256 of the bytes each writer stored at d669265, before R-51.
+# The sha256 of the bytes each writer stored at 09d6f59, before R-51.
 EVENT_BYTES = {
     "approval_decided": "a10f8b68b2f8c6dd494827878119ef524f5c30999c3559270b411bf18d717a76",
     "approval_expired": "b89d9b9522b87c742d31af7b3f6cd79131512ccdc2875ad627dc380d8be65cec",
@@ -901,7 +901,7 @@ FINGERPRINTS = {
     "edit_routine": "0116c53bbb5d13914dc2661daf0104850d951e59e569bc5954df6b8923eec4d5",
     "replay_candidate": "ee1584af778400823bccb4d3d1720ef88d9049b902d83ab4f6c7e5cd470e52fa",
 }
-# The sha256 of the result bytes each operation stored at d669265, before R-51.
+# The sha256 of the result bytes each operation stored at 09d6f59, before R-51.
 RECEIPT_BYTES = {
     "add_expert_version": "0899eaeee76dcfdd3c97f3afd61ce31158e7b795a26f1568d83727897e6cee85",
     "admit_run": "26d98a7fb7651383ca4edd1cdb9be01f2a166165201c659e6af6b707c5e24e07",

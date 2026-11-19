@@ -609,7 +609,7 @@ const dropped = others.filter(([, p]) => !models.offered(p)).map(([role]) => rol
 
 No finding was rejected. All 20 were kept: 7 confirmed and 13 revised. XWEB-04 was lowered from high to medium; every other severity stands.
 
-Verification re-opened every cited location at revision 156534d, recounted each pattern with grep and small Python scans over apps/web, and read the installed Next.js 16.4.5 dedupe-fetch source for XWEB-14. It ran no check, started no service and changed no file outside this folder.
+Verification re-opened every cited location at revision d0d85d3, recounted each pattern with grep and small Python scans over apps/web, and read the installed Next.js 16.4.5 dedupe-fetch source for XWEB-14. It ran no check, started no service and changed no file outside this folder.
 
 ## Not covered
 

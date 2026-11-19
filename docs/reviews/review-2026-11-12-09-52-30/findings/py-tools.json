@@ -4,7 +4,7 @@
   "title": "Python: tools and approvals",
   "kind": "area",
   "timestamp": "2026-11-12-09-52-30",
-  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "revision": "d0d85d3863b996e7cfbdb564d6670a7f0c9c8685",
   "summary": "The tools-and-approvals area is the one place a tool runs, and its durable-effect design is strong. A receipt commits under the lease before any effect. A failure is classified as failed or unknown. Readback reconciles interrupted effects. An approval binds the operation identity built from run, instance, tool version and the normalized parsed arguments, and the reviewed hash and resolved target are checked again. The cost of change sits in two functions, `ToolGateway._dispatch` (complexity 19, 15 returns) and `approval_gate` (116 lines, 18 parameters), which took in each new guardrail inline. The approval rule is restated in the catalog, and the approval and receipt state machines are bare strings written from six modules, one of them an adapter. One defect was confirmed by measurement: `search_files` runs a model-supplied regex in a thread, but CPython's `re` holds the GIL, so a catastrophic pattern freezes the worker's event loop, its lease heartbeat and the gateway's own timeout. An approved `browse_goal` call leaves no receipt, so the same call can repeat without a person for up to 24 hours. Key precedence follows the documented order but is coded in four resolvers. Types stop at the database boundary (`Any` connections, rows read by position), and gateway codes are strings matched by hand. `code_tools.search` (61 lines) was read and is acceptable as a pure, tested function. Its only issue is that `truncated` means different things in count mode depending on the target.",
   "scores": [
     {

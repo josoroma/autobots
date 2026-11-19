@@ -4,7 +4,7 @@
   "title": "Scripts and hooks",
   "kind": "area",
   "timestamp": "2026-11-12-09-52-30",
-  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "revision": "d0d85d3863b996e7cfbdb564d6670a7f0c9c8685",
   "summary": "The scripts area (28 modules, 10,215 lines, plus the 243-line hook dispatcher) is careful about safety and honest about what it proves. Every entry point documents its exit codes and what passing does not establish. Target guards refuse before any Docker or database change and prove ownership before removal. The hook is a thin adapter that fails closed. Pure logic such as release scoring, refusal rules and request shapes is covered by about 235 harness tests. Maintainability is weak, though. No linter, formatter or type checker covers this code: under the service's own configuration none of the 29 files passes `ruff format --check`, and 2,092 lines exceed 100 characters. The code grows by copying. The child-check runner appears 29 times, the disposable-stack setup, teardown and report skeleton 13 times, and the paid-run helper and watchdog 3 to 4 times, and the copies have started to drift on exit-code checks and on spend reporting. Qualifier scripts double as libraries: qualify_identity and qualify_operations are imported by 7 and 6 other scripts. Meanwhile harness_lib's hand-written domain map ignores that import graph, so the Stop hook can accept stale db evidence. Six functions run 215 to 410 lines, and qualify_identity.qualify takes on an inline fixture for nearly every story (52 commits between 2026-11-05 and 2026-11-08). Records and reports are untyped dicts whose vocabulary drifts. Two unrelated `Unavailable` classes break the exit-code contract in three scripts.",
   "scores": [
     {

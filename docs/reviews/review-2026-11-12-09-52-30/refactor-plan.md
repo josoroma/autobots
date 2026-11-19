@@ -1,6 +1,6 @@
 # Refactor plan
 
-This plan turns the verified findings of the code-quality review at revision `156534d` (run 2026-11-12 09:52:30) into 68 bounded work items in four waves. All 19 areas and 7 lenses have findings files, so no part is missing from it: 493 kept findings, 70 high, 269 medium and 154 low. Every high finding is addressed by an item, and none is deferred ([High findings and where they are addressed](#high-findings-and-where-they-are-addressed)). Standards are named by topic and defined in [standards.md](standards.md); measurements come from [metrics.md](metrics.md).
+This plan turns the verified findings of the code-quality review at revision `d0d85d3` (run 2026-11-12 09:52:30) into 68 bounded work items in four waves. All 19 areas and 7 lenses have findings files, so no part is missing from it: 493 kept findings, 70 high, 269 medium and 154 low. Every high finding is addressed by an item, and none is deferred ([High findings and where they are addressed](#high-findings-and-where-they-are-addressed)). Standards are named by topic and defined in [standards.md](standards.md); measurements come from [metrics.md](metrics.md).
 
 The review is static: it read code and ran installed tools. Nothing in this plan is runtime, H1 or product acceptance evidence. Start with the wave 0 guardrails and the four small fixes that open wave 2 ([R-13](#r-13) to [R-16](#r-16)), which close a data-loss path, a paid-run stop, a secret display and a consent bypass for little effort.
 

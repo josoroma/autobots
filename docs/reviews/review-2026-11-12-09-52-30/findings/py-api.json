@@ -4,7 +4,7 @@
   "title": "Python: HTTP API",
   "kind": "area",
   "timestamp": "2026-11-12-09-52-30",
-  "revision": "156534da0bd5b19417f05d313077d767804b175b",
+  "revision": "d0d85d3863b996e7cfbdb564d6670a7f0c9c8685",
   "summary": "The HTTP layer has 21 files, 3,206 lines and 80 routes in 14 routers, and its skeleton is sound. create_app stays pure for offline OpenAPI generation: it opens nothing, test_app_factory proves this with sockets blocked, and contracts/export.py builds the schema from it. The pool lives in the lifespan. Authentication fails closed. One error envelope never echoes input. Every schema route has a stable operation_id and a response model, and an AST test bans background work in requests. Where an application service exists (workflows, routines, Experts), handlers are thin. The friction sits where no such service exists. run_routes.py and settings_routes.py hold 11 of the 13 SQL statements found in route modules, including the versioned model-policy writes and the model-call reconciliation transaction. post_run (101 lines, complexity 12) assembles the gate for paid work inline. Shared plumbing is copied or in the wrong place: 10 copies of _pool, and the auth dependencies that 73 routes use live in settings_routes, with four ways of resolving the workspace. Error translation is spread over 54 per-module mappings keyed on code strings. app.state and the database handles are untyped (Any). Handlers read os.environ on every request, and five handlers hold two of the pool's five connections at once. The published OpenAPI documents a 422 body the server never sends and no ErrorResponse at all. In-process tests are strong at the boundary but reach only 8 of the 80 operations.",
   "scores": [
     {

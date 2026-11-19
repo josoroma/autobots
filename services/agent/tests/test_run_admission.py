@@ -49,7 +49,7 @@ PLAN = {"propose_plan": 1, "complete_task": 1, "read_offload": 1}
 LOOP = {**PLAN, "calculate": 1}
 INHERITED_SNAPSHOT = {"version": 1, "bindings": {"coordinator": "openrouter_terra"}}
 
-# Captured from the admission code at 9785411, before R-30 changed it. Never edit these values.
+# Captured from the admission code at 79b5d68, before R-30 changed it. Never edit these values.
 FINGERPRINTS = {
     "api_goal": "02dcf43b990efa771bb5388e781285f8ddc257d00940fb4a092de9f8f3aed8b0",
     "api_goal_in_full": "55f01a25319233c2b77d5ca75803eaede62a25db6cc0b888fba8d4ed377bd876",
