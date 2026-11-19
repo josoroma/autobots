@@ -5,6 +5,7 @@
 .claude/settings.local.json
 .checks/
 research/upstream/
+docs/video/
 __pycache__/
 *.py[cod]
 .venv/
