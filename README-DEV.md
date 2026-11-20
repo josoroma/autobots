@@ -310,8 +310,9 @@ To build the images and qualify them:
 make browser-images && python3.12 scripts/qualify_browser_executor.py
 ```
 
-- **The check:** it runs 25 cases on a disposable database. Among them: only named hosts are reached; private addresses, files, downloads and request bodies are refused; the memory, process and time caps end a session; and a crashed worker's containers are swept.
+- **The check:** it runs 26 cases on a disposable database. Among them: only named hosts are reached; private addresses, files, downloads and request bodies are refused; the memory, process and time caps end a session; and a crashed worker's containers are swept.
 - **The report:** it goes to `.checks/browser-executor/qualification.json`.
+- **browser-use:** the same command then qualifies browser-use 1.0.6 ([Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y5 to Y9), which runs in its own container in the box, from `services/browser-use/` and its own `uv.lock`. Its 13 cases go to `.checks/browser-executor/browser-use.json`. A YOLO call runs on browser-use while it is qualified, and on Autobots' loop otherwise. `browse_goal` version 2 takes up to 40 steps and 600 seconds on browser-use, by default 25 and 300. The loop keeps 20 and 300, and its default 10 and 120.
 - **No restart:** the running API and worker read the report each time they decide whether browsing is available, and re-check the image labels at least every 30 seconds.
 - **Each call:** runs on the run's researcher model. With paid inference on, that costs money.
 - **Approval and YOLO:** Settings → Browsing holds the workspace's YOLO setting, on by default ([Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y1 to Y4). The setting lives in `app_private.browsing_settings`, where no row means on, and each run freezes it in `runs.browsing_yolo` at admission. A call counts as YOLO only while both the frozen value and the current one are on.
@@ -958,7 +959,7 @@ From the repository root:
 | `make build` | Rebuild the web app |
 | `make toolchain` | Reinstall packages from the locks |
 | `make migrate` | Apply pending migrations, after [the upgrade runbook](docs/engineering/runbooks/upgrade.md) |
-| `make browser-images` | Build the browser executor's two images |
+| `make browser-images` | Build the browser executor's two images and browser-use's |
 | `python3.12 scripts/verify.py --profile <profile>` | Run a check profile: `harness`, `fast`, `full`, `db` or `operations` |
 | `python3.12 scripts/generate_contracts.py write` | Regenerate the OpenAPI schema and TypeScript client |
 | `python3.12 scripts/specs.py render && python3.12 scripts/specs.py validate` | Regenerate the backlog's navigation and validate it |

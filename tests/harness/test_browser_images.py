@@ -27,7 +27,9 @@ import toolchain  # noqa: E402
 SCRIPT = ROOT / 'scripts/browser_images.py'
 ENTRYPOINT = ROOT / 'infra/browser/browser-entrypoint.js'
 TODAY = browser_images.fingerprint_digest(browser_images.images_fingerprint(ROOT))
+OWN = browser_images.fingerprint_digest(browser_images.browser_use_fingerprint(ROOT))
 BROWSER, PROXY = browser_images.TAGS
+BROWSER_USE = browser_images.BROWSER_USE.tag
 # Answers `image inspect` from a file per tag in labels/, records every call with whether the build flag and a
 # credential reached it, and refuses anything but an inspect or a build.
 FAKE_DOCKER = """#!/bin/sh
@@ -90,12 +92,15 @@ class Build(unittest.TestCase):
              '--file', str(ROOT / 'infra/browser/browser.Dockerfile'), str(ROOT / 'infra/browser')],
             ['docker', 'build', '--label', f'autobots.fingerprint={TODAY}', '--tag', PROXY,
              '--file', str(ROOT / 'infra/browser/proxy.Dockerfile'), str(ROOT / 'services/agent/src/autobots/adapters')],
+            ['docker', 'build', '--label', f'autobots.fingerprint={OWN}', '--tag', BROWSER_USE,
+             '--file', str(ROOT / 'infra/browser/browser-use.Dockerfile'), str(ROOT / 'services/browser-use')],
         ])
+        self.assertNotEqual(TODAY, OWN)
 
     def test_a_source_edit_changes_the_label_the_next_build_carries(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             copy = Path(folder)
-            for name in browser_images.images_fingerprint(ROOT):
+            for name in browser_images.browser_use_fingerprint(ROOT):
                 (copy / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, copy / name)
             self.assertIn(f'autobots.fingerprint={TODAY}', browser_images.build_commands(copy)[1])
@@ -104,6 +109,12 @@ class Build(unittest.TestCase):
             edited = browser_images.build_commands(copy)
             self.assertNotIn(f'autobots.fingerprint={TODAY}', edited[0])
             self.assertEqual(edited[0][3], edited[1][3])
+            self.assertNotIn(f'autobots.fingerprint={OWN}', edited[2])
+            runner = copy / 'services/browser-use/runner.py'
+            runner.write_text(runner.read_text() + '# an edit to browser-use alone\n')
+            again = browser_images.build_commands(copy)
+            self.assertEqual(again[0][3], edited[0][3])
+            self.assertNotEqual(again[2][3], edited[2][3])
 
     def test_build_runs_both_builds_with_buildkit_and_no_credential(self) -> None:
         docker = FakeDocker({})
@@ -121,6 +132,11 @@ class Build(unittest.TestCase):
         self.assertRegex(proxy, r'Python 3\.12\.16 \(python:3\.12\.16-slim-bookworm\)')
         for text in (browser, proxy):
             self.assertEqual(len(re.findall(r'(?m)^FROM \S+@sha256:[0-9a-f]{64}$', text)), 1)
+        # browser-use's: the same Playwright image, and uv's official image only to copy uv from.
+        own = (ROOT / 'infra/browser/browser-use.Dockerfile').read_text()
+        bases = re.findall(r'(?m)^FROM (\S+@sha256:[0-9a-f]{64})( AS uv)?$', own)
+        self.assertEqual([base for base, _ in bases][1], re.search(r'(?m)^FROM (\S+)$', browser).group(1))  # type: ignore[union-attr]
+        self.assertTrue(bases[0][0].startswith('ghcr.io/astral-sh/uv@sha256:') and bases[0][1] == ' AS uv')
 
 
 class Check(unittest.TestCase):
@@ -143,6 +159,22 @@ class Check(unittest.TestCase):
                 self.assertIn(f'{BROWSER}: current', result.stdout)
                 self.assertIn('make browser-images', result.stdout)
                 self.assertFalse([call for call in docker.calls() if call.startswith('build')])
+
+    def test_without_browser_uses_image_check_passes_and_says_browsing_stays_on_the_loop(self) -> None:
+        docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY})
+        result = docker.run('check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'{BROWSER_USE}: not built, so browse_goal stays on the loop', result.stdout)
+
+    def test_a_stale_browser_use_image_fails_check(self) -> None:
+        for value in ('0' * 64, TODAY):
+            with self.subTest(value):
+                docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY, BROWSER_USE: value})
+                result = docker.run('check')
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(f'{BROWSER_USE}: built from other sources', result.stdout)
+        docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY, BROWSER_USE: OWN})
+        self.assertEqual(docker.run('check').returncode, 0)
 
     def test_without_docker_check_is_unavailable(self) -> None:
         docker = FakeDocker({})

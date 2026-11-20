@@ -217,7 +217,7 @@ A match line is capped at 500 characters. A pattern that doesn't compile is `inv
 
 By [Decision 0018](../engineering/decisions/0018-browser-executor.md) B1 to B3.
 
-**BX-01. Container.** One disposable container per browsing call, from the official Playwright image pinned by digest: non-root, all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `tmpfs` for profile and cache, and no bind mount, volume or Docker socket. Its environment holds nothing of the worker's: no model or provider key, no database URL. Caps: 1 CPU, 1 GiB memory, 256 processes, 300 seconds.
+**BX-01. Container.** One disposable container per browsing call, from the official Playwright image pinned by digest: non-root, all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `tmpfs` for profile and cache, and no bind mount, volume or Docker socket. Its environment holds nothing of the worker's: no model or provider key, no database URL. Caps: 1 CPU, 1 GiB memory, 256 processes, 300 seconds. A browse on browser-use (Decision 0035 Y8, Y9) adds a third container from the same pinned image with browser-use 1.0.6 from its own lock, with the same hardening and caps, on the internal network only, and its session's time cap is 600 seconds. Each session's cap includes a 60-second grace for its start and cleanup. Downloads are also off by Chromium's managed policy. Code that turns them back on over CDP gets the download cancelled and the call ended with `refused_action`, and anything written stays in the box's `tmpfs`.
 
 **BX-02. Network.** The container sits on an internal network whose only way out is an egress proxy. Its CDP port is published on `127.0.0.1` only, on a random port, behind a per-session token.
 

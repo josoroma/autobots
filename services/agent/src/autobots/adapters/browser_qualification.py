@@ -7,6 +7,11 @@ label. An edit without a rebuild, or a rebuild without a new qualification, turn
 (refactor plan R-57, SQLI-02). Standard library only, so `scripts/browser_images.py` labels each
 build with this same digest.
 
+browser-use (Decision 0035 Y8) is qualified apart, on top of the executor: its own image, a
+fingerprint of the executor's files and its own, its own report and its own cases. Removing its
+image turns only browser-use off, which leaves `browse_goal` on Autobots' loop (Decision 0035,
+reversal).
+
 The catalog, search, Expert saves and the gateway ask on every read, synchronously. The report and
 the sources are read each time, so a withdrawn report or an edited source turns browsing off at
 once. The labels need Docker, so one inspect per fingerprint digest is reused for
@@ -56,6 +61,10 @@ class Image:
 BROWSER = Image("autobots-browser:local", "infra/browser/browser.Dockerfile", "infra/browser")
 PROXY = Image("autobots-egress:local", "infra/browser/proxy.Dockerfile", ADAPTERS)
 IMAGES = (BROWSER, PROXY)
+BROWSER_USE = Image(
+    "autobots-browser-use:local", "infra/browser/browser-use.Dockerfile", "services/browser-use"
+)
+BROWSER_USE_QUALIFICATION = Path(".checks/browser-executor/browser-use.json")
 
 # Every file the images are built from and every module the live check exercises, named one by one,
 # so that no file joins or leaves the binding unnoticed (PADP-14).
@@ -63,6 +72,7 @@ FINGERPRINTED = (
     BROWSER.dockerfile,
     BROWSER.ignore_file,
     "infra/browser/browser-entrypoint.js",
+    "infra/browser/chromium-policy.json",
     PROXY.dockerfile,
     PROXY.ignore_file,
     f"{ADAPTERS}/egress_proxy.py",
@@ -71,6 +81,18 @@ FINGERPRINTED = (
     f"{APPLICATION}/browser_leases.py",
     f"{ADAPTERS}/browser_cdp.py",
     f"{ADAPTERS}/browser_qualification.py",
+)
+
+# browser-use's image sources, and the module that runs it and judges its outcome, on top of the
+# executor's own: a change to either needs browser-use qualified again.
+BROWSER_USE_FINGERPRINTED = (
+    *FINGERPRINTED,
+    BROWSER_USE.dockerfile,
+    BROWSER_USE.ignore_file,
+    "services/browser-use/pyproject.toml",
+    "services/browser-use/uv.lock",
+    "services/browser-use/runner.py",
+    f"{ADAPTERS}/browser_use_box.py",
 )
 
 # Every case the live check must observe before the executor is reported qualified (BX-05).
@@ -97,13 +119,36 @@ REQUIRED_CASES = (
     "no host outside the qualification hosts was reached",
 )
 
+# Every case browser-use's live check must observe before it is reported qualified (Decision 0035
+# Y8, US-17.3), on top of the executor's own.
+REQUIRED_BROWSER_USE_CASES = (
+    "a YOLO call runs on browser-use without approval, and with YOLO off it waits for the loop",
+    "a browse of the qualification host keeps browse_goal's output",
+    "each model request is one admitted call of the run on its researcher route",
+    "a navigation outside the allowed domains ends the call refused_action",
+    "a navigation the egress proxy refuses ends the call refused_action",
+    "a download is refused by Chromium's policy and ends the call refused_action",
+    "a page's own refused request is counted and the browse continues",
+    "the box reaches only its proxy and its browser",
+    "no request reaches Browser Use's hosts",
+    "the limits resolve per engine, with a box cap of 600 seconds for browser-use only",
+    "a refused model request ends the browse with its code",
+    "nothing of the host enters the browser-use container",
+    "the session's containers are removed when the call returns",
+)
+
 # Each tag's fingerprint label, or None when the image or its label is missing.
 LabelReader = Callable[[tuple[str, ...]], Mapping[str, str | None]]
 
 
-def images_fingerprint(root: Path) -> dict[str, str]:
+def images_fingerprint(root: Path, names: tuple[str, ...] = FINGERPRINTED) -> dict[str, str]:
     """Each fingerprinted file's SHA-256, by its path from the repository root."""
-    return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in FINGERPRINTED}
+    return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in names}
+
+
+def browser_use_fingerprint(root: Path) -> dict[str, str]:
+    """The executor's fingerprint with browser-use's own files."""
+    return images_fingerprint(root, BROWSER_USE_FINGERPRINTED)
 
 
 def fingerprint_digest(fingerprint: Mapping[str, str]) -> str:
@@ -147,11 +192,15 @@ def image_labels(
     return parse_labels(completed.stdout if completed.returncode == 0 else "", tags)
 
 
-def images_match(fingerprint: Mapping[str, str], labels: LabelReader = image_labels) -> bool:
-    """Both images the executor starts were built from the sources this fingerprint names."""
+def images_match(
+    fingerprint: Mapping[str, str],
+    labels: LabelReader = image_labels,
+    images: tuple[Image, ...] = IMAGES,
+) -> bool:
+    """Every image named was built from the sources this fingerprint names."""
     expected = fingerprint_digest(fingerprint)
-    found = labels(tuple(image.tag for image in IMAGES))
-    return all(found.get(image.tag) == expected for image in IMAGES)
+    found = labels(tuple(image.tag for image in images))
+    return all(found.get(image.tag) == expected for image in images)
 
 
 @dataclass(frozen=True)
@@ -173,8 +222,10 @@ class ImageCheck:
         labels: LabelReader = image_labels,
         seconds: float = IMAGE_CHECK_SECONDS,
         clock: Callable[[], float] = time.monotonic,
+        images: tuple[Image, ...] = IMAGES,
     ) -> None:
         self._labels = labels
+        self._images = images
         self._seconds = seconds
         self._clock = clock
         self._lock = threading.Lock()
@@ -190,13 +241,37 @@ class ImageCheck:
                 and self._clock() - checked.at < self._seconds
             ):
                 return checked.matched
-            matched = images_match(fingerprint, self._labels)
+            matched = images_match(fingerprint, self._labels, self._images)
             self._checked = _Checked(digest, matched, self._clock())
             return matched
 
 
-# The one the service asks through, unless a caller names its own label reader.
+# The ones the service asks through, unless a caller names its own label reader.
 IMAGE_CHECK = ImageCheck()
+BROWSER_USE_CHECK = ImageCheck(images=(BROWSER_USE,))
+
+
+def _passing(
+    report: Path, required: tuple[str, ...], key: str, fingerprint: Mapping[str, str]
+) -> bool:
+    """A readable report that passed, observed every required case, and binds this fingerprint."""
+    try:
+        data = json.loads(report.read_text())
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    cases = data.get("cases")
+    passed = {
+        case.get("id")
+        for case in (cases if isinstance(cases, list) else [])
+        if isinstance(case, dict) and case.get("status") == "passed"
+    }
+    return (
+        data.get("status") == "passed"
+        and all(case in passed for case in required)
+        and data.get(key) == fingerprint
+    )
 
 
 def executor_qualified(
@@ -208,22 +283,32 @@ def executor_qualified(
     `labels`, the process's IMAGE_CHECK reads them; a reader passed in is asked every time.
     """
     try:
-        data = json.loads((root / report).read_text())
         fingerprint = images_fingerprint(root)
-    except (OSError, ValueError):
+    except OSError:
         return False
-    if not isinstance(data, dict):
-        return False
-    cases = data.get("cases")
-    passed = {
-        case.get("id")
-        for case in (cases if isinstance(cases, list) else [])
-        if isinstance(case, dict) and case.get("status") == "passed"
-    }
-    if (
-        data.get("status") != "passed"
-        or not all(case in passed for case in REQUIRED_CASES)
-        or data.get("executor_fingerprint") != fingerprint
-    ):
+    if not _passing(root / report, REQUIRED_CASES, "executor_fingerprint", fingerprint):
         return False
     return IMAGE_CHECK.matches(fingerprint) if labels is None else images_match(fingerprint, labels)
+
+
+def browser_use_qualified(
+    root: Path,
+    report: Path = BROWSER_USE_QUALIFICATION,
+    labels: LabelReader | None = None,
+    executor_report: Path = QUALIFICATION,
+) -> bool:
+    """Decision 0035 Y8 and Y15: only while the executor is qualified, after a passing browser-use
+    check at today's browser-use fingerprint, and while its image carries that fingerprint."""
+    if not executor_qualified(root, executor_report, labels):
+        return False
+    try:
+        fingerprint = browser_use_fingerprint(root)
+    except OSError:
+        return False
+    if not _passing(
+        root / report, REQUIRED_BROWSER_USE_CASES, "browser_use_fingerprint", fingerprint
+    ):
+        return False
+    if labels is None:
+        return BROWSER_USE_CHECK.matches(fingerprint)
+    return images_match(fingerprint, labels, (BROWSER_USE,))

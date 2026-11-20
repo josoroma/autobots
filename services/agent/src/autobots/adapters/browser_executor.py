@@ -7,6 +7,10 @@ Mac's loopback behind a per-session token. Nothing of the worker's environment i
 session belongs to one attempt: losing the lease, cancelling the run or reaching the time cap
 removes it, and a sweeper removes any a crashed worker left, by their labels.
 
+For a browse on browser-use (Decision 0035 Y5 and Y8), a third container joins the session's
+internal network only and drives the session's Chromium over CDP, with the sidecar's model relay as
+its only model. It gets the browser's hardening and caps, and nothing of the worker's environment.
+
 The DevTools client and request guard are in `browser_cdp`, what a qualification binds is in
 `browser_qualification`, and the checks that end a session are in `application/browser_leases`.
 This module, those three and the images' sources are all in the images' fingerprint. The Docker CLI
@@ -28,6 +32,7 @@ import httpx
 from autobots.adapters.browser_cdp import Cdp, RequestGuard
 from autobots.adapters.browser_qualification import (
     BROWSER,
+    BROWSER_USE,
     DOCKER_ENV_NAMES,
     PROXY,
     executor_qualified,
@@ -44,6 +49,7 @@ __all__ = [
     "Cdp",
     "ExecutorConfig",
     "ExecutorUnavailable",
+    "ModelLink",
     "RequestGuard",
     "attempt_alive",
     "executor_qualified",
@@ -51,6 +57,9 @@ __all__ = [
 ]
 
 LABEL = "autobots.browser"
+# The session's DevTools forwarder and the sidecar's relay, as the browser-use container sees them.
+DEVTOOLS_PORT = 9222
+RELAY_URL = "http://proxy:9300/v1"
 
 
 class ExecutorUnavailable(Exception):
@@ -64,6 +73,7 @@ class ExecutorConfig:
     # The images whose fingerprint label `executor_qualified` checks (refactor plan R-57).
     browser_image: str = BROWSER.tag
     proxy_image: str = PROXY.tag
+    browser_use_image: str = BROWSER_USE.tag
     cpus: str = "1"
     memory: str = "1g"
     pids: int = 256
@@ -150,18 +160,8 @@ class BrowserExecutor:
                 raise ExecutorUnavailable("allowed_host_malformed")
         name = f"autobots-browser-{secrets.token_hex(6)}"
         token = secrets.token_urlsafe(24)
-        labels = [
-            "--label", f"{LABEL}=1",
-            "--label", f"{LABEL}.run={run_id}",
-            "--label", f"{LABEL}.generation={generation}",
-            "--label", f"{LABEL}.session={name}",
-        ]  # fmt: skip
-        hardening = [
-            "--read-only",
-            "--cap-drop=ALL",
-            "--security-opt", "no-new-privileges",
-            "--pids-limit", str(self.config.pids),
-        ]  # fmt: skip
+        labels = self._labels(name, run_id, generation)
+        hardening = self._hardening()
         try:
             await self._docker("network", "create", "--internal", *labels, f"{name}-net")
             # The proxy's own way out, a network of its own so Docker's DNS finds the browser.
@@ -194,11 +194,7 @@ class BrowserExecutor:
             )
             await self._docker(
                 "run", "-d", "--name", f"{name}-browser", *labels, *hardening,
-                "--network", f"{name}-net",
-                "--tmpfs", f"/tmp:rw,size={self.config.tmpfs},mode=1777",
-                "--memory", self.config.memory, "--memory-swap", self.config.memory,
-                "--cpus", self.config.cpus,
-                "-e", "HOME=/tmp",
+                "--network", f"{name}-net", *self._caps(),
                 self.config.browser_image,
             )  # fmt: skip
             mapping = (await self._docker("port", f"{name}-proxy", "9223")).split()[0]
@@ -209,6 +205,64 @@ class BrowserExecutor:
         session = BrowserSession(name, token, port, str(run_id), generation)
         await self._ready(session)
         return session
+
+    @staticmethod
+    def _labels(name: str, run_id: UUID | str, generation: int) -> list[str]:
+        return [
+            "--label", f"{LABEL}=1",
+            "--label", f"{LABEL}.run={run_id}",
+            "--label", f"{LABEL}.generation={generation}",
+            "--label", f"{LABEL}.session={name}",
+        ]  # fmt: skip
+
+    def _hardening(self) -> list[str]:
+        return [
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt", "no-new-privileges",
+            "--pids-limit", str(self.config.pids),
+        ]  # fmt: skip
+
+    def _caps(self) -> list[str]:
+        """BX-01's caps and the writable `tmpfs`, for the browser and the browser-use container."""
+        return [
+            "--tmpfs", f"/tmp:rw,size={self.config.tmpfs},mode=1777",
+            "--memory", self.config.memory, "--memory-swap", self.config.memory,
+            "--cpus", self.config.cpus,
+            "-e", "HOME=/tmp",
+        ]  # fmt: skip
+
+    async def run_browser_use(
+        self, session: BrowserSession, spec: dict[str, Any], seconds: float
+    ) -> str:
+        """One browse on browser-use in the session's box, Decision 0035 Y5 and Y8: a container on
+        the session's internal network only, driving its Chromium over CDP at the browser's address
+        (Chromium refuses a host name in the Host header), with the relay as its model. Returns the
+        runner's standard output, untrusted, or "" when it didn't finish within `seconds`. Its
+        standard error, which echoes model-written code, is dropped."""
+        network = f"{session.name}-net"
+        address = (
+            await self._docker(
+                "inspect", "--format",
+                f'{{{{(index .NetworkSettings.Networks "{network}").IPAddress}}}}',
+                f"{session.name}-browser",
+            )
+        ).strip()  # fmt: skip
+        if not address:
+            raise ExecutorUnavailable("browser_address_missing")
+        body = {**spec, "cdp_url": f"http://{address}:{DEVTOOLS_PORT}", "base_url": RELAY_URL}
+        code, out, _ = await self._run(
+            "run", "--rm", "--name", f"{session.name}-use",
+            *self._labels(session.name, session.run_id, session.generation), *self._hardening(),
+            "--network", network, *self._caps(),
+            "-e", f"AUTOBOTS_BROWSE_SPEC={json.dumps(body)}",
+            self.config.browser_use_image,
+            seconds=seconds,
+        )  # fmt: skip
+        if code == -1:
+            await self._docker("rm", "-f", f"{session.name}-use", check=False)
+            return ""
+        return out.decode(errors="replace")
 
     async def _ready(self, session: BrowserSession, seconds: float = 20.0) -> None:
         deadline = time.monotonic() + seconds
@@ -222,7 +276,9 @@ class BrowserExecutor:
         raise ExecutorUnavailable("executor_not_ready")
 
     async def remove(self, name: str) -> None:
-        await self._docker("rm", "-f", f"{name}-browser", f"{name}-proxy", check=False)
+        await self._docker(
+            "rm", "-f", f"{name}-use", f"{name}-browser", f"{name}-proxy", check=False
+        )  # fmt: skip
         await self._docker("network", "rm", f"{name}-net", f"{name}-out", check=False)
 
     async def stop(self, session: BrowserSession) -> None:

@@ -32,8 +32,9 @@ function entry(folder, wanted, description) {
   return name;
 }
 
-// Chrome for Testing in its new headless mode. Schemes, methods and downloads are refused over CDP
-// by the executor's request guard, and every connection by the egress proxy.
+// Chrome for Testing in its new headless mode. Schemes and methods are refused over CDP
+// by the executor's request guard, downloads by the managed policy the image installs, and every
+// connection by the egress proxy.
 const root = entry(
   "/ms-playwright",
   (name) => /^chromium-\d+$/.test(name),

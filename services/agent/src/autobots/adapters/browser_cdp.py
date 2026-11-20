@@ -2,8 +2,11 @@
 Decision 0018.
 
 The guard refuses what the egress proxy can't see inside TLS: any request that isn't a GET or HEAD,
-or that carries a body, and any scheme but https, data, blob and about. Downloads are denied. This
-module is in the images' fingerprint (`browser_qualification.FINGERPRINTED`).
+or that carries a body, and any scheme but https, data, blob and about. Downloads are denied. It
+also logs each page's committed top-frame navigations, those that landed on an error page and any
+download that began, which browser-use's outcome is judged by (Decision 0035 Y5,
+`browser_use_box`). This module is in the images' fingerprint
+(`browser_qualification.FINGERPRINTED`).
 """
 
 import asyncio
@@ -77,6 +80,12 @@ class RequestGuard:
 
     cdp: Cdp
     refused: list[dict[str, str]] = field(default_factory=list)
+    # Committed top-frame URLs, the URLs whose top-frame navigation landed on an error page, and
+    # downloads that began, each for the pages this guard attached to.
+    navigated: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+    downloads: int = 0
+    pages: set[str] = field(default_factory=set)
 
     async def start(self) -> None:
         self.cdp.handlers.append(self._event)
@@ -93,10 +102,17 @@ class RequestGuard:
                 attached = await self.cdp.send(
                     "Target.attachToTarget", {"targetId": target["targetId"], "flatten": True}
                 )
-                await self._guard(attached["result"]["sessionId"])
+                await self._guard(attached["result"]["sessionId"], page=target["type"] == "page")
 
-    async def _guard(self, session: str) -> None:
+    def refusals(self) -> int:
+        """Top-frame navigations that landed on an error page, and downloads that began."""
+        return len(self.failed) + self.downloads
+
+    async def _guard(self, session: str, *, page: bool = False) -> None:
         await self.cdp.send("Fetch.enable", {"patterns": [{"urlPattern": "*"}]}, session)
+        if page:
+            self.pages.add(session)
+            await self.cdp.send("Page.enable", {}, session)
         await self.cdp.send(
             "Target.setAutoAttach",
             {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True},
@@ -104,12 +120,28 @@ class RequestGuard:
         )
         await self.cdp.send("Runtime.runIfWaitingForDebugger", {}, session)
 
+    def _navigated(self, frame: dict[str, Any]) -> None:
+        if frame.get("parentId"):
+            return
+        if frame.get("unreachableUrl"):
+            self.failed.append(str(frame["unreachableUrl"]))
+        else:
+            self.navigated.append(str(frame.get("url", "")))
+
     async def _event(self, message: dict[str, Any]) -> None:
         method, params = message["method"], message.get("params", {})
         session = message.get("sessionId")
         try:
             if method == "Target.attachedToTarget":
-                await self._guard(params["sessionId"])
+                page = params.get("targetInfo", {}).get("type") == "page"
+                await self._guard(params["sessionId"], page=page)
+            elif method == "Page.frameNavigated" and session in self.pages:
+                self._navigated(params["frame"])
+            elif method == "Browser.downloadWillBegin":
+                # Code driving the browser over CDP can turn downloads back on, past Chromium's
+                # policy (Decision 0035 Y6), so one that begins anyway is cancelled and counted.
+                self.downloads += 1
+                await self.cdp.send("Browser.cancelDownload", {"guid": params["guid"]})
             elif method == "Fetch.requestPaused" and session is not None:
                 request = params["request"]
                 scheme = request["url"].split(":", 1)[0].lower()

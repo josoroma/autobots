@@ -20,7 +20,9 @@ ALLOWED = {
     "operations": {"domain", "persistence", "contracts", "application", "adapters"},
 }
 BASELINE = {
-    ("application", "adapters"): 12,
+    # Decision 0027 D4: the thirteenth is browsing_tool's import of browser_use_box, which runs a
+    # browse on browser-use in the isolated box (Decision 0035 Y5), bound by its qualification.
+    ("application", "adapters"): 13,
     # cronjob_tool's lazy import of the worker's credential check from operations/composition.py.
     ("application", "operations"): 1,
     # api/main.py, the API's process entry, composes from operations/composition.py (Decision 0029

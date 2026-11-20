@@ -40,6 +40,8 @@ MANUAL = {
                                                  'and outbound network (Decision 0018).',
     'tests/db/checks/browse_goal_check.py': 'Run by `qualify_browse_goal.py`, a live check of browse_goal through the '
                                             'real gateway and the isolated browser (Decision 0020).',
+    'tests/db/checks/browser_use_check.py': 'Run by `qualify_browser_executor.py`, live: browse_goal on browser-use in '
+                                            'the box needs the three images and outbound network (Decision 0035 Y8).',
     'apps/web/tests/browser/install.spec.ts': 'Read-only on the persistent install, run by hand with `--project '
                                               'install`, as US-11.3 ran it for its local app and upgrade checks.',
     'apps/web/tests/browser/install-current.spec.ts': 'Read-only on the persistent install, run by '

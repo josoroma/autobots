@@ -29,6 +29,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `checks/assignment_check.py` | check; starts `workers/assignment_worker.py` | `scripts/qualify_identity.py` |
 | `checks/browse_goal_check.py` | check, live | `scripts/qualify_browse_goal.py` (manual, `scripts/suites.py`) |
 | `checks/browser_executor_check.py` | check, live | `scripts/qualify_browser_executor.py` (manual, `scripts/suites.py`) |
+| `checks/browser_use_check.py` | check, live | `scripts/qualify_browser_executor.py` (manual, `scripts/suites.py`) |
 | `checks/browsing_loop_check.py` | check | `scripts/app_db.py` |
 | `checks/child_run_records_check.py` | check | `scripts/qualify_identity.py` |
 | `checks/concept_seed_check.py` | check | `scripts/qualify_identity.py` |

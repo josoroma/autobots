@@ -77,7 +77,7 @@ def tool_definitions(
         cronjob_tool(CATALOG),
         *_bound(runtime),
         *((APPROVAL_GATE,) if workflow else ()),
-        *((browsing_tool.browse_tool(browsing.runtime, browsing.qualified),) if browsing else ()),
+        *(browsing_tool.browse_tools(browsing.runtime, browsing.qualified) if browsing else ()),
     )
 
 

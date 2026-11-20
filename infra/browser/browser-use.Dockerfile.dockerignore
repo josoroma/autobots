@@ -1,0 +1,6 @@
+# The browser-use image's context is services/browser-use, and it copies only its lock, project file and
+# runner. This file is in the images' fingerprint.
+*
+!pyproject.toml
+!uv.lock
+!runner.py
