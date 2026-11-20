@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
+from psycopg.errors import UniqueViolation
 from pydantic import ValidationError
 
 from autobots.application.idempotency import (
@@ -231,6 +232,24 @@ async def set_description(
         "returning id",
         (description, workflow_id, workspace_id),
     )
+    if await cursor.fetchone() is None:
+        raise WorkflowRefused("workflow_not_found")
+    return await get_workflow(connection, workspace_id, workflow_id)
+
+
+async def rename_workflow(
+    connection: SqlConnection, workspace_id: UUID, workflow_id: UUID, name: str
+) -> WorkflowView:
+    """Only the name changes (Decision 0037 N3). The workspace's unique constraint decides a taken
+    name, a lost race included, and the workflow's own name violates nothing (N2, N5)."""
+    try:
+        cursor = await connection.execute(
+            "update public.workflows set name = %s where id = %s and workspace_id = %s "
+            "returning id",
+            (name, workflow_id, workspace_id),
+        )
+    except UniqueViolation:
+        raise WorkflowRefused("workflow_name_taken") from None
     if await cursor.fetchone() is None:
         raise WorkflowRefused("workflow_not_found")
     return await get_workflow(connection, workspace_id, workflow_id)

@@ -7,10 +7,10 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-18.1 |
+| Target | US-19.1 |
 | Kind | story |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-20 |
 | Updated | 2026-11-20 |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-18.1 | us-18-1-retire-inflation-rates-world | IN PROGRESS | Retire inflation_rates and the World Bank provider |
+| 1 | US-19.1 | us-19-1-rename-workflow | DONE | Rename a workflow |
 
 ## Next Action
 
-Action: apply
-Story: US-18.1
-Change: us-18-1-retire-inflation-rates-world
-Command: /ohmyorch:opsx-apply us-18-1-retire-inflation-rates-world
-Reason: 0/11 tasks complete
+Action: complete
+Story: -
+Change: -
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

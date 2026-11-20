@@ -31,6 +31,7 @@ from autobots.application.workflows import (
     list_workflows,
     publish_draft,
     publish_version,
+    rename_workflow,
     save_draft,
     set_description,
 )
@@ -50,6 +51,7 @@ from autobots.contracts.workflows import (
     WorkflowList,
     WorkflowPreview,
     WorkflowPublish,
+    WorkflowRename,
     WorkflowValidation,
     WorkflowView,
 )
@@ -253,6 +255,17 @@ async def put_description(
 ) -> WorkflowView:
     async with request_pool(request).connection() as connection:
         return await set_description(connection, workspace_id, workflow_id, body.description)
+
+
+@router.put(
+    "/workflows/{workflow_id}/name", operation_id="renameWorkflow", response_model=WorkflowView
+)
+async def put_name(
+    workflow_id: UUID, body: WorkflowRename, request: Request, workspace_id: OwnerWorkspace
+) -> WorkflowView:
+    """Decision 0037: the owner renames a workflow, with no key and no new version (N1, N5)."""
+    async with request_pool(request).connection() as connection:
+        return await rename_workflow(connection, workspace_id, workflow_id, body.name)
 
 
 @router.get("/workflows/{workflow_id}", operation_id="getWorkflow", response_model=WorkflowView)

@@ -7665,6 +7665,23 @@ export const schemas = {
     "title": "WorkflowPublish",
     "type": "object"
   },
+  "WorkflowRename": {
+    "additionalProperties": false,
+    "description": "Decision 0037 N2: creation's rule for a name. Renaming changes nothing else (N3).",
+    "properties": {
+      "name": {
+        "maxLength": 100,
+        "minLength": 1,
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "title": "WorkflowRename",
+    "type": "object"
+  },
   "WorkflowStepView": {
     "additionalProperties": false,
     "description": "WF-03: one step of a version, in the order it runs.",
@@ -9957,6 +9974,14 @@ export function parseWorkflowPublish(value: unknown): WorkflowPublish {
   return parseWith(schemas, "WorkflowPublish", value) as WorkflowPublish;
 }
 
+export interface WorkflowRename {
+  name: string;
+}
+
+export function parseWorkflowRename(value: unknown): WorkflowRename {
+  return parseWith(schemas, "WorkflowRename", value) as WorkflowRename;
+}
+
 export interface WorkflowStepView {
   approval: boolean;
   block: string;
@@ -10453,6 +10478,10 @@ export type CreateWorkflowExecutionHeaders = {
 
 export async function createWorkflowExecution(options: ClientOptions, workflow_id: string, body: ExecutionCreate, headers: CreateWorkflowExecutionHeaders, request?: RequestOptions): Promise<ExecutionBinding> {
   return parseExecutionBinding(await requestJson(options, "POST", `/v1/workflows/${encodeURIComponent(workflow_id)}/executions`, body, withHeaders(request, headers), parseErrorResponse));
+}
+
+export async function renameWorkflow(options: ClientOptions, workflow_id: string, body: WorkflowRename, request?: RequestOptions): Promise<WorkflowView> {
+  return parseWorkflowView(await requestJson(options, "PUT", `/v1/workflows/${encodeURIComponent(workflow_id)}/name`, body, request, parseErrorResponse));
 }
 
 export type PreviewWorkflowVersionQuery = {

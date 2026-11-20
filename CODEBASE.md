@@ -341,6 +341,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - A typed subset with immutable versions. A run binds to a version and hash, and emissions are insert-only.
   - IR v2 adds an optional node `label`, and `ir_normalized` keeps v1 hashes.
   - Optional description.
+  - Since US-19.1, after the analyzed revision, an owner renames a workflow through `PUT /v1/workflows/{id}/name` (`application/workflows.rename_workflow`) and the editor's Name field. The workspace's unique constraint refuses a taken name with `workflow_name_taken`, a lost race included. Nothing else changes, and a run's goal keeps the name its execution started under (Decision 0037). The concept seed adds a seeded workflow beside one renamed away rather than replaying its receipt onto it, and publishes under a key naming the workflow (N6).
   - One draft per workflow, which an owner can save, publish or discard. Executions and routines refuse `"draft"` with `draft_not_runnable`. Since R-56, after the analyzed revision, a draft that fails validation reads as absent with `draft_unreadable`, the list still loads, publishing it is refused, discard deletes it by key, and the editor says saving replaces it.
   - The list gives the Experts, step count, last execution and run count, with `/executions` and `/preview`.
   - Executions accept a D11 budget.

@@ -20,15 +20,22 @@ from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
 from autobots.application.plans import load_goal
 from autobots.application.run_lifecycle import LoopConfig
+from autobots.application.run_projection.run_list import read_run_list
 from autobots.application.runs import apply_command
 from autobots.application.tool_definitions import ToolScope
 from autobots.application.tool_gateway import LeaseLost
+from autobots.application.tool_grants import tool_grants
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_executions import create_execution
 from autobots.application.workflow_runner import commit_instance, run_workflow
 from autobots.application.workflows import (
+    WorkflowRefused,
     create_workflow,
+    get_workflow,
+    list_workflows,
     publish_version,
+    rename_workflow,
+    save_draft,
     set_description,
 )
 from autobots.contracts.experts import ExpertConfig
@@ -369,6 +376,90 @@ async def descriptions_and_labels(ctx: Running) -> None:
           described.description == 'Added later' and described.latest_version == 0)
 
 
+async def refused_code(rename: Any) -> str | None:
+    try:
+        await rename
+    except WorkflowRefused as refused:
+        return refused.code
+    return None
+
+
+async def workflow_renamed(ctx: Running) -> None:
+    """US-19.1 (Decision 0037 N2 to N5): only the name changes, a taken name and a lost race are refused, runs keep the
+    name they ran under, and an execution after the rename binds the same version and hash."""
+    advance, check, db, emitted, value = ctx.advance, ctx.cases.check, ctx.db, ctx.emitted, ctx.value
+    asker = await create_expert(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='rename-e', name='Retitle helper',
+                                config=ExpertConfig(tools=['calculate']), catalog=tool_registry.catalog())
+    agent_graph = {'nodes': [node('in', 'input', type='string'), node('ask', 'agent', expert_id=str(asker.id)), node('out', 'output')],
+                   'links': [link('in', 'value', 'ask', 'goal'), link('ask', 'result', 'out', 'value')]}
+    flow = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='rename-w', name='Granted flow',
+                                 description='Asks the Retitle helper')
+    await publish_version(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=flow.id, idempotency_key='rename-p', expected_version=0,
+                          graph=WorkflowGraph.model_validate(agent_graph), source='user')
+    labelled = {**agent_graph, 'nodes': [agent_graph['nodes'][0], {**agent_graph['nodes'][1], 'label': 'Ask it'}, agent_graph['nodes'][2]]}
+    before = await save_draft(db, WORKSPACE, ACTOR, flow.id, WorkflowGraph.model_validate(labelled))
+    renamed = await rename_workflow(db, WORKSPACE, flow.id, 'Granted flow, retitled')
+    check('a rename changes only the name: the same id, versions, hashes, draft and description', 'only the name differs',
+          (renamed.name, renamed.latest_version, [item.graph_hash for item in renamed.versions], renamed.draft is not None, renamed.description),
+          renamed.name == 'Granted flow, retitled' and renamed.model_dump(exclude={'name'}) == before.model_dump(exclude={'name'}))
+    listed = [item.name for item in await list_workflows(db, WORKSPACE) if item.id == flow.id]
+    read = (await get_workflow(db, WORKSPACE, flow.id)).name
+    granted = [name for item_id, name, _ in (await tool_grants(db, WORKSPACE, 'calculate'))[1] if item_id == flow.id]
+    check("the list, the read and the tool's Granted to give the new name", 'Granted flow, retitled, three times',
+          (listed, read, granted), listed == [read] == granted == ['Granted flow, retitled'])
+
+    other = await create_workflow(db, workspace_id=WORKSPACE, actor_id=ACTOR, idempotency_key='rename-other', name='Taken flow')
+    code = await refused_code(rename_workflow(db, WORKSPACE, flow.id, 'Taken flow'))
+    names = ((await get_workflow(db, WORKSPACE, flow.id)).name, (await get_workflow(db, WORKSPACE, other.id)).name)
+    check("a name another workflow holds is refused, and nothing changes", "workflow_name_taken, both names as they were", (code, names),
+          code == 'workflow_name_taken' and names == ('Granted flow, retitled', 'Taken flow'))
+    same = await rename_workflow(db, WORKSPACE, flow.id, 'Granted flow, retitled')
+    check('renaming it to its own name succeeds and changes nothing', 'the same view',
+          same.name, same.model_dump() == (await get_workflow(db, WORKSPACE, flow.id)).model_dump() and same.name == 'Granted flow, retitled')
+
+    # Two renames race for one name: the first holds its update in an open transaction, so the second waits on the unique
+    # constraint, which decides once the first commits.
+    async with await psycopg.AsyncConnection.connect(URL) as first, await psycopg.AsyncConnection.connect(URL, autocommit=True) as second:
+        async with first.transaction():
+            await rename_workflow(first, WORKSPACE, flow.id, 'Raced title')
+            rival = asyncio.create_task(refused_code(rename_workflow(second, WORKSPACE, other.id, 'Raced title')))
+            await asyncio.sleep(0.5)
+            waited = not rival.done()
+        lost = await rival
+    names = ((await get_workflow(db, WORKSPACE, flow.id)).name, (await get_workflow(db, WORKSPACE, other.id)).name)
+    check('when two renames race for one name, one succeeds and the other is refused and keeps its name',
+          'the second waited, then workflow_name_taken; Raced title and Taken flow', (waited, lost, names),
+          waited and lost == 'workflow_name_taken' and names == ('Raced title', 'Taken flow'))
+
+    # Runs keep the name they ran under, and the runs list labels each with the current name.
+    shout = {'nodes': [node('in', 'input', type='string'), node('up', 'transform', operation='upper'), node('out', 'output')],
+             'links': [link('in', 'value', 'up', 'value'), link('up', 'value', 'out', 'value')]}
+    earlier = await ctx.start('Before retitle flow', shout, {'in': 'before'})
+    first_result = await advance()
+    await rename_workflow(db, WORKSPACE, earlier.workflow_id, 'Moonlit flow')
+    later = await create_execution(db, workspace_id=WORKSPACE, actor_id=ACTOR, workflow_id=earlier.workflow_id,
+                                   idempotency_key='rename-later', version=1, inputs={'in': 'after'})
+    second_result = await advance()
+    goals = (await value('select goal_summary from public.runs where id = %s', earlier.run_id),
+             await value('select goal_summary from public.runs where id = %s', later.run_id))
+    check("the earlier run's goal keeps the old name, and the later run's goal names the new one",
+          "'Workflow Before retitle flow, version 1', then 'Workflow Moonlit flow, version 1'", goals,
+          goals == ('Workflow Before retitle flow, version 1', 'Workflow Moonlit flow, version 1'))
+    page = await read_run_list(db, WORKSPACE, query='Moonlit flow')
+    labels = {item.id: item.label for item in page.runs if item.id in (earlier.run_id, later.run_id)}
+    check('the runs list labels both runs with the new name and their version', 'Moonlit flow, version 1, twice', labels,
+          labels == {earlier.run_id: 'Moonlit flow, version 1', later.run_id: 'Moonlit flow, version 1'})
+    found = [item.id for item in (await read_run_list(db, WORKSPACE, query='Before retitle flow')).runs]
+    check('searching the runs list for the old name finds the earlier run', 'the earlier run, not the later', found,
+          earlier.run_id in found and later.run_id not in found)
+    check('the later execution binds the same version and hash, and both run that version to the end',
+          'version 1, the same hash, succeeded twice, BEFORE then AFTER',
+          (later.workflow_version, later.graph_hash == earlier.graph_hash, first_result.outcome, second_result.outcome,
+           await emitted(earlier, 'out', 'value'), await emitted(later, 'out', 'value')),
+          later.workflow_version == earlier.workflow_version == 1 and later.graph_hash == earlier.graph_hash
+          and first_result.outcome == second_result.outcome == 'succeeded'
+          and await emitted(earlier, 'out', 'value') == 'BEFORE' and await emitted(later, 'out', 'value') == 'AFTER')
+
 # US-16.6: what the first step of the Deep research content writer publishes, as a scripted model writes it, under the
 # outputs/child-N folder a delegated step may write (application/assignments.py).
 DEEP_FILES = {
@@ -486,6 +577,7 @@ SCENARIOS = (
     stalled_workflow_fails,
     version_under_older_rules_fails,
     descriptions_and_labels,
+    workflow_renamed,
     deep_research_review_reads_the_first_steps_artifacts,
 )
 

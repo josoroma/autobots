@@ -156,6 +156,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-17.5: The Transcript reader Expert and workflow](#us-175-the-transcript-reader-expert-and-workflow)
 - [EPIC-18: inflation_rates and the World Bank provider removed](#epic-18-inflation_rates-and-the-world-bank-provider-removed)
   - [US-18.1: Retire inflation_rates and the World Bank provider](#us-181-retire-inflation_rates-and-the-world-bank-provider)
+- [EPIC-19: A workflow's owner can rename it](#epic-19-a-workflows-owner-can-rename-it)
+  - [US-19.1: Rename a workflow](#us-191-rename-a-workflow)
 
 ## Work Item Status
 
@@ -749,6 +751,16 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-18.1#9 | Remove `world_bank` from the web's provider labels and their unit test. Checked by the web unit tests under `apps/web/tests/unit`. | DONE | US-18.1 |
 | US-18.1#10 | Through the change's delta specs, remove the market-data spec's inflation requirement and rename the workflow in the experts spec's seed scenario. Checked by reading the archived specs against R1 and R7. | DONE | US-18.1 |
 | US-18.1#11 | Amend PRD-Tool-Catalog TC-03 and "Market data", PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036's "Requirements revised" lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7. | DONE | US-18.1 |
+| EPIC-19 | A workflow's owner can rename it | — | — |
+| US-19.1 | Rename a workflow | DONE | EPIC-19 |
+| US-19.1#1 | Add the `{name}` request contract under creation's rule (1 to 100 characters). Add `PUT /v1/workflows/{workflow_id}/name` behind `OwnerWorkspace`, returning the workflow's view with no idempotency key. Add an application function that updates only the name, succeeds unchanged for the workflow's own name, and refuses another workspace's workflow with `workflow_not_found`. It refuses a name another workflow holds with `workflow_name_taken`, also when the unique constraint decides a race (N1, N2, N3, N5). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | DONE | US-19.1 |
+| US-19.1#2 | Regenerate OpenAPI and the TypeScript client with the new operation. Checked by `contract_drift` in the fast profile. | DONE | US-19.1 |
+| US-19.1#3 | Add the route to `WORKFLOW_ROUTES` and its refusals to the refusal tables in `services/agent/tests/test_refusal_responses.py`. Checked by pytest under `services/agent/tests`. | DONE | US-19.1 |
+| US-19.1#4 | Add a name field to the workflow editor beside the description. It trims what is typed, sends no blank name and carries no key. It updates the heading from the returned view and words `workflow_name_taken` and `owner_required` (N1, N2, N4). Checked by the web unit tests under `apps/web/tests/unit` and a workflows browser-suite case under `apps/web/tests/browser`, run by the db profile. | DONE | US-19.1 |
+| US-19.1#5 | Show on a disposable stack that a rename changes no version, graph, hash, draft, description or execution. Show that the list, the read, Granted to and the runs list's label give the new name, and that earlier runs' goals keep the old name and are still found by it. Show that a later execution and a routine's occurrence bind by id and version (N3, N4). Checked by the db profile's disposable fixtures, with a scripted model where an execution needs one. | DONE | US-19.1 |
+| US-19.1#6 | Make the seed keep a workflow renamed to a seeded name. When a seeded workflow is renamed away, seeding again adds the seeded one beside it, without replaying the earlier seed's receipts onto the renamed workflow or replacing its draft (N6, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a workspace seeded before US-18.1 and on one seeded after. | DONE | US-19.1 |
+| US-19.1#7 | Through the change's delta specs, add the rename to the workflow-definition spec. Checked by reading the archived spec against N1 to N6. | DONE | US-19.1 |
+| US-19.1#8 | Amend PRD-Studio WF-06 to "Name, labels and description", saying that a workflow's owner can rename it under N2 and N3, as Decision 0037's "Requirements revised" lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3. | DONE | US-19.1 |
 
 ## Dependency Diagram
 
@@ -917,6 +929,9 @@ flowchart TD
   end
   subgraph EPIC_18["EPIC-18: inflation_rates and the World Bank provider removed"]
     US_18_1["US-18.1: Retire inflation_rates and the World Bank provider"]
+  end
+  subgraph EPIC_19["EPIC-19: A workflow&#x27;s owner can rename it"]
+    US_19_1["US-19.1: Rename a workflow"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1268,6 +1283,11 @@ flowchart TD
   US_17_2 -.-> US_17_3
   US_17_3 -.-> US_17_4
   US_17_4 -.-> US_17_5
+  US_6_1 -.-> US_19_1
+  US_6_3 -.-> US_19_1
+  US_15_11 -.-> US_19_1
+  US_15_12 -.-> US_19_1
+  US_18_1 -.-> US_19_1
 ```
 
 ```mermaid
@@ -2387,6 +2407,29 @@ flowchart TD
     US_18_1 --> T_18_1_10
     T_18_1_11["US-18.1#11: Amend PRD-Tool-Catalog TC-03 and &quot;Market data&quot;, PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036&#x27;s &quot;Requirements revised&quot; lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7."]
     US_18_1 --> T_18_1_11
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_19["EPIC-19 tasks"]
+    US_19_1["US-19.1: Rename a workflow"]
+    T_19_1_1["US-19.1#1: Add the `{name}` request contract under creation&#x27;s rule (1 to 100 characters). Add `PUT /v1/workflows/{workflow_id}/name` behind `OwnerWorkspace`, returning the workflow&#x27;s view with no idempotency key. Add an application function that updates only the name, succeeds unchanged for the workflow&#x27;s own name, and refuses another workspace&#x27;s workflow with `workflow_not_found`. It refuses a name another workflow holds with `workflow_name_taken`, also when the unique constraint decides a race (N1, N2, N3, N5). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_19_1 --> T_19_1_1
+    T_19_1_2["US-19.1#2: Regenerate OpenAPI and the TypeScript client with the new operation. Checked by `contract_drift` in the fast profile."]
+    US_19_1 --> T_19_1_2
+    T_19_1_3["US-19.1#3: Add the route to `WORKFLOW_ROUTES` and its refusals to the refusal tables in `services/agent/tests/test_refusal_responses.py`. Checked by pytest under `services/agent/tests`."]
+    US_19_1 --> T_19_1_3
+    T_19_1_4["US-19.1#4: Add a name field to the workflow editor beside the description. It trims what is typed, sends no blank name and carries no key. It updates the heading from the returned view and words `workflow_name_taken` and `owner_required` (N1, N2, N4). Checked by the web unit tests under `apps/web/tests/unit` and a workflows browser-suite case under `apps/web/tests/browser`, run by the db profile."]
+    US_19_1 --> T_19_1_4
+    T_19_1_5["US-19.1#5: Show on a disposable stack that a rename changes no version, graph, hash, draft, description or execution. Show that the list, the read, Granted to and the runs list&#x27;s label give the new name, and that earlier runs&#x27; goals keep the old name and are still found by it. Show that a later execution and a routine&#x27;s occurrence bind by id and version (N3, N4). Checked by the db profile&#x27;s disposable fixtures, with a scripted model where an execution needs one."]
+    US_19_1 --> T_19_1_5
+    T_19_1_6["US-19.1#6: Make the seed keep a workflow renamed to a seeded name. When a seeded workflow is renamed away, seeding again adds the seeded one beside it, without replaying the earlier seed&#x27;s receipts onto the renamed workflow or replacing its draft (N6, Decision 0034 S1). Checked by the db profile&#x27;s disposable fixtures (`concept_seed_check`) on a workspace seeded before US-18.1 and on one seeded after."]
+    US_19_1 --> T_19_1_6
+    T_19_1_7["US-19.1#7: Through the change&#x27;s delta specs, add the rename to the workflow-definition spec. Checked by reading the archived spec against N1 to N6."]
+    US_19_1 --> T_19_1_7
+    T_19_1_8["US-19.1#8: Amend PRD-Studio WF-06 to &quot;Name, labels and description&quot;, saying that a workflow&#x27;s owner can rename it under N2 and N3, as Decision 0037&#x27;s &quot;Requirements revised&quot; lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3."]
+    US_19_1 --> T_19_1_8
   end
 ```
 
@@ -9587,6 +9630,124 @@ Tasks:
 - [x] Remove `world_bank` from the web's provider labels and their unit test. Checked by the web unit tests under `apps/web/tests/unit`.
 - [x] Through the change's delta specs, remove the market-data spec's inflation requirement and rename the workflow in the experts spec's seed scenario. Checked by reading the archived specs against R1 and R7.
 - [x] Amend PRD-Tool-Catalog TC-03 and "Market data", PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036's "Requirements revised" lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7.
+
+Open Questions:
+- None.
+
+# EPIC-19: A workflow's owner can rename it
+
+Scheduled by [Decision 0037](docs/engineering/decisions/0037-workflow-rename.md#decision), from the owner's request of 2026-11-20 to rename the workflow their install was seeded with as "Monthly FX and inflation note" to "Monthly FX note", and their choice to add rename to the app over running a database update themselves. The rest was delegated and is decided there. It amends PRD-Studio WF-06, which becomes "Name, labels and description". The workspace owner renames a workflow from its editor through `PUT /v1/workflows/{id}/name`, which replaces the name whole and carries no idempotency key, and a member is refused with `owner_required`. Creation's rule for a name holds: 1 to 100 characters, unique within the workspace, and a name another workflow holds is refused with `workflow_name_taken`, also when the unique constraint decides a race. A rename changes no version, graph, hash, draft, description or execution, and runs, routines and executions keep binding by id and version. Everything that shows a workflow reads its new name, while a run's goal keeps the name its execution started under. The seed keeps what exists by name, so a workflow renamed to a seeded name is kept, and one renamed away gets the seeded one beside it. Nothing records an earlier name except those goals, and renaming an Expert is not part of this. The owner renames their own workflow through the app. The story's checks use disposable stacks and scripted models, with no live model call. Nothing here establishes H1 or product acceptance ([what Decision 0037 doesn't establish](docs/engineering/decisions/0037-workflow-rename.md#what-this-doesnt-establish)).
+
+### US-19.1: Rename a workflow
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-20-us-19-1-rename-workflow/`
+
+As a workspace owner
+I want to rename a workflow from its editor, changing nothing else about it
+So that the workflow seeded as "Monthly FX and inflation note" can be called "Monthly FX note", and every screen that shows a workflow shows the name I gave it, while nothing that runs it breaks.
+
+Source:
+- [Decision 0037, N1 to N6](docs/engineering/decisions/0037-workflow-rename.md#decision)
+- [Decision 0037, requirements revised](docs/engineering/decisions/0037-workflow-rename.md#requirements-revised)
+- [Decision 0037, what this gives up](docs/engineering/decisions/0037-workflow-rename.md#what-this-gives-up)
+- [Decision 0037, reversal](docs/engineering/decisions/0037-workflow-rename.md#reversal)
+- [Decision 0036, R7, which seeded the monthly workflow under its earlier name](docs/engineering/decisions/0036-inflation-rates-removed.md#decision)
+- [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [Workflows, WF-01, WF-02, WF-03 and WF-06](docs/PRD/PRD-Studio.md#workflows)
+- [Runs, RN-01 and RN-02](docs/PRD/PRD-Studio.md#runs)
+- [Tools, TL-02](docs/PRD/PRD-Studio.md#tools)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Workflow IR](docs/PRD/PRD-LangChain-Deep-Agents.md#73-workflowdataflow-loop-application-owned)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD 169604d, and its Workflows entry lists an optional description and no rename. `api/workflow_routes.py` offers `PUT /v1/workflows/{workflow_id}/description` (`setWorkflowDescription`, behind `OwnerWorkspace`) and no route that changes a workflow's name. `application/workflows.set_description` updates that one column and refuses another workspace's workflow with `workflow_not_found`. `create_workflow` selects the name before inserting and refuses a taken one with `workflow_name_taken`, which `tests/test_refusal_responses.py` maps to 409. Nothing maps a unique-constraint violation, so a lost race would reach the generic 500 `internal_error` in `api/errors.py` (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `supabase/migrations/20261105000018_workflows.sql` declares `name text not null check (char_length(name) between 1 and 100)` and `unique (workspace_id, name)`. Members only select `public.workflows`, and only `autobots_runtime` may insert or update it, which later migrations leave as it is. `contracts/workflows.WorkflowCreate.name` is `Field(min_length=1, max_length=100)` with no trimming, a body that fails validation is refused 422 `invalid_request`, and `api/dependencies.py` refuses a member 403 `owner_required` (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `application/workflow_executions.create_execution` writes a run's `goal_text` as `Workflow <name>, version <n>` from the live name when the execution starts, and `goal_summary` keeps its first 200 characters. `application/run_projection/run_list.py` labels a workflow run with the joined `w.name` and its version, and its text filter matches `goal_summary`, the Expert's name and `w.name`. `application/tool_grants.py` lists Granted to workflows by `w.name`, and `application/search.py` finds workflows by their live name. Executions and routines (`application/routines.py`) bind a workflow by id and version (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `apps/web/components/workflow-editor/use-description.ts` and `description-field.tsx` edit the description. A save trims, sends `null` for a blank field, carries no key, words `owner_required`, and says "Description saved. No version changed.". `workflow-heading.tsx` shows `workflow.name`, and the list table and preview in `components/workflows/` show the list's name. `workflows-panel.tsx` words creation's `workflow_name_taken` as "That name is already used.", and `app/api/v1/[...path]/route.ts` forwards any `/v1` path and method (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `services/agent/src/autobots/operations/concept_seed.py` keeps a workflow that exists by exact name. Its comment on "Monthly FX note" says a workspace seeded before keeps the old one, and seeding again adds this one beside it. Otherwise it calls `create_workflow` with the key `concept-seed:workflow:<name>` and `publish_version` with `concept-seed:publish:<name>`, as the workspace owner, and receipts expire only under a workspace's `receipt_days` retention. So when a seeded workflow is renamed away and the seed runs again, the earlier receipt replays and returns the renamed workflow, and nothing is added beside it. For one seeded as a draft, `save_draft` replaces the renamed workflow's draft. `tests/db/checks/concept_seed_check.py` arranges a workspace seeded before US-18.1 (checked at HEAD). Not product intent.
+- [Workflow-definition spec, the description requirement](openspec/specs/workflow-definition/spec.md#requirement-workflows-have-an-optional-description-and-nodes-an-optional-label-at-a-new-ir-version): it requires an optional description and has no rename requirement. Not product intent.
+- [Experts spec, the concept seed](openspec/specs/experts/spec.md#requirement-an-optional-concept-seed): it requires that the seed never overwrite what already exists. Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The owner renames a workflow and only its name changes
+  Given a published workflow with a saved draft and a description, whose agent step names an Expert that grants a tool
+  When the owner renames it through the BFF
+  Then the reply is the workflow's view with the new name, its id, versions, graph hashes, draft and description are unchanged, and the workflow list, the workflow's read and the tool's Granted to give the new name
+
+Scenario: A name another workflow holds is refused
+  Given two workflows in one workspace
+  When the owner renames the first to the second's name, and then to its own name
+  Then the first rename is refused with workflow_name_taken and nothing changes, and the second succeeds and changes nothing
+
+Scenario: Two renames race for one name
+  Given two workflows in one workspace, and a name neither holds
+  When the owner renames both to that name at once
+  Then one rename succeeds, the other is refused with workflow_name_taken, and the refused workflow keeps its name
+
+Scenario: The name follows creation's rule
+  Given a workflow
+  When the owner renames it to an empty name, and then to a name of 101 characters
+  Then each is refused as an invalid request, and the name is unchanged
+
+Scenario: Only the owner renames
+  Given a workflow, and a member of its workspace who isn't the owner
+  When the member reads the workflow and then renames it
+  Then the read gives its name, the rename is refused with owner_required, and the name is unchanged
+
+Scenario: Runs keep the name they ran under
+  Given a published workflow with an execution started before it is renamed, and a scripted model
+  When the owner renames it, and an execution of the same published version is started after
+  Then the earlier run's goal keeps the old name, the later run's goal names the new name, the runs list labels both runs with the new name and their version, searching the runs list for the old name finds the earlier run, and the later execution binds the same version and hash as the earlier one
+
+Scenario: Executions and routines keep binding by id and version
+  Given a published workflow, a routine saved before the rename that targets its id and published version, and a scripted model
+  When the owner renames it, the published version is executed, and the routine's occurrence is admitted
+  Then the execution runs that version to its end, the occurrence's run binds the same version and hash, and the routine is unchanged
+
+Scenario: A workflow renamed to a seeded name is kept by the seed
+  Given a workspace seeded before "Monthly FX note" was seeded, whose "Monthly FX and inflation note" the owner renames "Monthly FX note"
+  When the concept seed runs again
+  Then the workspace holds one "Monthly FX note", the renamed workflow with its id and versions unchanged, and the seed adds nothing for that name
+
+Scenario: A seeded workflow renamed away keeps its new name
+  Given a workspace where the concept seed ran, whose published "Weekly competitor brief" and draft "Interview synthesis" the owner renames
+  When the concept seed runs again
+  Then each renamed workflow keeps its new name, versions, hashes and draft, and the seed adds a published "Weekly competitor brief" and a draft "Interview synthesis" beside them
+
+Scenario: The owner renames a workflow in the editor
+  Given the owner's editor open on a published workflow
+  When the owner types a new name with spaces around it and saves it
+  Then the rename sends the name trimmed, the heading shows it with the same version, and the workflows list and the workflow's preview show it
+
+Scenario: The editor sends no blank name and shows a taken one's refusal
+  Given the owner's editor open on a workflow, and another workflow in the workspace
+  When the owner clears the name and saves, and then types the other workflow's name and saves
+  Then no rename is sent for the cleared name, and the taken name's refusal is shown while the heading and the stored name stay as they were
+```
+
+Dependencies:
+- US-6.1
+- US-6.3
+- US-15.11
+- US-15.12
+- US-18.1
+
+Tasks:
+- [x] Add the `{name}` request contract under creation's rule (1 to 100 characters). Add `PUT /v1/workflows/{workflow_id}/name` behind `OwnerWorkspace`, returning the workflow's view with no idempotency key. Add an application function that updates only the name, succeeds unchanged for the workflow's own name, and refuses another workspace's workflow with `workflow_not_found`. It refuses a name another workflow holds with `workflow_name_taken`, also when the unique constraint decides a race (N1, N2, N3, N5). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [x] Regenerate OpenAPI and the TypeScript client with the new operation. Checked by `contract_drift` in the fast profile.
+- [x] Add the route to `WORKFLOW_ROUTES` and its refusals to the refusal tables in `services/agent/tests/test_refusal_responses.py`. Checked by pytest under `services/agent/tests`.
+- [x] Add a name field to the workflow editor beside the description. It trims what is typed, sends no blank name and carries no key. It updates the heading from the returned view and words `workflow_name_taken` and `owner_required` (N1, N2, N4). Checked by the web unit tests under `apps/web/tests/unit` and a workflows browser-suite case under `apps/web/tests/browser`, run by the db profile.
+- [x] Show on a disposable stack that a rename changes no version, graph, hash, draft, description or execution. Show that the list, the read, Granted to and the runs list's label give the new name, and that earlier runs' goals keep the old name and are still found by it. Show that a later execution and a routine's occurrence bind by id and version (N3, N4). Checked by the db profile's disposable fixtures, with a scripted model where an execution needs one.
+- [x] Make the seed keep a workflow renamed to a seeded name. When a seeded workflow is renamed away, seeding again adds the seeded one beside it, without replaying the earlier seed's receipts onto the renamed workflow or replacing its draft (N6, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a workspace seeded before US-18.1 and on one seeded after.
+- [x] Through the change's delta specs, add the rename to the workflow-definition spec. Checked by reading the archived spec against N1 to N6.
+- [x] Amend PRD-Studio WF-06 to "Name, labels and description", saying that a workflow's owner can rename it under N2 and N3, as Decision 0037's "Requirements revised" lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3.
 
 Open Questions:
 - None.

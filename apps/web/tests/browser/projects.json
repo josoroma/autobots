@@ -31,6 +31,7 @@
     "stream-result.spec.ts",
     "tool-switches.spec.ts",
     "workflow-list.spec.ts",
+    "workflow-rename.spec.ts",
     "workflows.spec.ts",
     "workspace-choice.spec.ts"
   ],

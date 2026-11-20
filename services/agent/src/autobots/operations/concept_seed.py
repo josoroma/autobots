@@ -4,8 +4,9 @@ seeded into one workspace an operator names.
 Run it with `python -m autobots.operations.concept_seed --workspace <id>`. It is not a migration,
 and running migrations creates none of this. It is repeatable: an Expert or workflow that already
 has its name in the workspace is left exactly as it is, so a second run, or a person's later edit,
-is never overwritten. It writes no key, token or password, and admits no run, so nothing is left
-pending.
+is never overwritten. A seeded workflow the owner renamed keeps its new name, and the seeded one is
+added beside it (Decision 0037 N6). It writes no key, token or password, and admits no run, so
+nothing is left pending.
 
 An Expert whose tool is unavailable on this install is saved without it, and its purpose says so. A
 workflow whose steps need an unavailable tool (SD-02) is saved as a draft and not published, and
@@ -448,7 +449,8 @@ WORKFLOWS = (
     ),
     WorkflowSeed(
         # It was "Monthly FX and inflation note". A workspace seeded before keeps that one, and
-        # seeding it again adds this one beside it (Decision 0036 R7).
+        # seeding it again adds this one beside it (Decision 0036 R7), unless the owner renamed
+        # the old one to this name, which is then kept (Decision 0037 N6).
         "Monthly FX note",
         "Name the currency pairs. Their rates are pulled into a short note.",
         (),
@@ -593,14 +595,28 @@ async def _seed_workflows(
         if await _named(connection, "public.workflows", workspace_id, workflow.name) is not None:
             report[workflow.name] = "kept"
             continue
+        key = f"concept-seed:workflow:{workflow.name}"
         flow = await create_workflow(
             connection,
             workspace_id=workspace_id,
             actor_id=actor,
-            idempotency_key=f"concept-seed:workflow:{workflow.name}",
+            idempotency_key=key,
             name=workflow.name,
             description=workflow.description,
         )
+        # An earlier seed's receipt replays the workflow it made, which the owner has since renamed.
+        # That one is theirs now, so the seeded workflow is made beside it, under a key naming it
+        # (Decision 0037 N6).
+        while flow.name != workflow.name:
+            key = f"concept-seed:workflow:{workflow.name}:beside:{flow.id}"
+            flow = await create_workflow(
+                connection,
+                workspace_id=workspace_id,
+                actor_id=actor,
+                idempotency_key=key,
+                name=workflow.name,
+                description=workflow.description,
+            )
         graph = WorkflowGraph.model_validate(workflow.graph(experts))
         unavailable = [tool for tool in workflow.needs if tool not in usable]
         if workflow.always_draft or unavailable:
@@ -612,7 +628,8 @@ async def _seed_workflows(
                 workspace_id=workspace_id,
                 actor_id=actor,
                 workflow_id=flow.id,
-                idempotency_key=f"concept-seed:publish:{workflow.name}",
+                # Named by the workflow, so it never replays a renamed one's publish (N6).
+                idempotency_key=f"concept-seed:publish:{flow.id}",
                 expected_version=0,
                 graph=graph,
                 source="user",

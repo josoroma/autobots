@@ -20,7 +20,7 @@ from autobots.application.routines import (
     set_enabled,
 )
 from autobots.application.runs import apply_command
-from autobots.application.workflows import create_workflow, publish_version
+from autobots.application.workflows import create_workflow, publish_version, rename_workflow
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.routines import RoutineConfig, RoutineTarget
 from autobots.contracts.workflows import WorkflowGraph
@@ -165,6 +165,25 @@ async def main() -> None:
         due = await evaluate_routines(db, no_key, START + timedelta(minutes=30), catalog=tool_registry.catalog())
         bound = await value('select workflow_version from public.workflow_executions e join public.routine_occurrences o on o.run_id = e.run_id where o.routine_id = %s', scheduled.id)
         check('a workflow routine binds its exact version, and needs no key without an agent step', '1, version 1', (due, bound), due == 1 and bound == 1)
+
+        # US-19.1 (Decision 0037 N3): a routine binds its workflow by id and version, so a rename leaves what it binds alone.
+        routine_before = await value('select jsonb_build_object(\'latest\', r.latest_version, \'config\', v.config) from public.routines r '
+                                     'join public.routine_versions v on v.routine_id = r.id and v.version = r.latest_version where r.id = %s', scheduled.id)
+        first_hash = await value('select e.graph_hash from public.workflow_executions e join public.routine_occurrences o on o.run_id = e.run_id '
+                                 'where o.routine_id = %s', scheduled.id)
+        first_run = await value('select run_id from public.routine_occurrences where routine_id = %s', scheduled.id)
+        await apply_command(db, workspace_id=WORKSPACE, run_id=first_run, command=RunCommand.CANCEL,
+                            expected_version=await value('select version from public.runs where id = %s', first_run))
+        await rename_workflow(db, WORKSPACE, flow.id, 'Routine flow, retitled')
+        due = await evaluate_routines(db, no_key, START + timedelta(minutes=60), catalog=tool_registry.catalog())
+        bound = await value('select jsonb_build_object(\'version\', e.workflow_version, \'hash\', e.graph_hash, \'workflow\', e.workflow_id) '
+                            'from public.workflow_executions e join public.routine_occurrences o on o.run_id = e.run_id '
+                            'where o.routine_id = %s and o.run_id <> %s', scheduled.id, first_run)
+        routine_after = await value('select jsonb_build_object(\'latest\', r.latest_version, \'config\', v.config) from public.routines r '
+                                    'join public.routine_versions v on v.routine_id = r.id and v.version = r.latest_version where r.id = %s', scheduled.id)
+        check("after the workflow is renamed, the routine's next occurrence binds the same version and hash, and the routine is unchanged",
+              '1 admitted, version 1, the same hash and workflow, the same routine version and configuration', (due, bound, routine_after == routine_before),
+              due == 1 and bound == {'version': 1, 'hash': first_hash, 'workflow': str(flow.id)} and routine_after == routine_before)
 
         # A daily routine in its own timezone.
         await clear_active()

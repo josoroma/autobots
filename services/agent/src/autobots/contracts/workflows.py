@@ -82,6 +82,14 @@ class WorkflowDescription(BaseModel):
     description: str | None = Field(min_length=1, max_length=500)
 
 
+class WorkflowRename(BaseModel):
+    """Decision 0037 N2: creation's rule for a name. Renaming changes nothing else (N3)."""
+
+    model_config = LAX_CONTRACT
+
+    name: str = Field(min_length=1, max_length=100)
+
+
 class WorkflowPublish(BaseModel):
     model_config = LAX_CONTRACT
 

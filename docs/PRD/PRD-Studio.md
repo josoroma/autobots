@@ -134,7 +134,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 **WF-05. Budget.** An execution takes a budget from US$0.25 to US$5.00, frozen on its run.
 
-**WF-06. Labels and description.** A workflow has an optional description. Graph nodes gain an optional `label`, which bumps the IR version, and older versions stay valid.
+**WF-06. Name, labels and description.** A workflow has an optional description. Graph nodes gain an optional `label`, which bumps the IR version, and older versions stay valid. By [Decision 0037](../engineering/decisions/0037-workflow-rename.md), a workflow's owner can rename it under creation's rule for a name, 1 to 100 characters and unique within the workspace, and a rename changes no version, graph, draft, description or execution.
 
 ## Tools
 

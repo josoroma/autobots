@@ -9,10 +9,17 @@ A second workspace, seeded first with only the six earlier Experts and workflows
 US-16.6 was, with the Market watcher and its monthly workflow as they were before US-18.1, then gets
 the real seed twice with a SerpApi key: it adds the Deep research writer and publishes its workflow,
 adds "Monthly FX note" beside the old monthly workflow, and changes nothing else (Decision 0034 S1,
-Decision 0036 R7). The fresh workspace's Market watcher has no inflation_rates. JSON cases out.
+Decision 0036 R7). The fresh workspace's Market watcher has no inflation_rates.
+
+US-19.1 (Decision 0037 N6): in the fresh workspace, a published and a draft seeded workflow renamed
+away keep their new names, versions, hashes and draft, and seeding again adds the seeded ones beside
+them. A third workspace, seeded as before US-18.1, whose old monthly workflow is renamed "Monthly FX
+note", keeps it as the one "Monthly FX note" when seeded again. Each rename goes through the
+application's rename, as the route calls it. JSON cases out.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -20,11 +27,13 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import psycopg
+from autobots.application.workflows import rename_workflow
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
-WORKSPACE, EARLIER = sys.argv[1], sys.argv[2]
+WORKSPACE, EARLIER, RENAMED = sys.argv[1], sys.argv[2], sys.argv[3]
 ROOT = Path(__file__).resolve().parents[3]
 EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot',
            'Deep research writer', 'Transcript reader']
@@ -195,9 +204,84 @@ def main() -> None:
                            '(select count(*) from public.routine_occurrences o join public.routines r on r.id = o.routine_id where r.workspace_id = %s)',
                        WORKSPACE, WORKSPACE, WORKSPACE)[0]
         check('nothing is pending: no run, job or routine occurrence', '0, 0, 0', pending, pending == (0, 0, 0))
+        renamed_away(db)
         earlier_install(db)
+        renamed_to_seeded(db)
     print(json.dumps({'cases': cases}))
 
+
+def rename(workspace: str, old: str, new: str) -> str:
+    """The owner's rename through the application, as `PUT /v1/workflows/{id}/name` calls it (Decision 0037)."""
+    async def renamed() -> str:
+        async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as connection:
+            found = await (await connection.execute('select id from public.workflows where workspace_id = %s and name = %s',
+                                                    (workspace, old))).fetchone()
+            if found is None:
+                raise SystemExit(f'no workflow named {old!r} to rename')
+            return (await rename_workflow(connection, UUID(workspace), found[0], new)).name
+    return asyncio.run(renamed())
+
+
+def state(db: psycopg.Connection, workspace: str, name: str) -> tuple[Any, ...] | None:
+    """A workflow's id, latest version, description, version hashes and draft graph, by its name, or None."""
+    found = rows(db, 'select w.id, w.latest_version, w.description, '
+                     '(select array_agg(v.graph_hash order by v.version) from public.workflow_versions v where v.workflow_id = w.id), '
+                     '(select d.graph from public.workflow_drafts d where d.workflow_id = w.id) '
+                     'from public.workflows w where w.workspace_id = %s and w.name = %s', workspace, name)
+    return found[0] if found else None
+
+
+def renamed_away(db: psycopg.Connection) -> None:
+    """US-19.1, Decision 0037 N6: a seeded workflow renamed away keeps its new name, versions, hashes and draft, and seeding
+    again adds the seeded one beside it, without replaying the earlier seed's writes onto the renamed one."""
+    moves = {'Weekly competitor brief': 'Competitor brief, retitled', 'Interview synthesis': 'Interview themes, retitled'}
+    before = {old: state(db, WORKSPACE, old) for old in moves}
+    brief, synthesis = before['Weekly competitor brief'], before['Interview synthesis']
+    check('the seeded workflows to rename are a published Weekly competitor brief and a draft Interview synthesis',
+          'version 1 with no draft, version 0 with a draft',
+          {old: (found[1], found[4] is not None) if found else None for old, found in before.items()},
+          brief is not None and (brief[1], brief[4]) == (1, None)
+          and synthesis is not None and synthesis[1] == 0 and synthesis[4] is not None)
+    renamed = {old: rename(WORKSPACE, old, new) for old, new in moves.items()}
+    check('the owner renames both away from their seeded names', str(moves), renamed, renamed == moves)
+    report = run_seed()
+    kept = {old: state(db, WORKSPACE, new) for old, new in moves.items()}
+    check('seeding again leaves each renamed workflow with its id, versions, hashes, description and draft',
+          'unchanged', 'same' if kept == before else (kept, before), kept == before)
+    added = {old: state(db, WORKSPACE, old) for old in moves}
+    new_brief, new_synthesis = added['Weekly competitor brief'], added['Interview synthesis']
+    check('the seed adds a published Weekly competitor brief and a draft Interview synthesis beside them',
+          'two new workflows: version 1 with no draft, version 0 with a draft',
+          (report['workflows'].get('Weekly competitor brief'), report['workflows'].get('Interview synthesis'),
+           (new_brief[1], new_brief[4]) if new_brief else None, new_synthesis[1] if new_synthesis else None),
+          new_brief is not None and new_synthesis is not None and brief is not None and synthesis is not None
+          and new_brief[0] != brief[0] and (new_brief[1], new_brief[4]) == (1, None)
+          and new_synthesis[0] != synthesis[0] and new_synthesis[1] == 0 and new_synthesis[4] is not None
+          and report['workflows'].get('Weekly competitor brief') == {'published': 1}
+          and report['workflows'].get('Interview synthesis') == {'draft': True, 'unavailable': []})
+    others = {name: outcome for name, outcome in report['workflows'].items() if name not in moves}
+    check('everything else is kept', 'kept', set(map(str, others.values())), set(map(str, others.values())) == {'kept'})
+    again = run_seed()
+    outcomes = set(map(str, again['experts'].values())) | set(map(str, again['workflows'].values()))
+    check('seeding a third time adds nothing', 'all kept', outcomes, outcomes == {'kept'})
+
+
+def renamed_to_seeded(db: psycopg.Connection) -> None:
+    """US-19.1, Decision 0037 N6: an install seeded before US-18.1, whose "Monthly FX and inflation note" the owner renames
+    "Monthly FX note", keeps it as the one "Monthly FX note" when seeded again, and the seed adds nothing for that name."""
+    run_seed(RENAMED, earlier=True)
+    before = state(db, RENAMED, OLD_MONTHLY)
+    check('the arranged install has the old monthly workflow, published, and no Monthly FX note', 'version 1, none',
+          (before[1] if before else None, state(db, RENAMED, MONTHLY)),
+          before is not None and before[1] == 1 and state(db, RENAMED, MONTHLY) is None)
+    renamed = rename(RENAMED, OLD_MONTHLY, MONTHLY)
+    report = run_seed(RENAMED)
+    named = rows(db, 'select count(*) from public.workflows where workspace_id = %s and name = %s', RENAMED, MONTHLY)[0][0]
+    check('seeding again keeps the renamed workflow as the one Monthly FX note, with its id and versions, and adds nothing for it',
+          'kept, one, unchanged, no old name',
+          (renamed, report['workflows'].get(MONTHLY), named, state(db, RENAMED, MONTHLY) == before, state(db, RENAMED, OLD_MONTHLY)),
+          renamed == MONTHLY and report['workflows'].get(MONTHLY) == 'kept' and named == 1
+          and state(db, RENAMED, MONTHLY) == before and state(db, RENAMED, OLD_MONTHLY) is None)
 
 def earlier_install(db: psycopg.Connection) -> None:
     """US-16.6: an install seeded before the Deep research writer existed gets it, and its workflow published once a

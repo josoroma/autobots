@@ -53,7 +53,7 @@ STEP_CASES = (
 )
 # The owners each step bootstraps, in order, after owners A and B.
 STEP_OWNERS = ('member-c', 'owner-d', 'reader-f', 'runs-g', 'experts-h', 'models-i', 'composer-j', 'home-k', 'flows-l',
-               'ops-n', 'multi-p', 'seed-o', 'seed-e', 'owner-e')
+               'ops-n', 'multi-p', 'seed-o', 'seed-e', 'seed-r', 'owner-e')
 # The role each arranging statement runs as: the runtime role where it may write, the admin where it may not.
 STEP_ROLES = (
     ('runtime', 'insert into public.workspace_members'), ('runtime', 'insert into public.runs'),
@@ -253,7 +253,8 @@ class Registry(Arranged):
         common = {'capture_output': True, 'text': True, 'errors': 'replace', 'check': False, 'cwd': self.root}
         self.assertEqual(helpers, [
             {'argv': [python, str(checks / 'arrange/model_sources.py'), 'ws-models-i', 'user-models-i'], 'env': service, 'timeout': 120, **common},
-            {'argv': [python, str(checks / 'checks/concept_seed_check.py'), 'ws-seed-o', 'ws-seed-e'], 'env': service, 'timeout': 240, **common},
+            {'argv': [python, str(checks / 'checks/concept_seed_check.py'), 'ws-seed-o', 'ws-seed-e', 'ws-seed-r'], 'env': service,
+             'timeout': 240, **common},
             {'argv': [python, str(checks / 'arrange/browser_runs.py'), 'ws-owner-a', 'ws-owner-e'],
              'env': children.service_env(self.root, RUNTIME_URL, AUTOBOTS_STORAGE_BASE=BASE, AUTOBOTS_STORAGE_SERVICE=SERVICE_KEY),
              'timeout': 120, **common}])

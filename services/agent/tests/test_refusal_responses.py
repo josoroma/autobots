@@ -388,6 +388,7 @@ WORKFLOW_ROUTES: list[tuple[str, str, Body]] = [
     (f"DELETE /v1/workflows/{WORKFLOW}/draft", "discard_draft", None),
     (f"POST /v1/workflows/{WORKFLOW}/draft/publish", "publish_draft", {"expected_version": 0}),
     (f"PUT /v1/workflows/{WORKFLOW}/description", "set_description", {"description": "About"}),
+    (f"PUT /v1/workflows/{WORKFLOW}/name", "rename_workflow", {"name": "Renamed"}),
     (f"GET /v1/workflows/{WORKFLOW}", "get_workflow", None),
     (
         f"POST /v1/workflows/{WORKFLOW}/versions",
@@ -421,6 +422,14 @@ WORKFLOWS = [
             {"version": 1, "budget_micro_usd": 1_000_000},
         )
         for code, (status, text) in BUDGET.items()
+    ),
+    # Decision 0037 N2: a name another workflow holds.
+    Case(
+        f"PUT /v1/workflows/{WORKFLOW}/name",
+        "workflow_routes.rename_workflow",
+        WorkflowRefused("workflow_name_taken"),
+        (409, "workflow_name_taken", SAVED_CONFLICT),
+        {"name": "Taken"},
     ),
 ]
 

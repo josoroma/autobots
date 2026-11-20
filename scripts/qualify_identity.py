@@ -527,12 +527,14 @@ def arrange_search(run: IdentityRun, cases: Cases) -> dict[str, str]:
 
 def check_concept_seed(run: IdentityRun, cases: Cases) -> dict[str, str]:
     """US-15.25 and US-16.6: the concept seed, run twice into a fresh workspace with no GitHub variables, and into a
-    second one arranged as an earlier install. A check, not an arrangement, so it records its child's cases and
-    returns nothing for the browser suites."""
+    second one arranged as an earlier install. US-19.1: a third, seeded as before US-18.1, whose old monthly workflow
+    is renamed before it is seeded again. A check, not an arrangement, so it records its child's cases and returns
+    nothing for the browser suites."""
     workspace = run.owner('seed-o@example.invalid').workspace_id
     # US-16.6: a second fresh workspace, which the check seeds as an install before the Deep research writer was.
     earlier = run.owner('seed-e@example.invalid').workspace_id
-    run_child_check(cases, run.root, 'checks/concept_seed_check.py', workspace, earlier, label='the concept seed check', env=service_env(run.root, run.runtime_url),
+    renamed = run.owner('seed-r@example.invalid').workspace_id
+    run_child_check(cases, run.root, 'checks/concept_seed_check.py', workspace, earlier, renamed, label='the concept seed check', env=service_env(run.root, run.runtime_url),
                     timeout=240, cwd=run.root, err_dir=run.root / ERR_DIR)
     return {}
 
