@@ -1,6 +1,7 @@
 """Golden graphs and every typed refusal, with no database."""
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any
@@ -483,3 +484,44 @@ def test_steps_run_after_what_feeds_them_and_ties_keep_their_listed_order() -> N
     }
     assert step_order(graph) == ["in", "research", "write", "gate", "out"]
     assert step_order({"nodes": [{"id": "a"}, {"id": "b"}], "links": []}) == ["a", "b"]
+
+
+def _patterned(config: Mapping[str, object]) -> dict[str, object]:
+    return {
+        "ir_version": 2,
+        "nodes": [
+            {"id": "video", "block": "input", "version": 1, "config": config},
+            {"id": "out", "block": "output", "version": 1, "config": {}},
+        ],
+        "links": [
+            {"source": "video", "source_port": "value", "target": "out", "target_port": "value"}
+        ],
+    }
+
+
+def test_only_a_string_input_may_declare_a_pattern_that_compiles() -> None:
+    """Decision 0035 Y17: a pattern on another type, not text, too long or broken is invalid."""
+    from autobots.domain.workflows import validate_graph
+
+    assert validate_graph(_patterned({"type": "string", "pattern": "a+"})) == []
+    for config in (
+        {"type": "number", "pattern": "1"},
+        {"type": "string", "pattern": "("},
+        {"type": "string", "pattern": 5},
+        {"type": "string", "pattern": "a" * 301},
+    ):
+        assert [(e.code, e.node) for e in validate_graph(_patterned(config))] == [
+            ("input_pattern_invalid", "video")
+        ], config
+
+
+def test_a_value_must_match_its_inputs_pattern_whole_and_inputs_without_one_are_unchanged() -> None:
+    from autobots.domain.workflows import input_errors
+
+    graph = _patterned({"type": "string", "pattern": "[a-z]+"})
+    assert input_errors(graph, {"video": "abc"}) == []
+    for value in ("abc1", "1abc", "a" * 2049):
+        assert [(e.code, e.node) for e in input_errors(graph, {"video": value})] == [
+            ("input_pattern_mismatch", "video")
+        ]
+    assert input_errors(_patterned({"type": "string"}), {"video": "anything at all"}) == []

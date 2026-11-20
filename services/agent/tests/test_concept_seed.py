@@ -1,17 +1,21 @@
-"""US-15.25 and US-16.6: the concept seed's definitions. The database side runs on a disposable
-stack."""
+"""US-15.25, US-16.6 and US-17.5: the concept seed's definitions. The database side runs on a
+disposable stack."""
 
+import json
 from uuid import uuid4
 
 from autobots.adapters.tool_registry import catalog
+from autobots.contracts.browsing import BrowseGoalV3Input
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
-from autobots.domain.workflows import validate_graph
+from autobots.domain.workflows import input_errors, validate_graph
 from autobots.operations.concept_seed import (
     DEEP_RESEARCH_INSTRUCTIONS,
     EXPERTS,
     GITHUB_RELEASE,
     GITHUB_TRIAGE,
+    TRANSCRIPT_INSTRUCTIONS,
+    TRANSCRIPT_SCHEMA,
     WORKFLOWS,
     available_tools,
 )
@@ -19,7 +23,7 @@ from autobots.operations.concept_seed import (
 GITHUB = {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "fake-token-for-tests"}
 
 
-def test_the_seven_experts_and_seven_workflows_are_sd_02s() -> None:
+def test_the_eight_experts_and_eight_workflows_are_sd_02s() -> None:
     assert [expert.name for expert in EXPERTS] == [
         "Market watcher",
         "Research analyst",
@@ -28,6 +32,7 @@ def test_the_seven_experts_and_seven_workflows_are_sd_02s() -> None:
         "Code maintainer",
         "Google bot",
         "Deep research writer",
+        "Transcript reader",
     ]
     assert [workflow.name for workflow in WORKFLOWS] == [
         "Weekly competitor brief",
@@ -37,6 +42,7 @@ def test_the_seven_experts_and_seven_workflows_are_sd_02s() -> None:
         "Release notes from merged PRs",
         "Vendor due diligence",
         "Deep research content writer",
+        "Transcript",
     ]
 
 
@@ -106,7 +112,9 @@ def test_the_deep_research_writer_is_decision_0034s() -> None:
     assert "Never put the document in a reply" in DEEP_RESEARCH_INSTRUCTIONS
     assert "outputs/child-1/" in DEEP_RESEARCH_INSTRUCTIONS
     assert "read_artifact" in DEEP_RESEARCH_INSTRUCTIONS
-    others = [item for item in EXPERTS if item.name != "Deep research writer"]
+    others = [
+        item for item in EXPERTS if item.name not in ("Deep research writer", "Transcript reader")
+    ]
     assert all(item.instructions == "" for item in others)
 
 
@@ -139,3 +147,65 @@ def test_the_deep_research_workflow_reviews_its_first_step_and_needs_google() ->
     tools = catalog()
     assert "google_search" not in available_tools({}, tools)
     assert "google_search" in available_tools({"SERPAPI_API_KEY": "fake-serpapi-key"}, tools)
+
+
+def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_one_file() -> None:
+    """Decision 0035 Y13 and Y14: its grants, its purpose's hosts and terms, and its instructions'
+    browse, stops and file."""
+    expert = next(item for item in EXPERTS if item.name == "Transcript reader")
+    assert expert.tools == ("browse_goal", "save_artifact", "publish_artifact")
+    for host in ("youtube.com", "ytimg.com", "ggpht.com", "gstatic.com", "googlevideo.com"):
+        assert host in expert.purpose and host in TRANSCRIPT_INSTRUCTIONS, host
+    assert "never googlevideo.com" in expert.purpose and "terms" in expert.purpose
+    for step in (
+        '"...more"',
+        '"Show transcript"',
+        "bot_check",
+        "no transcript",
+        "transcript.md",
+        "Source: ",
+        "YouTube's own captions",
+        "Never sign in, comment",
+    ):
+        assert step in TRANSCRIPT_INSTRUCTIONS, step
+    assert "never" in TRANSCRIPT_INSTRUCTIONS.lower() and "summarise" in TRANSCRIPT_INSTRUCTIONS
+    args = {
+        "task": "t",
+        "start_url": "https://www.youtube.com/watch?v=JWhICz1QR8M",
+        "allowed_domains": ["youtube.com"],
+        "output_schema": json.loads(TRANSCRIPT_SCHEMA),
+    }
+    assert BrowseGoalV3Input.model_validate(args).output_schema is not None
+    config = ExpertConfig(
+        purpose=expert.purpose, instructions=expert.instructions, tools=list(expert.tools)
+    )
+    assert config.browse_domains == []
+
+
+def test_the_transcript_workflow_takes_only_a_watch_address_and_needs_browsing() -> None:
+    """Decision 0035 Y14 and Y17: video, the Transcript reader, out; a draft without browse_goal."""
+    workflow = next(item for item in WORKFLOWS if item.name == "Transcript")
+    assert (workflow.needs, workflow.always_draft) == (("browse_goal",), False)
+    graph = workflow.graph({expert.name: uuid4() for expert in EXPERTS})
+    assert [(node["id"], node["block"]) for node in graph["nodes"]] == [
+        ("video", "input"),
+        ("transcribe", "agent"),
+        ("out", "output"),
+    ]
+    for good in (
+        "https://www.youtube.com/watch?v=JWhICz1QR8M&t=5s",
+        "https://youtu.be/JWhICz1QR8M",
+        "https://m.youtube.com/watch?v=JWhICz1QR8M",
+    ):
+        assert input_errors(graph, {"video": good}) == [], good
+    for bad in (
+        "http://www.youtube.com/watch?v=JWhICz1QR8M",
+        "https://evil.test/watch?v=JWhICz1QR8M",
+        "https://www.youtube.com/@channel",
+        "https://www.youtube.com/results?search_query=x",
+        "https://youtu.be/short",
+        "https://www.youtube.com/watch?v=JWhICz1QR8M x",
+    ):
+        assert [(error.code, error.node) for error in input_errors(graph, {"video": bad})] == [
+            ("input_pattern_mismatch", "video")
+        ], bad

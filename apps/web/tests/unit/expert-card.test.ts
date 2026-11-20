@@ -10,6 +10,7 @@ import type { ExpertView } from "@autobots/api-client";
 
 import {
   approvalNote,
+  browseDomainsLine,
   classify,
   EXPERT_FILTERS,
   executorLine,
@@ -187,4 +188,22 @@ test("a card shows four tools, then how many more, then its groups", () => {
 test("an Expert's tile shows its name's first letter", () => {
   assert.equal(initialOf("  market watcher"), "M");
   assert.equal(initialOf(""), "");
+});
+
+test("an Expert that browses says where, or that it can't until its domains are listed", () => {
+  assert.equal(
+    browseDomainsLine({ tools: ["browse_goal", "save_artifact"] }),
+    "No browse domains yet, so it can't browse",
+  );
+  assert.equal(
+    browseDomainsLine({
+      tools: ["browse_goal"],
+      browse_domains: ["youtube.com", "ytimg.com"],
+    }),
+    "Browses youtube.com, ytimg.com",
+  );
+  assert.equal(
+    browseDomainsLine({ tools: ["save_artifact"], browse_domains: ["a.test"] }),
+    null,
+  );
 });

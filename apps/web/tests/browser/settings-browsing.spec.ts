@@ -153,6 +153,14 @@ test("the owner lists an Expert's browse domains in the editor, and saving makes
       status: 201,
       parse: parseExpertView,
     });
+    // US-17.5: the Experts page says an Expert with no browse domains can't browse yet.
+    await page.goto("/experts");
+    const card = page.locator('li[data-slot="card"]').filter({
+      has: page.getByRole("link", { name: "Guide", exact: true }),
+    });
+    await expect(card.locator('[data-field="browse-domains"]')).toHaveText(
+      "No browse domains yet, so it can't browse",
+    );
     await page.goto(`/experts/${made.id}`);
     const field = page.getByLabel("Browse domains");
     await expect(field).toHaveValue("");
@@ -160,6 +168,11 @@ test("the owner lists an Expert's browse domains in the editor, and saving makes
     await page.getByRole("button", { name: "Save revision" }).click();
     await expect(page.locator('[data-message="save"]')).toContainText(
       "Saved as version 2",
+    );
+    await expectNoA11yViolations(page);
+    await page.goto("/experts");
+    await expect(card.locator('[data-field="browse-domains"]')).toHaveText(
+      "Browses en.wikivoyage.org",
     );
     await expectNoA11yViolations(page);
     const saved = await getJson(page, {

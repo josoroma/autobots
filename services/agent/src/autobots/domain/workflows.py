@@ -7,6 +7,7 @@ stored, normalized dict; a validated graph's runner reads it as typed `Node`s an
 
 import hashlib
 import json
+import re
 from collections import defaultdict, deque
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -104,6 +105,9 @@ BLOCKS: Mapping[str, Mapping[int, BlockSpec]] = {
     Block.AGENT: {1: BlockSpec({"goal": "string"}, {"result": "json"}, frozenset({"goal"}))},
 }
 INPUT_TYPES = frozenset({"string", "number", "boolean", "json", "list"})
+# Decision 0035 Y17: a `string` input's optional pattern, which a value must match whole.
+PATTERN_CHARACTERS = 300
+PATTERNED_VALUE_CHARACTERS = 2048
 
 
 @dataclass(frozen=True)
@@ -126,6 +130,7 @@ PASS_THROUGH = frozenset({Block.APPROVAL, Block.CONDITION})
 @dataclass(frozen=True)
 class InputConfig:
     type: str
+    pattern: str | None = None
 
 
 @dataclass(frozen=True)
@@ -176,9 +181,26 @@ def _named(value: object, names: Collection[str]) -> str | None:
     return value if isinstance(value, str) and value in names else None
 
 
+def _pattern(value: object) -> re.Pattern[str] | None:
+    """A pattern a `string` input may declare (Decision 0035 Y17), or None if it isn't one."""
+    if not isinstance(value, str) or not value or len(value) > PATTERN_CHARACTERS:
+        return None
+    try:
+        return re.compile(value)
+    except re.error:
+        return None
+
+
 def _input(config: Mapping[str, Any]) -> BlockConfig | str:
     kind = _named(config.get("type"), INPUT_TYPES)
-    return InputConfig(kind) if kind is not None else "input_type_invalid"
+    if kind is None:
+        return "input_type_invalid"
+    pattern = config.get("pattern")
+    if pattern is None:
+        return InputConfig(kind)
+    if kind != "string" or _pattern(pattern) is None:
+        return "input_pattern_invalid"
+    return InputConfig(kind, str(pattern))
 
 
 def _transform(config: Mapping[str, Any]) -> BlockConfig | str:
@@ -602,13 +624,24 @@ def block_versions(graph: Mapping[str, Any]) -> dict[str, str]:
     return {node["id"]: f"{node['block']}@{node['version']}" for node in graph["nodes"]}
 
 
+def _matches(pattern: object, value: str) -> bool:
+    compiled = _pattern(pattern)
+    return (
+        compiled is not None
+        and len(value) <= PATTERNED_VALUE_CHARACTERS
+        and compiled.fullmatch(value) is not None
+    )
+
+
 def input_errors(graph: Mapping[str, Any], inputs: Mapping[str, Any]) -> list[GraphError]:
-    """An execution binds values to the graph's input nodes, of the declared types."""
-    declared = {
-        node["id"]: node.get("config", {}).get("type", "json")
+    """An execution binds values to the graph's input nodes, of the declared types, and a `string`
+    value to its input's pattern when it declares one (Decision 0035 Y17)."""
+    configs = {
+        node["id"]: node.get("config", {})
         for node in graph["nodes"]
         if node["block"] == Block.INPUT
     }
+    declared = {name: config.get("type", "json") for name, config in configs.items()}
     errors = [GraphError("input_missing", name) for name in declared if name not in inputs]
     errors.extend(GraphError("input_unknown", name) for name in inputs if name not in declared)
     python_types: dict[str, tuple[type, ...]] = {
@@ -626,4 +659,6 @@ def input_errors(graph: Mapping[str, Any], inputs: Mapping[str, Any]) -> list[Gr
         )
         if not valid:
             errors.append(GraphError("input_type_mismatch", name))
+        elif "pattern" in configs[name] and not _matches(configs[name]["pattern"], value):
+            errors.append(GraphError("input_pattern_mismatch", name))
     return errors

@@ -7,6 +7,7 @@ import { Card, InitialTile } from "@/components/ui/card";
 import { Choice } from "@/components/ui/field";
 import {
   approvalNote,
+  browseDomainsLine,
   executorLine,
   initialOf,
   runsLine,
@@ -56,6 +57,7 @@ export function ExpertCard({
   const latest = expert.versions.at(-1)?.config ?? {};
   const purpose = latest.purpose?.trim() ?? "";
   const approval = approvalNote(latest.tools ?? [], tools);
+  const browsing = browseDomainsLine(latest);
   return (
     <Card
       as="li"
@@ -115,6 +117,14 @@ export function ExpertCard({
         >
           <ShieldAlert aria-hidden="true" className="size-3.5" />
           {approval}
+        </p>
+      )}
+      {browsing === null ? null : (
+        <p
+          data-field="browse-domains"
+          className="text-muted-foreground text-meta break-words"
+        >
+          {browsing}
         </p>
       )}
       <ToolChips chips={toolChips(latest)} />

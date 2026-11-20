@@ -1,9 +1,9 @@
-"""US-15.25 and US-16.6: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
+"""US-15.25, US-16.6 and US-17.5: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
 
 Migrations alone must have created none of it. Run twice, it leaves each Expert and workflow once.
 It holds no secret, leaves nothing pending, and follows SD-02: the GitHub-only workflows, Interview
-synthesis and, with no SerpApi key, Deep research content writer are drafts, the rest published, and
-Experts are saved without their unavailable tools.
+synthesis and, with no SerpApi key, Deep research content writer are drafts, and, with no browser executor, so
+is Transcript; the rest are published, and Experts are saved without their unavailable tools.
 
 A second workspace, seeded first with only the six earlier Experts and workflows as an install before
 US-16.6 was, then gets the real seed twice with a SerpApi key: it adds the Deep research writer and
@@ -25,12 +25,13 @@ URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE, EARLIER = sys.argv[1], sys.argv[2]
 ROOT = Path(__file__).resolve().parents[3]
 EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot',
-           'Deep research writer']
+           'Deep research writer', 'Transcript reader']
 WORKFLOWS = ['Weekly competitor brief', 'Monthly FX and inflation note', 'Nightly test triage', 'Interview synthesis',
-             'Release notes from merged PRs', 'Vendor due diligence', 'Deep research content writer']
-DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis', 'Deep research content writer'}
+             'Release notes from merged PRs', 'Vendor due diligence', 'Deep research content writer', 'Transcript']
+DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis', 'Deep research content writer', 'Transcript'}
 WRITER = 'Deep research writer'
 RESEARCH = 'Deep research content writer'
+READER, TRANSCRIPT = 'Transcript reader', 'Transcript'
 SECRET = re.compile(r'sk-or-|sk-[A-Za-z0-9]{16,}|eyJ[A-Za-z0-9_-]{10,}|ghp_|github_pat_|Bearer |password\s*[:=]|secret\s*[:=]', re.IGNORECASE)
 cases: list[dict[str, Any]] = []
 
@@ -87,8 +88,8 @@ def main() -> None:
                 'from public.workflows w where w.workspace_id = %s', WORKSPACE)}
         drafts = sorted(name for name, (latest, drafted) in states.items() if latest == 0 and drafted)
         published = sorted(name for name, (latest, drafted) in states.items() if latest == 1 and not drafted)
-        check('with no GitHub or SerpApi variable, the GitHub workflows, Interview synthesis and Deep research content writer are drafts, '
-              'and the other three are published',
+        check('with no GitHub or SerpApi variable and no browser executor, the GitHub workflows, Interview synthesis, Deep research '
+              'content writer and Transcript are drafts, and the other three are published',
               f'drafts {sorted(DRAFTS)}', (drafts, published), drafts == sorted(DRAFTS) and published == sorted(set(WORKFLOWS) - DRAFTS))
         unavailable = {name: report['unavailable'] for name, report in first['workflows'].items() if isinstance(report, dict) and report.get('draft')}
         check('a draft names the unavailable tools that made it one', 'GitHub tools for the two, none for Interview synthesis', unavailable,
@@ -97,10 +98,18 @@ def main() -> None:
               and unavailable.get('Nightly test triage') and unavailable.get('Release notes from merged PRs'))
         check('with no SerpApi variable, Deep research content writer is a draft for want of google_search', "['google_search']",
               unavailable.get(RESEARCH), unavailable.get(RESEARCH) == ['google_search'])
+        check('with no browser executor, Transcript is a draft for want of browse_goal', "['browse_goal']",
+              unavailable.get(TRANSCRIPT), unavailable.get(TRANSCRIPT) == ['browse_goal'])
 
         configs = {name: config for name, config in rows(
             db, 'select e.name, v.config from public.experts e join public.expert_versions v on v.expert_id = e.id and v.version = e.latest_version '
                 'where e.workspace_id = %s', WORKSPACE)}
+        reader = configs.get(READER, {})
+        check('with no browser executor, the Transcript reader is saved without browse_goal, says so, and lists no browse domains',
+              'save_artifact and publish_artifact, "Saved without browse_goal" in its purpose, no browse domains',
+              (reader.get('tools'), 'Saved without browse_goal' in reader.get('purpose', ''), reader.get('browse_domains', [])),
+              reader.get('tools') == ['save_artifact', 'publish_artifact'] and 'Saved without browse_goal' in reader.get('purpose', '')
+              and not reader.get('browse_domains'))
         github = {name: [tool for tool in configs[name]['tools'] if 'github' in tool] for name in ('Issue triager', 'Code maintainer')}
         said = {name: 'Saved without' in configs[name]['purpose'] and 'github' in configs[name]['purpose'] for name in ('Issue triager', 'Code maintainer')}
         check('Issue triager and Code maintainer are saved without their GitHub tools, and say so in their purpose', 'no GitHub tool, said',
@@ -159,17 +168,18 @@ def earlier_install(db: psycopg.Connection) -> None:
                'where e.workspace_id = %s order by e.name, v.version'
     before = rows(db, snapshot, EARLIER)
     flows_before = rows(db, 'select name, latest_version from public.workflows where workspace_id = %s order by name', EARLIER)
-    check('the arranged install has the six earlier Experts and workflows, without the two new ones', '6 and 6, none new',
+    check('the arranged install has the six earlier Experts and workflows, without the newer ones', '6 and 6, none new',
           ([name for name, _, _ in before], [name for name, _ in flows_before]),
           len(before) == 6 and len(flows_before) == 6 and WRITER not in [name for name, _, _ in before])
     serpapi = {'SERPAPI_API_KEY': 'fake-serpapi-key-for-the-seed-check'}
     first, second = run_seed(EARLIER, serpapi), run_seed(EARLIER, serpapi)
     created = sorted(name for group in ('experts', 'workflows') for name, report in first[group].items() if report != 'kept')
-    check('the first run adds only the Deep research writer and its workflow', f'{sorted([WRITER, RESEARCH])}', created,
-          created == sorted([WRITER, RESEARCH]) and first['workflows'][RESEARCH] == {'published': 1})
-    after = [row for row in rows(db, snapshot, EARLIER) if row[0] != WRITER]
+    check('the first run adds only the Deep research writer, the Transcript reader and their workflows',
+          f'{sorted([WRITER, RESEARCH, READER, TRANSCRIPT])}', created,
+          created == sorted([WRITER, RESEARCH, READER, TRANSCRIPT]) and first['workflows'][RESEARCH] == {'published': 1})
+    after = [row for row in rows(db, snapshot, EARLIER) if row[0] not in (WRITER, READER)]
     flows_after = [row for row in rows(db, 'select name, latest_version from public.workflows where workspace_id = %s order by name', EARLIER)
-                   if row[0] != RESEARCH]
+                   if row[0] not in (RESEARCH, TRANSCRIPT)]
     check('everything that existed is unchanged', 'the same versions and configurations', 'same' if (after, flows_after) == (before, flows_before) else 'changed',
           (after, flows_after) == (before, flows_before))
     added = rows(db, 'select v.config from public.experts e join public.expert_versions v on v.expert_id = e.id where e.workspace_id = %s and e.name = %s',

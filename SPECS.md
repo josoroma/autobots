@@ -725,13 +725,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-17.4#5 | Show that the box holds no key, password, cookie or card, that Chromium refuses downloads, and that a file chooser sees only the box's empty `tmpfs`. Checked by `scripts/qualify_browser_executor.py` on a disposable stack with a scripted model. | DONE | US-17.4 |
 | US-17.4#6 | Update the Pydantic contracts and `browse_goal`'s guide, and regenerate OpenAPI and the TypeScript client. Checked by `contract_drift` in the full profile and pytest under `services/agent/tests`. | DONE | US-17.4 |
 | US-17.4#7 | Amend PRD-Tool-Catalog's "Autonomous browsing" for `bot_check` and the output schema, and BX-03 for submits under YOLO. Update `README.md`, `README-DEV.md` and `CODEBASE.md` to say browsing presses, types and submits under YOLO, and that a bot check stops it. Checked by reading them against Decision 0035 Y5, Y10 to Y12 and Y19. | DONE | US-17.4 |
-| US-17.5 | The Transcript reader Expert and workflow | READY | EPIC-17 |
-| US-17.5#1 | Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`). | TODO | US-17.5 |
-| US-17.5#2 | Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures. | TODO | US-17.5 |
-| US-17.5#3 | Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-17.5 |
-| US-17.5#4 | Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures. | TODO | US-17.5 |
-| US-17.5#5 | Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`. | TODO | US-17.5 |
-| US-17.5#6 | Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17. | TODO | US-17.5 |
+| US-17.5 | The Transcript reader Expert and workflow | DONE | EPIC-17 |
+| US-17.5#1 | Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`). | DONE | US-17.5 |
+| US-17.5#2 | Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures. | DONE | US-17.5 |
+| US-17.5#3 | Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | DONE | US-17.5 |
+| US-17.5#4 | Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures. | DONE | US-17.5 |
+| US-17.5#5 | Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`. | DONE | US-17.5 |
+| US-17.5#6 | Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17. | DONE | US-17.5 |
 
 ## Dependency Diagram
 
@@ -9353,7 +9353,8 @@ Open Questions:
 
 ### US-17.5: The Transcript reader Expert and workflow
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-19-us-17-5-transcript-reader-expert-workflow/`
 
 As a workspace owner
 I want an Expert and a workflow that turn a YouTube video into its transcript as Markdown
@@ -9416,12 +9417,12 @@ Dependencies:
 - US-17.4
 
 Tasks:
-- [ ] Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`).
-- [ ] Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures.
-- [ ] Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
-- [ ] Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures.
-- [ ] Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`.
-- [ ] Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17.
+- [x] Seed the Transcript reader with a purpose and instructions. They open the watch address, press "...more" and "Show transcript", read every line, and publish `transcript.md` with the video's title, its source address and each line's timestamp, noting that the lines are YouTube's own captions. They stop when no transcript is offered or a bot check appears, and never sign in, comment or post (Y13). Grant it `browse_goal` and the artifact tools publication needs, with an empty browse domain list. Its purpose says it browses only once the owner adds youtube.com, ytimg.com, ggpht.com and gstatic.com, never googlevideo.com, and that adding them is where the owner accepts YouTube's terms. Checked by the db profile's disposable fixtures (`concept_seed_check`).
+- [x] Seed the Transcript workflow, input `video` → Transcript reader → output. It is published when `browse_goal` is available and otherwise a draft (SD-01), and the seed changes nothing that already exists by name (Decision 0034 S1). Checked by the db profile's disposable fixtures.
+- [x] Let a workflow's `string` input declare a pattern, and refuse an execution whose value doesn't match before it starts, naming the input (Y17). The Transcript workflow's `video` input requires an https YouTube watch or youtu.be address, and inputs without a pattern are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [x] Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures.
+- [x] Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`.
+- [x] Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17.
 
 Open Questions:
 - None.
