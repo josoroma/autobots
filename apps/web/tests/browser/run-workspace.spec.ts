@@ -22,6 +22,8 @@ const tools = arranged({
   generation: "AUTOBOTS_TEST_TOOL_GENERATION",
   workspace: "AUTOBOTS_TEST_TOOL_WORKSPACE",
 });
+// US-17.4, arranged by tests/db/checks/tool_use_view_check.py: a browse_goal use with two steps.
+const browse = arranged({ run: "AUTOBOTS_TEST_BROWSE_RUN" });
 const RUN_NOT_FOUND =
   "That run is not available. Sign in with access to it, or check the link.";
 const OUTAGE = {
@@ -508,6 +510,48 @@ test("a signed-out stream is refused, and Run links to the new run", async ({
   // Disconnected again. A later test here saves it once more, and runs.spec.ts removes that one
   // before settings.spec.ts checks that workspace A has none (TWEB-01).
   await disconnectProviderKey(page);
+});
+
+test("US-17.4: a browse's steps show their screenshots, pages and submits, only to a member", async ({
+  page,
+  request,
+}) => {
+  expect(
+    (
+      await request.get(`/api/v1/runs/${browse.run}/tool-uses/1/steps`)
+    ).status(),
+  ).toBe(401);
+  expect(
+    (
+      await request.get(
+        `/api/v1/runs/${browse.run}/tool-uses/1/steps/1/screenshot`,
+      )
+    ).status(),
+  ).toBe(401);
+  await signIn(page, users.owner);
+  await page.goto(`/runs/${browse.run}`);
+  const section = page.getByRole("region", { name: "Tools used" });
+  const row = section.locator('[data-tool-id="browse_goal"]');
+  await expect(row).toHaveCount(1);
+  await row.getByText("Show 2 steps").click();
+  const steps = row.locator("[data-browse-step]");
+  await expect(steps).toHaveCount(2);
+  await expect(steps.nth(0)).toContainText("Step 1: example.com/");
+  await expect(steps.nth(1)).toContainText("Step 2: example.com/search");
+  await expect(steps.nth(1)).toContainText("Submitted to example.com/search");
+  await expect(row).not.toContainText("secret");
+  const image = steps.nth(1).getByRole("img", {
+    name: "Screenshot after step 2, on example.com/search",
+  });
+  await expect(image).toBeVisible();
+  await expect
+    .poll(() =>
+      image.evaluate((img: HTMLImageElement) =>
+        img.complete ? img.naturalWidth : 0,
+      ),
+    )
+    .toBe(320);
+  await expectNoA11yViolations(page);
 });
 
 test("US-14.4: tool uses show live, once each and in order, and again after a reload", async ({

@@ -794,6 +794,71 @@ export const schemas = {
     "title": "BlockView",
     "type": "object"
   },
+  "BrowseStep": {
+    "additionalProperties": false,
+    "properties": {
+      "page": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The page it ended on, as host and path.",
+        "title": "Page"
+      },
+      "screenshot": {
+        "description": "Whether a screenshot was kept for this step.",
+        "title": "Screenshot",
+        "type": "boolean"
+      },
+      "step": {
+        "minimum": 1.0,
+        "title": "Step",
+        "type": "integer"
+      },
+      "submits": {
+        "description": "Each form it submitted, as host and path.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Submits",
+        "type": "array"
+      }
+    },
+    "required": [
+      "step",
+      "submits",
+      "screenshot"
+    ],
+    "title": "BrowseStep",
+    "type": "object"
+  },
+  "BrowseStepList": {
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "steps": {
+        "items": {
+          "$ref": "#/components/schemas/BrowseStep"
+        },
+        "title": "Steps",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "steps"
+    ],
+    "title": "BrowseStepList",
+    "type": "object"
+  },
   "BrowsingSettingsDraft": {
     "additionalProperties": false,
     "description": "The owner's change, at the version they last read.",
@@ -8101,6 +8166,26 @@ export function parseBlockView(value: unknown): BlockView {
   return parseWith(schemas, "BlockView", value) as BlockView;
 }
 
+export interface BrowseStep {
+  page?: string | null;
+  screenshot: boolean;
+  step: number;
+  submits: string[];
+}
+
+export function parseBrowseStep(value: unknown): BrowseStep {
+  return parseWith(schemas, "BrowseStep", value) as BrowseStep;
+}
+
+export interface BrowseStepList {
+  schema_version: 1;
+  steps: BrowseStep[];
+}
+
+export function parseBrowseStepList(value: unknown): BrowseStepList {
+  return parseWith(schemas, "BrowseStepList", value) as BrowseStepList;
+}
+
 export interface BrowsingSettingsDraft {
   expected_version: number;
   yolo: boolean;
@@ -10195,6 +10280,10 @@ export type ListRunToolUsesQuery = {
 
 export async function listRunToolUses(options: ClientOptions, run_id: string, query?: ListRunToolUsesQuery, request?: RequestOptions): Promise<ToolUseList> {
   return parseToolUseList(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/tool-uses${queryString(query, ["after", "limit"])}`, undefined, request, parseErrorResponse));
+}
+
+export async function listBrowseSteps(options: ClientOptions, run_id: string, use_id: string, request?: RequestOptions): Promise<BrowseStepList> {
+  return parseBrowseStepList(await requestJson(options, "GET", `/v1/runs/${encodeURIComponent(run_id)}/tool-uses/${encodeURIComponent(use_id)}/steps`, undefined, request, parseErrorResponse));
 }
 
 export async function getRunWorkspace(options: ClientOptions, run_id: string, request?: RequestOptions): Promise<RunWorkspace> {

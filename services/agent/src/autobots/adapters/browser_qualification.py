@@ -135,6 +135,13 @@ REQUIRED_BROWSER_USE_CASES = (
     "a refused model request ends the browse with its code",
     "nothing of the host enters the browser-use container",
     "the session's containers are removed when the call returns",
+    # US-17.4: pressing, typing and submitting, bot checks, typed results and step screenshots.
+    "a form is typed into and submitted by GET and POST, recorded as host and path only",
+    "a submit that leads outside the allowed domains ends the call refused_action",
+    "a CAPTCHA frame ends the call bot_check, with nothing solved or retried",
+    "a typed result keeps queries only in its link fields, and an invalid one stops invalid_action",
+    "each step keeps one screenshot with its page and submits",
+    "the box holds no key, password, cookie or card, and no host file",
 )
 
 # Each tag's fingerprint label, or None when the image or its label is missing.

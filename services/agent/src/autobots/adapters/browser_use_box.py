@@ -13,6 +13,12 @@ requests that reach the browse's model endpoint (`model_endpoint`).
   code, as `LoopStopped` does on the loop.
 - **Bounded spend.** Past `max_steps` plus one delivery turn, the guard refuses with `max_steps`, so
   a box that ignored its limit can't spend more.
+- **A bot check (Y10).** A CAPTCHA frame, a challenge page or a "sorry" address the guard saw
+  refuses the next request with `bot_check`, which outranks `refused_action`.
+- **What it saw (Y11).** At each model request, before admission, the worker captures the page
+  over its own connection: each step's view as the step began, and where a refused request
+  stopped. It is for people only (Y16). browser-use closes its tabs when it stops, so nothing is
+  captured after its run.
 
 `browse_in_box` runs one such browse: the worker's model endpoint, the session with its relay, the
 worker's own guard and log on the box's Chromium, and the browser-use container. This module is in
@@ -20,6 +26,8 @@ browser-use's fingerprint (`browser_qualification.BROWSER_USE_FINGERPRINTED`).
 """
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -43,7 +51,7 @@ from autobots.application.bounded import stop_task
 from autobots.application.browsing_loop import BrowseOutcome
 from autobots.application.loop_admission import AdmittingLoop
 from autobots.application.tool_definitions import ToolFailed
-from autobots.contracts.browsing import Stopped
+from autobots.contracts.browsing import Stopped, StoppedV3
 from autobots.domain.models import ModelRoute
 
 REPOSITORY = Path(__file__).resolve().parents[5]
@@ -61,6 +69,10 @@ STOPPED: dict[str, Stopped] = {
     "max_steps": "max_steps",
     "timeout": "max_seconds",
 }
+# One screenshot per step, for people only: JPEG at this quality keeps a page near 100 KB.
+SCREENSHOT = {"format": "jpeg", "quality": 60}
+# A step's record: its number, the page it ended on, its screenshot and its submits.
+StepSink = Callable[[int, str | None, bytes | None, tuple[str, ...]], Awaitable[None]]
 REPORT_TEXT_LIMIT = 20_000
 # How long a browse with no outcome of its own waits for the watcher to say why the session ended.
 SETTLE_SECONDS = 10.0
@@ -73,11 +85,13 @@ def browser_use_ready(root: Path = REPOSITORY) -> bool:
 
 @dataclass
 class BoxWatch:
-    """What the worker saw of one browse on browser-use. `refused` reads the CDP log."""
+    """What the worker saw of one browse on browser-use; `refused` and `bot_check` read its log."""
 
     max_calls: int
     refused: Callable[[], bool]
+    bot_check: Callable[[], bool] = lambda: False
     model_calls: int = 0
+    requests: int = 0
     stopped: str | None = None
     refusal: str | None = None
 
@@ -100,11 +114,19 @@ def notices_refusal(body: Mapping[str, Any]) -> bool:
     return any(notice in result for result in _latest_results(body) for notice in REFUSAL_NOTICES)
 
 
-def guarded(answer: Answer, watch: BoxWatch) -> Answer:
-    """`answer` behind the browse's guard, counting the calls it admits."""
+def guarded(
+    answer: Answer, watch: BoxWatch, before: Callable[[], Awaitable[None]] | None = None
+) -> Answer:
+    """`answer` behind the browse's guard, counting the calls it admits. `before` runs ahead of
+    each request, refused ones included."""
 
     async def guarded_answer(body: Mapping[str, Any]) -> Reply:
-        if watch.stopped is None and (watch.refused() or notices_refusal(body)):
+        watch.requests += 1
+        if before is not None:
+            await before()
+        if watch.stopped is None and watch.bot_check():
+            watch.stopped = "bot_check"
+        elif watch.stopped is None and (watch.refused() or notices_refusal(body)):
             watch.stopped = "refused_action"
         elif watch.stopped is None and watch.model_calls >= watch.max_calls:
             watch.stopped = "max_steps"
@@ -129,6 +151,7 @@ class BoxReport:
     status: str
     text: str
     steps: int
+    output: Any = None
 
 
 def parse_report(output: str) -> BoxReport | None:
@@ -145,27 +168,49 @@ def parse_report(output: str) -> BoxReport | None:
                 data["status"],
                 text[:REPORT_TEXT_LIMIT] if isinstance(text, str) else "",
                 steps if isinstance(steps, int) and steps >= 0 else 0,
+                data.get("output"),
             )
     return None
 
 
 def outcome(
-    report: BoxReport | None, watch: BoxWatch, *, refused: bool, visited: tuple[str, ...]
+    report: BoxReport | None,
+    watch: BoxWatch,
+    *,
+    refused: bool,
+    visited: tuple[str, ...],
+    bot_check: bool = False,
+    submits: tuple[str, ...] = (),
 ) -> BrowseOutcome:
     """browse_goal's outcome, or `ToolFailed` with the code that ended the browse."""
     # browser-use counts its delivery turn as a step, so the call's own limit caps what it reports.
     limit = watch.max_calls - 1
     steps = min(report.steps, watch.model_calls, limit) if report is not None else 0
     text = report.text if report is not None else ""
+
+    def ended(stopped: StoppedV3, result: Any = None) -> BrowseOutcome:  # noqa: ANN401 - untrusted JSON
+        return BrowseOutcome(text, visited, steps, watch.model_calls, stopped, result, submits)
+
+    if watch.stopped == "bot_check" or bot_check:
+        return ended("bot_check")
     if watch.stopped == "refused_action" or refused:
-        return BrowseOutcome(text, visited, steps, watch.model_calls, "refused_action")
+        return ended("refused_action")
     if watch.refusal is not None:
         raise ToolFailed(watch.refusal)
     if watch.stopped == "max_steps":
-        return BrowseOutcome(text, visited, steps, watch.model_calls, "max_steps")
+        return ended("max_steps")
     if report is None or report.status not in STOPPED:
         raise ToolFailed("browser_use_failed")
-    return BrowseOutcome(text, visited, steps, watch.model_calls, STOPPED[report.status])
+    return ended(STOPPED[report.status], report.output)
+
+
+@dataclass(frozen=True)
+class BoxModel:
+    """The run's admission, its attempt model and the frozen route each request is admitted on."""
+
+    middleware: AdmittingLoop
+    model: Any
+    route: ModelRoute
 
 
 @dataclass(frozen=True)
@@ -179,15 +224,58 @@ class BoxCall:
     max_steps: int
     max_seconds: int
     grace: int
+    output_schema: Mapping[str, Any] | None = None
 
     def spec(self) -> dict[str, Any]:
-        return {
+        spec: dict[str, Any] = {
             "task": self.task,
             "start_url": self.start_url,
             "allowed_domains": list(self.allowed_domains),
             "max_steps": self.max_steps,
             "max_seconds": self.max_seconds,
         }
+        if self.output_schema is not None:
+            # The worker keeps link fields' queries itself, so the model never sees the extension.
+            schema = {k: v for k, v in self.output_schema.items() if k != "x-link-fields"}
+            spec["output_schema"] = schema
+        return spec
+
+
+@dataclass
+class _Steps:
+    """Each step's screenshot and submits, from the worker's own connection to the box's browser."""
+
+    cdp: Cdp
+    guard: RequestGuard
+    sink: StepSink | None
+    taken: int = 0
+    submits_seen: int = 0
+
+    async def take(self) -> None:
+        if self.sink is None:
+            return
+        self.taken += 1
+        page = self.guard.navigated[-1] if self.guard.navigated else None
+        submits = tuple(self.guard.submitted[self.submits_seen :])
+        self.submits_seen = len(self.guard.submitted)
+        await self.sink(self.taken, page, await self._picture(), submits)
+
+    async def _picture(self) -> bytes | None:
+        session = self.guard.latest or next(iter(self.guard.pages), None)
+        if session is None:
+            return None
+        try:
+            reply = await self.cdp.send("Page.captureScreenshot", SCREENSHOT, session)
+            return base64.b64decode(reply["result"]["data"], validate=True)
+        except (
+            ConnectionError,
+            TimeoutError,
+            KeyError,
+            TypeError,
+            binascii.Error,
+            websockets.WebSocketException,
+        ):
+            return None
 
 
 def _reason(watcher: "asyncio.Task[str]") -> str | None:
@@ -203,17 +291,25 @@ async def browse_in_box(
     *,
     start: Callable[[ModelLink], Awaitable[BrowserSession]],
     alive: Callable[[], Awaitable[bool]],
-    middleware: AdmittingLoop,
-    model: Any,  # noqa: ANN401 - the worker's attempt model, of whichever chat class the route's factory built
-    route: ModelRoute,
+    model: BoxModel,
     visited: Callable[[Sequence[str]], tuple[str, ...]],
+    steps: StepSink | None = None,
 ) -> BrowseOutcome:
     """One browse on browser-use in the session's box, judged from what the worker observed."""
     guards: list[RequestGuard] = []
+    recorder: list[_Steps] = []
+
+    async def step_ended() -> None:
+        if recorder:
+            await recorder[0].take()
+
     watch = BoxWatch(
-        max_calls=call.max_steps + 1, refused=lambda: any(g.refusals() for g in guards)
+        max_calls=call.max_steps + 1,
+        refused=lambda: any(g.refusals() for g in guards),
+        bot_check=lambda: any(g.bot_checks for g in guards),
     )
-    async with ModelEndpoint(guarded(admitted(middleware, model, route), watch)) as endpoint:
+    answer = guarded(admitted(model.middleware, model.model, model.route), watch, step_ended)
+    async with ModelEndpoint(answer) as endpoint:
         try:
             session = await start(ModelLink(endpoint.port, endpoint.token))
         except ExecutorUnavailable:
@@ -223,13 +319,18 @@ async def browse_in_box(
         cdp: Cdp | None = None
         try:
             cdp = await Cdp.connect(await session.websocket_url())
-            guard = RequestGuard(cdp)
+            guard = RequestGuard(cdp, submits=True)
             await guard.start()
             guards.append(guard)
+            recorder.append(_Steps(cdp, guard, steps))
             printed = await executor.run_browser_use(session, call.spec(), seconds=seconds)
             report = parse_report(printed)
             undecided = watch.stopped is None and watch.refusal is None and not guard.refusals()
-            if undecided and (report is None or report.status not in STOPPED):
+            if (
+                undecided
+                and not guard.bot_checks
+                and (report is None or report.status not in STOPPED)
+            ):
                 # A session the watcher ended may still be being removed when the box's run returns,
                 # so its reason is read once the watcher settles.
                 await asyncio.wait({watcher}, timeout=SETTLE_SECONDS)
@@ -239,9 +340,15 @@ async def browse_in_box(
                 if reason is not None:
                     raise ToolFailed(f"browser_{reason}")
             return outcome(
-                report, watch, refused=guard.refusals() > 0, visited=visited(guard.navigated)
+                report,
+                watch,
+                refused=guard.refusals() > 0,
+                visited=visited(guard.navigated),
+                bot_check=bool(guard.bot_checks),
+                submits=tuple(guard.submitted),
             )
         except (ConnectionError, OSError, TimeoutError, websockets.WebSocketException):
+            await asyncio.wait({watcher}, timeout=SETTLE_SECONDS)
             reason = _reason(watcher)
             if reason == "attempt_ended":
                 return BrowseOutcome("", (), 0, watch.model_calls, "cancelled")

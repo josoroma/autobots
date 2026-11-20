@@ -83,8 +83,9 @@ EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "patch_code_file": 1,
         **PROVIDER_TOOLS,
         # Arbitrary execution in the isolated browser, only while it's qualified (US-14.12), with
-        # browser-use's limits from version 2 (Decision 0035 Y9).
-        "browse_goal": 2,
+        # browser-use's limits from version 2 (Decision 0035 Y9) and typed results, submits and
+        # bot_check from version 3 (Y10 to Y12).
+        "browse_goal": 3,
         # Manages the workspace's routines, every action but `list` approved (Decision 0026).
         "cronjob": 1,
     }

@@ -3,22 +3,55 @@ Decision 0018.
 
 The guard refuses what the egress proxy can't see inside TLS: any request that isn't a GET or HEAD,
 or that carries a body, and any scheme but https, data, blob and about. Downloads are denied. It
-also logs each page's committed top-frame navigations, those that landed on an error page and any
-download that began, which browser-use's outcome is judged by (Decision 0035 Y5,
-`browser_use_box`). This module is in the images' fingerprint
+also logs each page's committed top-frame navigations, those that landed on an error page, any
+download that began, form submissions and bot checks, which browser-use's outcome is judged by
+(Decision 0035 Y5, Y10, `browser_use_box`). A browser-use session's guard also lets submits through
+(`SUBMIT_METHODS`). This module is in the images' fingerprint
 (`browser_qualification.FINGERPRINTED`).
 """
 
 import asyncio
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 import websockets
 from websockets.asyncio.client import ClientConnection
 
 READ_METHODS = frozenset({"GET", "HEAD"})
+# Decision 0035 Y5: a browser-use session, which runs only under YOLO, may also submit, with a
+# body, and send a POST's CORS preflight. Every other method stays refused.
+SUBMIT_METHODS = frozenset({"GET", "HEAD", "POST", "OPTIONS"})
+FORM_SUBMISSIONS = frozenset({"formSubmissionGet", "formSubmissionPost"})
+_RECAPTCHA = re.compile(r"/recaptcha/(api2|enterprise)/(anchor|bframe)")
+_GOOGLE = re.compile(r"^(www\.)?google\.[a-z.]+$")
+
+
+def bot_check_host(url: str, resource_type: str | None = None) -> str | None:
+    """The host of a bot check or CAPTCHA this URL shows, from the page itself (Decision 0035 Y10,
+    Y16): reCAPTCHA's visible checkbox or its challenge, an hCaptcha, Cloudflare challenge,
+    DataDome or Arkose frame, or Google's "sorry" page. An invisible reCAPTCHA or Cloudflare's
+    silent detection script on an ordinary page isn't one. Only the host is kept."""
+    parts = urlsplit(url)
+    host, path = (parts.hostname or "").lower(), parts.path
+    document = resource_type in (None, "Document")
+    recaptcha = _RECAPTCHA.search(path)
+    if recaptcha and (recaptcha.group(2) == "bframe" or "size=invisible" not in parts.query):
+        return host
+    challenge = "/cdn-cgi/challenge-platform/" in path and "/orchestrate/" in path
+    framed = document and (
+        host.endswith(("hcaptcha.com", "arkoselabs.com", "funcaptcha.com"))
+        or host == "challenges.cloudflare.com"
+    )
+    sorry = bool(_GOOGLE.match(host)) and path.startswith("/sorry/")
+    if challenge or framed or sorry or host.endswith("captcha-delivery.com"):
+        return host
+    return None
+
+
 # Everything else, file and plain http included, is refused before it loads.
 ALLOWED_SCHEMES = frozenset({"https", "data", "blob", "about"})
 
@@ -80,12 +113,19 @@ class RequestGuard:
 
     cdp: Cdp
     refused: list[dict[str, str]] = field(default_factory=list)
+    # A browser-use session's guard, which lets submits through (SUBMIT_METHODS).
+    submits: bool = False
     # Committed top-frame URLs, the URLs whose top-frame navigation landed on an error page, and
     # downloads that began, each for the pages this guard attached to.
     navigated: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     downloads: int = 0
     pages: set[str] = field(default_factory=set)
+    # The page session that navigated last, form submissions as host and path, and the hosts of
+    # bot checks seen (Decision 0035 Y10, Y11).
+    latest: str | None = None
+    submitted: list[str] = field(default_factory=list)
+    bot_checks: list[str] = field(default_factory=list)
 
     async def start(self) -> None:
         self.cdp.handlers.append(self._event)
@@ -120,13 +160,35 @@ class RequestGuard:
         )
         await self.cdp.send("Runtime.runIfWaitingForDebugger", {}, session)
 
-    def _navigated(self, frame: dict[str, Any]) -> None:
+    def _navigated(self, session: str, frame: dict[str, Any]) -> None:
         if frame.get("parentId"):
             return
+        self.latest = session
         if frame.get("unreachableUrl"):
             self.failed.append(str(frame["unreachableUrl"]))
-        else:
-            self.navigated.append(str(frame.get("url", "")))
+            return
+        url = str(frame.get("url", ""))
+        self.navigated.append(url)
+        self._bot_check(url)
+
+    def _bot_check(self, url: str, resource_type: str | None = None) -> None:
+        host = bot_check_host(url, resource_type)
+        if host is not None:
+            self.bot_checks.append(host)
+
+    def _submitted(self, params: dict[str, Any]) -> None:
+        if params.get("reason") in FORM_SUBMISSIONS:
+            parts = urlsplit(str(params.get("url", "")))
+            self.submitted.append(f"{(parts.hostname or '').lower()}{parts.path or '/'}")
+
+    def _allowed(self, request: dict[str, Any], scheme: str) -> bool:
+        if scheme not in ALLOWED_SCHEMES:
+            return False
+        if self.submits:
+            return request["method"] in SUBMIT_METHODS and (
+                scheme == "https" or request["method"] in READ_METHODS
+            )
+        return request["method"] in READ_METHODS and not request.get("hasPostData")
 
     async def _event(self, message: dict[str, Any]) -> None:
         method, params = message["method"], message.get("params", {})
@@ -136,7 +198,9 @@ class RequestGuard:
                 page = params.get("targetInfo", {}).get("type") == "page"
                 await self._guard(params["sessionId"], page=page)
             elif method == "Page.frameNavigated" and session in self.pages:
-                self._navigated(params["frame"])
+                self._navigated(session, params["frame"])
+            elif method == "Page.frameRequestedNavigation" and session in self.pages:
+                self._submitted(params)
             elif method == "Browser.downloadWillBegin":
                 # Code driving the browser over CDP can turn downloads back on, past Chromium's
                 # policy (Decision 0035 Y6), so one that begins anyway is cancelled and counted.
@@ -145,11 +209,8 @@ class RequestGuard:
             elif method == "Fetch.requestPaused" and session is not None:
                 request = params["request"]
                 scheme = request["url"].split(":", 1)[0].lower()
-                if (
-                    scheme in ALLOWED_SCHEMES
-                    and request["method"] in READ_METHODS
-                    and not request.get("hasPostData")
-                ):
+                self._bot_check(request["url"], params.get("resourceType"))
+                if self._allowed(request, scheme):
                     await self.cdp.send(
                         "Fetch.continueRequest", {"requestId": params["requestId"]}, session
                     )

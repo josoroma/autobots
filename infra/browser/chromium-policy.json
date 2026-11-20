@@ -1,3 +1,7 @@
 {
-  "DownloadRestrictions": 3
+  "DownloadRestrictions": 3,
+  "AllowFileSelectionDialogs": false,
+  "PasswordManagerEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "AutofillAddressEnabled": false
 }

@@ -149,10 +149,11 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
     "browse_goal": ToolGuide(
         "Reads websites in an isolated browser to pursue a task, within the domains it is given.",
         "When an answer needs following links across pages, which search and extract can't do.",
-        # Decision 0035 Y2, Y3 and Y13.
-        "Read-only browsing that never types or submits. Each call waits for approval while YOLO "
-        "is off; while it is on, a call goes only to its Expert's browse domains, and an Expert "
-        "browsing a wiki or forum says in its instructions never to edit or post.",
+        # Decision 0035 Y2, Y3, Y5, Y10, Y12 and Y13.
+        "Each call waits for approval while YOLO is off, and then only reads. While it is on, a "
+        "call goes only to its Expert's browse domains, may press, type and submit there, stops "
+        "at a bot check, and may name an output schema for a typed result. An Expert browsing a "
+        "wiki or forum says in its instructions never to edit or post.",
     ),
     # Code
     "search_files": ToolGuide(

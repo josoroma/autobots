@@ -20,8 +20,9 @@ from uuid import UUID, uuid4
 
 import psycopg
 from autobots.adapters import loop_middleware, tool_registry
-from autobots.adapters.browser_executor import BrowserExecutor, BrowserSession
+from autobots.adapters.browser_executor import BrowserExecutor, BrowserSession, Cdp
 from autobots.adapters.loop_middleware import LoopMiddleware, ModelRoute
+from autobots.adapters.object_storage import _scoped
 from autobots.application import browsing_tool
 from autobots.application.approvals import decide
 from autobots.application.experts import create_expert
@@ -40,7 +41,7 @@ URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
 ACTOR = uuid4()
 RESEARCHER = ModelRoute('researcher', 'openrouter_sol', 'openai/gpt-6.1-sol', 1000)
-GRANT = {**PLAN_TOOLS, 'browse_goal': 2}
+GRANT = {**PLAN_TOOLS, 'browse_goal': 3}
 DOMAINS = ['example.com', 'localtest.me']
 BASE = {'task': 'What is example.com for?', 'start_url': 'https://example.com/', 'allowed_domains': ['example.com']}
 # Planted in the worker's environment, so the box's inspection shows none of them crossed.
@@ -91,6 +92,47 @@ def finish(result: str) -> Any:
 def last_tool_result(model: Script) -> str:
     """What browser-use reported of its last cell, as the next request showed the model."""
     return str(model.seen[-1][-1].content) if model.seen else ''
+
+
+class Store:
+    """The run's private storage, in memory, so each step's screenshot can be read back."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+
+    async def put(self, path: str, content: bytes, media_type: str) -> bool:
+        _scoped(path)  # the real store's rule: one name below the workspace and run
+        self.objects[path] = content
+        return True
+
+    async def get(self, path: str) -> bytes | None:
+        return self.objects.get(path)
+
+    async def remove(self, path: str) -> None:
+        self.objects.pop(path, None)
+
+    async def names(self, prefix: str) -> list[str]:
+        return [name for name in self.objects if name.startswith(prefix)]
+
+
+store = Store()
+# US-17.4: forms the scripted model types into and submits on the qualification host, a submit leading outside, a
+# CAPTCHA frame placed on that host, and a typed result's schema.
+FORMS = ("goto_url('https://example.com/')\n"
+         "js(\"document.body.innerHTML = '<form method=get action=/search><input id=q name=q></form>'; 'ok'\")\n"
+         "fill_input('#q', 'secret words')\npress_key('Enter')\nwait_for_load()")
+POST = ("js(\"document.body.innerHTML = '<form method=post action=/send><input id=m name=m></form>'; 'ok'\")\n"
+        "fill_input('#m', 'secret message')\npress_key('Enter')\nwait_for_load()")
+LEAVING = ("goto_url('https://example.com/')\n"
+           "js(\"document.body.innerHTML = '<form method=post action=https://www.iana.org/x><input id=o name=o></form>'; 'ok'\")\n"
+           "fill_input('#o', 'secret')\npress_key('Enter')\nimport time; time.sleep(2)")
+CAPTCHA = ("goto_url('https://example.com/')\n"
+           "js(\"document.body.insertAdjacentHTML('beforeend', '<iframe src=/recaptcha/api2/bframe?k=x></iframe>'); 'ok'\")\n"
+           "import time; time.sleep(2)")
+SCHEMA = {'type': 'object', 'properties': {'title': {'type': 'string'}, 'link': {'type': 'string'}, 'other': {'type': 'string'}},
+          'required': ['title', 'link'], 'x-link-fields': ['link']}
+POLICIES = ('DownloadRestrictions', 'AllowFileSelectionDialogs', 'PasswordManagerEnabled', 'AutofillCreditCardEnabled',
+            'AutofillAddressEnabled')
 
 
 class Watching(BrowserExecutor):
@@ -166,7 +208,7 @@ async def main() -> None:
 
         async def execute(scope: ToolScope, model: Script, arguments: dict[str, Any], limits: RootLimits | None = None) -> Any:
             registry = ToolRegistry()
-            runtime = browsing_tool.BrowsingRuntime(executor, model, RESEARCHER, settle=2.0, browser_use=lambda: True)
+            runtime = browsing_tool.BrowsingRuntime(executor, model, RESEARCHER, settle=2.0, browser_use=lambda: True, store=store)
             for tool in browsing_tool.browse_tools(runtime):
                 registry.register(tool)
             middleware = LoopMiddleware(db, scope, limits or RootLimits(), ROUTE, sleep=lambda _: asyncio.sleep(0), slot_wait_seconds=2)
@@ -230,7 +272,7 @@ async def main() -> None:
               and output.get('model_calls') == 2 and output.get('truncated') is False and 'Example Domain' in page_seen
               and len(uses) >= 1 and uses[0][0] == 'succeeded' and uses[0][4] == 'autobots' and uses[0][5] == 'browsing'
               and set(uses[0][2]) == {'start_url', 'allowed_domains', 'max_steps', 'typing'} and uses[0][2]['typing'] == 'on'
-              and set(uses[0][3]) == {'stopped', 'steps', 'visited_count'})
+              and set(uses[0][3]) == {'stopped', 'steps', 'visited_count', 'submits'})
         check('each model request is one admitted call of the run on its researcher route',
               "2 requests, 2 succeeded researcher invocations on openrouter_sol, the run's model_calls 2",
               (first_seen, invocations, usage),
@@ -387,6 +429,92 @@ async def main() -> None:
         check("no request reaches Browser Use's hosts",
               "no proxy log entry, allowed or refused, names Browser Use's gateway, cloud, telemetry or sync hosts, or the package index",
               named, bool(everything) and not any(BROWSER_USE_HOSTS.search(host) for host in named))
+        async def steps_of(run: UUID) -> list[tuple[Any, ...]]:
+            return await (await db.execute(
+                'select s.step, s.page, s.submits, s.object_path from app_private.browse_steps s join app_private.tool_uses u '
+                "on u.id = s.tool_use_id where u.run_id = %s and u.tool_id = 'browse_goal' order by s.step", (run,))).fetchall()
+
+        # US-17.4: typing and submitting by GET and POST on the qualification host.
+        typed, _typed_model, typed_run = await browse([cell(FORMS), cell(POST), finish('Submitted both forms.')])
+        typed_output = typed.output or {}
+        typed_public = await value("select output_public from app_private.tool_uses where run_id = %s and tool_id = 'browse_goal'", typed_run)
+        typed_steps = await steps_of(typed_run)
+        check('a form is typed into and submitted by GET and POST, recorded as host and path only',
+              'done; submits example.com/search then example.com/send, public; no typed value or query in the record',
+              (typed_output.get('stopped'), typed_output.get('submits'), typed_public, typed_steps),
+              typed_output.get('stopped') == 'done' and typed_output.get('submits') == ['example.com/search', 'example.com/send']
+              and (typed_public or {}).get('submits') == ['example.com/search', 'example.com/send']
+              and 'secret' not in json.dumps([typed_public, typed_output.get('submits'), [list(row[:3]) for row in typed_steps]]))
+        shots = [store.objects.get(row[3] or '') for row in typed_steps]
+        check('each step keeps one screenshot with its page and submits',
+              "one row per model call, each with a JPEG in the run's storage of the page as that step began, and each submit on "
+              'the step that saw its result',
+              ([(row[0], row[1], row[2], bool(row[3])) for row in typed_steps], typed_output.get('model_calls'),
+               [shot[:2].hex() if shot else None for shot in shots]),
+              len(typed_steps) == typed_output.get('model_calls') == 3
+              and all(shot is not None and shot[:2] == b'\xff\xd8' for shot in shots)
+              and [row[1:3] for row in typed_steps] == [(None, []), ('example.com/search', ['example.com/search']),
+                                                        ('example.com/send', ['example.com/send'])])
+
+        leaving, leaving_model, _ = await browse([cell(LEAVING), finish('never')])
+        check('a submit that leads outside the allowed domains ends the call refused_action',
+              'refused before it leaves, and the call ends refused_action after 1 model call',
+              ((leaving.output or {}).get('stopped'), len(leaving_model.seen)),
+              (leaving.output or {}).get('stopped') == 'refused_action' and len(leaving_model.seen) == 1)
+
+        captcha, captcha_model, _ = await browse([cell(CAPTCHA), cell('print(1)'), finish('never')])
+        check('a CAPTCHA frame ends the call bot_check, with nothing solved or retried',
+              'bot_check after 1 model call, the next request refused before admission',
+              ((captcha.output or {}).get('stopped'), len(captcha_model.seen), (captcha.output or {}).get('model_calls')),
+              (captcha.output or {}).get('stopped') == 'bot_check' and len(captcha_model.seen) == 1)
+
+        good = {'title': 'Example Domain', 'link': 'https://example.com/?ref=guide#top', 'other': 'https://example.com/x?q=secret'}
+        valid, _, _ = await browse([cell("goto_url('https://example.com/')"), calls(('finish', {'result': good, 'success': True}))],
+                                   {'output_schema': SCHEMA})
+        invalid, _, _ = await browse([cell("goto_url('https://example.com/')"),
+                                      calls(('finish', {'result': {'link': 'https://example.com/'}, 'success': True}))],
+                                     {'output_schema': SCHEMA})
+        check('a typed result keeps queries only in its link fields, and an invalid one stops invalid_action',
+              'the link keeps its query and fragment, another URL loses them, visited stays bare; a result missing its title stops '
+              'invalid_action with no result',
+              ((valid.output or {}).get('stopped'), (valid.output or {}).get('result'), (valid.output or {}).get('visited'),
+               (invalid.output or {}).get('stopped'), (invalid.output or {}).get('result')),
+              (valid.output or {}).get('stopped') == 'done'
+              and (valid.output or {}).get('result') == {**good, 'other': 'https://example.com/x'}
+              and (valid.output or {}).get('visited') == ['https://example.com/']
+              and (invalid.output or {}).get('stopped') == 'invalid_action' and (invalid.output or {}).get('result') is None)
+
+        # The box itself: a fresh session's cookies, Chromium's policies and what the browser container holds.
+        bare_box = BrowserExecutor(environ={**os.environ, **WORKER_SECRETS})
+        session = await bare_box.start('box', 1, ('example.com',))
+        try:
+            cdp = await Cdp.connect(await session.websocket_url())
+            cookies = (await cdp.send('Storage.getCookies'))['result']['cookies']
+            target = (await cdp.send('Target.createTarget', {'url': 'chrome://policy'}))['result']['targetId']
+            page_session = (await cdp.send('Target.attachToTarget', {'targetId': target, 'flatten': True}))['result']['sessionId']
+            await asyncio.sleep(2)
+            walk = ("(()=>{function w(n,o){if(!n)return;if(n.shadowRoot)w(n.shadowRoot,o);for(const c of n.childNodes){"
+                    "if(c.nodeType===3&&c.textContent.trim())o.push(c.textContent.trim());w(c,o);}}const o=[];w(document.body,o);"
+                    "return o.join(' | ')})()")
+            policy = (await cdp.send('Runtime.evaluate', {'expression': walk, 'returnByValue': True}, page_session))['result']['result']['value']
+            await cdp.close()
+            inspected = await bare_box.inspect(session)
+            held = (await bare_box._docker('exec', f'{session.name}-browser', 'sh', '-c', 'ls -A /tmp', check=False)).split()
+        finally:
+            await bare_box.stop(session)
+        browser = inspected['browser']
+        flat = json.dumps(inspected)
+        # Chrome 156 marks the two autofill policies deprecated, and still applies them.
+        set_policies = [name for name in POLICIES
+                        if re.search(rf'{name} \| (3|false) \| Platform \| Machine \| Mandatory \| (OK|Deprecated)', policy)]
+        check('the box holds no key, password, cookie or card, and no host file',
+              'no cookie; downloads, file selection, the password manager and card and address autofill off by policy; no mount; '
+              "no worker value; /tmp holds only the browser's own profile, cache and settings",
+              (cookies, set_policies, browser.get('Mounts'), held),
+              cookies == [] and set_policies == list(POLICIES) and not browser.get('Mounts')
+              and not any(secret in flat for secret in WORKER_SECRETS.values())
+              and all(name in ('profile', '.cache', '.config') or name.startswith('org.chromium.Chromium') for name in held))
+
         check("the session's containers are removed when the call returns", 'no browser, proxy or browser-use container left',
               containers(), not containers())
     print(json.dumps({'cases': cases}))

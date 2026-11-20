@@ -7,8 +7,10 @@ import {
   CircleHelp,
 } from "lucide-react";
 
+import { BrowseSteps } from "@/components/runs/tool-uses/browse-steps";
 import type { ToolUses } from "@/components/runs/tool-uses/use-tool-uses";
 import { LoadEmpty, LoadState } from "@/components/ui/load-state";
+import { browseStepCount } from "@/lib/runs/browse-steps";
 import {
   brief,
   toolOutcome,
@@ -155,6 +157,13 @@ function ToolUseRow({ use }: { use: ToolUseView }) {
         data-field="result"
       >
         {toolResult(use)}
+        {browseStepCount(use) > 0 ? (
+          <BrowseSteps
+            runId={use.run_id}
+            useId={use.id}
+            count={browseStepCount(use)}
+          />
+        ) : null}
       </td>
       <td className={CELL} data-field="outcome">
         <span className="inline-flex items-start gap-1.5">

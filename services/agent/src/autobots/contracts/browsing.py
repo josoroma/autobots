@@ -6,10 +6,13 @@ call. Nothing here carries a credential (PK-01). The start URL must already be i
 own domains, so the first navigation can't be the one that leaves them.
 """
 
+import json
+import re
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field, model_validator
+from jsonschema import Draft202012Validator, SchemaError  # type: ignore[import-untyped]  # jsonschema ships no stubs
+from pydantic import BaseModel, Field, JsonValue, model_validator
 
 from autobots.contracts.primitives import TOOL_CONTRACT
 from autobots.contracts.tool_fields import DomainName
@@ -17,6 +20,23 @@ from autobots.contracts.web_tools import WebOutput
 
 Stopped = Literal[
     "done", "max_steps", "max_seconds", "refused_action", "invalid_action", "cancelled"
+]
+# Decision 0035 Y19: an output schema's size, and the form of a link field's path, such as
+# `flights[].url`, where `[]` steps into an array.
+OUTPUT_SCHEMA_BYTES = 8192
+LINK_FIELDS = 20
+LINK_FIELD = re.compile(
+    r"^(\[\]|[A-Za-z_][A-Za-z0-9_-]*(\[\])?)(\.[A-Za-z_][A-Za-z0-9_-]*(\[\])?)*$"
+)
+# Version 3 adds `bot_check` (Decision 0035 Y10).
+StoppedV3 = Literal[
+    "done",
+    "max_steps",
+    "max_seconds",
+    "refused_action",
+    "invalid_action",
+    "cancelled",
+    "bot_check",
 ]
 
 
@@ -68,3 +88,39 @@ class BrowseGoalOutput(WebOutput):
     steps: int
     model_calls: int
     stopped: Stopped
+
+
+# Version 3, Decision 0035 Y12 and Y19: an optional output schema, a JSON Schema (Draft 2020-12)
+# object of at most 8 KB whose top-level `x-link-fields` lists the paths of its link fields.
+class BrowseGoalV3Input(BrowseGoalV2Input):
+    output_schema: dict[str, JsonValue] | None = None
+
+    @model_validator(mode="after")
+    def _schema(self) -> "BrowseGoalV3Input":
+        schema = self.output_schema
+        if schema is None:
+            return self
+        if len(json.dumps(schema).encode()) > OUTPUT_SCHEMA_BYTES:
+            raise ValueError("output_schema is larger than 8 KB")
+        try:
+            Draft202012Validator.check_schema(schema)
+        except SchemaError:
+            raise ValueError("output_schema isn't a JSON Schema") from None
+        links = schema.get("x-link-fields", [])
+        if not isinstance(links, list) or len(links) > LINK_FIELDS:
+            raise ValueError("x-link-fields must be a list of at most 20 paths")
+        if any(not isinstance(link, str) or not LINK_FIELD.match(link) for link in links):
+            raise ValueError("an x-link-fields entry isn't a path such as flights[].url")
+        return self
+
+
+# Version 3's output: the typed result, each submit's host and path, and `bot_check`.
+class BrowseGoalV3Output(WebOutput):
+    summary: str
+    visited: list[str]
+    visited_count: int
+    steps: int
+    model_calls: int
+    stopped: StoppedV3
+    submits: list[str] = Field(default_factory=list)
+    result: JsonValue = None

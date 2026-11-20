@@ -367,7 +367,7 @@ class ToolGateway:
             return _denied(refusal)
         if leaves_receipt(call.tool.operation_class):
             return await self.admit_effect(connection, scope, call, approval)
-        return await self._read(connection, scope, call, approval)
+        return await self._read(connection, scope, call, approval, use)
 
     async def _read(
         self,
@@ -375,11 +375,12 @@ class ToolGateway:
         scope: ToolScope,
         call: Call,
         approval: ApprovedRequest | None,
+        use: int | None = None,
     ) -> ToolResult:
         """No effect, so no receipt. A repeated read must see current content. One a person
         approved has used that approval up (PTOL-06)."""
         tool = call.tool
-        context = ToolContext(connection, scope, None, approval)
+        context = ToolContext(connection, scope, None, approval, use)
         for attempt in range(tool.retries + 1):
             try:
                 output = await asyncio.wait_for(

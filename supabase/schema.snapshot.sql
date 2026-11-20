@@ -363,6 +363,44 @@ CREATE TABLE app_private.assignments (
 );
 
 --
+-- Name: browse_steps; Type: TABLE; Schema: app_private; Owner: -
+--
+
+CREATE TABLE app_private.browse_steps (
+    id bigint NOT NULL,
+    tool_use_id bigint NOT NULL,
+    run_id uuid NOT NULL,
+    workspace_id uuid NOT NULL,
+    step integer NOT NULL,
+    page text,
+    submits jsonb DEFAULT '[]'::jsonb NOT NULL,
+    object_path text,
+    bytes integer,
+    sha256 text,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT browse_steps_bytes_check CHECK (((bytes IS NULL) OR (bytes >= 0))),
+    CONSTRAINT browse_steps_check CHECK ((((object_path IS NULL) = (bytes IS NULL)) AND ((object_path IS NULL) = (sha256 IS NULL)))),
+    CONSTRAINT browse_steps_object_path_check CHECK (((object_path IS NULL) OR (char_length(object_path) <= 512))),
+    CONSTRAINT browse_steps_page_check CHECK (((page IS NULL) OR (char_length(page) <= 2048))),
+    CONSTRAINT browse_steps_sha256_check CHECK (((sha256 IS NULL) OR (sha256 ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT browse_steps_step_check CHECK (((step >= 1) AND (step <= 100))),
+    CONSTRAINT browse_steps_submits_check CHECK ((jsonb_typeof(submits) = 'array'::text))
+);
+
+--
+-- Name: browse_steps_id_seq; Type: SEQUENCE; Schema: app_private; Owner: -
+--
+
+ALTER TABLE app_private.browse_steps ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME app_private.browse_steps_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+--
 -- Name: browsing_settings; Type: TABLE; Schema: app_private; Owner: -
 --
 
@@ -1342,6 +1380,20 @@ ALTER TABLE ONLY app_private.assignments
     ADD CONSTRAINT assignments_pkey PRIMARY KEY (id);
 
 --
+-- Name: browse_steps browse_steps_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browse_steps
+    ADD CONSTRAINT browse_steps_pkey PRIMARY KEY (id);
+
+--
+-- Name: browse_steps browse_steps_tool_use_id_step_key; Type: CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browse_steps
+    ADD CONSTRAINT browse_steps_tool_use_id_step_key UNIQUE (tool_use_id, step);
+
+--
 -- Name: browsing_settings browsing_settings_pkey; Type: CONSTRAINT; Schema: app_private; Owner: -
 --
 
@@ -1813,6 +1865,12 @@ CREATE INDEX assignments_parent ON app_private.assignments USING btree (parent_r
 CREATE INDEX assignments_root ON app_private.assignments USING btree (root_run_id, status);
 
 --
+-- Name: browse_steps_run; Type: INDEX; Schema: app_private; Owner: -
+--
+
+CREATE INDEX browse_steps_run ON app_private.browse_steps USING btree (run_id);
+
+--
 -- Name: improvement_replays_latest; Type: INDEX; Schema: app_private; Owner: -
 --
 
@@ -2015,6 +2073,27 @@ ALTER TABLE ONLY app_private.assignments
 
 ALTER TABLE ONLY app_private.assignments
     ADD CONSTRAINT assignments_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
+
+--
+-- Name: browse_steps browse_steps_run_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browse_steps
+    ADD CONSTRAINT browse_steps_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.runs(id) ON DELETE CASCADE;
+
+--
+-- Name: browse_steps browse_steps_tool_use_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browse_steps
+    ADD CONSTRAINT browse_steps_tool_use_id_fkey FOREIGN KEY (tool_use_id) REFERENCES app_private.tool_uses(id) ON DELETE CASCADE;
+
+--
+-- Name: browse_steps browse_steps_workspace_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
+--
+
+ALTER TABLE ONLY app_private.browse_steps
+    ADD CONSTRAINT browse_steps_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id);
 
 --
 -- Name: browsing_settings browsing_settings_workspace_id_fkey; Type: FK CONSTRAINT; Schema: app_private; Owner: -
@@ -3096,6 +3175,12 @@ GRANT SELECT ON TABLE agent_runtime.route_qualifications TO autobots_runtime;
 --
 
 GRANT SELECT,INSERT,UPDATE ON TABLE app_private.assignments TO autobots_runtime;
+
+--
+-- Name: TABLE browse_steps; Type: ACL; Schema: app_private; Owner: -
+--
+
+GRANT SELECT,INSERT ON TABLE app_private.browse_steps TO autobots_runtime;
 
 --
 -- Name: TABLE browsing_settings; Type: ACL; Schema: app_private; Owner: -

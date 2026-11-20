@@ -219,6 +219,8 @@ class InferenceSource:
     client_factory: Callable[[str], Any] | None = None
     # The isolated browser executor, or None where browsing isn't offered (US-14.12).
     browser: Any = None
+    # The run's private storage, which keeps each browser-use step's screenshot (Decision 0035 Y11).
+    store: Any = None
 
     async def open_attempt(
         self,
@@ -345,7 +347,7 @@ class InferenceSource:
         model, route = bound
         return Browsing(
             qualified=lambda: browsing_tool.executor_ready(environ=view),
-            runtime=browsing_tool.BrowsingRuntime(self.browser, model, route),
+            runtime=browsing_tool.BrowsingRuntime(self.browser, model, route, store=self.store),
         )
 
     async def role_route(

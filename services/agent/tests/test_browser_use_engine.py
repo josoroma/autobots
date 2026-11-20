@@ -36,6 +36,7 @@ from autobots.adapters.browser_qualification import (
 )
 from autobots.adapters.browser_use_box import (
     BoxCall,
+    BoxModel,
     BoxReport,
     BoxWatch,
     browse_in_box,
@@ -50,7 +51,7 @@ from autobots.application.browsing_loop import BrowseOutcome
 from autobots.application.browsing_tool import Limits, browse_tools, resolved_limits
 from autobots.application.loop_admission import active_middleware
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
-from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalV2Input
+from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalV2Input, BrowseGoalV3Input
 from autobots.domain.models import ModelRoute
 from autobots.domain.tools import EXPERT_TOOLS
 from sql_fakes import RuledConnection
@@ -94,18 +95,19 @@ def test_version_1_keeps_the_loops_ceilings() -> None:
 
 
 def test_both_versions_are_registered_and_new_grants_take_version_2() -> None:
-    first, second = browse_tools(None, qualified=lambda: True)
+    first, second, third = browse_tools(None, qualified=lambda: True)
     assert (first.version, first.input_model, first.timeout_seconds) == (1, BrowseGoalInput, 390)
+    assert (third.version, third.input_model, third.timeout_seconds) == (3, BrowseGoalV3Input, 690)
     assert (second.version, second.input_model, second.timeout_seconds) == (
         2,
         BrowseGoalV2Input,
         690,
     )
-    assert EXPERT_TOOLS["browse_goal"] == 2
+    assert EXPERT_TOOLS["browse_goal"] == 3
 
 
 def test_an_approval_shows_the_loops_limits_since_only_a_loop_call_waits() -> None:
-    _, second = browse_tools(None, qualified=lambda: True)
+    _, second, _ = browse_tools(None, qualified=lambda: True)
     assert second.approval is not None and second.approval.resource_target is not None
     most = BrowseGoalV2Input.model_validate({**ARGS, "max_steps": 40, "max_seconds": 600})
     plain = BrowseGoalV2Input.model_validate(ARGS)
@@ -394,9 +396,14 @@ class Endpoint:
 class Guard:
     last: "Guard | None" = None
 
-    def __init__(self, cdp: object) -> None:
+    def __init__(self, cdp: object, submits: bool = False) -> None:
         self.navigated: list[str] = []
         self.failed: list[str] = []
+        self.submitted: list[str] = []
+        self.bot_checks: list[str] = []
+        self.pages: set[str] = set()
+        self.latest: str | None = None
+        self.submits = submits
         Guard.last = self
 
     async def start(self) -> None:
@@ -505,9 +512,7 @@ def in_box(
                 call,
                 start=start,  # type: ignore[arg-type]  # starts a fake session
                 alive=alive,
-                middleware=admitting,  # type: ignore[arg-type]  # a fake admission
-                model=Model(),
-                route=ROUTE,
+                model=BoxModel(admitting, Model(), ROUTE),  # type: ignore[arg-type]  # a fake admission
                 visited=lambda navigated: browsing_tool.visited_urls(navigated, ["a.test"]),
             )
         except ToolFailed as failed:

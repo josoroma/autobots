@@ -96,6 +96,9 @@ class ToolContext:
     # What a person approved for this dispatch, loaded once the approval gate released the call,
     # and None when no approval held it (XMOD-02).
     approval: ApprovedRequest | None = None
+    # The dispatch's tool-use row, for a read that records more against it, such as a browse's
+    # steps (Decision 0035 Y11). None when the dispatch wasn't recorded.
+    use_id: int | None = None
 
     async def return_to_review(self, tool_id: str, detail: dict[str, Any]) -> UUID | None:
         """Nothing was sent, so this operation's approved request goes back to a person with

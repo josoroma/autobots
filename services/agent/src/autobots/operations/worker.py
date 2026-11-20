@@ -340,6 +340,7 @@ def inference_from_environment(
         CatalogCache(context.fetch_catalog),
         client_factory,
         browser=BrowserExecutor(),
+        store=store,
     )
 
 

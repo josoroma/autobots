@@ -24,7 +24,7 @@ from autobots.adapters.loop_middleware import AdmittedModel
 from autobots.application.loop_admission import AdmittingLoop
 from autobots.application.loop_policy import LoopStopped
 from autobots.application.model_attempts import FailureClass
-from autobots.contracts.browsing import Stopped
+from autobots.contracts.browsing import Stopped, StoppedV3
 from autobots.domain.models import ModelRoute
 
 TEXT_CHARS = 6000
@@ -147,11 +147,16 @@ Step = Callable[[list[BaseMessage]], Coroutine[Any, Any, AIMessage]]
 
 @dataclass(frozen=True)
 class BrowseOutcome:
+    """A browse's outcome. `result` and `submits` come only from browser-use (Decision 0035 Y11,
+    Y12), and only browser-use stops `bot_check` (Y10)."""
+
     summary: str
     visited: tuple[str, ...]
     steps: int
     model_calls: int
-    stopped: Stopped
+    stopped: StoppedV3
+    result: Any = None
+    submits: tuple[str, ...] = ()
 
 
 @dataclass
