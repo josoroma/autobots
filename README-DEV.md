@@ -7,6 +7,7 @@
   <b>Developer guide</b> ·
   <a href="README.md#quick-start">Quick start</a> ·
   <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
+  <a href="README-YouTube-Transcript.md">YouTube transcript, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>

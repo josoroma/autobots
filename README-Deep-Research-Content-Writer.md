@@ -6,6 +6,7 @@
   <a href="README.md">Product overview</a> ·
   <a href="README-DEV.md">Developer guide</a> ·
   <b>Deep research, live</b> ·
+  <a href="README-YouTube-Transcript.md">YouTube transcript, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>
