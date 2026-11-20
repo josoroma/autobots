@@ -7,6 +7,7 @@
   <a href="README-DEV.md">Developer guide</a> ·
   <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
   <b>YouTube transcript, live</b> ·
+  <a href="README-Market-Watcher-Costa-Rica.md">Market watcher Costa Rica, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>

@@ -16,6 +16,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
   <a href="README-YouTube-Transcript.md">YouTube transcript, live</a> ·
+  <a href="README-Market-Watcher-Costa-Rica.md">Market watcher Costa Rica, live</a> ·
   <a href="SPECS.md">Backlog</a> ·
   <a href="CODEBASE.md">Codebase</a>
 </p>
@@ -144,6 +145,7 @@ The engineering is held to the same standard as the agents:
 | [README-DEV.md](README-DEV.md) | The developer guide: install, local URLs, architecture, conventions and how work is delivered |
 | [Deep research, live](README-Deep-Research-Content-Writer.md) | How Autobots researches and writes like Deep-Research-Content-Writer, as an Expert and as a workflow, and what its live runs did |
 | [YouTube transcript, live](README-YouTube-Transcript.md) | The Transcript reader Expert and workflow on browser-use, and its first live run, which a YouTube bot check stopped |
+| [Market watcher Costa Rica, live](README-Market-Watcher-Costa-Rica.md) | An Expert and a workflow that turn the colón, oil and coffee into a short note in Costa Rican Spanish, and their two live runs |
 | [SPECS.md](SPECS.md) | The backlog: epics, stories, acceptance scenarios and status |
 | [CODEBASE.md](CODEBASE.md) | What the repository contains today |
 | [Option B engineering contract](docs/engineering/option-b-contract.md) | Run states, transitions and recovery guarantees |
