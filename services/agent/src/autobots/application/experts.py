@@ -37,7 +37,7 @@ from autobots.contracts.persisted import (
 )
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import UnknownModelProfile, approved_role
-from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS
+from autobots.domain.tools import DELEGATION_TOOL, EXPERT_TOOLS, PLAN_TOOLS, without_retired
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
 from autobots.persistence.rows import ExpertRow, ExpertRunsRow, ExpertVersionRow, RouteOptionRow
 
@@ -117,9 +117,16 @@ async def _workspace_keys(connection: SqlConnection, workspace_id: UUID) -> Mapp
     return await key_sources(connection, workspace_id, os.environ)
 
 
+def drop_retired(config: ExpertConfig) -> ExpertConfig:
+    """A retired tool, which a revision made from an earlier version may still name, is left out
+    rather than refused (Decision 0036 R4)."""
+    kept = without_retired(config.tools)
+    return config if len(kept) == len(config.tools) else config.model_copy(update={"tools": kept})
+
+
 def validate_config(config: ExpertConfig, catalog: Catalog, environ: Mapping[str, str]) -> None:
     """A revision can only name what exists and is available, by the catalog the composition edge
-    passes (PK-02). Anything else is refused, not dropped."""
+    passes (PK-02). Anything else is refused, not dropped, once `drop_retired` has run."""
     if any(tool not in EXPERT_TOOLS for tool in config.tools):
         raise ExpertRefused("expert_tool_not_available")
     if len(set(config.tools)) != len(config.tools):
@@ -216,7 +223,7 @@ async def create_expert(
         {"name": name, "config": config.model_dump(mode="json")},
     )
     keys = await _workspace_keys(connection, workspace_id)
-    config = expand_groups(config, catalog, keys)
+    config = expand_groups(drop_retired(config), catalog, keys)
     validate_config(config, catalog, keys)
     async with receipted(connection, command, ExpertCreatedReceipt) as receipt:
         if receipt.prior is not None:
@@ -260,7 +267,7 @@ async def add_version(
         {"expected": expected_version, "config": config.model_dump(mode="json")},
     )
     keys = await _workspace_keys(connection, workspace_id)
-    config = expand_groups(config, catalog, keys)
+    config = expand_groups(drop_retired(config), catalog, keys)
     validate_config(config, catalog, keys)
     async with receipted(connection, command, ExpertVersionReceipt) as receipt:
         if receipt.prior is not None:
@@ -488,7 +495,8 @@ async def resolve_binding(
         instructions=config.instructions + references,
         tools={
             **PLAN_TOOLS,
-            **{tool: EXPERT_TOOLS[tool] for tool in config.tools},
+            # A retired tool the saved version names is left out (Decision 0036 R3).
+            **{tool: EXPERT_TOOLS[tool] for tool in without_retired(config.tools)},
             **({DELEGATION_TOOL: 1} if kind == "coordinator" else {}),
         },
         role_bindings=expert_overrides(config),

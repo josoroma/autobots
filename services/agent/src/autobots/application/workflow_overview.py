@@ -15,6 +15,7 @@ from autobots.contracts.workflows import (
 )
 from autobots.domain.models import PROFILES, ModelRole
 from autobots.domain.runs import TERMINAL, RunStatus
+from autobots.domain.tools import without_retired
 from autobots.domain.workflows import agent_expert_ids, agent_expert_of, step_order
 from autobots.persistence.records import ExpertConfigRecord, read_expert_config
 from autobots.persistence.rows import (
@@ -201,7 +202,8 @@ async def preview_steps(
                 expert_id=UUID(expert_id) if expert_id is not None and found is not None else None,
                 expert_name=found[0] if found is not None else None,
                 model=executor if found is not None else None,
-                tools=sorted(found[1].tools) if found is not None else [],
+                # What the step's run is granted, so no retired tool (Decision 0036 R3).
+                tools=sorted(without_retired(found[1].tools)) if found is not None else [],
                 approval=node["block"] == "approval",
             )
         )

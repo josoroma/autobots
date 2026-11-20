@@ -8,6 +8,8 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Final
 
+from autobots.domain.tools import RETIRED_TOOLS
+
 # The shape of graph state and how the loop reads it.
 GRAPH_STATE_VERSION = 1
 COMPATIBLE_GRAPH_STATES = frozenset({1})
@@ -32,7 +34,6 @@ TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
         "google_extract": 1,
         "google_map": 1,
         "google_search": 1,
-        "inflation_rates": 1,
         "market_history": 1,
         "patch_code_file": 1,
         "propose_improvement": 1,
@@ -86,6 +87,10 @@ def incompatibility(recorded: Mapping[str, Any] | None) -> str | None:
         if current == version:
             continue
         if current is None:
+            # A retired tool stops nothing: the run's model no longer sees it, and a call to it is
+            # refused as tool_not_registered (Decision 0036 R5).
+            if tool in RETIRED_TOOLS:
+                continue
             return f"{tool} v{version} no longer exists"
         if (tool, version, current) not in COMPATIBLE_TOOL_CHANGES:
             return f"{tool} changed from v{version} to v{current}"

@@ -55,7 +55,6 @@ test("every contract value has its label", () => {
     serpapi: "SerpApi (Google)",
     direct: "Directly from each site",
     yahoo_finance: "Yahoo Finance",
-    world_bank: "World Bank",
     github: "GitHub",
   });
   assert.deepEqual(OPERATION_CLASS_LABEL, {

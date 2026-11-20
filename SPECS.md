@@ -6,6 +6,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 
 CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-17.1 to US-17.5 on 2026-11-19. Facts marked "checked at HEAD" were read at `0d407fa`; refreshing the whole analysis is separate work.
 
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-18.1 on 2026-11-20. Facts marked "checked at HEAD" were read at `5c00b04`; refreshing the whole analysis is separate work.
+
 ## Table of Contents
 
 - [EPIC-1: Development foundation and Gate 0](#epic-1-development-foundation-and-gate-0)
@@ -152,6 +154,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-17.3: browse_goal on browser-use in the isolated executor](#us-173-browse_goal-on-browser-use-in-the-isolated-executor)
   - [US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots](#us-174-pressing-typing-and-submitting-under-yolo-with-bot_check-typed-results-and-step-screenshots)
   - [US-17.5: The Transcript reader Expert and workflow](#us-175-the-transcript-reader-expert-and-workflow)
+- [EPIC-18: inflation_rates and the World Bank provider removed](#epic-18-inflation_rates-and-the-world-bank-provider-removed)
+  - [US-18.1: Retire inflation_rates and the World Bank provider](#us-181-retire-inflation_rates-and-the-world-bank-provider)
 
 ## Work Item Status
 
@@ -732,6 +736,19 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-17.5#4 | Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures. | DONE | US-17.5 |
 | US-17.5#5 | Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`. | DONE | US-17.5 |
 | US-17.5#6 | Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17. | DONE | US-17.5 |
+| EPIC-18 | inflation_rates and the World Bank provider removed | — | — |
+| US-18.1 | Retire inflation_rates and the World Bank provider | DONE | EPIC-18 |
+| US-18.1#1 | Remove `inflation_rates`: its adapter in `adapters/market_data.py`, its contracts in `contracts/market_tools.py`, its guide, its entries in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, its pinned digest in `tests/fixtures/tool_schema_versions.json`, and its tests. Remove `world_bank` from `ToolProvider` and the provider Literal. `market_history` keeps its version, schema and digest (R1). Checked by pytest under `services/agent/tests`, including registry–catalog parity, the execution contract and the pinned schema digests. | DONE | US-18.1 |
+| US-18.1#2 | Regenerate OpenAPI and the TypeScript client without `world_bank`. Checked by `contract_drift` in the fast profile. | DONE | US-18.1 |
+| US-18.1#3 | List the retired tools beside the tool map, starting with `inflation_rates`, and check that no retired name is registered, granted or in `TOOL_VERSIONS` (R2). Checked by pytest under `services/agent/tests`. | DONE | US-18.1 |
+| US-18.1#4 | Leave retired tools out wherever a saved configuration becomes a grant: an Expert's run in a session, a routine's run and a workflow's agent steps. Grant the configuration's other tools as before, and rewrite no stored configuration (R2, R3). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | DONE | US-18.1 |
+| US-18.1#5 | Save a revision that names a retired tool without that tool, and keep refusing any other name the catalog doesn't hold with `expert_tool_not_available` (R4). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | DONE | US-18.1 |
+| US-18.1#6 | Let the execution-contract check accept a recorded tool that is retired, so a paused run continues without it and a call to it is refused with `tool_not_registered`. A recorded tool removed without being retired still stops a run (R5). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model. | DONE | US-18.1 |
+| US-18.1#7 | Keep the stored-shape fixture and `tests/db/sql/app/identity/experts.sql`, which name `inflation_rates`, as saved work that must still read, and show that an earlier run's `inflation_rates` tool use still reads as recorded (R6). Move `web_tools_check.py`'s metered-call check to `market_history`, and remove `world_bank` from `browse_goal_check.py`'s provider set. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | DONE | US-18.1 |
+| US-18.1#8 | Seed the Market watcher for prices and exchange rates with no `inflation_rates`, and seed "Monthly FX note" with an input for the currency pairs and the step "Pull the rates", keeping what exists by name (R7, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a new workspace and on one seeded before. | DONE | US-18.1 |
+| US-18.1#9 | Remove `world_bank` from the web's provider labels and their unit test. Checked by the web unit tests under `apps/web/tests/unit`. | DONE | US-18.1 |
+| US-18.1#10 | Through the change's delta specs, remove the market-data spec's inflation requirement and rename the workflow in the experts spec's seed scenario. Checked by reading the archived specs against R1 and R7. | DONE | US-18.1 |
+| US-18.1#11 | Amend PRD-Tool-Catalog TC-03 and "Market data", PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036's "Requirements revised" lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7. | DONE | US-18.1 |
 
 ## Dependency Diagram
 
@@ -897,6 +914,9 @@ flowchart TD
     US_17_3["US-17.3: browse_goal on browser-use in the isolated executor"]
     US_17_4["US-17.4: Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots"]
     US_17_5["US-17.5: The Transcript reader Expert and workflow"]
+  end
+  subgraph EPIC_18["EPIC-18: inflation_rates and the World Bank provider removed"]
+    US_18_1["US-18.1: Retire inflation_rates and the World Bank provider"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -2338,6 +2358,35 @@ flowchart TD
     US_17_5 --> T_17_5_5
     T_17_5_6["US-17.5#6: Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17."]
     US_17_5 --> T_17_5_6
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_18["EPIC-18 tasks"]
+    US_18_1["US-18.1: Retire inflation_rates and the World Bank provider"]
+    T_18_1_1["US-18.1#1: Remove `inflation_rates`: its adapter in `adapters/market_data.py`, its contracts in `contracts/market_tools.py`, its guide, its entries in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, its pinned digest in `tests/fixtures/tool_schema_versions.json`, and its tests. Remove `world_bank` from `ToolProvider` and the provider Literal. `market_history` keeps its version, schema and digest (R1). Checked by pytest under `services/agent/tests`, including registry–catalog parity, the execution contract and the pinned schema digests."]
+    US_18_1 --> T_18_1_1
+    T_18_1_2["US-18.1#2: Regenerate OpenAPI and the TypeScript client without `world_bank`. Checked by `contract_drift` in the fast profile."]
+    US_18_1 --> T_18_1_2
+    T_18_1_3["US-18.1#3: List the retired tools beside the tool map, starting with `inflation_rates`, and check that no retired name is registered, granted or in `TOOL_VERSIONS` (R2). Checked by pytest under `services/agent/tests`."]
+    US_18_1 --> T_18_1_3
+    T_18_1_4["US-18.1#4: Leave retired tools out wherever a saved configuration becomes a grant: an Expert&#x27;s run in a session, a routine&#x27;s run and a workflow&#x27;s agent steps. Grant the configuration&#x27;s other tools as before, and rewrite no stored configuration (R2, R3). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_18_1 --> T_18_1_4
+    T_18_1_5["US-18.1#5: Save a revision that names a retired tool without that tool, and keep refusing any other name the catalog doesn&#x27;t hold with `expert_tool_not_available` (R4). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_18_1 --> T_18_1_5
+    T_18_1_6["US-18.1#6: Let the execution-contract check accept a recorded tool that is retired, so a paused run continues without it and a call to it is refused with `tool_not_registered`. A recorded tool removed without being retired still stops a run (R5). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures with a scripted model."]
+    US_18_1 --> T_18_1_6
+    T_18_1_7["US-18.1#7: Keep the stored-shape fixture and `tests/db/sql/app/identity/experts.sql`, which name `inflation_rates`, as saved work that must still read, and show that an earlier run&#x27;s `inflation_rates` tool use still reads as recorded (R6). Move `web_tools_check.py`&#x27;s metered-call check to `market_history`, and remove `world_bank` from `browse_goal_check.py`&#x27;s provider set. Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_18_1 --> T_18_1_7
+    T_18_1_8["US-18.1#8: Seed the Market watcher for prices and exchange rates with no `inflation_rates`, and seed &quot;Monthly FX note&quot; with an input for the currency pairs and the step &quot;Pull the rates&quot;, keeping what exists by name (R7, Decision 0034 S1). Checked by the db profile&#x27;s disposable fixtures (`concept_seed_check`) on a new workspace and on one seeded before."]
+    US_18_1 --> T_18_1_8
+    T_18_1_9["US-18.1#9: Remove `world_bank` from the web&#x27;s provider labels and their unit test. Checked by the web unit tests under `apps/web/tests/unit`."]
+    US_18_1 --> T_18_1_9
+    T_18_1_10["US-18.1#10: Through the change&#x27;s delta specs, remove the market-data spec&#x27;s inflation requirement and rename the workflow in the experts spec&#x27;s seed scenario. Checked by reading the archived specs against R1 and R7."]
+    US_18_1 --> T_18_1_10
+    T_18_1_11["US-18.1#11: Amend PRD-Tool-Catalog TC-03 and &quot;Market data&quot;, PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036&#x27;s &quot;Requirements revised&quot; lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7."]
+    US_18_1 --> T_18_1_11
   end
 ```
 
@@ -9423,6 +9472,121 @@ Tasks:
 - [x] Execute the workflow on a disposable stack with a scripted model and scripted browses (a transcript, no transcript, and a bot check), with no request to YouTube (Y18). Checked by the db profile's disposable fixtures.
 - [x] Show the Transcript reader's empty browse domain list on the Experts page. Checked by the Experts browser suite under `apps/web/tests/browser`.
 - [x] Amend PRD-Studio SD-01 and SD-02 for the Transcript reader and its workflow. Update `CODEBASE.md`. Checked by reading them against Decision 0035 Y14 and Y17.
+
+Open Questions:
+- None.
+
+# EPIC-18: inflation_rates and the World Bank provider removed
+
+Scheduled by [Decision 0036](docs/engineering/decisions/0036-inflation-rates-removed.md#decision), from the owner's request of 2026-11-20 to remove the inflation tool and its World Bank code, and the choices they delegated. It amends Decision 0017 C1, Q5 and its Reversal, PRD-LangChain-Deep-Agents 10.3 for a retired tool, PRD-Tool-Catalog TC-03 and "Market data", and PRD-Studio SD-01 and SD-02's Market watcher and monthly workflow. `inflation_rates`, its adapter, contracts and guide, and the `world_bank` provider leave Autobots. `market_history` stays as it is, and nothing replaces the inflation source. Autobots lists the tools it has retired and never reuses their names. A saved Expert version or routine that names a retired tool keeps its stored bytes. Wherever saved work becomes a grant, its other tools are granted. A revision drops the name instead of being refused. A run in flight continues, and a call to the tool is refused with `tool_not_registered`. Earlier runs' records stay as they were. The seed's Market watcher loses the tool, and its monthly workflow becomes "Monthly FX note". US-14.10, which delivered the tool, stays as it was. The story's checks use fake transports and scripted models, with no request to the World Bank. Nothing here establishes H1 or product acceptance ([what Decision 0036 doesn't establish](docs/engineering/decisions/0036-inflation-rates-removed.md#what-this-doesnt-establish)).
+
+### US-18.1: Retire inflation_rates and the World Bank provider
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-20-us-18-1-retire-inflation-rates-world/`
+
+As a workspace owner
+I want inflation_rates and its World Bank code gone from Autobots, with what I saved before still running
+So that the catalog offers only the market tool I keep, and no saved Expert, routine, workflow or run breaks or is rewritten.
+
+Source:
+- [Decision 0036, R1 to R7](docs/engineering/decisions/0036-inflation-rates-removed.md#decision)
+- [Decision 0036, requirements revised](docs/engineering/decisions/0036-inflation-rates-removed.md#requirements-revised)
+- [Decision 0036, what this gives up](docs/engineering/decisions/0036-inflation-rates-removed.md#what-this-gives-up)
+- [Decision 0036, reversal, a retired name stays retired](docs/engineering/decisions/0036-inflation-rates-removed.md#reversal)
+- [Decision 0017, C1, which no longer names the World Bank](docs/engineering/decisions/0017-tool-catalog.md#conflicts-with-existing-rules)
+- [Decision 0017, Q5, which no longer holds](docs/engineering/decisions/0017-tool-catalog.md#open-questions)
+- [Decision 0017, reversal, which R5 qualifies for a retired tool](docs/engineering/decisions/0017-tool-catalog.md#reversal)
+- [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [Catalog contract, TC-01, TC-03 and TC-06](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Market data](docs/PRD/PRD-Tool-Catalog.md#market-data)
+- [Tool-use record, TU-01 and TU-05](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [Resume compatibility, which R5 qualifies for a retired tool](docs/PRD/PRD-LangChain-Deep-Agents.md#103-pause-cancel-and-resume)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [SP-016](docs/engineering/option-b-contract.md#sp-016--schedules-workflows-and-learning)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `adapters/market_data.py` serves `market_history` (Yahoo's chart endpoint) and `inflation_rates` (World Bank `FP.CPI.TOTL.ZG` for `CRI`, `USA` and `EMU`). Their contracts are in `contracts/market_tools.py`, and the guide is in `domain/tool_guides.py`. `world_bank` is in `domain/tool_catalog.ToolProvider` and in the provider Literal in `contracts/tool_catalog.py`, so it appears in `contracts/generated/openapi.json` and `packages/api-client/src/generated.ts`, and `apps/web/lib/tools/text.ts` labels it (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): `domain/tools.PROVIDER_TOOLS` names `inflation_rates` and is part of `EXPERT_TOOLS`, not of a plain goal's `LOOP_TOOL_GRANTS`. `domain/execution.TOOL_VERSIONS` lists it, and every run records that whole map as its `execution_contract` at admission. `incompatibility()` reports "<tool> v<n> no longer exists" for a recorded tool the map lacks, and `recovery.execution_block` uses it to refuse a resume with `incompatible_version` and to stop a claimed run before any model call (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): an Expert's binding (`application/experts.py`) and a routine's run (`application/routines.py`) index `EXPERT_TOOLS[tool]` for every tool a saved configuration names, and admission's availability check lets through a name the catalog doesn't hold, so a saved version naming a removed tool would raise there. A workflow's agent steps (`application/workflow_executions.py`) already skip names outside `EXPERT_TOOLS`. Saving a revision refuses such a name with `expert_tool_not_available`, and the web Expert editor starts its draft from the latest version's tools. The gateway refuses a granted but unregistered tool with `tool_not_registered`, which `domain/stops.py` routes to the model, and `adapters/tool_middleware.py` leaves the tool out of the model's tool list (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `ToolUseView` keeps `group` and `provider` as plain strings, so a retired one still reads (`contracts/runs.py`). The concept seed gives the Market watcher `inflation_rates` and seeds "Monthly FX and inflation note" with the step "Pull rates and inflation", keeping anything already named (`operations/concept_seed.py`). The stored-shape fixture `services/agent/tests/fixtures/stored/expert_config/groups_expanded_past_twenty_tools.json` and `tests/db/sql/app/identity/experts.sql` hold configurations naming `inflation_rates`, and `tests/db/checks/web_tools_check.py` exercises the metered limit through it (checked at HEAD). Not product intent.
+- [Market-data spec, the inflation requirement](openspec/changes/archive/2026-11-20-us-18-1-retire-inflation-rates-world/specs/market-data/spec.md#requirement-inflation-is-annual-sourced-and-metered): the spec US-14.10 left required `inflation_rates` until this story's change removed it. Not product intent.
+- [Experts spec, the concept seed](openspec/specs/experts/spec.md#requirement-an-optional-concept-seed): its scenario names "Monthly FX and inflation note". Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: The catalog no longer offers it
+  Given the tool catalog after the change
+  When a member lists the tools through the API, and the contracts are generated
+  Then neither inflation_rates nor the world_bank provider appears in the listing, OpenAPI or the TypeScript client, and market_history is listed as before, with its version, provider and pinned schema digest
+
+Scenario: A retired name stays retired
+  Given inflation_rates is on the list of retired tools
+  When a tool map or registry that holds that name is checked
+  Then the check names it as retired, and the registry and tool maps Autobots ships hold no retired name
+
+Scenario: A revision drops it
+  Given an Expert whose latest version names inflation_rates and market_history
+  When the owner saves a revision from that version, and then a revision naming a tool that is neither in the catalog nor retired
+  Then the first is saved as a new version with market_history and without inflation_rates, the earlier version still lists inflation_rates, and the second is refused with expert_tool_not_available
+
+Scenario: Saved Experts and routines still run
+  Given an Expert version and a routine saved before the change, each naming inflation_rates and market_history
+  When a session runs the Expert and the routine's occurrence is admitted
+  Then each run is admitted and granted market_history without inflation_rates, and the stored version and routine are unchanged
+
+Scenario: A workflow's agent step still runs
+  Given a published workflow whose agent step names an Expert whose version lists inflation_rates and market_history, and a scripted model
+  When the workflow is executed
+  Then the step's run is granted market_history without inflation_rates, and the execution goes on past the step
+
+Scenario: A run in flight carries on
+  Given a paused run admitted before the change, whose recorded execution contract and grant list inflation_rates v1, and a scripted model
+  When it is resumed and claimed, and its model calls inflation_rates
+  Then it continues, its model's tool list leaves inflation_rates out, the call is refused with tool_not_registered, and the run carries on after the model reads the refusal
+
+Scenario: A tool removed without being retired still stops a run
+  Given a saved run whose recorded execution contract lists a tool that is neither registered nor retired
+  When it is resumed, or a worker claims it
+  Then the resume is refused with incompatible_version and the worker stops the run before any model call, each naming the tool as no longer existing, as before
+
+Scenario: History stays as it was
+  Given a run whose inflation_rates call was recorded before the change
+  When a member lists its tool uses through the API
+  Then the inflation_rates row reads with its version, group, provider and outcome as recorded, and its stored row is unchanged
+
+Scenario: The seed on a new workspace
+  Given a new workspace
+  When the concept seed runs twice
+  Then the Market watcher tracks prices and exchange rates without inflation_rates, "Monthly FX note" is published with an input for the currency pairs and the step "Pull the rates", no "Monthly FX and inflation note" exists, and the second run adds nothing
+
+Scenario: The seed on a workspace seeded before
+  Given a workspace where the concept seed ran before the change
+  When the seed runs again
+  Then the Market watcher and "Monthly FX and inflation note" are unchanged, and "Monthly FX note" is added beside them
+```
+
+Dependencies:
+- None
+
+Tasks:
+- [x] Remove `inflation_rates`: its adapter in `adapters/market_data.py`, its contracts in `contracts/market_tools.py`, its guide, its entries in `PROVIDER_TOOLS` and `TOOL_VERSIONS`, its pinned digest in `tests/fixtures/tool_schema_versions.json`, and its tests. Remove `world_bank` from `ToolProvider` and the provider Literal. `market_history` keeps its version, schema and digest (R1). Checked by pytest under `services/agent/tests`, including registry–catalog parity, the execution contract and the pinned schema digests.
+- [x] Regenerate OpenAPI and the TypeScript client without `world_bank`. Checked by `contract_drift` in the fast profile.
+- [x] List the retired tools beside the tool map, starting with `inflation_rates`, and check that no retired name is registered, granted or in `TOOL_VERSIONS` (R2). Checked by pytest under `services/agent/tests`.
+- [x] Leave retired tools out wherever a saved configuration becomes a grant: an Expert's run in a session, a routine's run and a workflow's agent steps. Grant the configuration's other tools as before, and rewrite no stored configuration (R2, R3). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [x] Save a revision that names a retired tool without that tool, and keep refusing any other name the catalog doesn't hold with `expert_tool_not_available` (R4). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [x] Let the execution-contract check accept a recorded tool that is retired, so a paused run continues without it and a call to it is refused with `tool_not_registered`. A recorded tool removed without being retired still stops a run (R5). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model.
+- [x] Keep the stored-shape fixture and `tests/db/sql/app/identity/experts.sql`, which name `inflation_rates`, as saved work that must still read, and show that an earlier run's `inflation_rates` tool use still reads as recorded (R6). Move `web_tools_check.py`'s metered-call check to `market_history`, and remove `world_bank` from `browse_goal_check.py`'s provider set. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [x] Seed the Market watcher for prices and exchange rates with no `inflation_rates`, and seed "Monthly FX note" with an input for the currency pairs and the step "Pull the rates", keeping what exists by name (R7, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a new workspace and on one seeded before.
+- [x] Remove `world_bank` from the web's provider labels and their unit test. Checked by the web unit tests under `apps/web/tests/unit`.
+- [x] Through the change's delta specs, remove the market-data spec's inflation requirement and rename the workflow in the experts spec's seed scenario. Checked by reading the archived specs against R1 and R7.
+- [x] Amend PRD-Tool-Catalog TC-03 and "Market data", PRD-Studio SD-01 and SD-02, and Decision 0017 C1, Q5 and its Reversal, as Decision 0036's "Requirements revised" lists. Update the seeded workflows in `README.md`, and update `CODEBASE.md`. Checked by reading each against Decision 0036 R1, R5 and R7.
 
 Open Questions:
 - None.

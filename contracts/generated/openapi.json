@@ -6417,7 +6417,6 @@
               "serpapi",
               "direct",
               "yahoo_finance",
-              "world_bank",
               "github"
             ],
             "title": "Provider",
@@ -17601,7 +17600,6 @@
                     "serpapi",
                     "direct",
                     "yahoo_finance",
-                    "world_bank",
                     "github"
                   ],
                   "type": "string"

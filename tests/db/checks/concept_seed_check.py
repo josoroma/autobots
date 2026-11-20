@@ -1,4 +1,4 @@
-"""US-15.25, US-16.6 and US-17.5: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
+"""US-15.25, US-16.6, US-17.5 and US-18.1: the concept seed on a disposable stack, in a fresh workspace, with no GitHub variables.
 
 Migrations alone must have created none of it. Run twice, it leaves each Expert and workflow once.
 It holds no secret, leaves nothing pending, and follows SD-02: the GitHub-only workflows, Interview
@@ -6,8 +6,10 @@ synthesis and, with no SerpApi key, Deep research content writer are drafts, and
 is Transcript; the rest are published, and Experts are saved without their unavailable tools.
 
 A second workspace, seeded first with only the six earlier Experts and workflows as an install before
-US-16.6 was, then gets the real seed twice with a SerpApi key: it adds the Deep research writer and
-publishes its workflow, and changes nothing else (Decision 0034 S1). JSON cases out.
+US-16.6 was, with the Market watcher and its monthly workflow as they were before US-18.1, then gets
+the real seed twice with a SerpApi key: it adds the Deep research writer and publishes its workflow,
+adds "Monthly FX note" beside the old monthly workflow, and changes nothing else (Decision 0034 S1,
+Decision 0036 R7). The fresh workspace's Market watcher has no inflation_rates. JSON cases out.
 """
 from __future__ import annotations
 
@@ -26,12 +28,13 @@ WORKSPACE, EARLIER = sys.argv[1], sys.argv[2]
 ROOT = Path(__file__).resolve().parents[3]
 EXPERTS = ['Market watcher', 'Research analyst', 'Brief writer', 'Issue triager', 'Code maintainer', 'Google bot',
            'Deep research writer', 'Transcript reader']
-WORKFLOWS = ['Weekly competitor brief', 'Monthly FX and inflation note', 'Nightly test triage', 'Interview synthesis',
+WORKFLOWS = ['Weekly competitor brief', 'Monthly FX note', 'Nightly test triage', 'Interview synthesis',
              'Release notes from merged PRs', 'Vendor due diligence', 'Deep research content writer', 'Transcript']
 DRAFTS = {'Nightly test triage', 'Release notes from merged PRs', 'Interview synthesis', 'Deep research content writer', 'Transcript'}
 WRITER = 'Deep research writer'
 RESEARCH = 'Deep research content writer'
 READER, TRANSCRIPT = 'Transcript reader', 'Transcript'
+MONTHLY, OLD_MONTHLY = 'Monthly FX note', 'Monthly FX and inflation note'
 SECRET = re.compile(r'sk-or-|sk-[A-Za-z0-9]{16,}|eyJ[A-Za-z0-9_-]{10,}|ghp_|github_pat_|Bearer |password\s*[:=]|secret\s*[:=]', re.IGNORECASE)
 cases: list[dict[str, Any]] = []
 
@@ -44,10 +47,34 @@ def rows(db: psycopg.Connection, sql: str, *values: Any) -> list[tuple[Any, ...]
     return list(db.execute(sql, values).fetchall())
 
 
-# The seed as it was before US-16.6: only its first six Experts and workflows.
-EARLIER_SEED = ('import sys\nimport autobots.operations.concept_seed as seed\n'
-                'seed.EXPERTS, seed.WORKFLOWS = seed.EXPERTS[:6], seed.WORKFLOWS[:6]\n'
-                'raise SystemExit(seed.main(sys.argv[1:]))\n')
+# The seed as it was before US-16.6: only its first six Experts and workflows. Its Market watcher and
+# monthly workflow are as they were before US-18.1, when inflation_rates was still a tool, so the old
+# seed's save rules are arranged here: the name is known and not dropped (Decision 0036 R7).
+EARLIER_SEED = """import sys
+from dataclasses import replace
+import autobots.application.experts as experts
+import autobots.operations.concept_seed as seed
+from autobots.domain.tools import EXPERT_TOOLS
+experts.EXPERT_TOOLS = {**EXPERT_TOOLS, 'inflation_rates': 1}
+experts.drop_retired = lambda config: config
+usable = seed.available_tools
+seed.available_tools = lambda environ, tools: usable(environ, tools) | {'inflation_rates'}
+current = seed.WORKFLOWS[1].graph
+def monthly(ids):
+    graph = current(ids)
+    for node in graph['nodes']:
+        if node['id'] == 'in':
+            node.pop('label', None)
+        if node['id'] == 'pull':
+            node['label'] = 'Pull rates and inflation'
+    return graph
+watcher = replace(seed.EXPERTS[0], purpose='Tracks prices, exchange rates and inflation, and explains what moved and why it matters.',
+                  tools=('market_history', 'inflation_rates', *seed.EXPERTS[0].tools[1:]))
+old = replace(seed.WORKFLOWS[1], name='Monthly FX and inflation note',
+              description='Name the currency pairs and countries. Rates and inflation are pulled into a short note.', graph=monthly)
+seed.EXPERTS, seed.WORKFLOWS = (watcher, *seed.EXPERTS[1:6]), (seed.WORKFLOWS[0], old, *seed.WORKFLOWS[2:6])
+raise SystemExit(seed.main(sys.argv[1:]))
+"""
 
 
 def run_seed(workspace: str = WORKSPACE, extra: dict[str, str] | None = None, earlier: bool = False) -> dict[str, Any]:
@@ -144,6 +171,18 @@ def main() -> None:
         steps = [node.get('label') for node in labels[0][0] if node.get('block') == 'agent'] if labels else []
         check('a published workflow carries its SD-02 steps', 'Research the vendor, then Compare and recommend', steps,
               steps == ['Research the vendor', 'Compare and recommend'])
+        # US-18.1, Decision 0036 R7: prices and exchange rates only, and the monthly note under its new name.
+        watcher = configs['Market watcher']
+        check('the Market watcher tracks prices and exchange rates, without inflation_rates',
+              'market_history and no inflation_rates; no inflation in its purpose', (watcher['tools'], watcher['purpose']),
+              'market_history' in watcher['tools'] and 'inflation_rates' not in watcher['tools'] and 'inflation' not in watcher['purpose'].lower())
+        graph = rows(db, "select v.graph -> 'nodes' from public.workflow_versions v join public.workflows w on w.id = v.workflow_id "
+                         "where w.workspace_id = %s and w.name = %s", WORKSPACE, MONTHLY)
+        labels = {node['id']: node.get('label') for node in graph[0][0]} if graph else {}
+        old = rows(db, 'select count(*) from public.workflows where workspace_id = %s and name = %s', WORKSPACE, OLD_MONTHLY)[0][0]
+        check('Monthly FX note is published with a Currency pairs input and a Pull the rates step, and no old monthly workflow exists',
+              'Currency pairs, Pull the rates, 0 old', (labels.get('in'), labels.get('pull'), old),
+              (labels.get('in'), labels.get('pull'), old) == ('Currency pairs', 'Pull the rates', 0))
 
         stored = json.dumps(rows(db, 'select v.config from public.experts e join public.expert_versions v on v.expert_id = e.id where e.workspace_id = %s', WORKSPACE)
                             + rows(db, 'select v.graph from public.workflows w join public.workflow_versions v on v.workflow_id = w.id where w.workspace_id = %s', WORKSPACE)
@@ -171,16 +210,23 @@ def earlier_install(db: psycopg.Connection) -> None:
     check('the arranged install has the six earlier Experts and workflows, without the newer ones', '6 and 6, none new',
           ([name for name, _, _ in before], [name for name, _ in flows_before]),
           len(before) == 6 and len(flows_before) == 6 and WRITER not in [name for name, _, _ in before])
+    watcher = next((config for name, _, config in before if name == 'Market watcher'), {})
+    check('the arranged install has the Market watcher with inflation_rates and the old monthly workflow, as seeded before US-18.1',
+          f'inflation_rates granted, {OLD_MONTHLY} present', (watcher.get('tools'), [name for name, _ in flows_before]),
+          'inflation_rates' in watcher.get('tools', []) and OLD_MONTHLY in [name for name, _ in flows_before]
+          and MONTHLY not in [name for name, _ in flows_before])
     serpapi = {'SERPAPI_API_KEY': 'fake-serpapi-key-for-the-seed-check'}
     first, second = run_seed(EARLIER, serpapi), run_seed(EARLIER, serpapi)
     created = sorted(name for group in ('experts', 'workflows') for name, report in first[group].items() if report != 'kept')
-    check('the first run adds only the Deep research writer, the Transcript reader and their workflows',
-          f'{sorted([WRITER, RESEARCH, READER, TRANSCRIPT])}', created,
-          created == sorted([WRITER, RESEARCH, READER, TRANSCRIPT]) and first['workflows'][RESEARCH] == {'published': 1})
+    check('the first run adds only the Deep research writer, the Transcript reader, their workflows and Monthly FX note',
+          f'{sorted([WRITER, RESEARCH, READER, TRANSCRIPT, MONTHLY])}', created,
+          created == sorted([WRITER, RESEARCH, READER, TRANSCRIPT, MONTHLY]) and first['workflows'][RESEARCH] == {'published': 1}
+          and first['workflows'][MONTHLY] == {'published': 1})
     after = [row for row in rows(db, snapshot, EARLIER) if row[0] not in (WRITER, READER)]
     flows_after = [row for row in rows(db, 'select name, latest_version from public.workflows where workspace_id = %s order by name', EARLIER)
-                   if row[0] not in (RESEARCH, TRANSCRIPT)]
-    check('everything that existed is unchanged', 'the same versions and configurations', 'same' if (after, flows_after) == (before, flows_before) else 'changed',
+                   if row[0] not in (RESEARCH, TRANSCRIPT, MONTHLY)]
+    check('everything that existed is unchanged, the Market watcher with inflation_rates and the old monthly workflow included',
+          'the same versions and configurations', 'same' if (after, flows_after) == (before, flows_before) else 'changed',
           (after, flows_after) == (before, flows_before))
     added = rows(db, 'select v.config from public.experts e join public.expert_versions v on v.expert_id = e.id where e.workspace_id = %s and e.name = %s',
                  EARLIER, WRITER)

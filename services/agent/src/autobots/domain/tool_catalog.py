@@ -37,7 +37,7 @@ GROUP_TITLES: Mapping[ToolGroup, tuple[str, str]] = {
     ToolGroup.WEB_EXTRACTION: ("Website extraction", "Read web pages as markdown."),
     ToolGroup.WEB_CRAWLING: ("Web crawling", "Map or crawl a site within fixed ceilings."),
     ToolGroup.FILES: ("Files", "Read, parse and store the run's own files."),
-    ToolGroup.MARKET_DATA: ("Market data", "Prices, exchange rates and inflation."),
+    ToolGroup.MARKET_DATA: ("Market data", "Prices and exchange rates."),
     ToolGroup.BROWSING: ("Autonomous browsing", "Goal-driven browser control."),
     ToolGroup.CODE: ("Code", "Search and edit the run's own files as code."),
     ToolGroup.CONNECTORS: (
@@ -63,7 +63,6 @@ class ToolProvider(StrEnum):
     # Autobots' own reader, fetching each page from its site (Decision 0033 K3).
     DIRECT = "direct"
     YAHOO_FINANCE = "yahoo_finance"
-    WORLD_BANK = "world_bank"
     GITHUB = "github"
 
 

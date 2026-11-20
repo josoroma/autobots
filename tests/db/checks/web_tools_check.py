@@ -90,8 +90,6 @@ async def no_wait(_: float) -> None:
 
 def markets(request: httpx.Request) -> httpx.Response:
     requests.append(f'market:{request.url.host}')
-    if request.url.host == 'api.worldbank.org':
-        return httpx.Response(200, json=[{'page': 1}, [{'countryiso3code': 'EMU', 'date': '2024', 'value': 2.36}]])
     return httpx.Response(200, json={'chart': {'result': [{'meta': {'currency': 'USD'}, 'timestamp': [1761955200, 1762041600],
                                                            'indicators': {'quote': [{'close': [100.0, 101.0]}]}}], 'error': None}})
 
@@ -379,33 +377,31 @@ async def file_tools_read_inputs_and_guard_stores(ctx: Tools) -> None:
 
 
 async def market_data_counts_against_the_tree(ctx: Tools) -> None:
-    """US-14.10: market data counts against the run tree's metered calls, 40 by Decision 0034 L3."""
+    """US-14.10: market data counts against the run tree's metered calls, 40 by Decision 0034 L3, through market_history
+    alone, since inflation_rates is retired (Decision 0036 R1)."""
     check, db, gateway = ctx.cases.check, ctx.db, ctx.gateway
     await db.execute("update app_private.run_jobs set status = 'done', lease_owner = null, lease_expires_at = null where status <> 'done'")
     admitted = await admit_run(db, workspace_id=WORKSPACE, actor_id=uuid4(), idempotency_key=str(uuid4()), goal_text='market data', limit_micro_usd=1000, policy=resolve_role_policy())
     lease = await claim_next(db, worker_id='market-tools', lease_seconds=120)
     assert lease is not None
-    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'market_history': 1, 'inflation_rates': 1}, ('outputs',))
+    scope = ToolScope(WORKSPACE, admitted.run_id, lease.generation, {'market_history': 1}, ('outputs',))
     requests.clear()
-    priced = [await gateway.execute(db, scope, 'market_history', {'symbols': ['BTC-USD']}) for _ in range(METERED_TOOL_CALLS - 1)]
-    rates = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024})
-    late = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['CRI'], 'start_year': 2024, 'end_year': 2024})
-    wrong = await gateway.execute(db, scope, 'inflation_rates', {'countries': ['MEX'], 'start_year': 2024, 'end_year': 2024})
-    out = rates.output or {}
-    check(f'inflation is returned with its indicator and source, as the last of {METERED_TOOL_CALLS} metered calls', 'EMU 2024 2.36, FP.CPI.TOTL.ZG',
-          (rates.outcome.value, out.get('countries'), out.get('indicator')),
-          all(item.outcome.value == 'succeeded' for item in priced) and rates.outcome.value == 'succeeded'
-          and out.get('countries') == [{'country': 'EMU', 'name': 'Euro area', 'rows': [{'year': 2024, 'inflation_pct': 2.36}]}]
-          and out.get('indicator') == 'FP.CPI.TOTL.ZG' and 'World Bank' in out.get('source', ''))
-    check('the next metered call is denied before any request, and another country is refused first',
+    priced = [await gateway.execute(db, scope, 'market_history', {'symbols': ['BTC-USD']}) for _ in range(METERED_TOOL_CALLS)]
+    late = await gateway.execute(db, scope, 'market_history', {'symbols': ['ETH-USD']})
+    wrong = await gateway.execute(db, scope, 'market_history', {'symbols': ['not a symbol']})
+    out = priced[-1].output or {}
+    check(f'prices are returned with their source, as the last of {METERED_TOOL_CALLS} metered calls', 'succeeded, 1 symbol, an unofficial source',
+          (priced[-1].outcome.value, out.get('symbol_count'), out.get('source')),
+          all(item.outcome.value == 'succeeded' for item in priced) and out.get('symbol_count') == 1 and 'unofficial' in out.get('source', ''))
+    check('the next metered call is denied before any request, and an invalid symbol is refused first',
           f'tool_budget_exceeded, invalid_arguments, {METERED_TOOL_CALLS} requests', (late.code, wrong.code, len(requests)),
           late.code == 'tool_budget_exceeded' and wrong.code == 'invalid_arguments' and len(requests) == METERED_TOOL_CALLS)
     listed = await list_tool_uses(db, WORKSPACE, admitted.run_id)
-    last = [use for use in (listed.uses if listed else []) if use.tool_id == 'inflation_rates']
-    check("the inflation call's record names its countries and source, not its values", 'countries, years, source',
-          (last[0].input_public, last[0].output_public) if last else None,
-          bool(last) and last[0].input_public == {'countries': ['EMU'], 'start_year': 2024, 'end_year': 2024}
-          and (last[0].output_public or {}).get('indicator') == 'FP.CPI.TOTL.ZG' and '2.36' not in last[0].model_dump_json())
+    uses = [use for use in (listed.uses if listed else []) if use.tool_id == 'market_history' and use.outcome == 'succeeded']
+    check("a price call's record names its symbols and source, not its prices", 'symbols and source, no close',
+          (uses[0].input_public, uses[0].output_public) if uses else None,
+          bool(uses) and (uses[0].input_public or {}).get('symbols') == ['BTC-USD']
+          and 'unofficial' in (uses[0].output_public or {}).get('source', '') and '101.0' not in uses[0].model_dump_json())
 
 
 async def code_tools_stay_in_the_runs_files(ctx: Tools) -> None:

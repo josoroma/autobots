@@ -140,11 +140,6 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
         "For questions about price moves, exchange rates such as CRC=X, or crypto prices.",
         "Real closing prices to compare or compute with.",
     ),
-    "inflation_rates": ToolGuide(
-        "Gets annual consumer price inflation for Costa Rica, the USA and the euro area.",
-        "When a note or comparison needs inflation over recent years.",
-        "Official World Bank figures, with their source named.",
-    ),
     # Browsing
     "browse_goal": ToolGuide(
         "Reads websites in an isolated browser to pursue a task, within the domains it is given.",

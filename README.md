@@ -42,14 +42,14 @@ Autobots is a studio for autonomous agents that runs on your Mac. You describe a
 ## Superpowers
 
 <p align="center">
-  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 38 tools in 14 groups, Experts and workflows, local by design." width="100%">
+  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 37 tools in 14 groups, Experts and workflows, local by design." width="100%">
 </p>
 
 - **Runs that survive.** A worker claims each run under a lease. Every checkpoint is fenced to that lease, so a crash, a restart or a sleeping Mac resumes the run instead of forking it. Each request carries a receipt, so a retry never starts a second run.
 - **Spending you control.** Pick US$0.25 to US$5.00 per run, never above what's left of the daily cap. Every model call reserves its worst-case cost before it's sent, and a call that can't be priced doesn't go out.
 - **Asks before it acts.** Opening a pull request or filing an issue needs an approval every time. The approval binds the exact arguments and diffs you saw, and a changed request needs a new one. Browsing asks too, unless you turn on its YOLO setting in Settings → Browsing (on by default). Then a browse starts without asking and runs browser-use in the isolated box, which may press, type and submit, but only on the domains its Expert lists. A bot check stops it, and each step keeps a screenshot you can open from the run's tool row.
-- **38 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
-- **Experts and workflows.** Seven Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer. Seven workflows: Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer. An agent can hand work to a specialist, a workflow's agent steps read each other's published work, and a routine can run a goal on a schedule.
+- **37 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
+- **Experts and workflows.** Seven Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer. Seven workflows: Weekly competitor brief, Monthly FX note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer. An agent can hand work to a specialist, a workflow's agent steps read each other's published work, and a routine can run a goal on a schedule.
 - **Local by design.** The web app, API and worker run natively on your Mac, and Supabase runs in Docker, every port on loopback. Stored keys are encrypted. What leaves your Mac is what OpenRouter needs, to validate your key and run the model calls, and the calls of the tools you granted.
 
 ## How it works

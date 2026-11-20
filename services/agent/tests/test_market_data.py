@@ -1,4 +1,5 @@
-"""US-14.10: market history and inflation against fake transports in the providers' reply shapes."""
+"""US-14.10: market history against fake transports in Yahoo's reply shape. Inflation and its World
+Bank provider are retired (Decision 0036 R1)."""
 
 from typing import Any
 from uuid import uuid4
@@ -40,17 +41,6 @@ def chart(closes: list[float | None], currency: str = "USD") -> dict[str, Any]:
             "error": None,
         }
     }
-
-
-WORLD_BANK = [
-    {"page": 1, "pages": 1, "per_page": 200, "total": 4},
-    [
-        {"countryiso3code": "CRI", "date": "2024", "value": 0.84},
-        {"countryiso3code": "CRI", "date": "2023", "value": 0.53},
-        {"countryiso3code": "USA", "date": "2024", "value": 2.95},
-        {"countryiso3code": "USA", "date": "2023", "value": None},
-    ],
-]
 
 
 class Fake:
@@ -161,46 +151,6 @@ async def test_no_cross_rate_is_computed() -> None:
     assert str(failed.value) == "symbol_not_found"
     # Only the symbol asked for was requested; no EURUSD=X or CRC=X was fetched to build a cross.
     assert len(fake.seen) == 1 and "EURCRC" in fake.seen[0]
-
-
-@pytest.mark.asyncio
-async def test_inflation_rows_by_country_with_indicator_and_source() -> None:
-    fake = Fake({"FP.CPI.TOTL.ZG": httpx.Response(200, json=WORLD_BANK)})
-    tool = tools(fake)["inflation_rates"]
-    output = await tool.handler(
-        tool.input_model.model_validate(
-            {"countries": ["CRI", "USA"], "start_year": 2023, "end_year": 2024}
-        ),
-        CONTEXT,
-    )
-    cri, usa = output.countries
-    assert [(row.year, row.inflation_pct) for row in cri.rows] == [(2023, 0.53), (2024, 0.84)]
-    assert [(row.year, row.inflation_pct) for row in usa.rows] == [(2023, None), (2024, 2.95)]
-    assert output.indicator == "FP.CPI.TOTL.ZG" and "World Bank" in output.source
-    assert "/v2/country/CRI;USA/indicator/FP.CPI.TOTL.ZG" in fake.seen[0]
-    assert "date=2023%3A2024" in fake.seen[0] or "date=2023:2024" in fake.seen[0]
-
-
-@pytest.mark.parametrize(
-    "arguments",
-    [
-        {"countries": ["MEX"], "start_year": 2020, "end_year": 2024},
-        {"countries": ["CRI"], "start_year": 2024, "end_year": 2020},
-        {"countries": ["CRI"], "start_year": 1960, "end_year": 2024},
-        {"countries": ["CRI", "CRI"], "start_year": 2020, "end_year": 2024},
-    ],
-)
-def test_any_other_country_or_range_is_refused_before_a_request(
-    arguments: dict[str, Any],
-) -> None:
-    fake = Fake({})
-    tool = tools(fake)["inflation_rates"]
-    registry = ToolRegistry()
-    registry.register(tool)
-    scope = ToolScope(uuid4(), uuid4(), 1, {"inflation_rates": 1})
-    refused = resolve(registry, scope, "inflation_rates", arguments)
-    assert refused == Refused(GatewayCode.INVALID_ARGUMENTS, tool)
-    assert fake.seen == []
 
 
 @pytest.mark.parametrize(

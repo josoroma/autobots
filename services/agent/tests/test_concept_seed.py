@@ -1,5 +1,5 @@
-"""US-15.25, US-16.6 and US-17.5: the concept seed's definitions. The database side runs on a
-disposable stack."""
+"""US-15.25, US-16.6, US-17.5 and US-18.1: the concept seed's definitions. The database side runs
+on a disposable stack."""
 
 import json
 from uuid import uuid4
@@ -36,7 +36,7 @@ def test_the_eight_experts_and_eight_workflows_are_sd_02s() -> None:
     ]
     assert [workflow.name for workflow in WORKFLOWS] == [
         "Weekly competitor brief",
-        "Monthly FX and inflation note",
+        "Monthly FX note",
         "Nightly test triage",
         "Interview synthesis",
         "Release notes from merged PRs",
@@ -209,3 +209,16 @@ def test_the_transcript_workflow_takes_only_a_watch_address_and_needs_browsing()
         assert [(error.code, error.node) for error in input_errors(graph, {"video": bad})] == [
             ("input_pattern_mismatch", "video")
         ], bad
+
+
+def test_the_market_watcher_and_its_monthly_note_have_no_inflation() -> None:
+    """Decision 0036 R7: prices and exchange rates only, and "Monthly FX note" pulls the rates."""
+    watcher = next(expert for expert in EXPERTS if expert.name == "Market watcher")
+    assert "inflation_rates" not in watcher.tools and "market_history" in watcher.tools
+    assert "inflation" not in watcher.purpose.lower()
+    workflow = next(item for item in WORKFLOWS if item.name == "Monthly FX note")
+    assert "inflation" not in workflow.description.lower()
+    graph = workflow.graph({expert.name: uuid4() for expert in EXPERTS})
+    labels = {node["id"]: node.get("label") for node in graph["nodes"]}
+    assert (labels["in"], labels["pull"]) == ("Currency pairs", "Pull the rates")
+    assert all(item.name != "Monthly FX and inflation note" for item in WORKFLOWS)

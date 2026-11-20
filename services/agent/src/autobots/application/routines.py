@@ -69,7 +69,7 @@ from autobots.domain.routines import (
     wall_clock,
 )
 from autobots.domain.runs import TERMINAL
-from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS
+from autobots.domain.tools import EXPERT_TOOLS, PLAN_TOOLS, without_retired
 from autobots.domain.workflows import needs_model
 from autobots.logs import log_event
 from autobots.persistence.records import (
@@ -556,7 +556,8 @@ async def admit_occurrence(
         )
         return execution.run_id
     expert = await _expert_config(connection, workspace_id, config)
-    tools = config.tools if config.tools is not None else expert.tools
+    # A retired tool the routine or its Expert names is left out (Decision 0036 R3).
+    tools = without_retired(config.tools if config.tools is not None else expert.tools)
     try:
         # The pinned version's role bindings, and no run-wide profile, which a routine can't name.
         policy = await workspace_role_policy(

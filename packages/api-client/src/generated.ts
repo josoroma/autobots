@@ -6418,7 +6418,6 @@ export const schemas = {
           "serpapi",
           "direct",
           "yahoo_finance",
-          "world_bank",
           "github"
         ],
         "title": "Provider",
@@ -9633,7 +9632,7 @@ export interface ToolDescriptor {
   network: boolean;
   operation_class: "pure" | "read_only" | "reversible_internal_write" | "consequential_external_write" | "arbitrary_execution";
   output_schema: Record<string, unknown>;
-  provider: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "world_bank" | "github";
+  provider: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "github";
   registered: boolean;
   side_effects: "none" | "internal_write" | "external_write" | "arbitrary";
   switch?: ToolSwitchView | null;
@@ -10369,7 +10368,7 @@ export async function validateOpenRouter(options: ClientOptions, request?: Reque
 export type ListToolsQuery = {
   group?: "planning" | "general" | "web_search" | "web_extraction" | "web_crawling" | "files" | "market_data" | "browsing" | "code" | "connectors" | "delegation" | "learning" | "automation" | "google" | null | undefined;
   availability?: "available" | "key_missing" | "disabled_by_policy" | "not_qualified" | null | undefined;
-  provider?: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "world_bank" | "github" | null | undefined;
+  provider?: "autobots" | "tavily" | "jina" | "serpapi" | "direct" | "yahoo_finance" | "github" | null | undefined;
 };
 
 export async function listTools(options: ClientOptions, query?: ListToolsQuery, request?: RequestOptions): Promise<ToolCatalog> {

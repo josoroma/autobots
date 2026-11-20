@@ -15,7 +15,6 @@ export const PROVIDER_LABEL: Readonly<
   serpapi: "SerpApi (Google)",
   direct: "Directly from each site",
   yahoo_finance: "Yahoo Finance",
-  world_bank: "World Bank",
   github: "GitHub",
 };
 

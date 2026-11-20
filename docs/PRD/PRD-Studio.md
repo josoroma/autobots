@@ -170,13 +170,13 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 
 ## Seed
 
-**SD-01. Concept Experts and workflows.** A repeatable seed creates eight Experts and eight workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer, by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot, by [Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) E1, Deep research writer and, by [Decision 0035](../engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y14, Transcript reader. The workflows are Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence, by Decision 0034 F1, Deep research content writer and, by Decision 0035 Y14, Transcript. A workflow whose tools are unavailable is seeded as a draft.
+**SD-01. Concept Experts and workflows.** A repeatable seed creates eight Experts and eight workflows in a chosen workspace, with no secrets and no pending jobs. It is separate from migrations. The Experts are Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer, by [Decision 0032](../engineering/decisions/0032-google-search-through-serpapi.md) G8, Google bot, by [Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) E1, Deep research writer and, by [Decision 0035](../engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y14, Transcript reader. The workflows are Weekly competitor brief, Monthly FX note (named by [Decision 0036](../engineering/decisions/0036-inflation-rates-removed.md) R7), Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence, by Decision 0034 F1, Deep research content writer and, by Decision 0035 Y14, Transcript. A workflow whose tools are unavailable is seeded as a draft.
 
 **SD-02. Seed definitions.** Drafted by the coordinator from the concepts for the owner's review (Decision 0022 D17). Role bindings follow the workspace policy unless named.
 
 | Expert | Purpose | Tools |
 |---|---|---|
-| Market watcher | Tracks prices, exchange rates and inflation, and explains what moved and why it matters | `market_history`, `inflation_rates`, `calculate`, `read_csv`, `save_artifact`, `publish_artifact` |
+| Market watcher | Tracks prices and exchange rates, and explains what moved and why it matters (Decision 0036 R7) | `market_history`, `calculate`, `read_csv`, `save_artifact`, `publish_artifact` |
 | Research analyst | Searches the web and reads sources carefully. Cites every claim and flags anything it couldn't confirm | `search_web`, `extract_website_content`, `tavily_search`, `tavily_extract`, `save_artifact`, `publish_artifact` |
 | Brief writer | Turns findings into a short brief with a recommendation, a comparison table and numbered sources | `read_run_file`, `save_artifact`, `publish_artifact` |
 | Issue triager | Groups failing checks by cause and drafts one GitHub issue per distinct failure. Each issue waits for you | `read_csv`, `github_list_workflow_runs`, `github_search_issues`, `create_github_issue` |
@@ -188,7 +188,7 @@ All of these use one configured repository (`GITHUB_REPOSITORY`) and one `GITHUB
 | Workflow | Steps (agent steps name their Expert) | Seeded as |
 |---|---|---|
 | Weekly competitor brief | input (competitors, question) → Gather sources (Research analyst) → Compare plans and prices (Research analyst) → Write the brief (Brief writer) → approval → output | published |
-| Monthly FX and inflation note | input (pairs, countries) → Pull rates and inflation (Market watcher) → Write the note (Brief writer) → output | published |
+| Monthly FX note | input (currency pairs) → Pull the rates (Market watcher) → Write the note (Brief writer) → output (Decision 0036 R7; a workspace seeded before keeps "Monthly FX and inflation note") | published |
 | Nightly test triage | input (workflow file, branch) → Find failures and duplicates (Issue triager) → approval → File one issue per failure (Issue triager) → output | published when the GitHub tools are available, otherwise a draft |
 | Interview synthesis | input (question) → read (attached notes) → Synthesize themes (Brief writer) → output | draft until executions can carry files |
 | Release notes from merged PRs | input (since, base branch) → Collect merged PRs (Code maintainer) → Write the notes (Brief writer) → approval → output | published when the GitHub tools are available, otherwise a draft |

@@ -122,6 +122,8 @@ TOOL_CHILDREN = (
     Child('checks/browsing_yolo_check.py', 'the browsing YOLO check', ('{workspace}',), from_root=True),
     Child('checks/browse_steps_check.py', 'the browse steps check', ('{workspace}',), from_root=True),
     Child('checks/transcript_check.py', 'the transcript check', (), from_root=True),
+    # US-18.1: a retired tool in saved Experts, routines, workflows, runs in flight and history, with a scripted model.
+    Child('checks/retired_tools_check.py', 'the retired tools check', (), from_root=True),
     # US-14.19: the cronjob tool through the gateway, approvals and the routine service, with no model.
     Child('checks/cronjob_check.py', 'the cronjob check', ('{workspace}',), from_root=True),
 )

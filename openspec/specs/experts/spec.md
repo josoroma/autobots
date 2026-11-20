@@ -61,7 +61,7 @@ A repeatable seed, separate from migrations, SHALL create in a chosen workspace,
 #### Scenario: Repeatable and separate from migrations
 - **GIVEN** a disposable stack after migrations, and a chosen workspace
 - **WHEN** the seed runs twice
-- **THEN** the workspace holds once each the Experts Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer, and the workflows Weekly competitor brief, Monthly FX and inflation note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer, and running migrations alone creates none of them
+- **THEN** the workspace holds once each the Experts Market watcher, Research analyst, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer, and the workflows Weekly competitor brief, Monthly FX note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer, and running migrations alone creates none of them
 
 #### Scenario: No secrets and no pending work
 - **GIVEN** the seed's files and the database after it runs
@@ -104,3 +104,17 @@ The concept seed SHALL also create the Deep research writer (Decision 0034 E1 to
 - **GIVEN** a disposable database with no SerpApi key
 - **WHEN** the concept seed runs
 - **THEN** the Deep research writer is saved without google_search and its purpose says so, and the workflow is a draft
+
+### Requirement: The seed's Market watcher tracks prices and exchange rates
+
+The concept seed SHALL give the Market watcher no `inflation_rates`, and SHALL seed "Monthly FX note", with an input for the currency pairs and the step "Pull the rates", in place of "Monthly FX and inflation note" (Decision 0036 R7). It SHALL keep a Market watcher or "Monthly FX and inflation note" that already exists as it is.
+
+#### Scenario: The seed on a new workspace
+- **GIVEN** a new workspace
+- **WHEN** the concept seed runs twice
+- **THEN** the Market watcher tracks prices and exchange rates without inflation_rates, "Monthly FX note" is published with an input for the currency pairs and the step "Pull the rates", no "Monthly FX and inflation note" exists, and the second run adds nothing
+
+#### Scenario: The seed on a workspace seeded before
+- **GIVEN** a workspace where the concept seed ran before the change
+- **WHEN** the seed runs again
+- **THEN** the Market watcher and "Monthly FX and inflation note" are unchanged, and "Monthly FX note" is added beside them

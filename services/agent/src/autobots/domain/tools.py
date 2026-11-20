@@ -4,7 +4,7 @@ The grant tables are read-only, as domain/models.py's are: they decide what a ru
 importer can widen them (PDOM-20).
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
@@ -51,7 +51,6 @@ PROVIDER_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         "google_map": 1,
         "google_crawl": 1,
         "market_history": 1,
-        "inflation_rates": 1,
     }
 )
 EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
@@ -103,6 +102,21 @@ WORKFLOW_APPROVAL_TOOL = "workflow_approval"
 WORKFLOW_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
     {**LOOP_TOOL_GRANTS, DELEGATION_TOOL: 1, WORKFLOW_APPROVAL_TOOL: 1}
 )
+
+# Tools Autobots has removed. A saved Expert version, routine or run may still name one: a grant
+# leaves it out, a revision drops it, and a run that recorded it continues without it. A retired
+# name is never reused for another tool (Decision 0036 R2 to R5).
+RETIRED_TOOLS: Final[frozenset[str]] = frozenset({"inflation_rates"})
+
+
+def without_retired(tools: Iterable[str]) -> list[str]:
+    """The names in their order, less the retired ones (Decision 0036 R3 and R4)."""
+    return [tool for tool in tools if tool not in RETIRED_TOOLS]
+
+
+def retired_in(tools: Iterable[str]) -> list[str]:
+    """The retired names among `tools`, which no shipped grant map or registry holds (R2)."""
+    return sorted({tool for tool in tools if tool in RETIRED_TOOLS})
 
 
 def workflow_grant(

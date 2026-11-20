@@ -64,3 +64,5 @@ Each tool can be removed from the registry. Saved runs that pinned its version w
 ## Amended
 
 [Decision 0022](0022-studio-product-surfaces.md) D2 moves Tools under **Build**, after Workflows, in place of C9's position directly before Settings.
+
+[Decision 0036](0036-inflation-rates-removed.md) R1 removes `inflation_rates` and the World Bank Indicators API, so C1's providers are Tavily, Jina and Yahoo Finance's chart endpoint, and Q5 no longer holds. By its R5, a tool it retires doesn't stop a saved run, so the Reversal's `incompatible_version` holds for a tool removed without being retired.

@@ -1,38 +1,23 @@
-"""Market history and inflation, US-14.10 and Decision 0017 C11, C12, Q5 and Q6.
+"""Market history, US-14.10 and Decision 0017 C11, C12 and Q6.
 
 Prices come from Yahoo Finance's chart endpoint, the one yfinance itself reads, called directly
 over `httpx` so no `pandas` comes with it (C12). It is unofficial, for a single owner's personal
-use, with no SLA, and every output says so (C11). Inflation comes from the World Bank Indicators
-API, `FP.CPI.TOTL.ZG`, annual, for Costa Rica, the USA and the euro area (Q5). Neither needs a key,
-and both count as metered calls because they leave this Mac (TU-06). No cross rate is computed: a
-symbol Yahoo doesn't serve fails `symbol_not_found` (Q6). Tests use fake transports (C5).
+use, with no SLA, and every output says so (C11). It needs no key, and counts as a metered call
+because it leaves this Mac (TU-06). No cross rate is computed: a symbol Yahoo doesn't serve fails
+`symbol_not_found` (Q6). Tests use fake transports (C5). Inflation and its World Bank provider are
+retired (Decision 0036 R1).
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
-from typing import TypedDict
 
 import httpx
-from pydantic import RootModel, ValidationError
 
-from autobots.adapters.provider_http import (
-    MALFORMED,
-    Number,
-    ProviderReply,
-    Text,
-    http_client,
-    read,
-    read_json,
-    refusal_code,
-)
+from autobots.adapters.provider_http import ProviderReply, http_client, read_json, refusal_code
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.market_tools import (
-    CountryInflation,
-    InflationInput,
-    InflationOutput,
-    InflationRow,
     MarketHistoryInput,
     MarketHistoryOutput,
     PriceRow,
@@ -42,12 +27,9 @@ from autobots.domain.tool_catalog import CostClass, ToolGroup, ToolProvider
 from autobots.domain.tools import OperationClass
 
 YAHOO_URL = "https://query1.finance.yahoo.com"
-WORLD_BANK_URL = "https://api.worldbank.org"
 YAHOO_SOURCE = "Yahoo Finance chart endpoint: unofficial, personal use, no SLA"
-WORLD_BANK_SOURCE = "World Bank Indicators API, FP.CPI.TOTL.ZG (consumer prices, annual %)"
-NAMES = {"CRI": "Costa Rica", "USA": "United States", "EMU": "Euro area"}
 HEADERS = {"Accept": "application/json", "User-Agent": "autobots-local/1"}
-# Each request's bound, inside each tool's 30-second timeout (tests/test_market_data.py).
+# Each request's bound, inside the tool's 30-second timeout (tests/test_market_data.py).
 REQUEST_SECONDS = 20.0
 TIMEOUT_SECONDS = 30.0
 
@@ -84,16 +66,6 @@ class _ChartBody(ProviderReply):
 
 class _Chart(ProviderReply):
     chart: _ChartBody | None = None
-
-
-class _Observation(ProviderReply):
-    countryiso3code: Text = ""
-    date: Text = ""
-    value: Number = None
-
-
-class _Indicator(RootModel[list[object]]):
-    """The World Bank answers a list: paging, then the rows. An error is a list of one message."""
 
 
 def _number(values: list[object] | None, index: int) -> float | None:
@@ -179,84 +151,9 @@ async def history(
     )
 
 
-def _observations(body: list[object]) -> list[_Observation]:
-    """The rows of a World Bank answer. A list without them is the API refusing the request."""
-    if len(body) < 2 or not isinstance(body[1], list):
-        raise ToolFailed("provider_refused_400")
-    try:
-        return [_Observation.model_validate(item) for item in body[1] if isinstance(item, dict)]
-    except ValidationError:
-        raise ToolFailed(MALFORMED) from None
-
-
-async def inflation(
-    market: MarketConnector, arguments: InflationInput, _: ToolContext
-) -> InflationOutput:
-    path = f"/v2/country/{';'.join(arguments.countries)}/indicator/FP.CPI.TOTL.ZG"
-    async with market.client(WORLD_BANK_URL) as client:
-        reply = await read(
-            client,
-            "GET",
-            path,
-            code_for=partial(refusal_code, "world_bank"),
-            params={
-                "format": "json",
-                "date": f"{arguments.start_year}:{arguments.end_year}",
-                "per_page": 200,
-            },
-        )
-    try:
-        body = _Indicator.model_validate_json(reply.content).root
-    except ValueError:
-        raise ToolFailed(MALFORMED) from None
-    found: dict[str, list[InflationRow]] = {country: [] for country in arguments.countries}
-    for row in _observations(body):
-        if row.countryiso3code in found and row.date.isdigit():
-            found[row.countryiso3code].append(
-                InflationRow(year=int(row.date), inflation_pct=row.value)
-            )
-    return InflationOutput(
-        countries=[
-            CountryInflation(
-                country=country,
-                name=NAMES[country],
-                rows=sorted(found[country], key=lambda row: row.year),
-            )
-            for country in arguments.countries
-        ],
-        source=WORLD_BANK_SOURCE,
-        retrieved_at=market.now(),
-    )
-
-
-class _MarketTraits(TypedDict):
-    """What the two market tools share. Typed, so each definition is checked field by field."""
-
-    version: int
-    operation_class: OperationClass
-    timeout_seconds: float
-    retries: int
-    max_output_bytes: int
-    group: ToolGroup
-    network: bool
-    cost_class: CostClass
-
-
-_MARKET = _MarketTraits(
-    version=1,
-    operation_class=OperationClass.READ_ONLY,
-    timeout_seconds=TIMEOUT_SECONDS,
-    retries=0,
-    max_output_bytes=500_000,
-    group=ToolGroup.MARKET_DATA,
-    network=True,
-    cost_class=CostClass.METERED_PROVIDER,
-)
-
-
 def market_tools(
     transport: httpx.AsyncBaseTransport | None = None, now: Callable[[], str] = _now
-) -> tuple[ToolDefinition, ToolDefinition]:
+) -> tuple[ToolDefinition]:
     market = MarketConnector(transport, now)
     return (
         ToolDefinition(
@@ -274,23 +171,14 @@ def market_tools(
             cost_note="No charge, but unofficial and rate limited; counts as a metered call.",
             public_input_fields=("symbols", "period", "interval"),
             public_output_fields=("source", "retrieved_at", "symbol_count"),
-            **_MARKET,
-        ),
-        ToolDefinition(
-            tool_id="inflation_rates",
-            title="Inflation rates",
-            description=(
-                "Annual consumer price inflation, in percent, for Costa Rica (CRI), the USA (USA) "
-                "and the euro area (EMU), from the World Bank, over at most 31 years."
-            ),
-            input_model=InflationInput,
-            output_model=InflationOutput,
-            handler=partial(inflation, market),
-            provider=ToolProvider.WORLD_BANK,
-            cost_note="No charge; counts as a metered call.",
-            public_input_fields=("countries", "start_year", "end_year"),
-            public_output_fields=("indicator", "source", "retrieved_at"),
-            **_MARKET,
+            version=1,
+            operation_class=OperationClass.READ_ONLY,
+            timeout_seconds=TIMEOUT_SECONDS,
+            retries=0,
+            max_output_bytes=500_000,
+            group=ToolGroup.MARKET_DATA,
+            network=True,
+            cost_class=CostClass.METERED_PROVIDER,
         ),
     )
 

@@ -44,6 +44,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `checks/keys_and_vars_check.py` | check | `scripts/app_db.py` |
 | `checks/browse_steps_check.py` | check | `scripts/app_db.py` |
 | `checks/transcript_check.py` | check | `scripts/app_db.py` |
+| `checks/retired_tools_check.py` | check | `scripts/app_db.py` |
 | `checks/browsing_yolo_check.py` | check | `scripts/app_db.py` |
 | `checks/memory_check.py` | check | `scripts/app_db.py` |
 | `checks/model_endpoint_check.py` | check | `scripts/app_db.py` |

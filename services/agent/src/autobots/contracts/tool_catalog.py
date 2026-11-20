@@ -29,7 +29,7 @@ ToolGroupName = Literal[
     "google",
 ]
 ToolProviderName = Literal[
-    "autobots", "tavily", "jina", "serpapi", "direct", "yahoo_finance", "world_bank", "github"
+    "autobots", "tavily", "jina", "serpapi", "direct", "yahoo_finance", "github"
 ]
 OperationClassName = Literal[
     "pure",

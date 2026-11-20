@@ -35,7 +35,7 @@ from autobots.contracts.run_commands import RunAccepted, RunRequest
 from autobots.contracts.runs import RunSummary
 from autobots.contracts.settings import PreviewProfile, RunPreview, budget_range
 from autobots.domain.models import PROFILES, ModelProfileId
-from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS
+from autobots.domain.tools import LOOP_TOOL_GRANTS, PLAN_TOOLS, without_retired
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
 
@@ -65,7 +65,7 @@ async def preview_run(
             if config is None:
                 raise ApiError(404, "expert_not_found", "That Expert is not available.")
             role_bindings = expert_overrides(config)
-            tools = sorted(config.tools)
+            tools = sorted(without_retired(config.tools))
         remaining = await remaining_daily_micro_usd(connection, workspace_id)
     # It shows what admission would resolve, and refusing a profile that isn't offered is
     # admission's to do.

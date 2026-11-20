@@ -7,31 +7,27 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-17 |
-| Kind | epic |
+| Target | US-18.1 |
+| Kind | story |
 | Focus | - |
 | Status | ACTIVE |
 | Reason | - |
-| Started | 2026-11-19 |
-| Updated | 2026-11-19 |
+| Started | 2026-11-20 |
+| Updated | 2026-11-20 |
 
 ## Stories
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-17.1 | us-17-1-yolo-setting-expert-s | IN PROGRESS | The YOLO setting and the Expert's browse domains |
-| 2 | US-17.2 | us-17-2-admitted-model-endpoint-browser | READY | An admitted model endpoint for the browser box |
-| 3 | US-17.3 | us-17-3-browse-goal-browser-use | BLOCKED | browse_goal on browser-use in the isolated executor |
-| 4 | US-17.4 | us-17-4-pressing-typing-submitting-under | BLOCKED | Pressing, typing and submitting under YOLO, with bot_check, typed results and step screenshots |
-| 5 | US-17.5 | us-17-5-transcript-reader-expert-workflow | BLOCKED | The Transcript reader Expert and workflow |
+| 1 | US-18.1 | us-18-1-retire-inflation-rates-world | IN PROGRESS | Retire inflation_rates and the World Bank provider |
 
 ## Next Action
 
 Action: apply
-Story: US-17.1
-Change: us-17-1-yolo-setting-expert-s
-Command: /ohmyorch:opsx-apply us-17-1-yolo-setting-expert-s
-Reason: 12/17 tasks complete
+Story: US-18.1
+Change: us-18-1-retire-inflation-rates-world
+Command: /ohmyorch:opsx-apply us-18-1-retire-inflation-rates-world
+Reason: 0/11 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
