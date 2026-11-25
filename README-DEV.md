@@ -321,6 +321,7 @@ make browser-images && python3.12 scripts/qualify_browser_executor.py
   - **Qualified apart.** The same command's last phase writes `.checks/browser-executor/stealth.json` (`--stealth` runs only that). While it isn't qualified, a stealth Expert's call is refused `stealth_browser_unqualified`, with no fallback.
   - **The browser's own user agent.** On both browsers the worker's guard refuses a request under another one. A top-frame navigation under one ends the call `refused_action`.
   - **Not for YouTube or Google,** and nothing is seeded with it (Z14).
+  - **The scoreboard (US-20.4, Z15).** `python3.12 scripts/browser_scoreboard.py <https address>...` opens each address once in each browser with no model and records hosts only. It is the owner's to run, after reading each site's terms, and in no profile.
   - **Quiet and paced (US-20.3, Z11 and Z12).** browser-use's highlights are off on stealth. `browser_cdp.WATCH` notes presses and typing in an isolated world, and each step's row keeps them in `browse_steps.touched` (migration 67). `application/browse_turns.py` holds the pace and the turn of a site, a session advisory lock on the attempt's connection.
   - **Checks (US-20.2, Z7 to Z10).** `browser_cdp.Patience` makes the guard of a stealth browse on browser-use wait up to 20 seconds, before the next model request is admitted, for a check that is the page to clear. `CHALLENGE_HOSTS` load as parts of a page only. A Turnstile frame isn't a check, and one that asks a person ends the call `bot_check` at once. On the box, and on the loop, nothing of this applies.
 - **Typing, bot checks and typed results (US-17.4):**
@@ -974,6 +975,7 @@ From the repository root:
 | `make build` | Rebuild the web app |
 | `make toolchain` | Reinstall packages from the locks |
 | `make migrate` | Apply pending migrations, after [the upgrade runbook](docs/engineering/runbooks/upgrade.md) |
+| `python3.12 scripts/browser_scoreboard.py <address>...` | Open addresses you name once in each browser, with no model (Decision 0038 Z15) |
 | `make browser-images` | Build the browser executor's two images, browser-use's and the stealth browser's |
 | `python3.12 scripts/verify.py --profile <profile>` | Run a check profile: `harness`, `fast`, `full`, `db` or `operations` |
 | `python3.12 scripts/generate_contracts.py write` | Regenerate the OpenAPI schema and TypeScript client |

@@ -268,6 +268,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - **The guard.** `RequestGuard` refuses a request whose user agent isn't the browser's own, and counts a top-frame navigation under one.
   - **Checks (US-20.2, after the analyzed revision).** `browser_cdp.is_the_page` and `asks_a_person` tell checks apart for a guard with `Patience`. `RequestGuard.settle` is awaited by `browser_use_box.guarded` before admission. `Stealth.challenge_hosts` joins the sidecar's allowed hosts for browser-use on the stealth browser only.
   - **Quiet and paced (US-20.3, after the analyzed revision).** `RequestGuard._listen` keeps ten polls waiting in each page's `WATCH` world, and each step writes what they answered into `app_private.browse_steps.touched` (migration 67) and `BrowseStep.touched`. `application/browse_turns.py` has `Pace` and `turn`, used by `browsing_tool` for both engines on the stealth browser.
+  - **The scoreboard (US-20.4, after the analyzed revision).** `scripts/browser_scoreboard.py` opens addresses the owner names once in each browser with the executor and the guard, and no model. No profile runs it.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
 - **Tracing:** `forbid_remote_tracing` turns inherited LangSmith and OTLP settings off.

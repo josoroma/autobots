@@ -793,11 +793,11 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-20.3#5 | On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses. | DONE | US-20.3 |
 | US-20.3#6 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | DONE | US-20.3 |
 | US-20.3#7 | Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12. | DONE | US-20.3 |
-| US-20.4 | A scoreboard the owner runs | READY | EPIC-20 |
-| US-20.4#1 | Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings. | TODO | US-20.4 |
-| US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | TODO | US-20.4 |
-| US-20.4#3 | Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log. | TODO | US-20.4 |
-| US-20.4#4 | Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15. | TODO | US-20.4 |
+| US-20.4 | A scoreboard the owner runs | DONE | EPIC-20 |
+| US-20.4#1 | Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings. | DONE | US-20.4 |
+| US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | DONE | US-20.4 |
+| US-20.4#3 | Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log. | DONE | US-20.4 |
+| US-20.4#4 | Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15. | DONE | US-20.4 |
 
 ## Dependency Diagram
 
@@ -10137,7 +10137,8 @@ Open Questions:
 
 ### US-20.4: A scoreboard the owner runs
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-25-us-20-4-scoreboard-owner-runs/`
 
 As a workspace owner
 I want to open the addresses I name once in each browser and see which open
@@ -10184,10 +10185,10 @@ Dependencies:
 - US-20.2
 
 Tasks:
-- [ ] Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings.
-- [ ] Show that no verification profile runs it. Checked by a harness test under `tests/harness`.
-- [ ] Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log.
-- [ ] Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15.
+- [x] Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings.
+- [x] Show that no verification profile runs it. Checked by a harness test under `tests/harness`.
+- [x] Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log.
+- [x] Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15.
 
 Open Questions:
 - None.

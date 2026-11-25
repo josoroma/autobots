@@ -170,6 +170,14 @@ An Expert that grants `browse_goal` drives the box's headless Chromium unless th
 select pid, objid, granted from pg_locks where locktype = 'advisory';
 ```
 
+**The scoreboard (US-20.4).** To see which addresses open in each browser, name them yourself. It opens each once in the box's browser and once in the stealth browser, in the isolated executor, with no model, and presses and solves nothing:
+
+```sh
+python3.12 scripts/browser_scoreboard.py https://example.com/ https://example.org/
+```
+
+It prints one row for each, `opened`, `check`, `blocked` (the site answered with an error status) or `error`, with the status, bytes and seconds. It keeps hosts only, in `.checks/browser-scoreboard/latest.json`. **Read each site's terms before you name it, and again before listing it on a stealth Expert: a site opening is not permission from that site** (Z14, Z15). It is in no verification profile, and it needs the box's, the sidecar's and the stealth browser's images, not their qualification.
+
 **Moving to a newer Chrome.** Google's package source keeps few old versions, so a first build can fail when the pinned one is gone, and a browser that meets hostile pages must be kept patched. Read the current version and SHA-256 from Google's own index, put both in `infra/browser/stealth.Dockerfile`, then build and qualify again:
 
 ```sh
