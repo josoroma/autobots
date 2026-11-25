@@ -41,7 +41,7 @@ URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
 ACTOR = uuid4()
 RESEARCHER = ModelRoute('researcher', 'openrouter_sol', 'openai/gpt-6.1-sol', 1000)
-GRANT = {**PLAN_TOOLS, 'browse_goal': 3}
+GRANT = {**PLAN_TOOLS, 'browse_goal': 4}
 DOMAINS = ['example.com', 'localtest.me']
 BASE = {'task': 'What is example.com for?', 'start_url': 'https://example.com/', 'allowed_domains': ['example.com']}
 # Planted in the worker's environment, so the box's inspection shows none of them crossed.
@@ -272,7 +272,7 @@ async def main() -> None:
               and output.get('model_calls') == 2 and output.get('truncated') is False and 'Example Domain' in page_seen
               and len(uses) >= 1 and uses[0][0] == 'succeeded' and uses[0][4] == 'autobots' and uses[0][5] == 'browsing'
               and set(uses[0][2]) == {'start_url', 'allowed_domains', 'max_steps', 'typing'} and uses[0][2]['typing'] == 'on'
-              and set(uses[0][3]) == {'stopped', 'steps', 'visited_count', 'submits'})
+              and set(uses[0][3]) == {'stopped', 'steps', 'visited_count', 'submits', 'saved_path', 'saved_items'})
         check('each model request is one admitted call of the run on its researcher route',
               "2 requests, 2 succeeded researcher invocations on openrouter_sol, the run's model_calls 2",
               (first_seen, invocations, usage),

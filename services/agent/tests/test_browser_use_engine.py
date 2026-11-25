@@ -51,7 +51,12 @@ from autobots.application.browsing_loop import BrowseOutcome
 from autobots.application.browsing_tool import Limits, browse_tools, resolved_limits
 from autobots.application.loop_admission import active_middleware
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
-from autobots.contracts.browsing import BrowseGoalInput, BrowseGoalV2Input, BrowseGoalV3Input
+from autobots.contracts.browsing import (
+    BrowseGoalInput,
+    BrowseGoalV2Input,
+    BrowseGoalV3Input,
+    BrowseGoalV4Input,
+)
 from autobots.domain.models import ModelRoute
 from autobots.domain.tools import EXPERT_TOOLS
 from sql_fakes import RuledConnection
@@ -94,8 +99,8 @@ def test_version_1_keeps_the_loops_ceilings() -> None:
         BrowseGoalInput.model_validate({**ARGS, "max_seconds": 301})
 
 
-def test_both_versions_are_registered_and_new_grants_take_version_2() -> None:
-    first, second, third = browse_tools(None, qualified=lambda: True)
+def test_every_version_is_registered_and_new_grants_take_the_latest() -> None:
+    first, second, third, fourth = browse_tools(None, qualified=lambda: True)
     assert (first.version, first.input_model, first.timeout_seconds) == (1, BrowseGoalInput, 390)
     assert (third.version, third.input_model, third.timeout_seconds) == (3, BrowseGoalV3Input, 690)
     assert (second.version, second.input_model, second.timeout_seconds) == (
@@ -103,11 +108,16 @@ def test_both_versions_are_registered_and_new_grants_take_version_2() -> None:
         BrowseGoalV2Input,
         690,
     )
-    assert EXPERT_TOOLS["browse_goal"] == 3
+    assert (fourth.version, fourth.input_model, fourth.timeout_seconds) == (
+        4,
+        BrowseGoalV4Input,
+        690,
+    )
+    assert EXPERT_TOOLS["browse_goal"] == 4
 
 
 def test_an_approval_shows_the_loops_limits_since_only_a_loop_call_waits() -> None:
-    _, second, _ = browse_tools(None, qualified=lambda: True)
+    second = browse_tools(None, qualified=lambda: True)[1]
     assert second.approval is not None and second.approval.resource_target is not None
     most = BrowseGoalV2Input.model_validate({**ARGS, "max_steps": 40, "max_seconds": 600})
     plain = BrowseGoalV2Input.model_validate(ARGS)

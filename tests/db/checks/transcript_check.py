@@ -1,5 +1,5 @@
-"""US-17.5 and Decision 0035 Y3, Y10, Y13, Y14, Y17 and Y18 on a real database: the seeded Transcript reader and Transcript
-workflow. JSON cases.
+"""US-17.5, US-21.1, Decision 0035 Y3, Y10, Y13, Y14, Y17 and Y18 and Decision 0039 on a real database: the seeded Transcript
+reader and Transcript workflow, and the transcript browse_goal saves itself. JSON cases.
 
 The model is scripted, and so is each browse: browse_goal's own tool runs, with its YOLO, domain, approval and typed-result
 rules, but the box is replaced by a scripted outcome, so nothing reaches YouTube or any other host (Y18). Published files go
@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import re
+from dataclasses import replace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -36,7 +37,8 @@ RESEARCHER = ModelRoute('researcher', 'openrouter_sol', 'openai/gpt-6.1-sol', 10
 VIDEO = 'https://www.youtube.com/watch?v=aaaaaaaaaaa&t=5s'
 DOMAINS = ['youtube.com', 'ytimg.com', 'ggpht.com', 'gstatic.com']
 TITLE = 'A scripted video'
-LINES = [{'time': f'{n // 60}:{n % 60:02d}', 'text': f'Scripted caption number {n}.'} for n in range(0, 240, 12)]
+# More than one model reply can hold, and past the 48,000 characters a tool's output is offloaded at.
+LINES = [{'time': f'{n // 60}:{n % 60:02d}', 'text': f'Scripted caption number {n}.'} for n in range(0, 24000, 12)]
 cases: list[dict[str, Any]] = []
 available = [False]
 browses: list[Any] = []
@@ -90,25 +92,30 @@ async def scripted_browse(executor: Any, call: Any, **_: Any) -> BrowseOutcome:
 
 
 def markdown() -> str:
-    """What the scripted model writes from the typed result, as the Transcript reader's instructions say."""
+    """The whole file the worker writes from the typed result, by the Transcript reader's layout."""
     lines = [f'# {TITLE}', '', f'Source: {VIDEO}', '', "These lines are YouTube's own captions for the video.", '']
     return '\n'.join(lines + [f"{line['time']} {line['text']}" for line in LINES]) + '\n'
 
 
+def layout(path: str) -> dict[str, Any]:
+    """The seeded instructions' `save`, as a model fills it in for this run."""
+    return json.loads(concept_seed.TRANSCRIPT_SAVE.replace('<outputs>/transcript.md', path).replace('<address>', VIDEO))
+
+
 def transcribing(result: dict[str, Any] | None) -> list[Any]:
-    """The scripted Transcript reader: a plan, one browse with the seeded schema, then the file or a stop."""
+    """The scripted Transcript reader: a plan, one browse with the seeded schema and save, then the file or a stop. It
+    never calls save_artifact and types no line."""
+    path = 'outputs/child-1/transcript.md'
     plan = calls(('propose_plan', {'tasks': [{'id': 't', 'title': 'Transcribe the video', 'criteria': ['c1'],
                                               'expected_evidence': 'transcript.md'}]}))
     browse = calls(('browse_goal', {'task': 'Open the address, press "...more" and "Show transcript", and read every line.',
                                     'start_url': VIDEO, 'allowed_domains': DOMAINS,
-                                    'output_schema': json.loads(concept_seed.TRANSCRIPT_SCHEMA)}))
+                                    'output_schema': json.loads(concept_seed.TRANSCRIPT_SCHEMA), 'save': layout(path)}))
     if result is None:
         return [plan, browse, say('YouTube answered with a bot check, so nothing was published.')]
     if not result['lines']:
         return [plan, browse, say('The video offers no transcript, so nothing was published.')]
-    path = 'outputs/child-1/transcript.md'
-    return [plan, browse, calls(('save_artifact', {'path': path, 'content': markdown()})),
-            calls(('publish_artifact', {'path': path, 'version': 1})),
+    return [plan, browse, calls(('publish_artifact', {'path': path, 'version': 1})),
             calls(('complete_task', {'task_id': 't', 'evidence': [{'kind': 'artifact', 'reference': path}], 'summary': 'published'})),
             say('Published transcript.md.')]
 
@@ -159,6 +166,24 @@ async def main() -> None:
               and await flow_state(on) == (1, False) and second_runs == {'kept'}
               and off_first['workflows']['Transcript'] == {'draft': True, 'unavailable': ['browse_goal']}
               and on_first['workflows']['Transcript'] == {'published': 1})
+
+        # A workspace seeded before version 4 could save, whose reader's instructions are an earlier release's.
+        earlier, _ = await workspace('Seeded before')
+        shipped = concept_seed.EXPERTS
+        concept_seed.EXPERTS = tuple(replace(expert, instructions='Save transcript.md with save_artifact.') if expert.name == 'Transcript reader'
+                                     else expert for expert in shipped)  # type: ignore[misc]  # arranged
+        await concept_seed.seed(db, earlier, {})
+        concept_seed.EXPERTS = shipped  # type: ignore[misc]  # the shipped ones again
+        before = await latest(earlier, 'Transcript reader')
+        again = await concept_seed.seed(db, earlier, {})
+        check('a reader seeded earlier is kept, and a new one saves the file itself',
+              "the earlier workspace's instructions unchanged, the new one's with a save, the same tools, no domains and the box",
+              (before == await latest(earlier, 'Transcript reader'), again['experts'].get('Transcript reader'),
+               concept_seed.TRANSCRIPT_SAVE in on_reader.get('instructions', ''), on_reader.get('tools'), on_reader.get('browser')),
+              before == await latest(earlier, 'Transcript reader') and before['instructions'] == 'Save transcript.md with save_artifact.'
+              and again['experts'].get('Transcript reader') == 'kept' and concept_seed.TRANSCRIPT_SAVE in on_reader['instructions']
+              and 'save_artifact' not in on_reader['instructions'] and 'browser' not in on_reader
+              and on_reader.get('browse_domains', []) == [])
 
         workflow_id = await value("select id from public.workflows where workspace_id = %s and name = 'Transcript'", on)
 
@@ -233,15 +258,32 @@ async def main() -> None:
         check('a watch address in, transcript.md out',
               'transcript.md published with the title, the source address and every line with its timestamp, as many lines as the '
               "transcript's, from the browse's typed result",
-              ([name for name, _ in files], content[:160], len(timed), len(LINES),
-               any('Scripted caption number 0.' in text for text in shown)),
+              ([name for name, _ in files], content[:160], len(timed), len(LINES), len(content)),
               [name for name, _ in files] == ['transcript.md'] and f'# {TITLE}' in content and f'Source: {VIDEO}' in content
-              and len(timed) == len(LINES) and timed == [f"{line['time']} {line['text']}" for line in LINES]
-              and any('Scripted caption number 0.' in text for text in shown))
+              and len(timed) == len(LINES) and timed == [f"{line['time']} {line['text']}" for line in LINES])
+        everything = ' '.join(str(message.content) + str(getattr(message, 'tool_calls', '')) for messages in model.seen for message in messages)
+        calls_made = [row[0] for row in await (await db.execute(
+            'select tool_id from app_private.tool_uses where run_id = any(%s) order by id', (await children(transcribed),))).fetchall()]
+        offloads = await value('select count(*) from app_private.run_offloads where run_id = any(%s)', await children(transcribed))
+        reported = next((text for text in shown if '"saved_items"' in text), '')
+        granted = await value("select spec -> 'allowed_tools' -> 'browse_goal' from app_private.goal_specs where run_id = any(%s)",
+                              await children(transcribed))
+        check("an Expert's new run is granted version 4", '4', granted, granted == 4)
+        check('the model types no line and reads none',
+              'the file is the whole expected text, the model saw its path and count and no line of it, nothing was offloaded, and '
+              'the run used no save_artifact',
+              (content == markdown(), 'Scripted caption' in everything, reported[:300], offloads, calls_made),
+              content == markdown() and 'Scripted caption' not in everything and f'"saved_items": {len(LINES)}' in reported
+              and '"result": null' in reported and offloads == 0 and 'save_artifact' not in calls_made)
 
         use = await (await db.execute(
-            "select input_public, outcome from app_private.tool_uses where tool_id = 'browse_goal' and run_id = any(%s)",
+            "select input_public, outcome, output_public from app_private.tool_uses where tool_id = 'browse_goal' and run_id = any(%s)",
             (await children(transcribed),))).fetchone()
+        row = json.dumps(use[2] if use else None)
+        check('the tool row shows the path and the count',
+              'saved_path and saved_items in the public output, and no caption',
+              row[:300], use is not None and use[2].get('saved_path') == 'outputs/child-1/transcript.md'
+              and use[2].get('saved_items') == len(LINES) and 'Scripted caption' not in row)
         asked = await value('select count(*) from public.approval_requests where run_id = any(%s)',
                             [transcribed.run_id, *(await children(transcribed))])
         named = list(browses[0].allowed_domains) if browses else []
@@ -254,10 +296,11 @@ async def main() -> None:
         nothing = BrowseOutcome('There is no Show transcript.', ('https://www.youtube.com/watch',), 3, 4, 'done', {'title': TITLE, 'lines': []}, ())
         empty_video, model = await run(transcribing({'title': TITLE, 'lines': []}), nothing)
         status = await value('select status from public.runs where id = %s', empty_video.run_id)
+        said = ' '.join(str(message.content) for message in (model.seen[2] if len(model.seen) > 2 else []))
         check('no transcript offered',
-              'the run ends, its last word says no transcript is offered, and no file is published',
-              (status, await published(empty_video), model.items, len(browses)),
-              status in ('succeeded', 'failed') and await published(empty_video) == [] and model.items == [] and len(browses) == 1)
+              'the model sees not_saved no_items, the run ends, its last word says no transcript is offered, and no file is published',
+              (status, 'no_items' in said, await published(empty_video), model.items, len(browses)),
+              'no_items' in said and status in ('succeeded', 'failed') and await published(empty_video) == [] and model.items == [] and len(browses) == 1)
 
         browses.clear()
         blocked = BrowseOutcome('', ('https://www.youtube.com/watch',), 1, 1, 'bot_check', None, ())

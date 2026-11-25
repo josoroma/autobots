@@ -16,7 +16,7 @@
 
 The Transcript reader turns a YouTube watch address into `transcript.md`: the video's title, its address, and every caption line with its timestamp. It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
 
-This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing.
+This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself.
 
 ## Contents
 
@@ -29,6 +29,7 @@ This page records the first live run, on the owner's install on 2026-11-20. That
   - [What happened](#what-happened)
   - [Why it stopped](#why-it-stopped)
   - [What it cost](#what-it-cost)
+- [A second run, on 2026-11-25](#a-second-run-on-2026-11-25)
 - [What this shows, and what it doesn't](#what-this-shows-and-what-it-doesnt)
 - [Where it is defined](#where-it-is-defined)
 
@@ -39,7 +40,7 @@ This page records the first live run, on the owner's install on 2026-11-20. That
 | | |
 |---|---|
 | **Name** | Transcript reader |
-| **Tools** | `browse_goal` (version 3), `save_artifact`, `publish_artifact` |
+| **Tools** | `browse_goal` (version 4), `save_artifact`, `publish_artifact` |
 | **Browse domains** | None when seeded. The owner adds `youtube.com`, `ytimg.com`, `ggpht.com` and `gstatic.com`, never `googlevideo.com`, the host that streams the video itself. Adding them is where the owner accepts YouTube's terms on automated access (Decision 0035 Y14) |
 | **Model** | The run's `researcher` route drives each browse step through the admitted endpoint (Y7). The other roles follow the workspace policy |
 
@@ -48,7 +49,7 @@ Its instructions ask for four things:
 1. **One browse.** One `browse_goal` call on the watch address, within those four hosts. It passes an output schema for the title and the lines, each with `time` and `text`. Its task: press "...more" under the video, press "Show transcript", and read every line of the panel in order.
 2. **A bot check.** If the browse stops with `bot_check`, say so and publish nothing. Never try to pass it.
 3. **No transcript.** If no lines come back, say the video offers no transcript and publish nothing.
-4. **The file.** Otherwise save and publish `transcript.md`: the title as a heading, `Source:` and the address, a note that the lines are YouTube's own captions, then `time text` per line, in order, none summarised.
+4. **The file.** The same `browse_goal` call carries a `save`, so the worker writes `transcript.md` itself: the title as a heading, `Source:` and the address, a note that the lines are YouTube's own captions, then `time text` per line, in order ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)). The model publishes that file and never retypes a line.
 
 It never signs in, comments, likes, subscribes or posts, and treats the page's text as data.
 
@@ -105,6 +106,16 @@ So the bot check was real, and the Transcript reader handled it as designed (Y10
 
 US$0.010363 in all, for the plan and the one browse step, against the US$1.00 budget.
 
+## A second run, on 2026-11-25
+
+The owner asked for one more run, on a 44-minute video, with one run and US$0.25 authorized. It ran on the box's browser (execution `0d8413a0…`, step run `20449859…`):
+
+- **The browse worked.** `browse_goal` version 3 ended `done` after 10 steps and 46.6 seconds, with no bot check. Its screenshots show the transcript panel scrolled to its end.
+- **The file wasn't written.** The instructions had the model retype the result into `save_artifact`, and a model reply holds 4,096 output tokens. After the browse, `assign_specialist` was refused (`scope_expansion_denied`) and `read_offload` found nothing (`offload_not_found`). The run failed `plan_incomplete` and published nothing.
+- **Cost.** US$0.054258.
+
+[Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md) has the worker save that result itself. How many lines the browse returned wasn't recorded, and no run since has shown the file.
+
 ## What this shows, and what it doesn't
 
 **It shows:**
@@ -113,7 +124,7 @@ US$0.010363 in all, for the plan and the one browse step, against the US$1.00 bu
 - **The bot check.** A real bot check stopped the browse at once, nothing was published, and the screenshots were kept.
 
 **It doesn't show:**
-- **That browser-use can read a transcript on YouTube from this Mac.** YouTube refused the box's browser before any page loaded.
+- **That a transcript can be read whole on YouTube from this Mac.** YouTube refused the first run before any page loaded. The second reached the panel's end, and published nothing.
 - **The no-transcript path, live.** It and the bot check are covered by checks with a scripted model and scripted browses (`tests/db/checks/transcript_check.py`).
 - **H1 or product acceptance.**
 
@@ -132,9 +143,9 @@ No transcript text appears here. A video's captions are its creator's work (Deci
 - **The Expert and the workflow.** [`services/agent/src/autobots/operations/concept_seed.py`](services/agent/src/autobots/operations/concept_seed.py) holds `TRANSCRIPT_INSTRUCTIONS`, `TRANSCRIPT_SCHEMA` and `WATCH_ADDRESS`.
 - **The input pattern.** [`services/agent/src/autobots/domain/workflows.py`](services/agent/src/autobots/domain/workflows.py) holds `InputConfig.pattern` and `input_pattern_mismatch`.
 - **browse_goal on browser-use.**
-  - [`application/browsing_tool.py`](services/agent/src/autobots/application/browsing_tool.py) holds versions 1 to 3, the engine and the limits.
+  - [`application/browsing_tool.py`](services/agent/src/autobots/application/browsing_tool.py) holds versions 1 to 4, the engine, the limits and the saved file.
   - [`adapters/browser_use_box.py`](services/agent/src/autobots/adapters/browser_use_box.py) runs the browse and judges it.
   - [`adapters/browser_cdp.py`](services/agent/src/autobots/adapters/browser_cdp.py) holds the guard, with its submits and bot-check signals.
   - [`services/browser-use/`](services/browser-use) is the box's runner and lock.
-- **The checks.** [`tests/db/checks/transcript_check.py`](tests/db/checks/transcript_check.py) covers the seed, the pattern, a published transcript, no transcript and a bot check. [`tests/db/checks/browser_use_check.py`](tests/db/checks/browser_use_check.py) is browser-use's qualification, run by `scripts/qualify_browser_executor.py`.
+- **The checks.** [`tests/db/checks/transcript_check.py`](tests/db/checks/transcript_check.py) covers the seed, the pattern, a long published transcript nothing retyped, no transcript and a bot check. [`tests/db/checks/browser_use_check.py`](tests/db/checks/browser_use_check.py) is browser-use's qualification, run by `scripts/qualify_browser_executor.py`.
 - **The specs.** [`openspec/specs/transcript-reader`](openspec/specs/transcript-reader/spec.md), [`openspec/specs/browser-use-typing`](openspec/specs/browser-use-typing/spec.md) and [`openspec/specs/browser-use-engine`](openspec/specs/browser-use-engine/spec.md).

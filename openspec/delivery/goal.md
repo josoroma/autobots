@@ -7,11 +7,11 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | EPIC-20 |
-| Kind | epic |
+| Target | US-21.1 |
+| Kind | story |
 | Focus | - |
-| Status | BLOCKED |
-| Reason | no progress: next action 'verify' for US-20.1 unchanged across 4 stop attempts |
+| Status | COMPLETE |
+| Reason | - |
 | Started | 2026-11-25 |
 | Updated | 2026-11-25 |
 
@@ -19,18 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-20.1 | us-20-1-stealth-browser-box | IN PROGRESS | A stealth browser in the box |
-| 2 | US-20.2 | us-20-2-check-that-clears-itself | BLOCKED | A check that clears by itself |
-| 3 | US-20.3 | us-20-3-quiet-page | BLOCKED | Quiet on the page |
-| 4 | US-20.4 | us-20-4-scoreboard-owner-runs | BLOCKED | A scoreboard the owner runs |
+| 1 | US-21.1 | us-21-1-browse-s-result-saved | DONE | A browse's result saved straight to a file |
 
 ## Next Action
 
-Action: verify
-Story: US-20.1
-Change: us-20-1-stealth-browser-box
-Command: /ohmyorch:opsx-verify us-20-1-stealth-browser-box; with no CRITICAL issue, run a separate Bash call: openspec archive us-20-1-stealth-browser-box -y
-Reason: 10/10 tasks complete; verify, then archive
+Action: complete
+Story: -
+Change: -
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

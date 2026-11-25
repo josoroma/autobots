@@ -163,6 +163,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-20.2: A check that clears by itself](#us-202-a-check-that-clears-by-itself)
   - [US-20.3: Quiet on the page](#us-203-quiet-on-the-page)
   - [US-20.4: A scoreboard the owner runs](#us-204-a-scoreboard-the-owner-runs)
+- [EPIC-21: A browse's typed result saved straight to a file](#epic-21-a-browses-typed-result-saved-straight-to-a-file)
+  - [US-21.1: A browse's result saved straight to a file](#us-211-a-browses-result-saved-straight-to-a-file)
 
 ## Work Item Status
 
@@ -798,6 +800,14 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | DONE | US-20.4 |
 | US-20.4#3 | Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log. | DONE | US-20.4 |
 | US-20.4#4 | Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15. | DONE | US-20.4 |
+| EPIC-21 | A browse's typed result saved straight to a file | — | — |
+| US-21.1 | A browse's result saved straight to a file | DONE | EPIC-21 |
+| US-21.1#1 | Add `browse_goal` version 4 to the contracts: version 3 with an optional `save` of `path`, `items`, `line` and `before`, refused without an `output_schema` or when it names what the schema doesn't have, and an output with the `saved_` fields and `not_saved` (V1, V2, V5, V6). Register it beside versions 1 to 3 with the save's path among its resources, and make only `saved_path` and `saved_items` public beside version 3's public fields. Regenerate OpenAPI and the TypeScript client where they change. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the tool row, and `contract_drift` in the fast profile. | DONE | US-21.1 |
+| US-21.1#2 | Render the validated result and write it in the worker, through the one writer of run files, under the run's lease and within its path grants, with the version bound to the call's tool-use row. A call that isn't saved says why and returns its result, and a repeat saves a new version (V3 to V7). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`) with a scripted model and scripted browses. | DONE | US-21.1 |
+| US-21.1#3 | Grant version 4 in `domain/tools.EXPERT_TOOLS`, add its digest to `tool_schema_versions.json` with versions 1 to 3 unchanged, and move the browse rigs' grants (V1). Checked by pytest under `services/agent/tests`, and the rigs by reading, since `scripts/qualify_browser_executor.py`, which runs them, is in no profile. | DONE | US-21.1 |
+| US-21.1#4 | Have the Transcript reader's seeded instructions save with `save`, then publish, and never retype a line, with its tools, empty browse domains and `box` browser unchanged and an Expert already seeded kept (V8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`). | DONE | US-21.1 |
+| US-21.1#5 | Amend PRD-Tool-Catalog AB-05, PRD-Studio SD-02's Transcript reader row, and Decision 0035 Y12 and Y14, as Decision 0039's "Requirements revised" lists. Checked by reading each against V1 to V8. | DONE | US-21.1 |
+| US-21.1#6 | Update `README-YouTube-Transcript.md`, `README-DEV.md`'s typed results, `browse_goal`'s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`. | DONE | US-21.1 |
 
 ## Dependency Diagram
 
@@ -975,6 +985,9 @@ flowchart TD
     US_20_2["US-20.2: A check that clears by itself"]
     US_20_3["US-20.3: Quiet on the page"]
     US_20_4["US-20.4: A scoreboard the owner runs"]
+  end
+  subgraph EPIC_21["EPIC-21: A browse&#x27;s typed result saved straight to a file"]
+    US_21_1["US-21.1: A browse&#x27;s result saved straight to a file"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1335,6 +1348,8 @@ flowchart TD
   US_20_1 -.-> US_20_2
   US_20_1 -.-> US_20_3
   US_20_2 -.-> US_20_4
+  US_17_4 -.-> US_21_1
+  US_17_5 -.-> US_21_1
 ```
 
 ```mermaid
@@ -2541,6 +2556,25 @@ flowchart TD
     US_20_4 --> T_20_4_3
     T_20_4_4["US-20.4#4: Document it in the operations runbook, with the owner&#x27;s reading of a site&#x27;s terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15."]
     US_20_4 --> T_20_4_4
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_21["EPIC-21 tasks"]
+    US_21_1["US-21.1: A browse&#x27;s result saved straight to a file"]
+    T_21_1_1["US-21.1#1: Add `browse_goal` version 4 to the contracts: version 3 with an optional `save` of `path`, `items`, `line` and `before`, refused without an `output_schema` or when it names what the schema doesn&#x27;t have, and an output with the `saved_` fields and `not_saved` (V1, V2, V5, V6). Register it beside versions 1 to 3 with the save&#x27;s path among its resources, and make only `saved_path` and `saved_items` public beside version 3&#x27;s public fields. Regenerate OpenAPI and the TypeScript client where they change. Checked by pytest under `services/agent/tests`, the db profile&#x27;s disposable fixtures for the tool row, and `contract_drift` in the fast profile."]
+    US_21_1 --> T_21_1_1
+    T_21_1_2["US-21.1#2: Render the validated result and write it in the worker, through the one writer of run files, under the run&#x27;s lease and within its path grants, with the version bound to the call&#x27;s tool-use row. A call that isn&#x27;t saved says why and returns its result, and a repeat saves a new version (V3 to V7). Checked by pytest under `services/agent/tests`, and by the db profile&#x27;s disposable fixtures (`tests/db/checks/transcript_check.py`) with a scripted model and scripted browses."]
+    US_21_1 --> T_21_1_2
+    T_21_1_3["US-21.1#3: Grant version 4 in `domain/tools.EXPERT_TOOLS`, add its digest to `tool_schema_versions.json` with versions 1 to 3 unchanged, and move the browse rigs&#x27; grants (V1). Checked by pytest under `services/agent/tests`, and the rigs by reading, since `scripts/qualify_browser_executor.py`, which runs them, is in no profile."]
+    US_21_1 --> T_21_1_3
+    T_21_1_4["US-21.1#4: Have the Transcript reader&#x27;s seeded instructions save with `save`, then publish, and never retype a line, with its tools, empty browse domains and `box` browser unchanged and an Expert already seeded kept (V8). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures (`tests/db/checks/transcript_check.py`)."]
+    US_21_1 --> T_21_1_4
+    T_21_1_5["US-21.1#5: Amend PRD-Tool-Catalog AB-05, PRD-Studio SD-02&#x27;s Transcript reader row, and Decision 0035 Y12 and Y14, as Decision 0039&#x27;s &quot;Requirements revised&quot; lists. Checked by reading each against V1 to V8."]
+    US_21_1 --> T_21_1_5
+    T_21_1_6["US-21.1#6: Update `README-YouTube-Transcript.md`, `README-DEV.md`&#x27;s typed results, `browse_goal`&#x27;s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`."]
+    US_21_1 --> T_21_1_6
   end
 ```
 
@@ -10189,6 +10223,103 @@ Tasks:
 - [x] Show that no verification profile runs it. Checked by a harness test under `tests/harness`.
 - [x] Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log.
 - [x] Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15.
+
+Open Questions:
+- None.
+
+# EPIC-21: A browse's typed result saved straight to a file
+
+Scheduled by [Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#decision), from the owner's choice of 2026-11-25, "Yes, build it", on saving a browse's result straight to a file without the model retyping it. The rest was delegated and is decided there. It amends Decision 0035 Y12 and Y14, and the PRD-Tool-Catalog and PRD-Studio rows it lists. `browse_goal` version 4 takes an optional `save` with its `output_schema`. When a call ends `done` and its result validates, the worker writes the result to a run file, every item in order and one line each, and the model types none of it. The output names the saved version and counts its items and characters, and carries no result. A browse still keeps no receipt, so a repeat browses again and saves a new version. The seeded Transcript reader saves this way, with its tools, its empty browse domains and its `box` browser unchanged. Saving another tool's output, adding to an existing file and other layouts aren't scheduled (V9). The story's checks use scripted models and scripted browses, and reach no YouTube. Nothing here establishes that any site opens, that a browse reads a page completely, H1 or product acceptance ([what Decision 0039 doesn't establish](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#what-this-doesnt-establish)).
+
+### US-21.1: A browse's result saved straight to a file
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-25-us-21-1-browse-s-result-saved/`
+
+As a workspace owner
+I want a browse's typed result saved straight to a run file by the worker
+So that a long result, such as a video's transcript, is kept whole and can be published, with no line retyped by the model.
+
+Source:
+- [Decision 0039, V1 to V9](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#decision)
+- [Decision 0039, context, on why a long result can't be saved today](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#context)
+- [Decision 0039, requirements revised](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#requirements-revised)
+- [Decision 0039, what this gives up](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#what-this-gives-up)
+- [Decision 0039, reversal](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#reversal)
+- [Decision 0035, Y3, Y5, Y12, Y14, Y18 and Y19](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0038, Z14](docs/engineering/decisions/0038-local-stealth-browser.md#decision)
+- [Decision 0034, L1, a reply's output tokens](docs/engineering/decisions/0034-deep-research-like-content-writer.md#limits-for-every-run-us-166)
+- [Decision 0034, L7, tool output in view](docs/engineering/decisions/0034-deep-research-like-content-writer.md#a-64k-working-context-us-168)
+- [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [Decision 0029, F13, tool schemas stay byte-identical](docs/engineering/decisions/0029-refactor-decisions-delegated-r41-r68.md#decision-0029-choices-made-while-delivering-refactor-items-r-41-to-r-68)
+- [Decision 0020, L5, what stays of the browse's approval](docs/engineering/decisions/0020-own-browsing-loop.md#decision)
+- [Autonomous browsing, AB-02 and AB-05](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Tool-use record, TU-01 and TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool-use views, TV-01](docs/PRD/PRD-Tool-Catalog.md#tool-use-views)
+- [Experts, EX-01, whose browse domains and browser V8 leaves unchanged](docs/PRD/PRD-Studio.md#experts)
+- [Seed, SD-01 and SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-010, a call leaving no receipt](docs/engineering/option-b-contract.md#tool-attempt-receipts-and-approval-requests)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD 9cc20bc. `application/browsing_tool.py` registers `browse_goal` versions 1 to 3 and declares no resource paths, and its `_typed_output` returns version 3's validated `result`. `domain/tools.EXPERT_TOOLS` grants version 3, and admission reads an Expert's versions from it. `TRANSCRIPT_INSTRUCTIONS` in `operations/concept_seed.py` have the model write the transcript's lines into `save_artifact` (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `application/run_files.write` writes a tool's run file under the lease with `context.operation_id`, and `app_private.run_files.operation_id` is `not null unique`. The gateway dispatches `arbitrary_execution` as a read, so a browse's `ToolContext` has a `use_id`, no operation ID and no receipt, and a tool's reply over 300,000 bytes fails `output_too_large` (checked at HEAD). Not product intent.
+- [Integration points](CODEBASE.md#integration-points): the fingerprints in `adapters/browser_qualification.py` name neither `application/browsing_tool.py` nor `contracts/browsing.py` (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Every line, in order, and none typed by the model
+  Given a run granted browse_goal version 4 under YOLO, a scripted model, and a scripted browse that ends done with a valid result of more lines than a model reply could hold, past 48,000 characters, one of whose values holds a line break
+  When the model calls it with a save whose layout names the lines and holds a brace that names nothing, and again with a save to another path and no layout
+  Then the first file is the text above the items with that brace as text, and then every item in order, one line each, as it came but for the line break as one space, the second file is the result as indented JSON, no line reached the model or came from it, and the first output holds saved_path, saved_version, saved_sha256, saved_items and saved_characters as its file has them and no result
+
+Scenario: Refused before any container
+  Given a run granted browse_goal version 4 whose path grant is outputs/child-1, and an executor that fails if it is touched
+  When the model calls it with a save and no output_schema, with a save whose items, line or before names what the schema doesn't have, and with a save path under outputs/ outside that grant
+  Then the save with no schema and each unknown name are refused invalid_arguments, the path is refused resource_not_granted, and no container starts
+
+Scenario: When it isn't saved
+  Given scripted version 4 calls with a save: one whose array is empty, one whose file would pass 256,000 characters, one whose attempt has ended, one whose use was never recorded, and some that end other than done
+  When each call ends
+  Then none writes a file, the first four say no_items, too_large, lease_lost and lease_lost in not_saved with the result as version 3 returns it, and the rest save nothing
+
+Scenario: A repeat browses again
+  Given a version 4 call that saved its file, and an attempt that ended before the call's outcome was recorded
+  When the run's next attempt makes the same call
+  Then it browses again and saves a new version, the earlier version stays as it was, and the output names the version this call wrote
+
+Scenario: Earlier versions keep their schemas
+  Given the pinned schema digests of browse_goal versions 1 to 3, and a run that pinned version 3 before the change
+  When the tools are registered, that run makes a browse_goal call, and an Expert that grants browse_goal starts a run
+  Then versions 1 to 3 keep their digests beside version 4, the earlier run's call runs as version 3 and returns its result, and the new run is granted version 4
+
+Scenario: A published transcript nothing retyped
+  Given YOLO on, a workspace seeded before the change, a new one where the concept seed runs and its owner then adds youtube.com, ytimg.com, ggpht.com and gstatic.com to the Transcript reader's domains, a scripted model, and a scripted browse that returns a video's title and a transcript too long for a model reply
+  When the seed runs again in the earlier workspace, and the Transcript workflow is executed in the new one with that video's https watch address
+  Then transcript.md is published from the saved file with the title, the source address and every line with its timestamp in order, no call the model made holds a transcript line, the new Transcript reader was seeded with the same tools, no browse domains and the box's browser, and the earlier workspace's Transcript reader is unchanged
+
+Scenario: The tool row shows the path and the count
+  Given a saved browse of a run, whose result holds a planted text
+  When a member reads the run's tool uses
+  Then the browse's row shows saved_path and saved_items, and the planted text is in no row or event
+```
+
+Dependencies:
+- US-17.4
+- US-17.5
+
+Tasks:
+- [x] Add `browse_goal` version 4 to the contracts: version 3 with an optional `save` of `path`, `items`, `line` and `before`, refused without an `output_schema` or when it names what the schema doesn't have, and an output with the `saved_` fields and `not_saved` (V1, V2, V5, V6). Register it beside versions 1 to 3 with the save's path among its resources, and make only `saved_path` and `saved_items` public beside version 3's public fields. Regenerate OpenAPI and the TypeScript client where they change. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the tool row, and `contract_drift` in the fast profile.
+- [x] Render the validated result and write it in the worker, through the one writer of run files, under the run's lease and within its path grants, with the version bound to the call's tool-use row. A call that isn't saved says why and returns its result, and a repeat saves a new version (V3 to V7). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`) with a scripted model and scripted browses.
+- [x] Grant version 4 in `domain/tools.EXPERT_TOOLS`, add its digest to `tool_schema_versions.json` with versions 1 to 3 unchanged, and move the browse rigs' grants (V1). Checked by pytest under `services/agent/tests`, and the rigs by reading, since `scripts/qualify_browser_executor.py`, which runs them, is in no profile.
+- [x] Have the Transcript reader's seeded instructions save with `save`, then publish, and never retype a line, with its tools, empty browse domains and `box` browser unchanged and an Expert already seeded kept (V8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`).
+- [x] Amend PRD-Tool-Catalog AB-05, PRD-Studio SD-02's Transcript reader row, and Decision 0035 Y12 and Y14, as Decision 0039's "Requirements revised" lists. Checked by reading each against V1 to V8.
+- [x] Update `README-YouTube-Transcript.md`, `README-DEV.md`'s typed results, `browse_goal`'s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`.
 
 Open Questions:
 - None.

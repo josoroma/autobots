@@ -28,7 +28,7 @@ from checklib import Cases
 from goal_loop_script import ROUTE, Script, calls
 
 RESEARCHER = ModelRoute('researcher', 'openrouter_sol', 'openai/gpt-6.1-sol', 1000)
-GRANT = {**PLAN_TOOLS, 'browse_goal': 3}
+GRANT = {**PLAN_TOOLS, 'browse_goal': 4}
 BASE = {'task': 'What is example.com for?', 'start_url': 'https://example.com/', 'allowed_domains': ['example.com']}
 
 

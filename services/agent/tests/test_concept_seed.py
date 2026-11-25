@@ -5,7 +5,7 @@ import json
 from uuid import uuid4
 
 from autobots.adapters.tool_registry import catalog
-from autobots.contracts.browsing import BrowseGoalV3Input
+from autobots.contracts.browsing import BrowseGoalV4Input
 from autobots.contracts.experts import ExpertConfig
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.workflows import input_errors, validate_graph
@@ -15,6 +15,7 @@ from autobots.operations.concept_seed import (
     GITHUB_RELEASE,
     GITHUB_TRIAGE,
     TRANSCRIPT_INSTRUCTIONS,
+    TRANSCRIPT_SAVE,
     TRANSCRIPT_SCHEMA,
     WORKFLOWS,
     available_tools,
@@ -174,8 +175,13 @@ def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_one_fil
         "start_url": "https://www.youtube.com/watch?v=JWhICz1QR8M",
         "allowed_domains": ["youtube.com"],
         "output_schema": json.loads(TRANSCRIPT_SCHEMA),
+        "save": json.loads(TRANSCRIPT_SAVE.replace("<outputs>", "outputs/child-1")),
     }
-    assert BrowseGoalV3Input.model_validate(args).output_schema is not None
+    save = BrowseGoalV4Input.model_validate(args).save
+    assert save is not None and save.path == "outputs/child-1/transcript.md"
+    assert TRANSCRIPT_SAVE in TRANSCRIPT_INSTRUCTIONS
+    assert "Never retype" in TRANSCRIPT_INSTRUCTIONS
+    assert "save_artifact" not in TRANSCRIPT_INSTRUCTIONS
     config = ExpertConfig(
         purpose=expert.purpose, instructions=expert.instructions, tools=list(expert.tools)
     )
