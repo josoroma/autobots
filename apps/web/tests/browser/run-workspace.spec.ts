@@ -539,6 +539,10 @@ test("US-17.4: a browse's steps show their screenshots, pages and submits, only 
   await expect(steps.nth(0)).toContainText("Step 1: example.com/");
   await expect(steps.nth(1)).toContainText("Step 2: example.com/search");
   await expect(steps.nth(1)).toContainText("Submitted to example.com/search");
+  // US-20.3: what a stealth browse's step pressed and typed into, and none on the step before it.
+  await expect(steps.nth(1)).toContainText('Typed into "Search", text input');
+  await expect(steps.nth(1)).toContainText("Pressed an unnamed button");
+  await expect(steps.nth(0)).not.toContainText("Pressed");
   await expect(row).not.toContainText("secret");
   const image = steps.nth(1).getByRole("img", {
     name: "Screenshot after step 2, on example.com/search",

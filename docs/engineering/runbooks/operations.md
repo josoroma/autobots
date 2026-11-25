@@ -164,6 +164,12 @@ An Expert that grants `browse_goal` drives the box's headless Chromium unless th
 
 **Checks (US-20.2).** On browser-use and the stealth browser, a check that is the page gets 20 seconds to clear by itself while the model waits, and one that stays stops the call `bot_check` (Z8). A Turnstile frame isn't a check. A reCAPTCHA, hCaptcha or Arkose frame stops the call at first sight (Z9). Pages may load parts from `challenges.cloudflare.com`, `captcha-delivery.com` and `datadome.co`, never go to one (Z7). Nothing solves a check. browser-use is told never to press or answer one, and **that instruction isn't enforced on a Turnstile widget** (Z10).
 
+**What it leaves and how fast it goes (US-20.3, migration 67).** Nothing is drawn on the page. Each step's record names up to ten elements it pressed or typed into, never a typed value, and the run's tool row shows them (Z11). A label the page built from what was typed is left empty. Only the main frame's elements are recorded. Steps are at least 2 seconds apart, and one stealth browse of a site runs at a time across the install, held by a Postgres advisory lock that a lost worker's connection frees. A second browse waits within its own limit or ends `max_seconds` (Z12). To see who holds one:
+
+```sql
+select pid, objid, granted from pg_locks where locktype = 'advisory';
+```
+
 **Moving to a newer Chrome.** Google's package source keeps few old versions, so a first build can fail when the pinned one is gone, and a browser that meets hostile pages must be kept patched. Read the current version and SHA-256 from Google's own index, put both in `infra/browser/stealth.Dockerfile`, then build and qualify again:
 
 ```sh

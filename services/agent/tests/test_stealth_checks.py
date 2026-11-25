@@ -218,6 +218,7 @@ def test_only_browser_use_on_the_stealth_browser_is_given_the_list(
         stealth=lambda: True,
     )
     connection = RuledConnection(
+        ("pg_try_advisory_lock", [(True,)]),
         ("browsing_yolo", [(on,)]),
         ("browse_domains", [{"domains": '["a.test"]'}]),
         ("v.config ->> 'browser'", [{"browser": browser, "timezone": "UTC"}]),
@@ -443,5 +444,7 @@ def test_browser_use_is_told_never_to_answer_a_check_on_the_stealth_browser(
     task, options = runner_task({"stealth": True}, monkeypatch)
     assert "Never press, type into or answer a CAPTCHA" in task
     assert options["use_vision"] is False and options["judge"] is False
-    task, _ = runner_task({}, monkeypatch)
-    assert "CAPTCHA" not in task
+    # Decision 0038 Z11: nothing is drawn on the stealth page, and the box keeps its highlights.
+    assert options["highlight_actions"] is False
+    task, options = runner_task({}, monkeypatch)
+    assert "CAPTCHA" not in task and options["highlight_actions"] is True

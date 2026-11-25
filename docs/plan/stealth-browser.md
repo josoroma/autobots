@@ -52,7 +52,7 @@ So **headed Chromium runs inside the box's present limits**, and clears the loud
 - **Any embedded challenge frame ends the call.** `bot_check_host` in [`browser_cdp.py`](../../services/agent/src/autobots/adapters/browser_cdp.py) counts every document frame from `challenges.cloudflare.com`, including a widget on a form the task doesn't use, and it stops at first sight.
 - **browser-use's highlights are drawn on the page** and kept on for the step screenshots (Y11).
 
-**One suspected cause is ruled out.** `Runtime.enable`, a well-known sign of CDP, isn't sent by browser-use, its harness or the worker (checked by search in the image and the source). The model's own code could still send it.
+**One suspected cause is weaker than its reputation.** `Runtime.enable`, a well-known sign of CDP, is sent by browser-use's harness, which enables Page, DOM, Runtime and Network on each tab (this plan first said it isn't, from a text search that missed a command built at run time). The worker never sends it. Measured on Chrome 158 on 2026-11-25, the classic check, a getter on an error's `stack`, sees nothing. Two subtler ones differ: a trap on an error's prototype (1 read becomes 3), and the time `console.debug` takes (9 ms becomes about 120 ms for 2,000 calls).
 
 **What sites answered earlier:** the box got Google's "sorry" page on YouTube on 2026-11-20. The day before, outside the box on the same Mac, headless Chromium opened the same kind of page. A US State Department page gave 403, Google Flights a reCAPTCHA and Costa Rica's central bank a 503 ([plan 7.1](browser-typing-and-flights.md#71-what-sites-allow-an-automated-browser)). That suggests the box matters, and doesn't prove which marker.
 

@@ -785,14 +785,14 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-20.2#4 | Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook. | DONE | US-20.2 |
 | US-20.2#5 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | DONE | US-20.2 |
 | US-20.2#6 | Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10. | DONE | US-20.2 |
-| US-20.3 | Quiet on the page | READY | EPIC-20 |
-| US-20.3#1 | Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
-| US-20.3#2 | Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
-| US-20.3#3 | Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`). | TODO | US-20.3 |
-| US-20.3#4 | Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe. | TODO | US-20.3 |
-| US-20.3#5 | On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses. | TODO | US-20.3 |
-| US-20.3#6 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.3 |
-| US-20.3#7 | Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12. | TODO | US-20.3 |
+| US-20.3 | Quiet on the page | DONE | EPIC-20 |
+| US-20.3#1 | Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack. | DONE | US-20.3 |
+| US-20.3#2 | Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack. | DONE | US-20.3 |
+| US-20.3#3 | Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`). | DONE | US-20.3 |
+| US-20.3#4 | Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe. | DONE | US-20.3 |
+| US-20.3#5 | On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses. | DONE | US-20.3 |
+| US-20.3#6 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | DONE | US-20.3 |
+| US-20.3#7 | Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12. | DONE | US-20.3 |
 | US-20.4 | A scoreboard the owner runs | READY | EPIC-20 |
 | US-20.4#1 | Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings. | TODO | US-20.4 |
 | US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | TODO | US-20.4 |
@@ -10060,7 +10060,8 @@ Open Questions:
 
 ### US-20.3: Quiet on the page
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-25-us-20-3-quiet-page/`
 
 As a workspace owner
 I want a stealth browse to leave no marks on the page and keep a pace
@@ -10123,13 +10124,13 @@ Dependencies:
 - US-20.1
 
 Tasks:
-- [ ] Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack.
-- [ ] Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack.
-- [ ] Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`).
-- [ ] Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe.
-- [ ] On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses.
-- [ ] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
-- [ ] Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12.
+- [x] Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack.
+- [x] Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack.
+- [x] Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`).
+- [x] Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe.
+- [x] On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses.
+- [x] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
+- [x] Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12.
 
 Open Questions:
 - None.

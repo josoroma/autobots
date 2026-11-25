@@ -105,7 +105,13 @@ BROWSER_USE_FINGERPRINTED = (
 
 # The stealth browser's image sources (Decision 0038 Z6), on top of browser-use's, which its live
 # check also exercises.
-STEALTH_FINGERPRINTED = (*BROWSER_USE_FINGERPRINTED, STEALTH.dockerfile, STEALTH.ignore_file)
+STEALTH_FINGERPRINTED = (
+    *BROWSER_USE_FINGERPRINTED,
+    STEALTH.dockerfile,
+    STEALTH.ignore_file,
+    # The pace its browses keep (Decision 0038 Z12).
+    f"{APPLICATION}/browse_turns.py",
+)
 
 # Every case the live check must observe before the executor is reported qualified (BX-05).
 REQUIRED_CASES = (
@@ -180,6 +186,12 @@ REQUIRED_STEALTH_CASES = (
     "and no other host is reached",
     "the box's browser is unchanged: a check ends the call at first sight and the challenge hosts "
     "stay refused",
+    # US-20.3: what it draws and records, and its pace.
+    "nothing is drawn on a stealth page and it sees no trace of the reading, while each step names "
+    "what it pressed or typed into",
+    "a step records ten elements at most, and never what was typed, though the page echoes it",
+    "the box keeps its highlights, and its steps name no element",
+    "a stealth browse's steps are at least 2 seconds apart on both engines",
 )
 
 # Each tag's fingerprint label, or None when the image or its label is missing.

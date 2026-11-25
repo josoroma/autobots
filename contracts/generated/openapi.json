@@ -825,11 +825,20 @@
             },
             "title": "Submits",
             "type": "array"
+          },
+          "touched": {
+            "description": "What it pressed or typed into, on the stealth browser only.",
+            "items": {
+              "$ref": "#/components/schemas/BrowseTouch"
+            },
+            "title": "Touched",
+            "type": "array"
           }
         },
         "required": [
           "step",
           "submits",
+          "touched",
           "screenshot"
         ],
         "title": "BrowseStep",
@@ -856,6 +865,40 @@
           "steps"
         ],
         "title": "BrowseStepList",
+        "type": "object"
+      },
+      "BrowseTouch": {
+        "additionalProperties": false,
+        "description": "One element a step of a stealth browse pressed or typed into (Decision 0038 Z11).",
+        "properties": {
+          "action": {
+            "enum": [
+              "pressed",
+              "typed",
+              "chose"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "kind": {
+            "description": "The element's kind, such as button.",
+            "maxLength": 40,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "description": "Its label on the page, never a typed value.",
+            "maxLength": 80,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "kind",
+          "label"
+        ],
+        "title": "BrowseTouch",
         "type": "object"
       },
       "BrowsingSettingsDraft": {

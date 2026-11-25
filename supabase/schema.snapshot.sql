@@ -378,13 +378,15 @@ CREATE TABLE app_private.browse_steps (
     bytes integer,
     sha256 text,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    touched jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT browse_steps_bytes_check CHECK (((bytes IS NULL) OR (bytes >= 0))),
     CONSTRAINT browse_steps_check CHECK ((((object_path IS NULL) = (bytes IS NULL)) AND ((object_path IS NULL) = (sha256 IS NULL)))),
     CONSTRAINT browse_steps_object_path_check CHECK (((object_path IS NULL) OR (char_length(object_path) <= 512))),
     CONSTRAINT browse_steps_page_check CHECK (((page IS NULL) OR (char_length(page) <= 2048))),
     CONSTRAINT browse_steps_sha256_check CHECK (((sha256 IS NULL) OR (sha256 ~ '^[0-9a-f]{64}$'::text))),
     CONSTRAINT browse_steps_step_check CHECK (((step >= 1) AND (step <= 100))),
-    CONSTRAINT browse_steps_submits_check CHECK ((jsonb_typeof(submits) = 'array'::text))
+    CONSTRAINT browse_steps_submits_check CHECK ((jsonb_typeof(submits) = 'array'::text)),
+    CONSTRAINT browse_steps_touched_check CHECK ((jsonb_typeof(touched) = 'array'::text))
 );
 
 --

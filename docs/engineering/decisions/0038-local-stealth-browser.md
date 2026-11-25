@@ -18,7 +18,7 @@ On 2026-11-25, offline, in the box's hardening. Google Chrome 158.0.8127.88 for 
 - **What a page read:** no `Headless` in the user agent, the brand `Google Chrome`, a 1440×900 screen, the container's time zone, `en-US,en` and SwiftShader WebGL.
 - **Processes:** eight cross-site frames reached 241 and hit the 256-process cap, at 423 MB.
 - **A changed user agent:** one set by another CDP client is in the request the worker's guard pauses, before it leaves.
-- **Presses:** a script in an isolated world recorded presses and typing by element, and the page saw no trace of it.
+- **Presses:** a script in an isolated world recorded presses and typing by element, and the page saw no trace of it. Chrome holds every command to a page whose navigation is paused, so each touch is awaited rather than read as a page is left.
 
 ## Decision
 
@@ -55,6 +55,7 @@ Each story amends the rows it changes, in its own change:
 - **No GPU.** A container on a Mac has none, and SwiftShader says so. Strict sites may still refuse it.
 - **A second browser to keep patched.** Chrome's download address drops old versions, so a build must move with it and qualify again.
 - **Cookies.** Every call is a new visitor.
+- **`Runtime.enable`.** browser-use's harness sends it on each tab. On Chrome 158 the classic check for it sees nothing, and two subtler ones do: an error-prototype trap, and the time `console.debug` takes. Nothing here hides it. The worker's own reading never sends it.
 - **The scoreboard first.** The plan built only what a score showed was needed. This builds first.
 - **A bot check on an unused form** still ends the call, unless it is Turnstile's.
 

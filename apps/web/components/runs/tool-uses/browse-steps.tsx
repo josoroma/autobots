@@ -10,6 +10,7 @@ import {
   screenshotUrl,
   stepsLabel,
   stepTitle,
+  touchText,
 } from "@/lib/runs/browse-steps";
 
 // Decision 0035 Y11: with no approval under YOLO, this is how a person sees afterwards what a
@@ -79,6 +80,13 @@ function StepList({ runId, useId }: { runId: string; useId: number }) {
       {state.steps.map((step) => (
         <li key={step.step} data-browse-step={step.step}>
           <p className="text-xs">{stepTitle(step)}</p>
+          {step.touched.length === 0 ? null : (
+            <ul className="text-muted-foreground text-xs wrap-anywhere">
+              {step.touched.map((touch, index) => (
+                <li key={`${index}-${touch.kind}`}>{touchText(touch)}</li>
+              ))}
+            </ul>
+          )}
           {step.submits.length === 0 ? null : (
             <ul className="text-muted-foreground text-xs">
               {step.submits.map((submit, index) => (

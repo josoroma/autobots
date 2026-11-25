@@ -23,6 +23,7 @@ from autobots.application import browsing_tool
 from autobots.application.browse_steps import page_of, screenshot_path
 from autobots.application.browsing_loop import BrowseOutcome
 from autobots.application.tool_definitions import ToolContext, ToolFailed, ToolScope
+from autobots.contracts.browse_steps import BrowseTouch
 from autobots.contracts.browsing import BrowseGoalV3Input
 
 ARGS = {"task": "Search", "start_url": "https://a.test/", "allowed_domains": ["a.test"]}
@@ -308,8 +309,13 @@ def test_each_step_is_pictured_once_with_only_its_new_submits() -> None:
     recorded: list[tuple[int, str | None, bytes | None, tuple[str, ...]]] = []
 
     async def sink(
-        step: int, page: str | None, image: bytes | None, submits: tuple[str, ...]
+        step: int,
+        page: str | None,
+        image: bytes | None,
+        submits: tuple[str, ...],
+        touched: tuple[BrowseTouch, ...],
     ) -> None:
+        assert touched == ()
         recorded.append((step, page, image, submits))
 
     steps = _Steps(sent, guard, sink)  # type: ignore[arg-type]  # a fake CDP sender
@@ -370,7 +376,8 @@ def test_a_steps_screenshot_is_stored_privately_and_a_failure_keeps_the_row(fail
     assert sink is not None
 
     async def record() -> None:
-        await sink(1, "https://a.test/s?q=secret", b"jpeg", ("a.test/s",))
+        touch = BrowseTouch(action="pressed", kind="button", label="Go")
+        await sink(1, "https://a.test/s?q=secret", b"jpeg", ("a.test/s",), (touch,))
 
     asyncio.run(record())
     ((sql, params),) = connection.statements
@@ -382,8 +389,9 @@ def test_a_steps_screenshot_is_stored_privately_and_a_failure_keeps_the_row(fail
         "a.test/s",
     )
     assert json.loads(str(params[5])) == ["a.test/s"]
+    assert json.loads(str(params[9])) == [{"action": "pressed", "kind": "button", "label": "Go"}]
     if fails:
-        assert params[6:] == (None, None, None) and store.put_calls == []
+        assert params[6:9] == (None, None, None) and store.put_calls == []
     else:
         assert params[6] == screenshot_path(scope, 41, 1) and params[7] == 4
         assert store.put_calls == [(screenshot_path(scope, 41, 1), 4, "image/jpeg")]

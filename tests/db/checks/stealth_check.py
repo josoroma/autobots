@@ -1,6 +1,6 @@
-"""The stealth browser live on a disposable stack, Decision 0038 Z1 to Z10 and Z13: what it says it is, which browser and
-engine each Expert's call runs on, its refusal while it isn't qualified, a changed user agent, and checks that clear,
-stay or ask a person. JSON cases, whose ids are among browser_qualification.REQUIRED_STEALTH_CASES.
+"""The stealth browser live on a disposable stack, Decision 0038 Z1 to Z13: what it says it is, which browser and
+engine each Expert's call runs on, its refusal while it isn't qualified, a changed user agent, checks that clear,
+stay or ask a person, and what it draws and records. JSON cases, whose ids are among browser_qualification.REQUIRED_STEALTH_CASES.
 
 browse_goal goes through the real gateway, approvals, admission, model endpoint, relay and executor. The model is
 scripted, so no inference provider is called. The browser reaches only Decision 0018's qualification hosts. The
@@ -16,6 +16,7 @@ import os
 import re
 import sys
 import time
+from itertools import pairwise
 from typing import Any
 from uuid import UUID
 
@@ -62,12 +63,12 @@ DISGUISE = ("cdp('Emulation.setUserAgentOverride', userAgent='Mozilla/5.0 Fake/1
 
 # The challenge host these checks arrange, and pages that show a check by its address alone.
 CHALLENGE = 'example.org'
-HOME = "goto_url('https://example.com/')\n"
+HOME = "goto_url('https://example.com/')\nwait_for_load()\nimport time; time.sleep(1)\n"
 CHL = 'https://example.com/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1'
 # A check that is the page: the script a Cloudflare challenge loads from the site's own host.
 SHOWS = ("js(\"(()=>{const s=document.createElement('script');s.src='%s';document.head.appendChild(s);%s return 'ok'})()\")\n"
-         'import time; time.sleep(1)')
-CLEARS = SHOWS % (CHL, "setTimeout(()=>{location.href='https://example.com/?cleared'},6000);")
+         'import time; time.sleep(3)')
+CLEARS = SHOWS % (CHL, "setTimeout(()=>{location.href='https://example.com/?cleared'},9000);")
 STAYS = SHOWS % (CHL, '')
 FRAME = "js(\"document.body.insertAdjacentHTML('beforeend','<iframe src=%s></iframe>'); 'ok'\")\nimport time; time.sleep(2)"
 TURNSTILE = FRAME % 'https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if'
@@ -201,6 +202,24 @@ async def changed_user_agent(rig: Rig) -> None:
         browsed.output.get('stopped') == 'refused_action' and len(browsed.model.seen) == 1 and guard.disguised >= 1
         and not any('disguised' in url for url in guard.navigated))
 
+# The page is loaded before it is replaced, so nothing of its own is still arriving. A page that counts the nodes and attributes anything adds to it, then buttons and a field to press and type into. One button
+# echoes what was typed, as a search page does.
+PLANTED = 'planted secret words'
+COUNTS = ("js(\"(()=>{document.body.innerHTML='<input id=ours aria-label=Search><button id=go>Go</button><button id=echo></button>'"
+          "+Array.from({length:12},(_,i)=>'<button id=b'+i+'>Button '+i+'</button>').join('');"
+          "document.getElementById('ours').addEventListener('input',(e)=>{document.getElementById('echo').textContent='Search for '+e.target.value});"
+          "window.added=0;new MutationObserver((l)=>{for(const m of l){window.added+=[...m.addedNodes].filter((n)=>n.nodeType===1).length;"
+          "if(m.type==='attributes')window.added++}}).observe(document,{subtree:true,childList:true,attributes:true});return 'ok'})()\")\n")
+# Real mouse presses and inserted text, which are what browser-use highlights, then a scripted press of the echoing button.
+TYPES = (f"import json; at = lambda i: json.loads(js(\"(()=>{{const r=document.getElementById('\"+i+\"').getBoundingClientRect();"
+         f"return JSON.stringify([r.x+4,r.y+4])}})()\"))\n"
+         f"click_at_xy(*at('ours'))\ntype_text('{PLANTED}')\ntime.sleep(1)\n"
+         "js(\"document.getElementById('echo').click()\")\nclick_at_xy(*at('go'))\ntime.sleep(1)\n")
+MANY = ''.join(f"js(\"document.getElementById('b{i}').click()\")\n" for i in range(12))
+LEAVES = ("js(\"(()=>{document.body.insertAdjacentHTML('beforeend','<a id=n href=/?next aria-label=Onward>n</a>');"
+          "document.getElementById('n').click();return 'ok'})()\")\nimport time; time.sleep(3)\nprint(page_info()['url'])")
+SAW = "print('SAW', js(\"JSON.stringify([window.added, typeof nextTouched, Object.keys(window).filter((k)=>/autobots|touched/i.test(k))])\"))"
+
 
 def reached(rig: Rig, since: int) -> tuple[list[str], list[str]]:
     """The hosts the sessions started after `since` reached, and those their proxies refused."""
@@ -239,9 +258,9 @@ async def check_clears(rig: Rig) -> None:
     waited = moments[1] - moments[0]
     rig.cases.check(
         'a check that is the page clears by itself, with no model call meanwhile, and the browse goes on',
-        'the second request answered only after the page moved on, 6 to 20 seconds later, then done with 3 model calls',
+        'the second request answered only after the page moved on, 9 to 25 seconds later, then done with 3 model calls',
         (round(waited, 1), cleared.output.get('stopped'), cleared.output.get('model_calls'), last_result(cleared.model)[-120:]),
-        6 <= waited < 20 and cleared.output.get('stopped') == 'done' and cleared.output.get('model_calls') == 3
+        9 <= waited < 25 and cleared.output.get('stopped') == 'done' and cleared.output.get('model_calls') == 3
         and '?cleared' in last_result(cleared.model))
 
 
@@ -297,8 +316,64 @@ async def box_unchanged(rig: Rig) -> None:
         ended == ['bot_check', 'bot_check'] and took < 40 and 'example.org' in refused and parts.output.get('stopped') == 'done')
 
 
+async def recorded(rig: Rig, run: UUID) -> list[tuple[int, list[list[str]]]]:
+    rows = await (await rig.db.execute('select s.step, s.touched from app_private.browse_steps s join app_private.tool_uses u '
+                                       'on u.id = s.tool_use_id where u.run_id = %s order by s.step', (run,))).fetchall()
+    return [(step, [[t['action'], t['kind'], t['label']] for t in touched]) for step, touched in rows]
+
+
+async def quiet_on_the_page(rig: Rig) -> None:
+    quiet = await rig.browse('stealth', cell(HOME + COUNTS + TYPES + SAW), cell(MANY + "print('pressed')"), cell(LEAVES), finish('Read.'))
+    steps = await recorded(rig, quiet.run)
+    saw = next((str(message.content) for messages in quiet.model.seen for message in messages if 'SAW' in str(message.content)), '')
+    rig.cases.check(
+        'nothing is drawn on a stealth page and it sees no trace of the reading, while each step names what it pressed or typed into',
+        'no node or attribute added by browser-use, no name of ours in the page, and the search field, the echo and the Go button by '
+        'action, kind and label',
+        (saw[-200:], steps[:2], quiet.output.get('stopped')),
+        'undefined' in saw and '[0,' in saw.replace(' ', '').replace('\\', '') and quiet.output.get('stopped') == 'done'
+        and ['typed', 'text input', 'Search'] in steps[1][1] and ['pressed', 'button', 'Go'] in steps[1][1]
+        # A press that leaves the page is recorded too.
+        and ['pressed', 'a', 'Onward'] in steps[3][1])
+    everywhere = flat([steps, quiet.output, await rig.shown(quiet.run)])
+    events = flat(await (await rig.db.execute('select payload from public.run_events where run_id = %s', (quiet.run,))).fetchall())
+    rig.cases.check(
+        'a step records ten elements at most, and never what was typed, though the page echoes it',
+        'ten of twelve presses, the echo unnamed, and the planted words nowhere',
+        ([len(touched) for _, touched in steps], [t for _, touched in steps for t in touched if t[2] == '']),
+        max(len(touched) for _, touched in steps) == 10 and ['pressed', 'button', ''] in steps[1][1]
+        and PLANTED not in everywhere and 'planted' not in events)
+    # browser-use draws on its own thread, for a second.
+    box = await rig.browse('box', cell(HOME + COUNTS + TYPES + SAW), finish('Read.'))
+    drew = re.search(r'SAW \[(\d+)', next((str(message.content) for messages in box.model.seen for message in messages
+                                           if 'SAW' in str(message.content) and 'window.added' not in str(message.content)), ''))
+    rig.cases.check("the box keeps its highlights, and its steps name no element", "what browser-use draws on the page, and no touch",
+                    (drew and drew.group(0), await recorded(rig, box.run)),
+                    drew is not None and int(drew.group(1)) > 0 and all(touched == [] for _, touched in await recorded(rig, box.run)))
+
+
+async def keeps_a_pace(rig: Rig) -> None:
+    moments: list[float] = []
+
+    def at(answer: Any) -> Any:
+        def given() -> Any:
+            moments.append(time.monotonic())
+            return answer
+        return given
+
+    paced = await rig.browse('stealth', at(cell("print('a')")), at(cell("print('b')")), at(finish('Read.')))
+    gaps = [round(b - a, 1) for a, b in pairwise(moments)]
+    moments.clear()
+    await rig.set_yolo(False)
+    await rig.approved('stealth', at(calls(('scroll', {}))), at(calls(('scroll', {}))), at(calls(('finish', {'summary': 'Read.'}))))
+    await rig.set_yolo(True)
+    loop = [round(b - a, 1) for a, b in pairwise(moments)]
+    rig.cases.check("a stealth browse's steps are at least 2 seconds apart on both engines", 'two gaps of 2 seconds or more on each',
+                    (gaps, loop, paced.output.get('stopped')), len(gaps) == len(loop) == 2 and min(*gaps, *loop) >= 1.9)
+
+
 SCENARIOS = (says_what_it_is, fresh_profile, policies, either_engine, no_fallback, changed_user_agent, parts_only, check_clears, check_stays,
-             widget_and_person, nothing_solves, box_unchanged)
+             widget_and_person, nothing_solves, box_unchanged, quiet_on_the_page, keeps_a_pace)
 
 
 async def main(cases: Cases) -> None:

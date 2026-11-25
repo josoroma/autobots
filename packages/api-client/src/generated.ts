@@ -826,11 +826,20 @@ export const schemas = {
         },
         "title": "Submits",
         "type": "array"
+      },
+      "touched": {
+        "description": "What it pressed or typed into, on the stealth browser only.",
+        "items": {
+          "$ref": "#/components/schemas/BrowseTouch"
+        },
+        "title": "Touched",
+        "type": "array"
       }
     },
     "required": [
       "step",
       "submits",
+      "touched",
       "screenshot"
     ],
     "title": "BrowseStep",
@@ -857,6 +866,40 @@ export const schemas = {
       "steps"
     ],
     "title": "BrowseStepList",
+    "type": "object"
+  },
+  "BrowseTouch": {
+    "additionalProperties": false,
+    "description": "One element a step of a stealth browse pressed or typed into (Decision 0038 Z11).",
+    "properties": {
+      "action": {
+        "enum": [
+          "pressed",
+          "typed",
+          "chose"
+        ],
+        "title": "Action",
+        "type": "string"
+      },
+      "kind": {
+        "description": "The element's kind, such as button.",
+        "maxLength": 40,
+        "title": "Kind",
+        "type": "string"
+      },
+      "label": {
+        "description": "Its label on the page, never a typed value.",
+        "maxLength": 80,
+        "title": "Label",
+        "type": "string"
+      }
+    },
+    "required": [
+      "action",
+      "kind",
+      "label"
+    ],
+    "title": "BrowseTouch",
     "type": "object"
   },
   "BrowsingSettingsDraft": {
@@ -8205,6 +8248,7 @@ export interface BrowseStep {
   screenshot: boolean;
   step: number;
   submits: string[];
+  touched: BrowseTouch[];
 }
 
 export function parseBrowseStep(value: unknown): BrowseStep {
@@ -8218,6 +8262,16 @@ export interface BrowseStepList {
 
 export function parseBrowseStepList(value: unknown): BrowseStepList {
   return parseWith(schemas, "BrowseStepList", value) as BrowseStepList;
+}
+
+export interface BrowseTouch {
+  action: "pressed" | "typed" | "chose";
+  kind: string;
+  label: string;
+}
+
+export function parseBrowseTouch(value: unknown): BrowseTouch {
+  return parseWith(schemas, "BrowseTouch", value) as BrowseTouch;
 }
 
 export interface BrowsingSettingsDraft {

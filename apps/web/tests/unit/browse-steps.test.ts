@@ -14,6 +14,7 @@ import {
   screenshotUrl,
   stepsLabel,
   stepTitle,
+  touchText,
 } from "../../lib/runs/browse-steps.ts";
 
 function use(patch: Partial<ToolUseView>): ToolUseView {
@@ -69,6 +70,7 @@ test("a step reads as its host and path, and its screenshot says where it was", 
     step: 2,
     page: "a.test/search",
     submits: ["a.test/search"],
+    touched: [],
     screenshot: true,
   };
   assert.equal(stepTitle(step), "Step 2: a.test/search");
@@ -83,4 +85,13 @@ test("a step reads as its host and path, and its screenshot says where it was", 
   );
   assert.equal(stepsLabel(1), "Show 1 step");
   assert.equal(stepsLabel(4), "Show 4 steps");
+});
+
+test("a stealth step says what it pressed or typed into, and never a value", () => {
+  const touch = (action: "pressed" | "typed" | "chose", label: string) =>
+    touchText({ action, kind: "button", label });
+  assert.equal(touch("pressed", "Go"), 'Pressed "Go", button');
+  assert.equal(touch("typed", "Search"), 'Typed into "Search", button');
+  assert.equal(touch("chose", "Country"), 'Chose from "Country", button');
+  assert.equal(touch("pressed", ""), "Pressed an unnamed button");
 });

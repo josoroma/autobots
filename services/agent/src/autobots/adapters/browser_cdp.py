@@ -19,7 +19,7 @@ import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import websockets
@@ -97,6 +97,84 @@ def is_the_page(url: str, resource_type: str | None = None) -> str | None:
     return host if sorry or cloudflare or datadome else None
 
 
+# Decision 0038 Z11: what a stealth browse pressed and typed into, noted from a world of its own
+# that the page can't see or reach. Only an element's kind and label leave it. A label that holds
+# what was typed, which a page may echo, is left empty.
+STEPS_WORLD = "autobots-steps"
+TOUCHES = 10
+ACTIONS = ("pressed", "typed", "chose")
+WATCH = """(() => {
+  if (globalThis.nextTouched) return;
+  const waiting = [];
+  const queued = [];
+  const typed = new Map();
+  let last = '';
+  const CONTROL = 'button,a[href],input,select,textarea,summary,label,[role],[contenteditable]';
+  const control = (node) => (node instanceof Element ? node.closest(CONTROL) || node : null);
+  const kind = (e) => {
+    const tag = e.tagName.toLowerCase();
+    return (e.getAttribute('role') || (tag === 'input' ? `${e.type} input` : tag)).slice(0, 40);
+  };
+  const shown = (e) => {
+    if (['BUTTON', 'A', 'SUMMARY', 'LABEL'].includes(e.tagName)) return e.innerText;
+    return ['submit', 'button', 'reset'].includes(e.type) ? e.getAttribute('value') : '';
+  };
+  const label = (e) =>
+    (e.getAttribute('aria-label') || shown(e) || e.labels?.[0]?.innerText ||
+      e.getAttribute('placeholder') || e.getAttribute('title') || e.getAttribute('name') || '')
+      .replace(/\\s+/g, ' ').trim().slice(0, 80);
+  const echoes = (text) =>
+    [...typed.values()].some((value) => value.length > 2 && text.includes(value));
+  const note = (action, node) => {
+    const e = control(node);
+    if (!e) return;
+    const text = label(e);
+    const entry = JSON.stringify([action, kind(e), echoes(text) ? '' : text]);
+    if (entry === last) return;
+    last = entry;
+    if (waiting.length) waiting.shift()(entry);
+    else if (queued.length < 10) queued.push(entry);
+  };
+  addEventListener('click', (event) => note('pressed', event.target), true);
+  addEventListener('input', (event) => {
+    const e = event.target;
+    if (!(e instanceof Element) || ['checkbox', 'radio'].includes(e.type)) return;
+    typed.set(e, String(e.value ?? e.innerText ?? '').trim());
+    note(e.tagName === 'SELECT' ? 'chose' : 'typed', e);
+  }, true);
+  globalThis.nextTouched = () => new Promise((resolve) => {
+    if (queued.length) resolve(queued.shift());
+    else waiting.push(resolve);
+  });
+})()"""
+# One poll answers with one touch, whenever it comes. As many wait as a step records, so a burst
+# that ends in a navigation isn't lost with its page: Chrome holds every command to a page that is
+# being left, and a reply already promised still arrives.
+NEXT = "globalThis.nextTouched ? globalThis.nextTouched() : null"
+# How often a new page's world is asked again while its script hasn't run yet.
+WORLD_TRIES = 5
+
+
+class Touch(NamedTuple):
+    """One element pressed or typed into: pressed, typed or chose, its kind and its label."""
+
+    action: str
+    kind: str
+    label: str
+
+
+def touched(text: object) -> Touch | None:
+    """A page's answer as data: one well-formed touch, cut to its bounds, or None."""
+    try:
+        entry = json.loads(str(text))
+    except ValueError:
+        return None
+    if not isinstance(entry, list) or len(entry) != 3 or entry[0] not in ACTIONS:
+        return None
+    action, kind, label = (str(part) for part in entry)
+    return Touch(action, kind[:40], label[:80])
+
+
 # Everything else, file and plain http included, is refused before it loads.
 ALLOWED_SCHEMES = frozenset({"https", "data", "blob", "about"})
 
@@ -122,7 +200,10 @@ class Cdp:
             async for raw in self._socket:
                 message = json.loads(raw)
                 if "id" in message and message["id"] in self._waiting:
-                    self._waiting.pop(message["id"]).set_result(message)
+                    future = self._waiting.pop(message["id"])
+                    # One whose caller gave up is done already, and its late reply is dropped.
+                    if not future.done():
+                        future.set_result(message)
                 elif "method" in message:
                     for handler in list(self.handlers):
                         task = asyncio.ensure_future(handler(message))
@@ -136,8 +217,13 @@ class Cdp:
                     future.set_exception(ConnectionError("cdp_closed"))
 
     async def send(
-        self, method: str, params: dict[str, Any] | None = None, session: str | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        session: str | None = None,
+        seconds: float | None = 30,
     ) -> dict[str, Any]:
+        """One command's reply, within `seconds`, or whenever it comes with None."""
         self._next += 1
         message: dict[str, Any] = {"id": self._next, "method": method, "params": params or {}}
         if session is not None:
@@ -145,7 +231,7 @@ class Cdp:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._waiting[self._next] = future
         await self._socket.send(json.dumps(message))
-        return await asyncio.wait_for(future, 30)
+        return await asyncio.wait_for(future, seconds)
 
     async def close(self) -> None:
         await self._socket.close()
@@ -187,6 +273,10 @@ class RequestGuard:
     since: float | None = None
     moved: float = 0.0
     barred: int = 0
+    # Decision 0038 Z11: the touches read and not yet recorded, when this guard watches for them.
+    watches: bool = False
+    touched: list[Touch] = field(default_factory=list)
+    listening: set[asyncio.Future[None]] = field(default_factory=set)
     clock: Callable[[], float] = time.monotonic
     pages: set[str] = field(default_factory=set)
     # The page session that navigated last, form submissions as host and path, and the hosts of
@@ -220,6 +310,42 @@ class RequestGuard:
         a challenge host, and downloads that began."""
         return len(self.failed) + self.downloads + self.disguised + self.barred
 
+    async def _listen(self, session: str) -> None:
+        """Waits for what a page's elements see, in their own watched world, until it is left."""
+        try:
+            world = await self.cdp.send(
+                "Page.createIsolatedWorld",
+                {"frameId": self.frames[session], "worldName": STEPS_WORLD},
+                session,
+            )
+            params = {
+                "expression": NEXT,
+                "contextId": world["result"]["executionContextId"],
+                "awaitPromise": True,
+                "returnByValue": True,
+            }
+        except (ConnectionError, TimeoutError, KeyError):
+            return
+        await asyncio.gather(*(self._poll(params, session) for _ in range(TOUCHES)))
+
+    async def _poll(self, params: dict[str, Any], session: str) -> None:
+        tries = 0
+        while True:
+            try:
+                reply = await self.cdp.send("Runtime.evaluate", params, session, None)
+                value = reply["result"]["result"].get("value")
+            except (ConnectionError, KeyError):
+                # The page was left, or the browser is gone.
+                return
+            found = touched(value)
+            if found is not None and len(self.touched) < TOUCHES * 10:
+                self.touched.append(found)
+            if value is None:
+                tries += 1
+                if tries > WORLD_TRIES:
+                    return
+                await asyncio.sleep(POLL_SECONDS)
+
     async def settle(self) -> None:
         """Waits while a page shows a check that may clear by itself. One still showing when its
         time is up is a bot check (Decision 0038 Z8)."""
@@ -243,6 +369,12 @@ class RequestGuard:
             self.pages.add(session)
             self.frames[session] = main
             await self.cdp.send("Page.enable", {}, session)
+            if self.watches:
+                await self.cdp.send(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    {"source": WATCH, "worldName": STEPS_WORLD},
+                    session,
+                )
         await self.cdp.send(
             "Target.setAutoAttach",
             {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True},
@@ -259,6 +391,10 @@ class RequestGuard:
             return
         url = str(frame.get("url", ""))
         self.navigated.append(url)
+        if self.watches:
+            task = asyncio.ensure_future(self._listen(session))
+            self.listening.add(task)
+            task.add_done_callback(self.listening.discard)
         # Another page took the place of the one that showed a check, unless this shows one too.
         if self.checking.pop(session, None) is not None:
             self.moved = self.clock()

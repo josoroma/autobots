@@ -121,6 +121,8 @@ TOOL_CHILDREN = (
     # US-17.1: browsing's YOLO setting, its freezing, the approval waiver and the Expert's browse domains.
     Child('checks/browsing_yolo_check.py', 'the browsing YOLO check', ('{workspace}',), from_root=True),
     Child('checks/browse_steps_check.py', 'the browse steps check', ('{workspace}',), from_root=True),
+    # US-20.3: one stealth browse of a site at a time, across connections.
+    Child('checks/browse_turn_check.py', 'the browse turn check', (), from_root=True),
     Child('checks/transcript_check.py', 'the transcript check', (), from_root=True),
     # US-18.1: a retired tool in saved Experts, routines, workflows, runs in flight and history, with a scripted model.
     Child('checks/retired_tools_check.py', 'the retired tools check', (), from_root=True),

@@ -25,13 +25,14 @@ import asyncio
 import contextlib
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 import websockets
+from langchain_core.messages import AIMessage, BaseMessage
 
 from autobots.adapters.browser_executor import (
     CHALLENGE_HOSTS,
@@ -48,6 +49,7 @@ from autobots.adapters.browser_page import CdpPage, PageUnavailable
 from autobots.adapters.browser_use_box import (
     BoxCall,
     BoxModel,
+    StepSink,
     browse_in_box,
     browser_use_ready,
     stealth_ready,
@@ -57,8 +59,15 @@ from autobots.application import browsing_settings
 from autobots.application.artifacts import ObjectStore
 from autobots.application.bounded import stop_task
 from autobots.application.browse_steps import MEDIA_TYPE, record_step, screenshot_path
+from autobots.application.browse_turns import Pace, SiteBusy, TurnLost, turn
 from autobots.application.browser_leases import attempt_alive, lease_alive
-from autobots.application.browsing_loop import BrowseOutcome, admitted_steps, bare, browse
+from autobots.application.browsing_loop import (
+    BrowseOutcome,
+    Step,
+    admitted_steps,
+    bare,
+    browse,
+)
 from autobots.application.loop_admission import AdmittingLoop, current_middleware
 from autobots.application.loop_policy import LoopStopped
 from autobots.application.tool_definitions import (
@@ -68,6 +77,7 @@ from autobots.application.tool_definitions import (
     ToolFailed,
 )
 from autobots.application.typed_results import ResultRefused, typed_result
+from autobots.contracts.browse_steps import BrowseTouch
 from autobots.contracts.browsing import (
     BrowseGoalInput,
     BrowseGoalOutput,
@@ -299,9 +309,49 @@ async def _browse(runtime: BrowsingRuntime, args: Arguments, context: ToolContex
     # Off the event loop, as an expired image check runs `docker image inspect`.
     on_browser_use = yolo and await asyncio.to_thread(runtime.browser_use)
     limits = resolved_limits(args, on_browser_use=on_browser_use)
-    await _sweep(runtime, context)
-    if on_browser_use:
-        return await _on_browser_use(runtime, args, context, middleware, limits, stealth)
+
+    async def drive(limits: Limits) -> BrowseOutcome:
+        await _sweep(runtime, context)
+        if on_browser_use:
+            return await _on_browser_use(runtime, args, context, middleware, limits, stealth)
+        return await _on_the_loop(runtime, args, context, middleware, limits, stealth)
+
+    if stealth is None:
+        return await drive(limits)
+
+    async def alive() -> bool:
+        return await attempt_alive(context.connection, scope)
+
+    # Decision 0038 Z12: one stealth browse of a site at a time, within the call's own limit.
+    try:
+        async with turn(context.connection, args.allowed_domains, limits.seconds, alive) as waited:
+            return await drive(replace(limits, seconds=max(1, limits.seconds - int(waited))))
+    except SiteBusy:
+        return BrowseOutcome("", (), 0, 0, "max_seconds")
+    except TurnLost:
+        return BrowseOutcome("", (), 0, 0, "cancelled")
+
+
+def _paced(step: Step, pace: Pace) -> Step:
+    """Each step of the loop, at the stealth browser's pace (Decision 0038 Z12)."""
+
+    async def paced(messages: list[BaseMessage]) -> AIMessage:
+        await pace()
+        return await step(messages)
+
+    return paced
+
+
+async def _on_the_loop(
+    runtime: BrowsingRuntime,
+    args: Arguments,
+    context: ToolContext,
+    middleware: AdmittingLoop,
+    limits: Limits,
+    stealth: Stealth | None,
+) -> BrowseOutcome:
+    """One browse on Autobots' read-only loop (Decision 0020)."""
+    scope = context.scope
     session = await _session(runtime, args, context, stealth=stealth)
 
     async def alive() -> bool:
@@ -315,9 +365,10 @@ async def _browse(runtime: BrowsingRuntime, args: Arguments, context: ToolContex
         cdp = await Cdp.connect(await session.websocket_url())
         await RequestGuard(cdp).start()
         page = await CdpPage.open(cdp, settle=runtime.settle)
+        steps = admitted_steps(middleware, runtime.model, runtime.route)
         result = await browse(
             page,
-            admitted_steps(middleware, runtime.model, runtime.route),
+            steps if stealth is None else _paced(steps, Pace()),
             task=args.task,
             start_url=args.start_url,
             permitted=lambda url: permitted(url, args.allowed_domains),
@@ -337,16 +388,18 @@ async def _browse(runtime: BrowsingRuntime, args: Arguments, context: ToolContex
     return result
 
 
-def _step_sink(
-    runtime: BrowsingRuntime, context: ToolContext
-) -> Callable[[int, str | None, bytes | None, tuple[str, ...]], Awaitable[None]] | None:
+def _step_sink(runtime: BrowsingRuntime, context: ToolContext) -> StepSink | None:
     """Each browser-use step's row, with its screenshot in the run's private storage (Y11)."""
     use_id, scope, store = context.use_id, context.scope, runtime.store
     if use_id is None:
         return None
 
     async def record(
-        step: int, page: str | None, image: bytes | None, submits: tuple[str, ...]
+        step: int,
+        page: str | None,
+        image: bytes | None,
+        submits: tuple[str, ...],
+        touched: tuple[BrowseTouch, ...],
     ) -> None:
         stored = None
         if image is not None and store is not None:
@@ -363,7 +416,14 @@ def _step_sink(
                     error=error,
                 )
         await record_step(
-            context.connection, scope, use_id, step, page=page, submits=submits, screenshot=stored
+            context.connection,
+            scope,
+            use_id,
+            step,
+            page=page,
+            submits=submits,
+            screenshot=stored,
+            touched=touched,
         )
 
     return record

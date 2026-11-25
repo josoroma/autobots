@@ -28,6 +28,7 @@ from autobots.application.tool_uses import list_tool_uses
 from autobots.application.worker_leases import claim_next
 from autobots.application.workflow_executions import create_execution
 from autobots.application.workflows import create_workflow, publish_version
+from autobots.contracts.browse_steps import BrowseTouch
 from autobots.contracts.plans import InputDocument
 from autobots.contracts.workflows import WorkflowGraph
 from autobots.domain.models import resolve_role_policy
@@ -48,6 +49,8 @@ TASKS = [{'id': 't1', 'title': 'Add the totals', 'depends_on': [], 'criteria': [
          {'id': 't2', 'title': 'Save the note', 'depends_on': [], 'criteria': [], 'tools': ['save_artifact'], 'expected_evidence': 'a file'}]
 # Two small screenshots of plain pages, for the browse steps the run workspace's browser suite opens (US-17.4).
 STEP_PICTURES = [Path(__file__).resolve().parents[1] / f'fixtures/browse-step-{n}.jpg' for n in (1, 2)]
+# What the second step pressed and typed into, as a stealth browse records it (Decision 0038 Z11).
+STEP_TOUCHES = (BrowseTouch(action='typed', kind='text input', label='Search'), BrowseTouch(action='pressed', kind='button', label=''))
 cases: list[dict[str, Any]] = []
 
 
@@ -77,7 +80,8 @@ async def browse_steps(db: Any, store: SupabaseObjectStore) -> str:
         for step, ((page, submits), picture) in enumerate(zip(pages, STEP_PICTURES, strict=True), start=1):
             path, image = screenshot_path(scope, context.use_id, step), picture.read_bytes()
             assert await store.put(path, image, 'image/jpeg')
-            await record_step(db, scope, context.use_id, step, page=page, submits=submits, screenshot=(path, image))
+            await record_step(db, scope, context.use_id, step, page=page, submits=submits, screenshot=(path, image),
+                              touched=STEP_TOUCHES if step == 2 else ())
         return Browsed(stopped='done', steps=2, visited_count=2, submits=['example.com/search'])
 
     stand_in = ToolDefinition(tool_id='browse_goal', version=3, title='Goal-driven browsing', description='A recorded browse.',

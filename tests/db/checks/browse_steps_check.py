@@ -33,11 +33,13 @@ from autobots.application.tool_definitions import (
 )
 from autobots.application.tool_gateway import ToolGateway
 from autobots.application.worker_leases import claim_next
+from autobots.contracts.browse_steps import BrowseTouch
 from autobots.domain.models import resolve_role_policy
 from autobots.domain.tools import OperationClass
 from pydantic import BaseModel, ConfigDict
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
+TOUCHED = (BrowseTouch(action='typed', kind='text input', label='Search'), BrowseTouch(action='pressed', kind='button', label='Go'))
 WORKSPACE = UUID(sys.argv[1])
 cases: list[dict[str, Any]] = []
 
@@ -97,7 +99,8 @@ async def main() -> None:
                     start=1):
                 path = screenshot_path(scope, context.use_id, step)
                 await store.put(path, image, 'image/jpeg')
-                await record_step(db, scope, context.use_id, step, page=page, submits=submits, screenshot=(path, image))
+                await record_step(db, scope, context.use_id, step, page=page, submits=submits, screenshot=(path, image),
+                                  touched=TOUCHED if step == 2 else ())
             await record_step(db, scope, context.use_id, 3, page=None, submits=(), screenshot=None)
             return Done(steps=3)
 
@@ -119,6 +122,13 @@ async def main() -> None:
               "[(1, 'example.com/', [], True), (2, 'example.com/search', ['example.com/search'], True), (3, None, [], False)]",
               listed, listed == [(1, 'example.com/', [], True), (2, 'example.com/search', ['example.com/search'], True), (3, None, [], False)]
               and 'secret' not in json.dumps(listed))
+
+        await db.execute('insert into app_private.browse_steps (tool_use_id, run_id, workspace_id, step) values (%s, %s, %s, 4)',
+                         (use_id, lease.run_id, WORKSPACE))
+        touched = [(s.step, s.touched) for s in await list_steps(db, WORKSPACE, lease.run_id, use_id)]
+        check('a step keeps what it pressed or typed into, and one recorded without any reads as none',
+              'step 2 has both touches in order, the others none', touched,
+              touched == [(1, []), (2, list(TOUCHED)), (3, []), (4, [])])
 
         first = await read_screenshot(db, store, WORKSPACE, lease.run_id, use_id, 1)
         check("a member reads a step's screenshot by its run, use and step", "b'first'", first, first == b'first')

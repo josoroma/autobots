@@ -254,6 +254,7 @@ def browse_call(
         stealth=lambda: qualified,
     )
     connection = RuledConnection(
+        ("pg_try_advisory_lock", [(True,)]),
         ("browsing_yolo", [(on,)]),
         ("browse_domains", [{"domains": '["en.wikivoyage.org"]'}]),
         ("v.config ->> 'browser'", [{"browser": browser, "timezone": "America/Costa_Rica"}]),

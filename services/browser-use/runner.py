@@ -10,7 +10,8 @@ browser's DevTools URL, the relay's URL and an optional output schema (Y12, Y19)
 printed as one JSON line with browser-use's status, its answer, its steps and its typed output,
 which the worker treats as untrusted data and validates itself. Vision and the judge are off (Y16),
 so no screenshot reaches a model. browser-use's highlights stay on, so the screenshots the worker
-keeps for people show what it pressed and typed into (Y11). The image's environment turns off
+keeps for people show what it pressed and typed into (Y11), except on the stealth browser, where
+nothing is drawn on the page and the worker records it instead (Decision 0038 Z11). The image's environment turns off
 telemetry and the update check.
 
 
@@ -53,6 +54,7 @@ async def main() -> int:
         output_model_schema=StructuredDict(schema) if schema else None,
         use_vision=False,
         judge=False,
+        highlight_actions=not spec.get("stealth"),
     )
     try:
         result = await agent.run(max_steps=spec["max_steps"], timeout=spec["max_seconds"])

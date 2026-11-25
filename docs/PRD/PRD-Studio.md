@@ -82,6 +82,8 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 **RN-05. Task timing.** The worker records each plan task's start and finish times on the fenced write path. The current task is the earliest open task that has started.
 
+**RN-06. A browse's steps.** A browse's row in Tools used opens its steps (PRD-Tool-Catalog TV-01). On the stealth browser each step also says what it pressed, typed into or chose from, by the element's kind and label and never a typed value (Decision 0038 Z11).
+
 ## Experts
 
 **EX-01. Card facts.** A card shows the executor binding's role and profile, the granted tools (first four, then +N), a run count, the time of the last run, and Start run. One that grants `browse_goal` says where it browses, and that it does so on the stealth browser when its version is set to it. The editor sets the browser beside the browse domains (Decision 0038 Z1).

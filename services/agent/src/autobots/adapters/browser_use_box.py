@@ -40,7 +40,7 @@ from typing import Any
 
 import websockets
 
-from autobots.adapters.browser_cdp import Cdp, Patience, RequestGuard
+from autobots.adapters.browser_cdp import TOUCHES, Cdp, Patience, RequestGuard
 from autobots.adapters.browser_executor import (
     BrowserExecutor,
     BrowserSession,
@@ -52,9 +52,11 @@ from autobots.adapters.browser_qualification import browser_use_qualified, steal
 from autobots.adapters.model_endpoint import Answer, EndpointRefused, ModelEndpoint, Reply
 from autobots.adapters.model_endpoint import admitted_answer as admitted
 from autobots.application.bounded import stop_task
+from autobots.application.browse_turns import Pace
 from autobots.application.browsing_loop import BrowseOutcome
 from autobots.application.loop_admission import AdmittingLoop
 from autobots.application.tool_definitions import ToolFailed
+from autobots.contracts.browse_steps import BrowseTouch
 from autobots.contracts.browsing import Stopped, StoppedV3
 from autobots.domain.models import ModelRoute
 
@@ -75,8 +77,11 @@ STOPPED: dict[str, Stopped] = {
 }
 # One screenshot per step, for people only: JPEG at this quality keeps a page near 100 KB.
 SCREENSHOT = {"format": "jpeg", "quality": 60}
-# A step's record: its number, the page it ended on, its screenshot and its submits.
-StepSink = Callable[[int, str | None, bytes | None, tuple[str, ...]], Awaitable[None]]
+# A step's record: its number, the page it ended on, its screenshot, its submits and, on the stealth
+# browser, what it pressed or typed into.
+StepSink = Callable[
+    [int, str | None, bytes | None, tuple[str, ...], tuple[BrowseTouch, ...]], Awaitable[None]
+]
 REPORT_TEXT_LIMIT = 20_000
 # How long a browse with no outcome of its own waits for the watcher to say why the session ended.
 SETTLE_SECONDS = 10.0
@@ -100,6 +105,7 @@ class BoxWatch:
     refused: Callable[[], bool]
     bot_check: Callable[[], bool] = lambda: False
     settle: Callable[[], Awaitable[None]] | None = None
+    pace: Callable[[], Awaitable[None]] | None = None
     model_calls: int = 0
     requests: int = 0
     stopped: str | None = None
@@ -144,6 +150,8 @@ def guarded(
             watch.stopped = "max_steps"
         if watch.stopped is not None:
             raise EndpointRefused(403, watch.stopped, "This browse has ended.")
+        if watch.pace is not None:
+            await watch.pace()
         try:
             reply = await answer(body)
         except EndpointRefused as refused:
@@ -274,7 +282,11 @@ class _Steps:
         page = self.guard.navigated[-1] if self.guard.navigated else None
         submits = tuple(self.guard.submitted[self.submits_seen :])
         self.submits_seen = len(self.guard.submitted)
-        await self.sink(self.taken, page, await self._picture(), submits)
+        touched = tuple(
+            BrowseTouch.model_validate(touch._asdict()) for touch in self.guard.touched[:TOUCHES]
+        )
+        self.guard.touched.clear()
+        await self.sink(self.taken, page, await self._picture(), submits, touched)
 
     async def _picture(self) -> bytes | None:
         session = self.guard.latest or next(iter(self.guard.pages), None)
@@ -324,13 +336,16 @@ async def browse_in_box(
             await guard.settle()
 
     watched: dict[str, Any] = (
-        {} if call.stealth is None else {"patience": Patience(call.stealth.challenge_hosts)}
+        {}
+        if call.stealth is None
+        else {"patience": Patience(call.stealth.challenge_hosts), "watches": True}
     )
     watch = BoxWatch(
         max_calls=call.max_steps + 1,
         refused=lambda: any(g.refusals() for g in guards),
         bot_check=lambda: any(g.bot_checks for g in guards),
         settle=None if call.stealth is None else settle,
+        pace=None if call.stealth is None else Pace(),
     )
     answer = guarded(admitted(model.middleware, model.model, model.route), watch, step_ended)
     async with ModelEndpoint(answer) as endpoint:

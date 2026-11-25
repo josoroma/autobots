@@ -15,7 +15,7 @@ from uuid import UUID
 from autobots.application.artifacts import ObjectStore
 from autobots.application.sql import SqlConnection, all_rows, optional_row
 from autobots.application.tool_definitions import ToolScope
-from autobots.contracts.browse_steps import BrowseStep
+from autobots.contracts.browse_steps import BrowseStep, BrowseTouch
 from autobots.domain.errors import Refusal, RefusalKind
 
 MEDIA_TYPE = "image/jpeg"
@@ -51,6 +51,7 @@ async def record_step(
     page: str | None,
     submits: tuple[str, ...],
     screenshot: tuple[str, bytes] | None,
+    touched: tuple[BrowseTouch, ...] = (),
 ) -> None:
     """One step's row. `screenshot` is its stored object's path and bytes, or None."""
     path, size, digest = (
@@ -60,8 +61,8 @@ async def record_step(
     )
     await connection.execute(
         "insert into app_private.browse_steps "
-        "(tool_use_id, run_id, workspace_id, step, page, submits, object_path, bytes, sha256) "
-        "values (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s) "
+        "(tool_use_id, run_id, workspace_id, step, page, submits, object_path, bytes, sha256, "
+        "touched) values (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb) "
         "on conflict (tool_use_id, step) do nothing",
         (
             use_id,
@@ -73,6 +74,7 @@ async def record_step(
             path,
             size,
             digest,
+            json.dumps([touch.model_dump(mode="json") for touch in touched]),
         ),
     )
 
@@ -82,6 +84,7 @@ class _StepRow:
     step: int
     page: str | None
     submits: list[str]
+    touched: list[dict[str, str]]
     screenshot: bool
 
 
@@ -103,12 +106,18 @@ async def list_steps(
     rows = await all_rows(
         connection,
         _StepRow,
-        "select s.step, s.page, s.submits, s.object_path is not null as screenshot "
+        "select s.step, s.page, s.submits, s.touched, s.object_path is not null as screenshot "
         f"{_OWNED} order by s.step",
         (workspace_id, run_id, use_id),
     )
     return [
-        BrowseStep(step=r.step, page=r.page, submits=r.submits, screenshot=r.screenshot)
+        BrowseStep(
+            step=r.step,
+            page=r.page,
+            submits=r.submits,
+            touched=[BrowseTouch.model_validate(touch) for touch in r.touched],
+            screenshot=r.screenshot,
+        )
         for r in rows
     ]
 
