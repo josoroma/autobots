@@ -44,3 +44,7 @@ That browsing works against real sites with a real model. The live checks prove 
 ## Reversal
 
 Remove `browse_goal`'s registration and its executor. The descriptor returns to `disabled_by_policy`. Saved runs that pinned it stop as `incompatible_version`.
+
+## Amended
+
+[Decision 0035](0035-browser-use-typing-and-transcripts.md) amends B5 and B6 while YOLO is on. [Decision 0038](0038-local-stealth-browser.md) amends B1 and B2 for the `stealth` browser: its Z2 and Z4.

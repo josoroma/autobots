@@ -73,3 +73,7 @@ That browser-use works reliably. Each story's checks use scripted models, and on
 ## Reversal
 
 Uncheck the setting, which returns browsing to the read-only loop with approval on every call. Or remove the browser-use image, which leaves `browse_goal` on Autobots' loop.
+
+## Amended
+
+[Decision 0038](0038-local-stealth-browser.md) amends Y10 and Y11 for an Expert set to the `stealth` browser: its Z3 and Z8 to Z11. For `box`, the default, both stand as written. Its Z13 enforces Y10's "no other user agent" on both.

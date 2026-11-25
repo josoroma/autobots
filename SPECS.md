@@ -158,6 +158,11 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-18.1: Retire inflation_rates and the World Bank provider](#us-181-retire-inflation_rates-and-the-world-bank-provider)
 - [EPIC-19: A workflow's owner can rename it](#epic-19-a-workflows-owner-can-rename-it)
   - [US-19.1: Rename a workflow](#us-191-rename-a-workflow)
+- [EPIC-20: A local stealth browser for browsing on browser-use](#epic-20-a-local-stealth-browser-for-browsing-on-browser-use)
+  - [US-20.1: A stealth browser in the box](#us-201-a-stealth-browser-in-the-box)
+  - [US-20.2: A check that clears by itself](#us-202-a-check-that-clears-by-itself)
+  - [US-20.3: Quiet on the page](#us-203-quiet-on-the-page)
+  - [US-20.4: A scoreboard the owner runs](#us-204-a-scoreboard-the-owner-runs)
 
 ## Work Item Status
 
@@ -761,6 +766,38 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-19.1#6 | Make the seed keep a workflow renamed to a seeded name. When a seeded workflow is renamed away, seeding again adds the seeded one beside it, without replaying the earlier seed's receipts onto the renamed workflow or replacing its draft (N6, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a workspace seeded before US-18.1 and on one seeded after. | DONE | US-19.1 |
 | US-19.1#7 | Through the change's delta specs, add the rename to the workflow-definition spec. Checked by reading the archived spec against N1 to N6. | DONE | US-19.1 |
 | US-19.1#8 | Amend PRD-Studio WF-06 to "Name, labels and description", saying that a workflow's owner can rename it under N2 and N3, as Decision 0037's "Requirements revised" lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3. | DONE | US-19.1 |
+| EPIC-20 | A local stealth browser for browsing on browser-use | — | — |
+| US-20.1 | A stealth browser in the box | READY | EPIC-20 |
+| US-20.1#1 | Build `autobots-browser-stealth` from the digest-pinned Playwright image (B1), with Chrome's arm64 `.deb` fetched at build time from `dl.google.com` by exact version and SHA-256, and unpacked without its install scripts (Z2). Put the box's managed policy where Chrome reads it. Start Chrome headed under Xvfb with software WebGL on, and set no user agent, device, GPU, brand or fingerprint (Z3). Checked by a harness test under `tests/harness` that reads the pins, and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.1 |
+| US-20.1#2 | Start the Expert's browser for a session: the stealth image with the workspace's time zone and a cap of 512 processes for that session only. The proxy, guard, other caps, hardening, `tmpfs`, ownership and cleanup stay the box's, and every call gets a fresh profile (Z3, Z4). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py`. | TODO | US-20.1 |
+| US-20.1#3 | Add the browser to an Expert version: the contract and the stored record, left out while `box` so earlier requests, receipts and records keep their bytes, and the regenerated OpenAPI and TypeScript client (Z1). Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures and `contract_drift` in the fast profile. | TODO | US-20.1 |
+| US-20.1#4 | Set the browser in the Expert editor beside the browse domains, and show it on the Expert's card (Z1). Checked by the web unit tests under `apps/web/tests/unit` and the Experts browser suite under `apps/web/tests/browser`, with axe. | TODO | US-20.1 |
+| US-20.1#5 | Read the browser from the Expert version the run was admitted with, apart from the engine (Z5). Show `browser: stealth` in the tool row's public context, and refuse `stealth_browser_unqualified` before any container starts, with no fallback (Z6). `browse_goal`'s inputs, versions and pinned schema digests are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model. | TODO | US-20.1 |
+| US-20.1#6 | Qualify the stealth browser apart, with its own fingerprint, image label, report and required cases: the executor's refusals observed again on its image, and its own. `make browser-images` builds it and `scripts/browser_images.py check` reports it. Qualify the executor and browser-use again, since their fingerprinted files change. Checked by pytest under `services/agent/tests`, `tests/harness/test_browser_images.py` and `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.1 |
+| US-20.1#7 | Refuse in the request guard, on both browsers, a request whose user agent isn't the browser's own, and end the call `refused_action` (Z13). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` on both browsers. | TODO | US-20.1 |
+| US-20.1#8 | Show that nothing is seeded with `stealth` (Z14). Checked by the db profile's disposable fixtures (`concept_seed_check`). | TODO | US-20.1 |
+| US-20.1#9 | Amend PRD-Tool-Catalog BX-01, BX-05, AB-02 and AB-03, and PRD-Studio EX-01 with the editor, as Decision 0038's "Requirements revised" lists. Checked by reading each against Z1, Z2, Z4, Z6 and Z13. | TODO | US-20.1 |
+| US-20.1#10 | Update the operations runbook (building, qualifying, moving with Chrome's version, reversal), `README.md`, `README-DEV.md` and `CODEBASE.md`. They say building the image accepts Google's terms for Chrome, that the owner reads a site's terms before listing it on a stealth Expert, and that the stealth browser is not for YouTube or Google (Z2, Z14). Checked by reading each against Z1 to Z6, Z13 and Z14. | TODO | US-20.1 |
+| US-20.2 | A check that clears by itself | BLOCKED | EPIC-20 |
+| US-20.2#1 | Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org. | TODO | US-20.2 |
+| US-20.2#2 | On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model. | TODO | US-20.2 |
+| US-20.2#3 | Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts. | TODO | US-20.2 |
+| US-20.2#4 | Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook. | TODO | US-20.2 |
+| US-20.2#5 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.2 |
+| US-20.2#6 | Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10. | TODO | US-20.2 |
+| US-20.3 | Quiet on the page | BLOCKED | EPIC-20 |
+| US-20.3#1 | Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
+| US-20.3#2 | Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
+| US-20.3#3 | Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`). | TODO | US-20.3 |
+| US-20.3#4 | Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe. | TODO | US-20.3 |
+| US-20.3#5 | On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses. | TODO | US-20.3 |
+| US-20.3#6 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.3 |
+| US-20.3#7 | Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12. | TODO | US-20.3 |
+| US-20.4 | A scoreboard the owner runs | BLOCKED | EPIC-20 |
+| US-20.4#1 | Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings. | TODO | US-20.4 |
+| US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | TODO | US-20.4 |
+| US-20.4#3 | Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log. | TODO | US-20.4 |
+| US-20.4#4 | Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15. | TODO | US-20.4 |
 
 ## Dependency Diagram
 
@@ -932,6 +969,12 @@ flowchart TD
   end
   subgraph EPIC_19["EPIC-19: A workflow&#x27;s owner can rename it"]
     US_19_1["US-19.1: Rename a workflow"]
+  end
+  subgraph EPIC_20["EPIC-20: A local stealth browser for browsing on browser-use"]
+    US_20_1["US-20.1: A stealth browser in the box"]
+    US_20_2["US-20.2: A check that clears by itself"]
+    US_20_3["US-20.3: Quiet on the page"]
+    US_20_4["US-20.4: A scoreboard the owner runs"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1288,6 +1331,10 @@ flowchart TD
   US_15_11 -.-> US_19_1
   US_15_12 -.-> US_19_1
   US_18_1 -.-> US_19_1
+  US_17_4 -.-> US_20_1
+  US_20_1 -.-> US_20_2
+  US_20_1 -.-> US_20_3
+  US_20_2 -.-> US_20_4
 ```
 
 ```mermaid
@@ -2430,6 +2477,70 @@ flowchart TD
     US_19_1 --> T_19_1_7
     T_19_1_8["US-19.1#8: Amend PRD-Studio WF-06 to &quot;Name, labels and description&quot;, saying that a workflow&#x27;s owner can rename it under N2 and N3, as Decision 0037&#x27;s &quot;Requirements revised&quot; lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3."]
     US_19_1 --> T_19_1_8
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_20["EPIC-20 tasks"]
+    US_20_1["US-20.1: A stealth browser in the box"]
+    T_20_1_1["US-20.1#1: Build `autobots-browser-stealth` from the digest-pinned Playwright image (B1), with Chrome&#x27;s arm64 `.deb` fetched at build time from `dl.google.com` by exact version and SHA-256, and unpacked without its install scripts (Z2). Put the box&#x27;s managed policy where Chrome reads it. Start Chrome headed under Xvfb with software WebGL on, and set no user agent, device, GPU, brand or fingerprint (Z3). Checked by a harness test under `tests/harness` that reads the pins, and by `scripts/qualify_browser_executor.py` on a disposable stack."]
+    US_20_1 --> T_20_1_1
+    T_20_1_2["US-20.1#2: Start the Expert&#x27;s browser for a session: the stealth image with the workspace&#x27;s time zone and a cap of 512 processes for that session only. The proxy, guard, other caps, hardening, `tmpfs`, ownership and cleanup stay the box&#x27;s, and every call gets a fresh profile (Z3, Z4). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py`."]
+    US_20_1 --> T_20_1_2
+    T_20_1_3["US-20.1#3: Add the browser to an Expert version: the contract and the stored record, left out while `box` so earlier requests, receipts and records keep their bytes, and the regenerated OpenAPI and TypeScript client (Z1). Checked by pytest under `services/agent/tests`, the db profile&#x27;s disposable fixtures and `contract_drift` in the fast profile."]
+    US_20_1 --> T_20_1_3
+    T_20_1_4["US-20.1#4: Set the browser in the Expert editor beside the browse domains, and show it on the Expert&#x27;s card (Z1). Checked by the web unit tests under `apps/web/tests/unit` and the Experts browser suite under `apps/web/tests/browser`, with axe."]
+    US_20_1 --> T_20_1_4
+    T_20_1_5["US-20.1#5: Read the browser from the Expert version the run was admitted with, apart from the engine (Z5). Show `browser: stealth` in the tool row&#x27;s public context, and refuse `stealth_browser_unqualified` before any container starts, with no fallback (Z6). `browse_goal`&#x27;s inputs, versions and pinned schema digests are unchanged. Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures with a scripted model."]
+    US_20_1 --> T_20_1_5
+    T_20_1_6["US-20.1#6: Qualify the stealth browser apart, with its own fingerprint, image label, report and required cases: the executor&#x27;s refusals observed again on its image, and its own. `make browser-images` builds it and `scripts/browser_images.py check` reports it. Qualify the executor and browser-use again, since their fingerprinted files change. Checked by pytest under `services/agent/tests`, `tests/harness/test_browser_images.py` and `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts."]
+    US_20_1 --> T_20_1_6
+    T_20_1_7["US-20.1#7: Refuse in the request guard, on both browsers, a request whose user agent isn&#x27;t the browser&#x27;s own, and end the call `refused_action` (Z13). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` on both browsers."]
+    US_20_1 --> T_20_1_7
+    T_20_1_8["US-20.1#8: Show that nothing is seeded with `stealth` (Z14). Checked by the db profile&#x27;s disposable fixtures (`concept_seed_check`)."]
+    US_20_1 --> T_20_1_8
+    T_20_1_9["US-20.1#9: Amend PRD-Tool-Catalog BX-01, BX-05, AB-02 and AB-03, and PRD-Studio EX-01 with the editor, as Decision 0038&#x27;s &quot;Requirements revised&quot; lists. Checked by reading each against Z1, Z2, Z4, Z6 and Z13."]
+    US_20_1 --> T_20_1_9
+    T_20_1_10["US-20.1#10: Update the operations runbook (building, qualifying, moving with Chrome&#x27;s version, reversal), `README.md`, `README-DEV.md` and `CODEBASE.md`. They say building the image accepts Google&#x27;s terms for Chrome, that the owner reads a site&#x27;s terms before listing it on a stealth Expert, and that the stealth browser is not for YouTube or Google (Z2, Z14). Checked by reading each against Z1 to Z6, Z13 and Z14."]
+    US_20_1 --> T_20_1_10
+    US_20_2["US-20.2: A check that clears by itself"]
+    T_20_2_1["US-20.2#1: Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org."]
+    US_20_2 --> T_20_2_1
+    T_20_2_2["US-20.2#2: On browser-use and stealth, tell a check that is the page (Google&#x27;s &quot;sorry&quot; page, a Cloudflare challenge on the site&#x27;s own host, a DataDome frame) from a Turnstile frame, which isn&#x27;t a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model."]
+    US_20_2 --> T_20_2_2
+    T_20_2_3["US-20.2#3: Give a check that is the page 20 seconds to clear, holding the model&#x27;s next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts."]
+    US_20_2 --> T_20_2_3
+    T_20_2_4["US-20.2#4: Tell browser-use on stealth never to press or answer a check, and record that this isn&#x27;t enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook."]
+    US_20_2 --> T_20_2_4
+    T_20_2_5["US-20.2#5: Add these to the stealth browser&#x27;s required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts."]
+    US_20_2 --> T_20_2_5
+    T_20_2_6["US-20.2#6: Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038&#x27;s &quot;Requirements revised&quot; lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10."]
+    US_20_2 --> T_20_2_6
+    US_20_3["US-20.3: Quiet on the page"]
+    T_20_3_1["US-20.3#1: Turn browser-use&#x27;s highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack."]
+    US_20_3 --> T_20_3_1
+    T_20_3_2["US-20.3#2: Read each step&#x27;s presses and typing from an isolated world the page can&#x27;t see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack."]
+    US_20_3 --> T_20_3_2
+    T_20_3_3["US-20.3#3: Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile&#x27;s disposable fixtures (`browse_steps_check`)."]
+    US_20_3 --> T_20_3_3
+    T_20_3_4["US-20.3#4: Add it to the steps&#x27; contract, regenerate OpenAPI and the TypeScript client, and show it in the run&#x27;s tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe."]
+    US_20_3 --> T_20_3_4
+    T_20_3_5["US-20.3#5: On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures with scripted browses."]
+    US_20_3 --> T_20_3_5
+    T_20_3_6["US-20.3#6: Add these to the stealth browser&#x27;s required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts."]
+    US_20_3 --> T_20_3_6
+    T_20_3_7["US-20.3#7: Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run&#x27;s tool row, as Decision 0038&#x27;s &quot;Requirements revised&quot; lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12."]
+    US_20_3 --> T_20_3_7
+    US_20_4["US-20.4: A scoreboard the owner runs"]
+    T_20_4_1["US-20.4#1: Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings."]
+    US_20_4 --> T_20_4_1
+    T_20_4_2["US-20.4#2: Show that no verification profile runs it. Checked by a harness test under `tests/harness`."]
+    US_20_4 --> T_20_4_2
+    T_20_4_3["US-20.4#3: Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy&#x27;s log."]
+    US_20_4 --> T_20_4_3
+    T_20_4_4["US-20.4#4: Document it in the operations runbook, with the owner&#x27;s reading of a site&#x27;s terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15."]
+    US_20_4 --> T_20_4_4
   end
 ```
 
@@ -9748,6 +9859,332 @@ Tasks:
 - [x] Make the seed keep a workflow renamed to a seeded name. When a seeded workflow is renamed away, seeding again adds the seeded one beside it, without replaying the earlier seed's receipts onto the renamed workflow or replacing its draft (N6, Decision 0034 S1). Checked by the db profile's disposable fixtures (`concept_seed_check`) on a workspace seeded before US-18.1 and on one seeded after.
 - [x] Through the change's delta specs, add the rename to the workflow-definition spec. Checked by reading the archived spec against N1 to N6.
 - [x] Amend PRD-Studio WF-06 to "Name, labels and description", saying that a workflow's owner can rename it under N2 and N3, as Decision 0037's "Requirements revised" lists, and update `CODEBASE.md`. Checked by reading them against Decision 0037 N2 and N3.
+
+Open Questions:
+- None.
+
+# EPIC-20: A local stealth browser for browsing on browser-use
+
+Scheduled by [Decision 0038](docs/engineering/decisions/0038-local-stealth-browser.md#decision), from the owner's request of 2026-11-25 for browser-use to run locally "with stealth capabilities", their yes to downloading Google Chrome for the image, and their choice to build now and score later. The rest was delegated and is decided there. It amends Decision 0018 B1 and B2, Decision 0035 Y10 and Y11, and the PRD-Tool-Catalog and PRD-Studio rows it lists. An Expert's version names its browser, `box` (the default) or `stealth`. The stealth browser is real Google Chrome, headed, in an image of its own. It invents no device, and it keeps the box's proxy, guard, caps and cleanup, except its process cap and a fixed list of challenge hosts. It is qualified apart, and no call falls back to another browser. On browser-use, a check that needs no person may clear by itself, and nothing solves one. A stealth browse draws nothing on the page and keeps a pace, and the owner can run a scoreboard. Cookies kept between browses, an engine that invents a device, Chrome on the Mac and cloud browsers aren't scheduled (Z16). Each story's checks use fixtures, scripted models and Decision 0018's qualification hosts, so no real bot check is met and no site is shown to open. Nothing here establishes H1 or product acceptance ([what Decision 0038 doesn't establish](docs/engineering/decisions/0038-local-stealth-browser.md#what-this-doesnt-establish)).
+
+### US-20.1: A stealth browser in the box
+
+Status: READY
+
+As a workspace owner
+I want an Expert to browse with real, headed Google Chrome in the isolated box
+So that sites that turn away a headless browser may open, while the box's limits and my domain list stay in force.
+
+Source:
+- [Decision 0038, Z1 to Z6, Z13, Z14 and Z16](docs/engineering/decisions/0038-local-stealth-browser.md#decision)
+- [Decision 0038, what was measured](docs/engineering/decisions/0038-local-stealth-browser.md#what-was-measured)
+- [Decision 0038, requirements revised](docs/engineering/decisions/0038-local-stealth-browser.md#requirements-revised)
+- [Decision 0038, what this gives up, on a second browser to keep patched](docs/engineering/decisions/0038-local-stealth-browser.md#what-this-gives-up)
+- [Decision 0038, reversal](docs/engineering/decisions/0038-local-stealth-browser.md#reversal)
+- [Decision 0018, B1 and B2](docs/engineering/decisions/0018-browser-executor.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
+- [Decision 0035, Y3, Y5, Y10, Y15 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Isolated browser executor, BX-01 to BX-05](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Autonomous browsing, AB-01 to AB-03](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Tool-use views, TV-01](docs/PRD/PRD-Tool-Catalog.md#tool-use-views)
+- [Experts, EX-01](docs/PRD/PRD-Studio.md#experts)
+- [Seed, SD-02](docs/PRD/PRD-Studio.md#seed)
+- [Filesystem and execution boundaries](docs/PRD/PRD-LangChain-Deep-Agents.md#93-filesystem-and-execution-boundaries)
+- [SP-005](docs/engineering/option-b-contract.md#sp-005--local-services-and-isolation)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [Stealth browser plan, draft US-20.1, ingested here as the decision amends it](docs/plan/stealth-browser.md#us-201-a-stealth-browser-in-the-box)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `CODEBASE.md` was analyzed at 095a976, behind HEAD aa75608. `adapters/browser_executor.py` starts a session's containers, and its `ExecutorConfig` caps 256 processes. `infra/browser/browser.Dockerfile` uses the Playwright image by digest, with Chromium's managed policy. `adapters/browser_qualification.py` binds `FINGERPRINTED` and `REQUIRED_CASES` for the executor, and `BROWSER_USE_FINGERPRINTED` and `REQUIRED_BROWSER_USE_CASES` for browser-use. `RequestGuard` in `adapters/browser_cdp.py` pauses every request, and reads its method, scheme and body, not its headers (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `application/browsing_tool.py` picks the engine per call and refuses a domain outside the Expert's list before any container starts. `application/browsing_settings.py` reads `browse_domains` from the config of the Expert version the run was admitted with, and `ExpertConfig.browse_domains` in `contracts/experts.py` and its stored record are left out while empty (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `public.workspaces.timezone` exists, default `UTC`, and no language setting does (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: It says what it is
+  Given the stealth browser's container with no outside network, for a workspace whose time zone is America/Costa_Rica
+  When a page there reads its user agent, brands, screen, time zone, languages and WebGL
+  Then nothing says Headless, the brands name Google Chrome, the screen is a desktop size, the time zone is America/Costa_Rica, the languages are Chrome's default, and WebGL is present and names its software renderer
+
+Scenario: The box still holds
+  Given a stealth session and a box session on a disposable stack
+  When each container is inspected and driven past its process cap, and another stealth session follows
+  Then the stealth container has the box's hardening and other caps and holds no key, cookie, card or host file, the stealth session ends at 512 processes and the box's at 256, and the next stealth session starts with a fresh profile
+
+Scenario: Qualified apart
+  Given the stealth browser's qualification on a disposable stack with a scripted driver, reaching only Decision 0018's qualification hosts
+  When a case it requires isn't observed, and then when every refusal BX-05 lists and every case of its own is observed on the stealth image
+  Then it reports not qualified in the first, and qualified in the second only while the executor is qualified and the image carries today's fingerprint
+
+Scenario: The owner sets an Expert's browser
+  Given an Expert that grants browse_goal
+  When the owner sets its browser to stealth beside its browse domains in the editor and saves
+  Then a new version holds stealth, the earlier version is unchanged, and the Expert's card and editor show the browser
+
+Scenario: An Expert on box keeps its bytes
+  Given an Expert version saved before the change, and the receipt of its save
+  When it is read, the same request is sent again, and the owner saves a revision that keeps the browser on box
+  Then each version reads as box, no stored configuration names a browser, and the repeated request matches its receipt
+
+Scenario: The owner chooses, not the model
+  Given an Expert set to box, and a scripted model whose task asks for another browser
+  When it browses
+  Then it runs on the box's browser, and no input of any browse_goal version names a browser
+
+Scenario: Either engine drives the Expert's browser
+  Given an Expert set to stealth with example.com as its domain, the stealth browser and browser-use qualified, and a scripted model on a disposable stack
+  When a run browses with YOLO on, and browses again after YOLO is turned off and the call is approved
+  Then the first runs on browser-use and the second on Autobots' read-only loop, both on the stealth browser with each engine's own limits, and each tool row shows browser: stealth
+
+Scenario: No quiet fallback
+  Given an Expert set to stealth, the stealth browser not qualified, and the executor and browser-use qualified
+  When a run calls browse_goal with YOLO on, and again with YOLO off and the call approved
+  Then each call is refused with stealth_browser_unqualified before any container starts, and nothing runs on the box's browser
+
+Scenario: A changed user agent ends the call
+  Given a browse on browser-use of the qualification host, on the box's browser and on the stealth browser
+  When model-written code sets another user agent over CDP and then opens a page
+  Then the request is refused before it leaves, and the call ends refused_action with no further model call
+
+Scenario: Nothing is seeded with stealth
+  Given a new workspace where browse_goal is available
+  When the concept seed runs
+  Then every seeded Expert reads as box, the Transcript reader included
+```
+
+Dependencies:
+- US-17.4
+
+Tasks:
+- [ ] Build `autobots-browser-stealth` from the digest-pinned Playwright image (B1), with Chrome's arm64 `.deb` fetched at build time from `dl.google.com` by exact version and SHA-256, and unpacked without its install scripts (Z2). Put the box's managed policy where Chrome reads it. Start Chrome headed under Xvfb with software WebGL on, and set no user agent, device, GPU, brand or fingerprint (Z3). Checked by a harness test under `tests/harness` that reads the pins, and by `scripts/qualify_browser_executor.py` on a disposable stack.
+- [ ] Start the Expert's browser for a session: the stealth image with the workspace's time zone and a cap of 512 processes for that session only. The proxy, guard, other caps, hardening, `tmpfs`, ownership and cleanup stay the box's, and every call gets a fresh profile (Z3, Z4). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py`.
+- [ ] Add the browser to an Expert version: the contract and the stored record, left out while `box` so earlier requests, receipts and records keep their bytes, and the regenerated OpenAPI and TypeScript client (Z1). Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures and `contract_drift` in the fast profile.
+- [ ] Set the browser in the Expert editor beside the browse domains, and show it on the Expert's card (Z1). Checked by the web unit tests under `apps/web/tests/unit` and the Experts browser suite under `apps/web/tests/browser`, with axe.
+- [ ] Read the browser from the Expert version the run was admitted with, apart from the engine (Z5). Show `browser: stealth` in the tool row's public context, and refuse `stealth_browser_unqualified` before any container starts, with no fallback (Z6). `browse_goal`'s inputs, versions and pinned schema digests are unchanged. Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with a scripted model.
+- [ ] Qualify the stealth browser apart, with its own fingerprint, image label, report and required cases: the executor's refusals observed again on its image, and its own. `make browser-images` builds it and `scripts/browser_images.py check` reports it. Qualify the executor and browser-use again, since their fingerprinted files change. Checked by pytest under `services/agent/tests`, `tests/harness/test_browser_images.py` and `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
+- [ ] Refuse in the request guard, on both browsers, a request whose user agent isn't the browser's own, and end the call `refused_action` (Z13). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` on both browsers.
+- [ ] Show that nothing is seeded with `stealth` (Z14). Checked by the db profile's disposable fixtures (`concept_seed_check`).
+- [ ] Amend PRD-Tool-Catalog BX-01, BX-05, AB-02 and AB-03, and PRD-Studio EX-01 with the editor, as Decision 0038's "Requirements revised" lists. Checked by reading each against Z1, Z2, Z4, Z6 and Z13.
+- [ ] Update the operations runbook (building, qualifying, moving with Chrome's version, reversal), `README.md`, `README-DEV.md` and `CODEBASE.md`. They say building the image accepts Google's terms for Chrome, that the owner reads a site's terms before listing it on a stealth Expert, and that the stealth browser is not for YouTube or Google (Z2, Z14). Checked by reading each against Z1 to Z6, Z13 and Z14.
+
+Open Questions:
+- None.
+
+### US-20.2: A check that clears by itself
+
+Status: BLOCKED
+
+As a workspace owner
+I want a check that needs no person to finish
+So that a page isn't given up because Autobots blocked or misread the check.
+
+Source:
+- [Decision 0038, Z5 and Z7 to Z10](docs/engineering/decisions/0038-local-stealth-browser.md#decision)
+- [Decision 0038, requirements revised](docs/engineering/decisions/0038-local-stealth-browser.md#requirements-revised)
+- [Decision 0038, what this gives up, on a bot check on an unused form](docs/engineering/decisions/0038-local-stealth-browser.md#what-this-gives-up)
+- [Decision 0035, Y10, Y16 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Decision 0018, a refused action ends the call](docs/engineering/decisions/0018-browser-executor.md#a-refused-action-ends-the-call)
+- [Isolated browser executor, BX-03 and BX-05](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Admitted browser model, BM-05](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
+- [Autonomous browsing, AB-03 and AB-04](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [Stealth browser plan, draft US-20.2, ingested here as the decision amends it](docs/plan/stealth-browser.md#us-202-a-check-that-clears-by-itself)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `bot_check_host` in `adapters/browser_cdp.py` counts any document from `challenges.cloudflare.com` as a check, and `guarded` with `BoxWatch` in `adapters/browser_use_box.py` refuses the next model request with `bot_check` once the guard logged one. The egress sidecar allows only the hosts its session names, with their subdomains (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Challenge hosts only as parts of a page
+  Given a stealth browse on browser-use of example.com, with the challenge hosts arranged as example.org
+  When the page loads a frame and a script from example.org, and then model-written code goes to example.org as a page
+  Then the frame and the script reach it, and the navigation is refused and ends the call refused_action
+
+Scenario: The list is fixed, and only browser-use on stealth reaches it
+  Given the challenge hosts in code
+  When a session is prepared for browser-use on stealth, for the read-only loop on stealth, and for either engine on the box's browser
+  Then only the first may reach challenges.cloudflare.com, captcha-delivery.com, datadome.co and their subdomains, and no other host is added to any
+
+Scenario: A check that clears
+  Given a check that is the page itself and clears by itself within 20 seconds, and a scripted model
+  When a stealth browse on browser-use meets it
+  Then the model's next request waits until it clears, no model call is made and nothing is pressed meanwhile, and the browse continues
+
+Scenario: A check that stays
+  Given a check that is the page itself and doesn't clear
+  When a stealth browse on browser-use meets it and 20 seconds pass
+  Then the call ends bot_check with no model call meanwhile, and nothing solved or retried it
+
+Scenario: A widget that needs nobody
+  Given a page whose content loads and which embeds a Turnstile frame
+  When a stealth browse on browser-use reads the page
+  Then the call continues
+
+Scenario: A check that asks a person
+  Given a page with a reCAPTCHA checkbox or challenge, an hCaptcha frame or an Arkose frame
+  When a stealth browse on browser-use meets it
+  Then the call ends bot_check at first sight
+
+Scenario: Nothing solves
+  Given a stealth browse on browser-use that meets a check, and a scripted model
+  When the call ends
+  Then browser-use was told never to press or answer a check, no model request carried an image, and the proxy log shows no host but the call's domains and the challenge hosts
+
+Scenario: The box's browser is unchanged
+  Given an Expert set to box and a browse on browser-use
+  When it meets a Turnstile frame, a Cloudflare challenge on the site's own host or a DataDome frame
+  Then the call ends bot_check at first sight, and the challenge hosts stay refused
+```
+
+Dependencies:
+- US-20.1
+
+Tasks:
+- [ ] Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org.
+- [ ] On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model.
+- [ ] Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts.
+- [ ] Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook.
+- [ ] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
+- [ ] Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10.
+
+Open Questions:
+- None.
+
+### US-20.3: Quiet on the page
+
+Status: BLOCKED
+
+As a workspace owner
+I want a stealth browse to leave no marks on the page and keep a pace
+So that the page it reads is the page a visitor gets, and the record still shows what it did.
+
+Source:
+- [Decision 0038, Z11 and Z12](docs/engineering/decisions/0038-local-stealth-browser.md#decision)
+- [Decision 0038, what was measured, on presses seen from an isolated world](docs/engineering/decisions/0038-local-stealth-browser.md#what-was-measured)
+- [Decision 0038, requirements revised](docs/engineering/decisions/0038-local-stealth-browser.md#requirements-revised)
+- [Decision 0035, Y9, Y11 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Isolated browser executor, BX-04](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [Autonomous browsing, AB-01](docs/PRD/PRD-Tool-Catalog.md#autonomous-browsing)
+- [Tool-use record, TU-02, TU-04 and TU-05](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool-use views, TV-01 and TV-03](docs/PRD/PRD-Tool-Catalog.md#tool-use-views)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-014](docs/engineering/option-b-contract.md#sp-014--application-interfaces-and-ux)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+- [Stealth browser plan, draft US-20.3, ingested here as the decision amends it](docs/plan/stealth-browser.md#us-203-quiet-on-the-page)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `services/browser-use/runner.py` leaves browser-use's highlights on, and `_Steps` in `adapters/browser_use_box.py` takes each step's screenshot, page and submits at each model request, over the worker's own connection (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `app_private.browse_steps` came with migration 66, the newest. `application/browse_steps.py` writes and lists its rows, and `components/runs/tool-uses/browse-steps.tsx` shows them in the run's tool row (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: No marks, same record
+  Given a stealth browse on browser-use of the qualification host that presses and types, on a disposable stack with a scripted model
+  When it finishes
+  Then the page's document gained no node from browser-use, the page saw no trace of the worker's reading, and each step's record names the elements it pressed or typed into by action, kind and label
+
+Scenario: Never the typed value, and at most ten
+  Given a stealth browse whose step types a planted value and presses more than ten elements
+  When its step is recorded
+  Then the record names ten elements, and the planted value is in no row, event or log line
+
+Scenario: The box keeps its highlights
+  Given a browse on browser-use of an Expert set to box
+  When it presses and types
+  Then browser-use's highlights are on, and its steps' records name no elements
+
+Scenario: The run's tool row shows them
+  Given a stealth browse's recorded steps, and a step recorded before the change
+  When a member opens the browse's steps in the run's tool row
+  Then each stealth step shows what it pressed or typed into, and the earlier step shows its page, submits and screenshot as before
+
+Scenario: Steps keep a pace
+  Given a stealth browse of several steps, and a scripted model that answers at once
+  When it runs on browser-use, and again on Autobots' read-only loop
+  Then on both its steps are at least 2 seconds apart
+
+Scenario: One browse of a site at a time
+  Given a stealth browse of example.com in one workspace, still running
+  When stealth browses of example.com start in another workspace, one whose time limit outlasts the first and one whose doesn't, and a box browse of example.com starts
+  Then the one that outlasts it waits and runs after the first ends, the other ends max_seconds without running, and the box browse doesn't wait
+```
+
+Dependencies:
+- US-20.1
+
+Tasks:
+- [ ] Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack.
+- [ ] Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack.
+- [ ] Add what each step pressed or typed into to `app_private.browse_steps` in a migration with its traceability header and its Locks, Data and Recovery lines. Earlier rows read as none, and writes stay fenced (TU-02). Checked by `tests/harness/test_migration_headers.py` and the db profile's disposable fixtures (`browse_steps_check`).
+- [ ] Add it to the steps' contract, regenerate OpenAPI and the TypeScript client, and show it in the run's tool row. Checked by `contract_drift` in the fast profile, the web unit tests under `apps/web/tests/unit` and the run workspace browser suite under `apps/web/tests/browser`, with axe.
+- [ ] On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses.
+- [ ] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
+- [ ] Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12.
+
+Open Questions:
+- None.
+
+### US-20.4: A scoreboard the owner runs
+
+Status: BLOCKED
+
+As a workspace owner
+I want to open the addresses I name once in each browser and see which open
+So that I know what the stealth browser changes before I rely on it.
+
+Source:
+- [Decision 0038, Z14 and Z15](docs/engineering/decisions/0038-local-stealth-browser.md#decision)
+- [Decision 0038, what this gives up, on the scoreboard first](docs/engineering/decisions/0038-local-stealth-browser.md#what-this-gives-up)
+- [Decision 0038, what this doesn't establish](docs/engineering/decisions/0038-local-stealth-browser.md#what-this-doesnt-establish)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Decision 0035, Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Isolated browser executor, BX-01 to BX-04](docs/PRD/PRD-Tool-Catalog.md#isolated-browser-executor)
+- [SP-018](docs/engineering/option-b-contract.md#sp-018--local-operations-and-runbooks)
+- [Stealth browser plan, build order, whose scoreboard this is without its gate](docs/plan/stealth-browser.md#7-build-order)
+
+Codebase Context:
+- [Runtime and Tooling](CODEBASE.md#runtime-and-tooling): `scripts/qualify_browser_executor.py` drives the executor's images with a scripted driver and is in no verification profile (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Each address once in each browser, with no model
+  Given the box's and the stealth browser's images, and https://example.com/ and https://example.org/ as the addresses named
+  When the scoreboard is run
+  Then it opens each address once in each browser in the isolated executor, makes no model call, records each as opened with its bytes and seconds, and removes its containers
+
+Scenario: Four results
+  Given scripted openings where a page opens, shows a check, is blocked, and fails to load
+  When the scoreboard records them
+  Then they read opened, check, blocked and error
+
+Scenario: Hosts only
+  Given an address with a path and a query
+  When the scoreboard finishes
+  Then what it keeps and prints holds its host, and no path, query or page text
+
+Scenario: Only the owner's to run
+  Given the verification profiles
+  When each profile's commands are listed, and the scoreboard is started with no address
+  Then no profile runs the scoreboard, and it opens nothing
+```
+
+Dependencies:
+- US-20.2
+
+Tasks:
+- [ ] Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings.
+- [ ] Show that no verification profile runs it. Checked by a harness test under `tests/harness`.
+- [ ] Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log.
+- [ ] Document it in the operations runbook, with the owner's reading of a site's terms before listing it on a stealth Expert, and that a site opening is not permission from that site (Z14). Update `README-DEV.md` and `CODEBASE.md`. Checked by reading them against Z14 and Z15.
 
 Open Questions:
 - None.
