@@ -16,7 +16,7 @@
 
 The Transcript reader turns a YouTube watch address into `transcript.md`: the video's title, its address, and every caption line with its timestamp. It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
 
-This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself.
+This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript.
 
 ## Contents
 
@@ -30,6 +30,7 @@ This page records the first live run, on the owner's install on 2026-11-20. That
   - [Why it stopped](#why-it-stopped)
   - [What it cost](#what-it-cost)
 - [A second run, on 2026-11-25](#a-second-run-on-2026-11-25)
+- [A third run, on 2026-11-25](#a-third-run-on-2026-11-25)
 - [What this shows, and what it doesn't](#what-this-shows-and-what-it-doesnt)
 - [Where it is defined](#where-it-is-defined)
 
@@ -114,7 +115,27 @@ The owner asked for one more run, on a 44-minute video, with one run and US$0.25
 - **The file wasn't written.** The instructions had the model retype the result into `save_artifact`, and a model reply holds 4,096 output tokens. After the browse, `assign_specialist` was refused (`scope_expansion_denied`) and `read_offload` found nothing (`offload_not_found`). The run failed `plan_incomplete` and published nothing.
 - **Cost.** US$0.054258.
 
-[Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md) has the worker save that result itself. How many lines the browse returned wasn't recorded, and no run since has shown the file.
+[Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md) has the worker save that result itself. How many lines this browse returned wasn't recorded.
+
+## A third run, on 2026-11-25
+
+After US-21.1, the install ran commit `dc75422`, and the owner saved Transcript reader version 3 with the new seeded instructions. Its browse domains and the box's browser were unchanged. The owner authorized one run on the same video, up to US$0.25 (execution `e6176aa7…`, step run `d6682abf…`):
+
+| Time (UTC) | Event |
+|---|---|
+| 23:40:37 | Workflow **Transcript** version 1 started, and its agent step was delegated to the Transcript reader |
+| 23:40:40 | The step proposed a one-task plan |
+| 23:40:45 | `browse_goal` version 4 started without approval, under YOLO, on browser-use in the box, within `youtube.com, ytimg.com, ggpht.com, gstatic.com` |
+| 23:41:33 | The browse ended `done` after 8 steps and 47.6 seconds, with no bot check. The worker saved `outputs/child-1/transcript.md`, with 320 items. The model saw the path and the count, and no line |
+| 23:41:35 | `publish_artifact` published that file as `transcript.md`, 51,325 bytes |
+| 23:41:37 | The task completed, and the step and the workflow succeeded |
+
+**The file.** Its shape was checked without printing it:
+- **The top.** It starts with the title as a heading, the source address and the note that the lines are YouTube's own captions.
+- **The lines.** Then come 320 timed lines in order, from 0:00 to 44:11, the video's end. None is empty or repeated, and the longest gap between two timestamps is 12 seconds.
+- **Not compared word for word** with YouTube's panel.
+
+**Cost.** US$0.051799, against the US$0.25 budget.
 
 ## What this shows, and what it doesn't
 
@@ -122,9 +143,10 @@ The owner asked for one more run, on a 44-minute video, with one run and US$0.25
 - **The path.** An installed Autobots took a YouTube address through a published workflow with a pattern-checked input, to an Expert, to browse_goal version 3 on browser-use in the isolated box. That ran on the owner's real OpenRouter key and route, with no approval under YOLO.
 - **The domains.** Only the Expert's four hosts were requested.
 - **The bot check.** A real bot check stopped the browse at once, nothing was published, and the screenshots were kept.
+- **A whole transcript.** In the third run the worker saved every caption line itself, and the model published the file without a line passing through it ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)).
 
 **It doesn't show:**
-- **That a transcript can be read whole on YouTube from this Mac.** YouTube refused the first run before any page loaded. The second reached the panel's end, and published nothing.
+- **That it works every time.** YouTube refused the first run before any page loaded, and may refuse a later one. The third run is one success on one video.
 - **The no-transcript path, live.** It and the bot check are covered by checks with a scripted model and scripted browses (`tests/db/checks/transcript_check.py`).
 - **H1 or product acceptance.**
 
