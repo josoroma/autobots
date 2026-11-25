@@ -92,7 +92,11 @@ test("Tools sits under Build after Workflows and lists tools by group", async ({
 
 test("filters live in the URL, so a view can be linked", async ({ page }) => {
   await signedIn(page, "/tools");
-  await page.getByLabel("Group").selectOption("files");
+  // By role, since each group's switch is labelled "... group for this workspace" (US-14.24), and the
+  // label around this select holds its options too.
+  await page
+    .getByRole("combobox", { name: "Group", exact: true })
+    .selectOption("files");
   await expect(page).toHaveURL(/group=files/);
   await expect(page.locator("[data-group]")).toHaveCount(1);
   await expect(page.locator('[data-tool="read_run_file"]')).toBeVisible();
