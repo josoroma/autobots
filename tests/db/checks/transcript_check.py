@@ -214,7 +214,8 @@ async def main() -> None:
         check('seeded with no domains',
               "an empty browse domain list, and the call refused browse_domains_missing with no box and no file",
               (domains_before, refused_code, len(browses), await published(empty)),
-              domains_before == [] and refused_code == 'browse_domains_missing' and browses == [] and await published(empty) == [])
+              domains_before == [] and 'browser' not in on_reader and refused_code == 'browse_domains_missing' and browses == []
+              and await published(empty) == [])
 
         # The owner adds YouTube's hosts, which is where the owner accepts YouTube's terms (Y14).
         expert_id = await value("select id from public.experts where workspace_id = %s and name = 'Transcript reader'", on)

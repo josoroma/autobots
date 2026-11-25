@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Build the isolated browser executor's two images and browser-use's, each labelled with the fingerprint of
-its sources (refactor plan R-57, SQLI-02; Decision 0018 B1 and B3; Decision 0035 Y8).
+"""Build the isolated browser executor's two images, browser-use's and the stealth browser's, each labelled with the
+fingerprint of its sources (refactor plan R-57, SQLI-02; Decision 0018 B1 and B3; Decision 0035 Y8; Decision 0038 Z2).
 
 `build` runs `docker build` for each image, from the Dockerfile and context the service's `browser_qualification`
 module names, with `--label autobots.fingerprint=<digest>`. The executor's two carry the executor's digest, and
-browser-use's carries its own. Each Dockerfile's own `<Dockerfile>.dockerignore` narrows its context to the files
+browser-use's and the stealth browser's carry their own. The stealth browser's fetches Google Chrome, by exact version
+and SHA-256, and building it accepts Google's terms for Chrome. Each Dockerfile's own `<Dockerfile>.dockerignore` narrows its context to the files
 it copies. The bases are pinned by digest, so a build pulls each one only if it is absent. `check` reads the labels
 with `docker image inspect` and changes nothing.
 
 The executor reports qualified only while both its labels equal today's digest and a passing live report from
-scripts/qualify_browser_executor.py carries the same fingerprint; browser-use, likewise with its own. Without the
-browser-use image, browse_goal stays on Autobots' loop (Decision 0035, reversal), so `check` reports it and still
-passes. In no verification profile: a check never builds an image.
+scripts/qualify_browser_executor.py carries the same fingerprint; browser-use and the stealth browser, likewise with
+their own. Without the browser-use image, browse_goal stays on Autobots' loop (Decision 0035, reversal), and without the
+stealth image a stealth Expert can't browse (Decision 0038 Z6), so `check` reports either and still passes. In no verification profile: a check never builds an image.
 
-Exit codes: 0 built, or the executor's images current and browser-use's current or not built; 1 a build failed, or
+Exit codes: 0 built, or the executor's images current and each other image current or not built; 1 a build failed, or
 an image is missing or built from other sources; 2 Docker is unavailable.
 """
 from __future__ import annotations
@@ -33,19 +34,24 @@ from autobots.adapters.browser_qualification import (
     FINGERPRINT_LABEL,
     IMAGES,
     INSPECT_LABELS,
+    STEALTH,
     Image,
     browser_use_fingerprint,
     fingerprint_digest,
     images_fingerprint,
     parse_labels,
+    stealth_fingerprint,
 )
 
-# The executor's images, which both qualifiers require; browser-use's is optional (Decision 0035, reversal).
+# The executor's images, which every qualifier requires; browser-use's and the stealth browser's are optional (Decision
+# 0035 and Decision 0038, reversal).
 TAGS = tuple(image.tag for image in IMAGES)
 # A first build pulls both bases; later ones reuse the layer cache.
 BUILD_TIMEOUT = 1800.0
 REBUILD = 'build them with `make browser-images`'
 REQUALIFY = 'python3.12 scripts/qualify_browser_executor.py'
+# What an optional image's absence turns off.
+WITHOUT = {BROWSER_USE.tag: 'browse_goal stays on the loop', STEALTH.tag: "a stealth Expert can't browse"}
 DESCRIBED = {'current': 'current', 'stale': 'built from other sources', 'missing': 'not built'}
 
 
@@ -55,10 +61,11 @@ def _build(root: Path, image: Image, digest: str) -> list[str]:
 
 
 def build_commands(root: Path) -> list[list[str]]:
-    """One `docker build` per image: the executor's labelled with its digest, browser-use's with its own."""
+    """One `docker build` per image: the executor's labelled with its digest, each other image's with its own."""
     executor = fingerprint_digest(images_fingerprint(root))
-    own = fingerprint_digest(browser_use_fingerprint(root))
-    return [*(_build(root, image, executor) for image in IMAGES), _build(root, BROWSER_USE, own)]
+    return [*(_build(root, image, executor) for image in IMAGES),
+            _build(root, BROWSER_USE, fingerprint_digest(browser_use_fingerprint(root))),
+            _build(root, STEALTH, fingerprint_digest(stealth_fingerprint(root)))]
 
 
 def _state(tag: str, expected: str) -> str:
@@ -77,6 +84,11 @@ def image_states(fingerprint: dict[str, str]) -> dict[str, str]:
 def browser_use_state(root: Path) -> str:
     """The browser-use image's state against its own fingerprint."""
     return _state(BROWSER_USE.tag, fingerprint_digest(browser_use_fingerprint(root)))
+
+
+def stealth_state(root: Path) -> str:
+    """The stealth browser's image's state against its own fingerprint."""
+    return _state(STEALTH.tag, fingerprint_digest(stealth_fingerprint(root)))
 
 
 def require_current_images(fingerprint: dict[str, str]) -> None:
@@ -101,10 +113,9 @@ def build(root: Path) -> int:
         if built.returncode:
             print(f'FAIL: {tag} did not build (docker exit code {built.returncode}).', file=sys.stderr)
             return 1
-    label = commands[0][commands[0].index('--label') + 1]
-    own = commands[-1][commands[-1].index('--label') + 1]
-    print(f"Built {' and '.join(TAGS)} with {label}, and {BROWSER_USE.tag} with {own}. "
-          f"Requalify the executor and browser-use with: {REQUALIFY}")
+    labels = [command[command.index('--label') + 1] for command in commands]
+    print(f"Built {' and '.join(TAGS)} with {labels[0]}, {BROWSER_USE.tag} with {labels[-2]}, and {STEALTH.tag} with "
+          f"{labels[-1]}. Requalify the executor, browser-use and the stealth browser with: {REQUALIFY}")
     return 0
 
 
@@ -113,9 +124,10 @@ def check(root: Path) -> int:
     states = image_states(fingerprint)
     for tag, state in states.items():
         print(f'{tag}: {DESCRIBED[state]}')
-    own = browser_use_state(root)
-    print(f"{BROWSER_USE.tag}: {DESCRIBED[own]}" + (', so browse_goal stays on the loop' if own == 'missing' else ''))
-    if all(state == 'current' for state in states.values()) and own != 'stale':
+    optional = {BROWSER_USE.tag: browser_use_state(root), STEALTH.tag: stealth_state(root)}
+    for tag, state in optional.items():
+        print(f'{tag}: {DESCRIBED[state]}' + (f', so {WITHOUT[tag]}' if state == 'missing' else ''))
+    if all(state == 'current' for state in states.values()) and 'stale' not in optional.values():
         print(f'PASS: the executor\'s images carry {FINGERPRINT_LABEL}={fingerprint_digest(fingerprint)}.')
         return 0
     print(f'FAIL: {REBUILD}, then requalify with: {REQUALIFY}')

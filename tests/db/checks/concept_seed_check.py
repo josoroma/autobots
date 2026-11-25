@@ -146,6 +146,8 @@ def main() -> None:
               (reader.get('tools'), 'Saved without browse_goal' in reader.get('purpose', ''), reader.get('browse_domains', [])),
               reader.get('tools') == ['save_artifact', 'publish_artifact'] and 'Saved without browse_goal' in reader.get('purpose', '')
               and not reader.get('browse_domains'))
+        check('no seeded Expert is set to the stealth browser (Decision 0038 Z14)', 'none names a browser',
+              [name for name, config in configs.items() if 'browser' in config], not any('browser' in config for config in configs.values()))
         github = {name: [tool for tool in configs[name]['tools'] if 'github' in tool] for name in ('Issue triager', 'Code maintainer')}
         said = {name: 'Saved without' in configs[name]['purpose'] and 'github' in configs[name]['purpose'] for name in ('Issue triager', 'Code maintainer')}
         check('Issue triager and Code maintainer are saved without their GitHub tools, and say so in their purpose', 'no GitHub tool, said',

@@ -12,6 +12,10 @@ fingerprint of the executor's files and its own, its own report and its own case
 image turns only browser-use off, which leaves `browse_goal` on Autobots' loop (Decision 0035,
 reversal).
 
+The stealth browser (Decision 0038 Z6) is qualified apart too, on top of the executor: its own
+image, a fingerprint of browser-use's files and its own, its own report and its own cases. Removing
+its image refuses a call of an Expert set to it, and nothing falls back to another browser.
+
 The catalog, search, Expert saves and the gateway ask on every read, synchronously. The report and
 the sources are read each time, so a withdrawn report or an edited source turns browsing off at
 once. The labels need Docker, so one inspect per fingerprint digest is reused for
@@ -65,6 +69,10 @@ BROWSER_USE = Image(
     "autobots-browser-use:local", "infra/browser/browser-use.Dockerfile", "services/browser-use"
 )
 BROWSER_USE_QUALIFICATION = Path(".checks/browser-executor/browser-use.json")
+STEALTH = Image(
+    "autobots-browser-stealth:local", "infra/browser/stealth.Dockerfile", "infra/browser"
+)
+STEALTH_QUALIFICATION = Path(".checks/browser-executor/stealth.json")
 
 # Every file the images are built from and every module the live check exercises, named one by one,
 # so that no file joins or leaves the binding unnoticed (PADP-14).
@@ -94,6 +102,10 @@ BROWSER_USE_FINGERPRINTED = (
     "services/browser-use/runner.py",
     f"{ADAPTERS}/browser_use_box.py",
 )
+
+# The stealth browser's image sources (Decision 0038 Z6), on top of browser-use's, which its live
+# check also exercises.
+STEALTH_FINGERPRINTED = (*BROWSER_USE_FINGERPRINTED, STEALTH.dockerfile, STEALTH.ignore_file)
 
 # Every case the live check must observe before the executor is reported qualified (BX-05).
 REQUIRED_CASES = (
@@ -142,6 +154,19 @@ REQUIRED_BROWSER_USE_CASES = (
     "a typed result keeps queries only in its link fields, and an invalid one stops invalid_action",
     "each step keeps one screenshot with its page and submits",
     "the box holds no key, password, cookie or card, and no host file",
+    # Decision 0038 Z13.
+    "a changed user agent is refused and ends the call refused_action",
+)
+
+# Every case the stealth browser's live check must observe before it is reported qualified (Decision
+# 0038 Z6, US-20.1): the executor's, on the stealth image, and its own.
+REQUIRED_STEALTH_CASES = (
+    *REQUIRED_CASES,
+    "the stealth browser says what it is, and names nothing it isn't",
+    "a stealth Expert's browse runs on the stealth browser, and its tool row says so",
+    "each stealth session starts with a fresh profile",
+    "a stealth Expert is refused while the stealth browser isn't qualified, before any container",
+    "a changed user agent is refused and ends the call refused_action",
 )
 
 # Each tag's fingerprint label, or None when the image or its label is missing.
@@ -156,6 +181,11 @@ def images_fingerprint(root: Path, names: tuple[str, ...] = FINGERPRINTED) -> di
 def browser_use_fingerprint(root: Path) -> dict[str, str]:
     """The executor's fingerprint with browser-use's own files."""
     return images_fingerprint(root, BROWSER_USE_FINGERPRINTED)
+
+
+def stealth_fingerprint(root: Path) -> dict[str, str]:
+    """browser-use's fingerprint with the stealth image's own files."""
+    return images_fingerprint(root, STEALTH_FINGERPRINTED)
 
 
 def fingerprint_digest(fingerprint: Mapping[str, str]) -> str:
@@ -256,6 +286,7 @@ class ImageCheck:
 # The ones the service asks through, unless a caller names its own label reader.
 IMAGE_CHECK = ImageCheck()
 BROWSER_USE_CHECK = ImageCheck(images=(BROWSER_USE,))
+STEALTH_CHECK = ImageCheck(images=(STEALTH,))
 
 
 def _passing(
@@ -319,3 +350,24 @@ def browser_use_qualified(
     if labels is None:
         return BROWSER_USE_CHECK.matches(fingerprint)
     return images_match(fingerprint, labels, (BROWSER_USE,))
+
+
+def stealth_qualified(
+    root: Path,
+    report: Path = STEALTH_QUALIFICATION,
+    labels: LabelReader | None = None,
+    executor_report: Path = QUALIFICATION,
+) -> bool:
+    """Decision 0038 Z6: only while the executor is qualified, after a passing stealth check at
+    today's stealth fingerprint, and while its image carries that fingerprint."""
+    if not executor_qualified(root, executor_report, labels):
+        return False
+    try:
+        fingerprint = stealth_fingerprint(root)
+    except OSError:
+        return False
+    if not _passing(root / report, REQUIRED_STEALTH_CASES, "stealth_fingerprint", fingerprint):
+        return False
+    if labels is None:
+        return STEALTH_CHECK.matches(fingerprint)
+    return images_match(fingerprint, labels, (STEALTH,))

@@ -107,7 +107,7 @@ Nothing checks a key against its provider automatically, because that costs a re
 
 The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. `browse_goal` uses it, and stays disabled until the executor is qualified at the current code and turned on (below).
 
-Build the images on this Mac, through the one build entry point. The browser image starts from the Playwright 1.65.1 image pinned by digest (Chromium 159.0.8154.6, which carries the fix for CVE-2026-125350), and the proxy from the Python 3.12.16 image (`python:3.12.16-slim-bookworm`) pinned by digest, so a build pulls a base only if it is absent. A third image, `autobots-browser-use:local`, holds browser-use 1.0.6 ([Decision 0035](../decisions/0035-browser-use-typing-and-transcripts.md) Y8): the same Playwright image, with its own environment installed by uv (copied from uv's official image, pinned by digest) from `services/browser-use/uv.lock` only:
+Build the images on this Mac, through the one build entry point. The browser image starts from the Playwright 1.65.1 image pinned by digest (Chromium 159.0.8154.6, which carries the fix for CVE-2026-125350), and the proxy from the Python 3.12.16 image (`python:3.12.16-slim-bookworm`) pinned by digest, so a build pulls a base only if it is absent. A third image, `autobots-browser-use:local`, holds browser-use 1.0.6 ([Decision 0035](../decisions/0035-browser-use-typing-and-transcripts.md) Y8): the same Playwright image, with its own environment installed by uv (copied from uv's official image, pinned by digest) from `services/browser-use/uv.lock` only. A fourth, `autobots-browser-stealth:local`, is the stealth browser ([Decision 0038](../decisions/0038-local-stealth-browser.md) Z2): the same Playwright image with Google Chrome's arm64 `.deb`, 142 MB, fetched from `dl.google.com` by exact version and SHA-256 and unpacked without its install scripts. **Building it accepts Google's terms for Chrome:**
 
 ```sh
 make browser-images
@@ -119,7 +119,7 @@ It runs `scripts/browser_images.py build`. Each Dockerfile's own `<Dockerfile>.d
 python3.12 scripts/browser_images.py check
 ```
 
-It exits 0 when the executor's two images are current and browser-use's is current or not built, 1 when an executor image is missing or any image was built from other sources, and 2 without Docker. browser-use's image carries its own label: a digest of the executor's fingerprint plus its Dockerfile and ignore file, `services/browser-use/` (`pyproject.toml`, `uv.lock`, `runner.py`) and `adapters/browser_use_box.py`. The browser image also installs Chromium's managed policy `DownloadRestrictions` 3 (`infra/browser/chromium-policy.json`). Code driving the browser over CDP can override it, so the worker's request guard also cancels any download that begins, and a browser-use call then ends `refused_action`.
+It exits 0 when the executor's two images are current and each other image is current or not built, 1 when an executor image is missing or any image was built from other sources, and 2 without Docker. browser-use's image carries its own label: a digest of the executor's fingerprint plus its Dockerfile and ignore file, `services/browser-use/` (`pyproject.toml`, `uv.lock`, `runner.py`) and `adapters/browser_use_box.py`. The browser image also installs Chromium's managed policy `DownloadRestrictions` 3 (`infra/browser/chromium-policy.json`). Code driving the browser over CDP can override it, so the worker's request guard also cancels any download that begins, and a browser-use call then ends `refused_action`.
 
 Then qualify it. This starts a disposable database, drives the browser with a scripted driver, never a model, and needs outbound network to `https://example.com/` (and `example.org` for the request cap), the only hosts it reaches. It refuses, before starting anything, images whose label isn't the current fingerprint's:
 
@@ -127,10 +127,16 @@ Then qualify it. This starts a disposable database, drives the browser with a sc
 python3.12 scripts/qualify_browser_executor.py
 ```
 
-It writes `.checks/browser-executor/qualification.json`, bound to the fingerprint it started with. When the executor passes and browser-use's image is current, it then qualifies browser-use on a fresh disposable stack. browse_goal runs there through the real gateway, admission, model endpoint and relay, with a scripted model and browser-use's own tools, reaching only `https://example.com/`. Its 13 cases go to `.checks/browser-executor/browser-use.json`, bound to browser-use's fingerprint. To run only that phase, with the executor already qualified:
+It writes `.checks/browser-executor/qualification.json`, bound to the fingerprint it started with. When the executor passes and browser-use's image is current, it then qualifies browser-use on a fresh disposable stack. browse_goal runs there through the real gateway, admission, model endpoint and relay, with a scripted model and browser-use's own tools, reaching only `https://example.com/`. Its 25 cases go to `.checks/browser-executor/browser-use.json`, bound to browser-use's fingerprint. To run only that phase, with the executor already qualified:
 
 ```sh
 python3.12 scripts/qualify_browser_executor.py --browser-use
+```
+
+Last it qualifies the stealth browser when its image is current: the executor's own cases again on that image, then its own, in `.checks/browser-executor/stealth.json`, bound to the stealth fingerprint. To run only that phase, with the executor already qualified:
+
+```sh
+python3.12 scripts/qualify_browser_executor.py --stealth
 ```
 
 browser-use reports qualified only from its own passing report, while its image carries its label and the executor is qualified too. Without its image or report, YOLO calls run on Autobots' loop. The executor reports qualified only from a passing report at the current fingerprint, and only while both images it starts carry that fingerprint's label, so after changing any file the fingerprint names, run both commands again. Until then `browse_goal` is off. It's in no verification profile, since it needs network and images a check never builds.
@@ -141,10 +147,31 @@ browser-use reports qualified only from its own passing report, while its image 
 make browser-images && python3.12 scripts/qualify_browser_executor.py
 ```
 
-What a session is: a non-root container from the pinned image with all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `/tmp`, 1 CPU, 1 GiB, 256 processes and 300 seconds (600 for a browser-use session, each plus a 60-second grace for its start and cleanup), on an internal network. A browse on browser-use adds a third container, `<session>-use`, with the same hardening and caps, on the internal network only. It drives the session's Chromium over DevTools at the browser's address and calls its model through the relay below, and it holds nothing of the worker's environment. The sidecar allows only `CONNECT` to port 443 of the hosts the call names, refuses any address that isn't public and connects to the one it checked, and caps requests and bytes. DevTools are published on `127.0.0.1` only, on a random port, behind a per-session token. A browse with a model endpoint (Decision 0035 Y7, for browser-use) also gets a relay on the sidecar's port 9300. It forwards only `POST /v1/chat/completions` to the worker's endpoint on the Mac's loopback through `host.docker.internal`, adding a token the box never holds; each request there is one admitted call on the run's `researcher` route. The qualification checks the relay too (on 2026-11-19, 26 of 26 cases passed). Losing the lease, cancelling the run or reaching a cap removes the session; a sweeper removes containers labelled `autobots.browser` that a crashed worker left:
+What a session is: a non-root container from the pinned image with all capabilities dropped, `no-new-privileges`, a read-only root, a 256 MiB `/tmp`, 1 CPU, 1 GiB, 256 processes (512 for the stealth browser) and 300 seconds (600 for a browser-use session, each plus a 60-second grace for its start and cleanup), on an internal network. A browse on browser-use adds a third container, `<session>-use`, with the same hardening and caps, on the internal network only. It drives the session's Chromium over DevTools at the browser's address and calls its model through the relay below, and it holds nothing of the worker's environment. The sidecar allows only `CONNECT` to port 443 of the hosts the call names, refuses any address that isn't public and connects to the one it checked, and caps requests and bytes. DevTools are published on `127.0.0.1` only, on a random port, behind a per-session token. A browse with a model endpoint (Decision 0035 Y7, for browser-use) also gets a relay on the sidecar's port 9300. It forwards only `POST /v1/chat/completions` to the worker's endpoint on the Mac's loopback through `host.docker.internal`, adding a token the box never holds; each request there is one admitted call on the run's `researcher` route. The qualification checks the relay too (on 2026-11-19, 26 of 26 cases passed). Losing the lease, cancelling the run or reaching a cap removes the session; a sweeper removes containers labelled `autobots.browser` that a crashed worker left:
 
 ```sh
 docker ps -a --filter label=autobots.browser=1
+```
+
+### The stealth browser
+
+An Expert that grants `browse_goal` drives the box's headless Chromium unless the owner sets its **Browser** to **Stealth** in the Expert editor ([Decision 0038](../decisions/0038-local-stealth-browser.md), US-20.1). Then a browse runs on real, headed Google Chrome in the same box, with the workspace's time zone, whichever engine drives it. Its tool row shows `browser: stealth`.
+
+- **Read a site's terms first.** The stealth browser opens some sites that refuse a headless browser. It makes none of them allow automation. It isn't for YouTube or Google, and nothing is seeded with it (Z14).
+- **Nothing is invented.** It names no user agent, device or GPU of its own (Z3). A container on a Mac has no GPU, and its WebGL says SwiftShader, so a strict site may still refuse it.
+- **No fallback.** While it isn't qualified, a call is refused `stealth_browser_unqualified` before any container starts (Z6).
+- **512 processes.** Headed Chrome reaches 256 on an ordinary page, so its container's cap is higher. The other caps are the box's (Z4).
+
+**Moving to a newer Chrome.** Google's package source keeps few old versions, so a first build can fail when the pinned one is gone, and a browser that meets hostile pages must be kept patched. Read the current version and SHA-256 from Google's own index, put both in `infra/browser/stealth.Dockerfile`, then build and qualify again:
+
+```sh
+curl -s https://dl.google.com/linux/chrome/deb/dists/stable/main/binary-arm64/Packages | grep -A20 'Package: google-chrome-stable' | grep -E '^(Version|SHA256|Filename)'
+```
+
+**Reversal.** Set every Expert back to **Isolated box**. Or remove the image, which refuses the calls of any Expert still set to stealth:
+
+```sh
+docker image rm autobots-browser-stealth:local
 ```
 
 ### Turning on `browse_goal`

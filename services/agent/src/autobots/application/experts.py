@@ -58,6 +58,7 @@ def expert_record(config: ExpertConfig) -> ExpertConfigRecord:
         skills=tuple(config.skills),
         role_bindings={role: profile.value for role, profile in config.role_bindings.items()},
         browse_domains=tuple(config.browse_domains),
+        browser=config.browser,
     )
 
 
@@ -72,6 +73,7 @@ def expert_view_config(record: ExpertConfigRecord) -> ExpertConfigView:
             "skills": list(record.skills),
             "role_bindings": dict(record.role_bindings),
             "browse_domains": list(record.browse_domains),
+            "browser": record.browser,
         }
     )
 

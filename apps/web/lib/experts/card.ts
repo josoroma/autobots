@@ -121,14 +121,16 @@ export function approvalNote(
 
 /**
  * Where an Expert that grants browse_goal may browse, or that it can't until its domains are listed
- * (Decision 0035 Y3, Y14); else null.
+ * (Decision 0035 Y3, Y14); else null. It names the stealth browser (Decision 0038 Z1).
  */
 export function browseDomainsLine(config: ExpertConfig): string | null {
   if (!(config.tools ?? []).includes("browse_goal")) return null;
   const domains = config.browse_domains ?? [];
+  const browser =
+    config.browser === "stealth" ? ", on the stealth browser" : "";
   return domains.length === 0
     ? "No browse domains yet, so it can't browse"
-    : `Browses ${domains.join(", ")}`;
+    : `Browses ${domains.join(", ")}${browser}`;
 }
 
 /** The tool chips a card shows. */

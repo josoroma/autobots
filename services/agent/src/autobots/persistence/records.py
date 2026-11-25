@@ -15,6 +15,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, PlainSerializer, PlainValidator
 
+from autobots.domain.browsing import BrowserKind
 from autobots.domain.routines import (
     DEFAULT_TIMEZONE,
     DailyTrigger,
@@ -53,6 +54,8 @@ class ExpertConfigRecord(StoredRecord):
     role_bindings: Mapping[str, str] = Field(default_factory=dict)
     # Left out while empty, so a version saved without it keeps its stored bytes.
     browse_domains: tuple[str, ...] = Field(default=(), exclude_if=lambda domains: not domains)
+    # Left out while it is the box, as versions before US-20.1 read (Decision 0038 Z1).
+    browser: BrowserKind = Field(default="box", exclude_if=lambda browser: browser == "box")
 
 
 def _trigger(value: object) -> SavedTrigger:

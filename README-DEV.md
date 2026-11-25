@@ -314,7 +314,13 @@ make browser-images && python3.12 scripts/qualify_browser_executor.py
 
 - **The check:** it runs 26 cases on a disposable database. Among them: only named hosts are reached; private addresses, files, downloads and request bodies are refused; the memory, process and time caps end a session; and a crashed worker's containers are swept.
 - **The report:** it goes to `.checks/browser-executor/qualification.json`.
-- **browser-use:** the same command then qualifies browser-use 1.0.6 ([Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y5 to Y9), which runs in its own container in the box, from `services/browser-use/` and its own `uv.lock`. Its 13 cases go to `.checks/browser-executor/browser-use.json`. A YOLO call runs on browser-use while it is qualified, and on Autobots' loop otherwise. `browse_goal` version 2 takes up to 40 steps and 600 seconds on browser-use, by default 25 and 300. The loop keeps 20 and 300, and its default 10 and 120.
+- **browser-use:** the same command then qualifies browser-use 1.0.6 ([Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) Y5 to Y9), which runs in its own container in the box, from `services/browser-use/` and its own `uv.lock`. Its 25 cases go to `.checks/browser-executor/browser-use.json`. A YOLO call runs on browser-use while it is qualified, and on Autobots' loop otherwise. `browse_goal` version 2 takes up to 40 steps and 600 seconds on browser-use, by default 25 and 300. The loop keeps 20 and 300, and its default 10 and 120.
+- **The stealth browser (US-20.1, [Decision 0038](docs/engineering/decisions/0038-local-stealth-browser.md) Z1 to Z6 and Z13):**
+  - **Whose choice.** An Expert version's `browser` is `box` or `stealth`, left out of stored configurations, requests and receipts while `box`. No input of `browse_goal` names it, and either engine drives it.
+  - **What it is.** `autobots-browser-stealth:local` (`infra/browser/stealth.Dockerfile`): Google Chrome, unpacked and pinned by version and SHA-256, started headed under Xvfb by the box's own entrypoint. Building it accepts Google's terms for Chrome.
+  - **Qualified apart.** The same command's last phase writes `.checks/browser-executor/stealth.json` (`--stealth` runs only that). While it isn't qualified, a stealth Expert's call is refused `stealth_browser_unqualified`, with no fallback.
+  - **The browser's own user agent.** On both browsers the worker's guard refuses a request under another one. A top-frame navigation under one ends the call `refused_action`.
+  - **Not for YouTube or Google,** and nothing is seeded with it (Z14).
 - **Typing, bot checks and typed results (US-17.4):**
   - **Submitting.** On browser-use the worker's guard also lets `POST` with a body and `OPTIONS` through on `https`, and records each form submission as host and path.
   - **Bot checks.** A CAPTCHA frame or challenge page stops the call `bot_check`.
@@ -966,7 +972,7 @@ From the repository root:
 | `make build` | Rebuild the web app |
 | `make toolchain` | Reinstall packages from the locks |
 | `make migrate` | Apply pending migrations, after [the upgrade runbook](docs/engineering/runbooks/upgrade.md) |
-| `make browser-images` | Build the browser executor's two images and browser-use's |
+| `make browser-images` | Build the browser executor's two images, browser-use's and the stealth browser's |
 | `python3.12 scripts/verify.py --profile <profile>` | Run a check profile: `harness`, `fast`, `full`, `db` or `operations` |
 | `python3.12 scripts/generate_contracts.py write` | Regenerate the OpenAPI schema and TypeScript client |
 | `python3.12 scripts/specs.py render && python3.12 scripts/specs.py validate` | Regenerate the backlog's navigation and validate it |

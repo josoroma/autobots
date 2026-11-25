@@ -191,6 +191,39 @@ async def main() -> None:
         versions = {v.version: v.config.browse_domains for v in revised.versions}
         check('adding browse domains makes version 2 with them, and version 1 keeps none', '{1: [], 2: [en.wikivoyage.org]}',
               versions, versions == {1: [], 2: ['en.wikivoyage.org']})
+
+        # Decision 0038 Z1: the browser is part of a version too, and is left out while it is the box.
+        async def stored(expert: UUID) -> list[Any]:
+            return [row[0] for row in await (await db.execute(
+                'select config from public.expert_versions where expert_id = %s order by version', (expert,))).fetchall()]
+
+        stealthy = await add_version(db, workspace_id=WORKSPACE_A, actor_id=actor, expert_id=made.id,
+                                     idempotency_key=str(uuid4()), expected_version=2, catalog=tool_registry.catalog(),
+                                     config=ExpertConfig(tools=['browse_goal'], browse_domains=['en.wikivoyage.org'], browser='stealth'))
+        browsers = {v.version: v.config.browser for v in stealthy.versions}
+        held = [config.get('browser') for config in await stored(made.id)]
+        check('a new version holds stealth, and the earlier versions are unchanged', '{1: box, 2: box, 3: stealth}, stored as none, none, stealth',
+              (browsers, held), browsers == {1: 'box', 2: 'box', 3: 'stealth'} and held == [None, None, 'stealth'])
+        read = {}
+        for version in (2, 3):
+            run = await admit(WORKSPACE_A, (made.id, version))
+            read[version] = await browsing_settings.expert_browser(db, run)
+        check('a run reads the browser of the version it was admitted with, and its workspace time zone', 'box for 2, stealth for 3, one time zone',
+              read, (read[2].kind, read[3].kind) == ('box', 'stealth') and read[2].timezone == read[3].timezone)
+
+        key, name = str(uuid4()), f'Boxed {uuid4().hex[:6]}'
+        saved = await create_expert(db, workspace_id=WORKSPACE_A, actor_id=actor, idempotency_key=key, name=name,
+                                    catalog=tool_registry.catalog(), config=ExpertConfig(tools=['browse_goal']))
+        again = await create_expert(db, workspace_id=WORKSPACE_A, actor_id=actor, idempotency_key=key, name=name,
+                                    catalog=tool_registry.catalog(), config=ExpertConfig(tools=['browse_goal'], browser='box'))
+        kept = await add_version(db, workspace_id=WORKSPACE_A, actor_id=actor, expert_id=saved.id, idempotency_key=str(uuid4()),
+                                 expected_version=1, catalog=tool_registry.catalog(),
+                                 config=ExpertConfig(tools=['browse_goal'], purpose='Revised', browser='box'))
+        check('an Expert on the box stores no browser, reads as box, and the same request again matches its receipt',
+              'one Expert, box twice, no stored browser',
+              (again.id == saved.id, [v.config.browser for v in kept.versions], [sorted(config) for config in await stored(saved.id)]),
+              again.id == saved.id and [v.config.browser for v in kept.versions] == ['box', 'box']
+              and not any('browser' in config for config in await stored(saved.id)))
     os.environ.pop('AUTOBOTS_BROWSER_EXECUTOR', None)
 
 

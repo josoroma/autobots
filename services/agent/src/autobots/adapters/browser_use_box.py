@@ -44,7 +44,7 @@ from autobots.adapters.browser_executor import (
     ExecutorUnavailable,
     ModelLink,
 )
-from autobots.adapters.browser_qualification import browser_use_qualified
+from autobots.adapters.browser_qualification import browser_use_qualified, stealth_qualified
 from autobots.adapters.model_endpoint import Answer, EndpointRefused, ModelEndpoint, Reply
 from autobots.adapters.model_endpoint import admitted_answer as admitted
 from autobots.application.bounded import stop_task
@@ -81,6 +81,11 @@ SETTLE_SECONDS = 10.0
 def browser_use_ready(root: Path = REPOSITORY) -> bool:
     """Decision 0035 Y8 and Y15: browser-use's own passing check binds today's images."""
     return browser_use_qualified(root)
+
+
+def stealth_ready(root: Path = REPOSITORY) -> bool:
+    """Decision 0038 Z6: the stealth browser's own passing check binds today's image."""
+    return stealth_qualified(root)
 
 
 @dataclass

@@ -43,6 +43,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `checks/improvement_check.py` | check | `scripts/qualify_identity.py` |
 | `checks/keys_and_vars_check.py` | check | `scripts/app_db.py` |
 | `checks/browse_steps_check.py` | check | `scripts/app_db.py` |
+| `checks/stealth_check.py` | check, live | `scripts/qualify_browser_executor.py` (manual, `scripts/suites.py`) |
 | `checks/transcript_check.py` | check | `scripts/app_db.py` |
 | `checks/retired_tools_check.py` | check | `scripts/app_db.py` |
 | `checks/browsing_yolo_check.py` | check | `scripts/app_db.py` |
@@ -93,6 +94,7 @@ browser helper that a script starts inherits that path. `scripts/qualify_upgrade
 | `arrange/run_files_probe.py` | reads a run's input files | `run-workspace.spec.ts` |
 | `arrange/task_timing_live.py` | live: task times | `run-panel.spec.ts` |
 | `arrange/tool_use_live.py` | live: tool uses | `run-workspace.spec.ts` |
+| `fixtures/browse_rig.py` | the real gateway and executor with a scripted model, and an Expert for each browser | `checks/stealth_check.py` |
 | `fixtures/checklib.py` | the case protocol and shared arrangements | the checks; `tests/harness/test_db_case_protocol.py` |
 | `fixtures/effect_tools.py` | tools that deliver to a sink | `checks/effect_check.py`, `workers/effect_worker.py`, `arrange/browser_runs.py` |
 | `fixtures/goal_loop_script.py` | the scripted model, with a planted key | the checks, workers and arrangements that drive a loop |

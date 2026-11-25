@@ -1,0 +1,5 @@
+# The browser image copies only its entrypoint and Chromium's policy, so its build context sends
+# nothing else (Decision 0018 B1, refactor plan R-57). This file is in the images' fingerprint.
+*
+!browser-entrypoint.js
+!chromium-policy.json

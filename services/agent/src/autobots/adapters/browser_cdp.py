@@ -6,7 +6,8 @@ or that carries a body, and any scheme but https, data, blob and about. Download
 also logs each page's committed top-frame navigations, those that landed on an error page, any
 download that began, form submissions and bot checks, which browser-use's outcome is judged by
 (Decision 0035 Y5, Y10, `browser_use_box`). A browser-use session's guard also lets submits through
-(`SUBMIT_METHODS`). This module is in the images' fingerprint
+(`SUBMIT_METHODS`). A request whose user agent isn't the browser's own is refused (Decision 0038
+Z13). This module is in the images' fingerprint
 (`browser_qualification.FINGERPRINTED`).
 """
 
@@ -120,6 +121,11 @@ class RequestGuard:
     navigated: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     downloads: int = 0
+    # The browser's own user agent, and the top-frame navigations that named another (Decision 0038
+    # Z13). Each page session's target is its main frame, which tells such a navigation.
+    user_agent: str | None = None
+    disguised: int = 0
+    frames: dict[str, str] = field(default_factory=dict)
     pages: set[str] = field(default_factory=set)
     # The page session that navigated last, form submissions as host and path, and the hosts of
     # bot checks seen (Decision 0035 Y10, Y11).
@@ -128,6 +134,8 @@ class RequestGuard:
     bot_checks: list[str] = field(default_factory=list)
 
     async def start(self) -> None:
+        version = await self.cdp.send("Browser.getVersion")
+        self.user_agent = version.get("result", {}).get("userAgent")
         self.cdp.handlers.append(self._event)
         await self.cdp.send(
             "Browser.setDownloadBehavior", {"behavior": "deny", "eventsEnabled": True}
@@ -142,16 +150,20 @@ class RequestGuard:
                 attached = await self.cdp.send(
                     "Target.attachToTarget", {"targetId": target["targetId"], "flatten": True}
                 )
-                await self._guard(attached["result"]["sessionId"], page=target["type"] == "page")
+                main = target["targetId"] if target["type"] == "page" else None
+                await self._guard(attached["result"]["sessionId"], main=main)
 
     def refusals(self) -> int:
-        """Top-frame navigations that landed on an error page, and downloads that began."""
-        return len(self.failed) + self.downloads
+        """Top-frame navigations that landed on an error page or named another user agent, and
+        downloads that began."""
+        return len(self.failed) + self.downloads + self.disguised
 
-    async def _guard(self, session: str, *, page: bool = False) -> None:
+    async def _guard(self, session: str, *, main: str | None = None) -> None:
+        """Guards a session: a page's, whose main frame is `main`, or a frame's or worker's."""
         await self.cdp.send("Fetch.enable", {"patterns": [{"urlPattern": "*"}]}, session)
-        if page:
+        if main is not None:
             self.pages.add(session)
+            self.frames[session] = main
             await self.cdp.send("Page.enable", {}, session)
         await self.cdp.send(
             "Target.setAutoAttach",
@@ -181,6 +193,21 @@ class RequestGuard:
             parts = urlsplit(str(params.get("url", "")))
             self.submitted.append(f"{(parts.hostname or '').lower()}{parts.path or '/'}")
 
+    def _own_agent(self, request: dict[str, Any]) -> bool:
+        """Whether a request says it comes from this browser. One with no user agent, as a data URL
+        has none, says nothing else."""
+        headers = request.get("headers") or {}
+        named = next((v for k, v in headers.items() if k.lower() == "user-agent"), None)
+        return named is None or self.user_agent is None or named == self.user_agent
+
+    def _top(self, session: str, params: dict[str, Any]) -> bool:
+        """Whether a paused request is a page's own top-frame navigation."""
+        return (
+            params.get("resourceType") == "Document"
+            and session in self.frames
+            and params.get("frameId") == self.frames[session]
+        )
+
     def _allowed(self, request: dict[str, Any], scheme: str) -> bool:
         if scheme not in ALLOWED_SCHEMES:
             return False
@@ -195,8 +222,9 @@ class RequestGuard:
         session = message.get("sessionId")
         try:
             if method == "Target.attachedToTarget":
-                page = params.get("targetInfo", {}).get("type") == "page"
-                await self._guard(params["sessionId"], page=page)
+                target = params.get("targetInfo", {})
+                main = str(target.get("targetId", "")) if target.get("type") == "page" else None
+                await self._guard(params["sessionId"], main=main)
             elif method == "Page.frameNavigated" and session in self.pages:
                 self._navigated(session, params["frame"])
             elif method == "Page.frameRequestedNavigation" and session in self.pages:
@@ -210,7 +238,10 @@ class RequestGuard:
                 request = params["request"]
                 scheme = request["url"].split(":", 1)[0].lower()
                 self._bot_check(request["url"], params.get("resourceType"))
-                if self._allowed(request, scheme):
+                own = self._own_agent(request)
+                if not own and self._top(session, params):
+                    self.disguised += 1
+                if own and self._allowed(request, scheme):
                     await self.cdp.send(
                         "Fetch.continueRequest", {"requestId": params["requestId"]}, session
                     )

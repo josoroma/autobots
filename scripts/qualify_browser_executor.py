@@ -14,6 +14,10 @@ and relay, with a scripted model, reaching only the qualification host. Its repo
 fingerprint, and browser-use reports qualified only while the executor does too. Without its image, browse_goal stays
 on Autobots' loop. `--browser-use` runs only that phase, which needs the executor qualified already.
 
+Last, it qualifies the stealth browser (Decision 0038 Z6, US-20.1) when its image carries today's stealth fingerprint: the
+executor's own cases again on that image, then its own on the same disposable stack. Its report is its own too, and without
+its image a stealth Expert can't browse. `--stealth` runs only that phase, which needs the executor qualified already.
+
 In no verification profile: it needs network and images a check never builds or fetches.
 Exit codes: 0 qualified, 1 a case failed, 2 a prerequisite is missing.
 """
@@ -22,12 +26,14 @@ from __future__ import annotations
 import secrets
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app_db import MIGRATIONS, WORKSPACE_A, AppStack, apply_migrations, bootstrap, seed
 from browser_images import (
     BROWSER_USE,
+    STEALTH,
     TAGS,
     browser_use_fingerprint,
     browser_use_state,
@@ -35,6 +41,8 @@ from browser_images import (
     image_states,
     images_fingerprint,
     require_current_images,
+    stealth_fingerprint,
+    stealth_state,
 )
 from disposable_db import (
     PROJECT_PREFIX,
@@ -50,12 +58,14 @@ from disposable_db import (
     tool_env,
 )
 from harness_lib import project_root
-from qualification.children import run_child_check, service_env
+from qualification.children import Child, run_child, run_child_check, service_env
 from qualification.records import write_report
 from supabase_stack import generated_values, require_images, require_rendered
 
 REPORT = Path('.checks/browser-executor/qualification.json')
 BROWSER_USE_REPORT = Path('.checks/browser-executor/browser-use.json')
+STEALTH_REPORT = Path('.checks/browser-executor/stealth.json')
+STEALTH_CHECK = Child('checks/stealth_check.py', 'the stealth check', args=('{workspace}',), timeout=1500, from_root=True)
 # The images the executor starts; qualify_browse_goal checks the same tags.
 IMAGES = TAGS
 
@@ -178,19 +188,73 @@ def qualify_browser_use(root: Path) -> int:
     return 0 if passed else 1
 
 
+def qualify_stealth(root: Path) -> int:
+    """Decision 0038 Z6: the executor's cases on the stealth image, and the stealth browser's own, into its own report."""
+    (root / STEALTH_REPORT).unlink(missing_ok=True)
+    state = stealth_state(root)
+    if state != 'current':
+        raise Unavailable(f'{STEALTH.tag} is {"not built" if state == "missing" else "built from other sources"}: build it with '
+                          '`make browser-images`')
+    from autobots.adapters.browser_qualification import executor_qualified
+    if not executor_qualified(root):
+        raise Unavailable("the executor is not qualified at today's fingerprint; run this script without --stealth first")
+    if browser_use_state(root) != 'current':
+        raise Unavailable(f"{BROWSER_USE.tag} is not current, and the stealth browser's check runs browser-use on it")
+    fingerprint = stealth_fingerprint(root)
+    stack = Stack(root)
+    before = stack.prepare()
+    cases = Cases(model_transport='mock')
+    started_at = time.monotonic()
+    try:
+        url = stack.up(cases)
+        env = service_env(root, url)
+        run_child_check(cases, root, 'checks/browser_executor_check.py', WORKSPACE_A, str(stack.db_port), str(stack.gateway_port), 'stealth',
+                        label="the executor's check on the stealth browser", env=env, timeout=900, cwd=root,
+                        err_dir=root / STEALTH_REPORT.parent, err_name='stealth-executor')
+        run_child(cases, root, STEALTH_CHECK, {'workspace': WORKSPACE_A}, env=env, err_dir=root / STEALTH_REPORT.parent)
+    finally:
+        stack.down(cases, before)
+    cases.check('the stealth image still carries the fingerprint the check started with', 'current', stealth_state(root),
+                stealth_state(root) == 'current' and stealth_fingerprint(root) == fingerprint)
+    passed = cases.status == 'passed'
+    write_report(root / STEALTH_REPORT, {
+        'schema_version': 'autobots.stealth-browser-qualification/v1', 'completed_at_utc': datetime.now(UTC).isoformat(),
+        'duration_seconds': round(time.monotonic() - started_at, 1), 'status': cases.status,
+        'stealth_fingerprint': fingerprint, 'image_label': fingerprint_digest(fingerprint), 'target_class': 'disposable',
+        'driver': 'scripted', 'model': 'scripted, no provider',
+        'network': 'outbound to https://example.com/ and https://example.org/ only', 'cases': cases.records,
+        'not_established': ['H1', 'product acceptance', 'browsing with a real model', 'that any site opens', 'any real bot check']})
+    print(f"{'PASS' if passed else 'FAIL'}: {sum(r['status'] == 'passed' for r in cases.records)} of {len(cases.records)} stealth cases passed.")
+    return 0 if passed else 1
+
+
+def optional(root: Path, state: str, report: Path, without: str, phase: Callable[[Path], int]) -> int:
+    """A phase whose image may not be built: then its report goes, and what that turns off is said."""
+    if state != 'missing':
+        return phase(root)
+    (root / report).unlink(missing_ok=True)
+    print(without)
+    return 0
+
+
 def main() -> int:
     root = project_root()
     try:
         if '--browser-use' in sys.argv[1:]:
             return qualify_browser_use(root)
+        if '--stealth' in sys.argv[1:]:
+            return qualify_stealth(root)
         executor = qualify(root)
         if executor != 0:
             return executor
-        if browser_use_state(root) == 'missing':
-            (root / BROWSER_USE_REPORT).unlink(missing_ok=True)
-            print(f'{BROWSER_USE.tag} is not built, so browser-use is not qualified and browse_goal stays on the loop.')
-            return 0
-        return qualify_browser_use(root)
+        browser_use = optional(root, browser_use_state(root), BROWSER_USE_REPORT,
+                               f'{BROWSER_USE.tag} is not built, so browser-use is not qualified and browse_goal stays on the loop.',
+                               qualify_browser_use)
+        if browser_use != 0:
+            return browser_use
+        return optional(root, stealth_state(root), STEALTH_REPORT,
+                        f"{STEALTH.tag} is not built, so the stealth browser is not qualified and a stealth Expert can't browse.",
+                        qualify_stealth)
     except Refused as refusal:
         print(f'REFUSED before any change: {refusal}', file=sys.stderr)
         return 1

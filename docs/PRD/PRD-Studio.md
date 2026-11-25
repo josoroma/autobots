@@ -84,7 +84,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 
 ## Experts
 
-**EX-01. Card facts.** A card shows the executor binding's role and profile, the granted tools (first four, then +N), a run count, the time of the last run, and Start run.
+**EX-01. Card facts.** A card shows the executor binding's role and profile, the granted tools (first four, then +N), a run count, the time of the last run, and Start run. One that grants `browse_goal` says where it browses, and that it does so on the stealth browser when its version is set to it. The editor sets the browser beside the browse domains (Decision 0038 Z1).
 
 **EX-02. Filters.** **All**, **Can change things outside** (any granted tool whose class is consequential) and **Read only** (no consequential tool), each with a count, plus text search.
 

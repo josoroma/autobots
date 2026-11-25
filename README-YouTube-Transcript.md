@@ -99,7 +99,7 @@ A scripted navigation through the same box and guard, with no model and no spend
 - **The proxy.** It refused `www.google.com`, which isn't in the allowed domains, so the redirect landed on an error page.
 - **YouTube.** No YouTube page ever committed.
 
-So the bot check was real, and the Transcript reader handled it as designed (Y10): it stopped and published nothing. Getting past it would take a changed user agent, stealth settings or a CAPTCHA solver, all of which Decision 0035 rules out.
+So the bot check was real, and the Transcript reader handled it as designed (Y10): it stopped and published nothing. Getting past it would take a changed user agent, stealth settings or a CAPTCHA solver, all of which Decision 0035 rules out here. [Decision 0038](docs/engineering/decisions/0038-local-stealth-browser.md)'s stealth browser doesn't change that: it isn't for YouTube (Z14), and the Transcript reader stays on the box.
 
 ### What it cost
 

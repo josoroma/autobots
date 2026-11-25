@@ -25,6 +25,21 @@ export interface Draft extends Grants {
   executor: ModelProfileId | typeof WORKSPACE_SETTING;
   /** The browse domains as typed, one per line or comma-separated (Decision 0035 Y3). */
   browseDomains: string;
+  /** The browser its browse drives (Decision 0038 Z1). */
+  browser: Browser;
+}
+
+/** The browsers an Expert may name. */
+export type Browser = NonNullable<ExpertConfig["browser"]>;
+
+export const BROWSERS: readonly { kind: Browser; label: string }[] = [
+  { kind: "box", label: "Isolated box" },
+  { kind: "stealth", label: "Stealth" },
+];
+
+/** A chosen browser, or null for a value that isn't one. */
+export function browserChoice(value: string): Browser | null {
+  return BROWSERS.find((option) => option.kind === value)?.kind ?? null;
 }
 
 /** The executor choice that binds no profile, so runs use the workspace's setting. */
@@ -40,6 +55,7 @@ export function draftOf(expert: ExpertView): Draft {
     groups: latest.tool_groups ?? [],
     executor: latest.role_bindings?.executor ?? WORKSPACE_SETTING,
     browseDomains: (latest.browse_domains ?? []).join("\n"),
+    browser: latest.browser ?? "box",
   };
 }
 
@@ -108,6 +124,7 @@ export function revisionBody(
       tools: [...draft.tools],
       tool_groups: [...draft.groups],
       browse_domains: domainsOf(draft.browseDomains),
+      browser: draft.browser,
       role_bindings: {
         ...kept,
         ...(draft.executor === WORKSPACE_SETTING

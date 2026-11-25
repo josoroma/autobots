@@ -1756,6 +1756,15 @@ export const schemas = {
         "title": "Browse Domains",
         "type": "array"
       },
+      "browser": {
+        "default": "box",
+        "enum": [
+          "box",
+          "stealth"
+        ],
+        "title": "Browser",
+        "type": "string"
+      },
       "instructions": {
         "default": "",
         "maxLength": 20000,
@@ -1829,6 +1838,15 @@ export const schemas = {
         },
         "title": "Browse Domains",
         "type": "array"
+      },
+      "browser": {
+        "default": "box",
+        "enum": [
+          "box",
+          "stealth"
+        ],
+        "title": "Browser",
+        "type": "string"
       },
       "instructions": {
         "default": "",
@@ -8464,6 +8482,7 @@ export function parseExpertBinding(value: unknown): ExpertBinding {
 
 export interface ExpertConfig {
   browse_domains?: string[];
+  browser?: "box" | "stealth";
   instructions?: string;
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;
@@ -8478,6 +8497,7 @@ export function parseExpertConfig(value: unknown): ExpertConfig {
 
 export interface ExpertConfigView {
   browse_domains?: string[];
+  browser?: "box" | "stealth";
   instructions?: string;
   purpose?: string;
   role_bindings?: Record<string, ModelProfileId>;

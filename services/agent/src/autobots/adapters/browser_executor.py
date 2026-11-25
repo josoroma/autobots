@@ -11,6 +11,10 @@ For a browse on browser-use (Decision 0035 Y5 and Y8), a third container joins t
 internal network only and drives the session's Chromium over CDP, with the sidecar's model relay as
 its only model. It gets the browser's hardening and caps, and nothing of the worker's environment.
 
+A session's browser is the box's headless Chromium, or the stealth browser (Decision 0038 Z2 to Z4):
+headed Google Chrome in its own image, with the workspace's time zone, in the same network, proxy,
+guard and hardening. Only its process cap is higher.
+
 The DevTools client and request guard are in `browser_cdp`, what a qualification binds is in
 `browser_qualification`, and the checks that end a session are in `application/browser_leases`.
 This module, those three and the images' sources are all in the images' fingerprint. The Docker CLI
@@ -35,6 +39,7 @@ from autobots.adapters.browser_qualification import (
     BROWSER_USE,
     DOCKER_ENV_NAMES,
     PROXY,
+    STEALTH,
     executor_qualified,
 )
 from autobots.application.browser_leases import attempt_alive, lease_alive
@@ -51,6 +56,7 @@ __all__ = [
     "ExecutorUnavailable",
     "ModelLink",
     "RequestGuard",
+    "Stealth",
     "attempt_alive",
     "executor_qualified",
     "lease_alive",
@@ -74,9 +80,12 @@ class ExecutorConfig:
     browser_image: str = BROWSER.tag
     proxy_image: str = PROXY.tag
     browser_use_image: str = BROWSER_USE.tag
+    stealth_image: str = STEALTH.tag
     cpus: str = "1"
     memory: str = "1g"
     pids: int = 256
+    # Decision 0038 Z4: headed Chrome reaches 256 on an ordinary page of cross-site frames.
+    stealth_pids: int = 512
     tmpfs: str = "256m"
     seconds: float = 300.0
     max_requests: int = 500
@@ -94,12 +103,21 @@ class ModelLink:
 
 
 @dataclass(frozen=True)
+class Stealth:
+    """The stealth browser for one session (Decision 0038 Z2, Z3): the workspace's time zone."""
+
+    timezone: str = "UTC"
+
+
+@dataclass(frozen=True)
 class BrowserSession:
     name: str
     token: str
     port: int
     run_id: str
     generation: int
+    # The browser container's process cap, which says when a count held at it is being enforced.
+    pids: int = 256
 
     @property
     def base(self) -> str:
@@ -152,9 +170,11 @@ class BrowserExecutor:
         generation: int,
         allowed_hosts: tuple[str, ...],
         model: ModelLink | None = None,
+        stealth: Stealth | None = None,
     ) -> BrowserSession:
         """`allowed_hosts` are the only hosts the browser may reach, with their subdomains. With
-        `model`, the sidecar also relays the box's chat completions to the worker's endpoint."""
+        `model`, the sidecar also relays the box's chat completions to the worker's endpoint. With
+        `stealth`, the browser is the stealth one."""
         for host in allowed_hosts:
             if not host or any(mark in host for mark in "/, \t") or host.startswith("."):
                 raise ExecutorUnavailable("allowed_host_malformed")
@@ -162,6 +182,7 @@ class BrowserExecutor:
         token = secrets.token_urlsafe(24)
         labels = self._labels(name, run_id, generation)
         hardening = self._hardening()
+        pids = self.config.pids if stealth is None else self.config.stealth_pids
         try:
             await self._docker("network", "create", "--internal", *labels, f"{name}-net")
             # The proxy's own way out, a network of its own so Docker's DNS finds the browser.
@@ -193,16 +214,17 @@ class BrowserExecutor:
                 "network", "connect", "--alias", "proxy", f"{name}-net", f"{name}-proxy"
             )
             await self._docker(
-                "run", "-d", "--name", f"{name}-browser", *labels, *hardening,
+                "run", "-d", "--name", f"{name}-browser", *labels, *self._hardening(pids),
                 "--network", f"{name}-net", *self._caps(),
-                self.config.browser_image,
+                *([] if stealth is None else ["-e", f"TZ={stealth.timezone}"]),
+                self.config.browser_image if stealth is None else self.config.stealth_image,
             )  # fmt: skip
             mapping = (await self._docker("port", f"{name}-proxy", "9223")).split()[0]
             port = int(mapping.rsplit(":", 1)[1])
         except (ExecutorUnavailable, IndexError, ValueError):
             await self.remove(name)
             raise ExecutorUnavailable("executor_start_failed") from None
-        session = BrowserSession(name, token, port, str(run_id), generation)
+        session = BrowserSession(name, token, port, str(run_id), generation, pids)
         await self._ready(session)
         return session
 
@@ -215,12 +237,12 @@ class BrowserExecutor:
             "--label", f"{LABEL}.session={name}",
         ]  # fmt: skip
 
-    def _hardening(self) -> list[str]:
+    def _hardening(self, pids: int | None = None) -> list[str]:
         return [
             "--read-only",
             "--cap-drop=ALL",
             "--security-opt", "no-new-privileges",
-            "--pids-limit", str(self.config.pids),
+            "--pids-limit", str(self.config.pids if pids is None else pids),
         ]  # fmt: skip
 
     def _caps(self) -> list[str]:
@@ -363,7 +385,7 @@ class BrowserExecutor:
         )
         count = out.decode().strip()
         # Docker's count leaves out one task the cgroup holds, so the limit shows as one less.
-        if code == 0 and count.isdigit() and int(count) >= self.config.pids - 1:
+        if code == 0 and count.isdigit() and int(count) >= session.pids - 1:
             saturated = True
         refused = pids.get("max", 0) or (1 if saturated else 0)
         return memory.get("oom_kill", 0), refused

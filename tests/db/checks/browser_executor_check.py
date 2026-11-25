@@ -2,6 +2,9 @@
 
 Run by scripts/qualify_browser_executor.py. A scripted driver, not a model, issues CDP commands.
 The one public host requested is https://example.com/ (Decision 0018). JSON cases on stdout.
+
+With `stealth` as its last argument, every session's browser is the stealth one (Decision 0038 Z6), so each refusal is
+observed again on its image.
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from autobots.adapters.browser_executor import (
     ExecutorConfig,
     ModelLink,
     RequestGuard,
+    Stealth,
     attempt_alive,
     lease_alive,
 )
@@ -34,6 +38,8 @@ from autobots.domain.runs import RunCommand
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 WORKSPACE = UUID(sys.argv[1])
 DB_PORT, GATEWAY_PORT = int(sys.argv[2]), int(sys.argv[3])
+STEALTH = sys.argv[4:] == ['stealth']
+IMAGE = 'autobots-browser-stealth:local' if STEALTH else 'autobots-browser:local'
 ALLOWED = 'https://example.com/'
 # Decision 0018: the only hosts this check may reach.
 HOSTS = ('example.com', 'example.org')
@@ -49,6 +55,14 @@ cases: list[dict[str, Any]] = []
 
 def check(name: str, expected: str, observed: object, passed: bool) -> None:
     cases.append({'id': name, 'expected': expected, 'observed': str(observed)[:900], 'passed': bool(passed)})
+
+
+class Executor(BrowserExecutor):
+    """The executor under check, with the checked browser in every session."""
+
+    async def start(self, run_id: Any, generation: int, allowed_hosts: tuple[str, ...], model: ModelLink | None = None,
+                    stealth: Stealth | None = None) -> BrowserSession:
+        return await super().start(run_id, generation, allowed_hosts, model, Stealth('America/Costa_Rica') if STEALTH else stealth)
 
 
 class Page:
@@ -177,7 +191,7 @@ async def containment(executor: BrowserExecutor) -> None:
         await remember(executor, session)
         await executor.stop(session)
 
-    capped = BrowserExecutor(ExecutorConfig(max_requests=1), environ=dict(os.environ))
+    capped = Executor(ExecutorConfig(max_requests=1), environ=dict(os.environ))
     session = await capped.start('qualification', 1, HOSTS)
     try:
         cdp, _, page = await browse(capped, session)
@@ -188,7 +202,7 @@ async def containment(executor: BrowserExecutor) -> None:
     finally:
         await remember(capped, session)
         await capped.stop(session)
-    small = BrowserExecutor(ExecutorConfig(max_bytes=2_000), environ=dict(os.environ))
+    small = Executor(ExecutorConfig(max_bytes=2_000), environ=dict(os.environ))
     session = await small.start('qualification', 1, HOSTS)
     try:
         cdp, _, page = await browse(small, session)
@@ -204,14 +218,14 @@ async def containment(executor: BrowserExecutor) -> None:
 
 
 async def isolation() -> None:
-    executor = BrowserExecutor(environ={**os.environ, **WORKER_SECRETS})
+    executor = Executor(environ={**os.environ, **WORKER_SECRETS})
     session = await executor.start('qualification', 1, HOSTS)
     try:
         info = await executor.inspect(session)
         browser, proxy = info['browser'], info['proxy']
         host = browser['HostConfig']
         text = json.dumps(info)
-        layers = json.loads(await executor._docker('image', 'inspect', '--format', '{{json .RootFS.Layers}}', 'autobots-browser:local'))
+        layers = json.loads(await executor._docker('image', 'inspect', '--format', '{{json .RootFS.Layers}}', IMAGE))
         base = json.loads(await executor._docker('image', 'inspect', '--format', '{{json .RootFS.Layers}}',
                                                  'mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579'))
         observed = {'user': browser['Config']['User'], 'readonly': host['ReadonlyRootfs'], 'cap_drop': host['CapDrop'], 'security': host['SecurityOpt'],
@@ -222,7 +236,7 @@ async def isolation() -> None:
         check('nothing of the host enters the container', 'pwuser, read-only, no capabilities, caps, tmpfs, no mounts, internal network, no secret',
               (observed, leaked), observed['user'] == 'pwuser' and observed['readonly'] is True and observed['cap_drop'] == ['ALL']
               and observed['security'] == ['no-new-privileges'] and observed['memory'] == 1024 ** 3 and observed['cpus'] == 10 ** 9
-              and observed['pids'] == 256 and observed['tmpfs'] == {'/tmp': 'rw,size=256m,mode=1777'} and observed['mounts'] == []
+              and observed['pids'] == (512 if STEALTH else 256) and observed['tmpfs'] == {'/tmp': 'rw,size=256m,mode=1777'} and observed['mounts'] == []
               and not observed['binds'] and observed['networks'] == [f'{session.name}-net'] and not observed['browser_ports']
               and all(binding['HostIp'] == '127.0.0.1' for binding in observed['proxy_ports']['9223/tcp']) and 'docker.sock' not in text
               and not leaked and layers[:len(base)] == base)
@@ -242,7 +256,7 @@ async def relay() -> None:
         return Reply({'object': 'chat.completion', 'relayed': True})
 
     async with ModelEndpoint(fixed) as endpoint:
-        executor = BrowserExecutor(environ={**os.environ, **WORKER_SECRETS})
+        executor = Executor(environ={**os.environ, **WORKER_SECRETS})
         session = await executor.start('qualification', 1, HOSTS, ModelLink(endpoint.port, endpoint.token))
         try:
             async def from_box(url: str) -> str:
@@ -278,7 +292,7 @@ async def ownership(db: Any) -> None:
     async def always() -> bool:
         return True
 
-    narrow = BrowserExecutor(ExecutorConfig(memory='512m'), environ=dict(os.environ))
+    narrow = Executor(ExecutorConfig(memory='512m'), environ=dict(os.environ))
     session = await narrow.start('qualification', 1, HOSTS)
     watcher = asyncio.create_task(narrow.watch(session, always, every=0.5))
     # A process in the container allocates past the cap, so the kernel's OOM kill is deterministic.
@@ -288,7 +302,7 @@ async def ownership(db: Any) -> None:
     check('the memory cap ends the session', 'memory_cap, containers removed', (reason, await narrow.exists(session)),
           reason == 'memory_cap' and not await narrow.exists(session))
 
-    executor = BrowserExecutor(environ=dict(os.environ))
+    executor = Executor(environ=dict(os.environ))
     session = await executor.start('qualification', 1, HOSTS)
     watcher = asyncio.create_task(executor.watch(session, always, every=0.5))
     # A runaway that keeps forking, as a page's processes would, holds the container at its limit.
@@ -334,7 +348,7 @@ async def ownership(db: Any) -> None:
 
 
 async def main() -> None:
-    executor = BrowserExecutor(environ=dict(os.environ))
+    executor = Executor(environ=dict(os.environ))
     await containment(executor)
     await isolation()
     await relay()
@@ -345,4 +359,5 @@ async def main() -> None:
     print(json.dumps({'cases': cases}))
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())

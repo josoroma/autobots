@@ -30,6 +30,8 @@ TODAY = browser_images.fingerprint_digest(browser_images.images_fingerprint(ROOT
 OWN = browser_images.fingerprint_digest(browser_images.browser_use_fingerprint(ROOT))
 BROWSER, PROXY = browser_images.TAGS
 BROWSER_USE = browser_images.BROWSER_USE.tag
+STEALTH = browser_images.STEALTH.tag
+STEALTH_OWN = browser_images.fingerprint_digest(browser_images.stealth_fingerprint(ROOT))
 # Answers `image inspect` from a file per tag in labels/, records every call with whether the build flag and a
 # credential reached it, and refuses anything but an inspect or a build.
 FAKE_DOCKER = """#!/bin/sh
@@ -94,13 +96,15 @@ class Build(unittest.TestCase):
              '--file', str(ROOT / 'infra/browser/proxy.Dockerfile'), str(ROOT / 'services/agent/src/autobots/adapters')],
             ['docker', 'build', '--label', f'autobots.fingerprint={OWN}', '--tag', BROWSER_USE,
              '--file', str(ROOT / 'infra/browser/browser-use.Dockerfile'), str(ROOT / 'services/browser-use')],
+            ['docker', 'build', '--label', f'autobots.fingerprint={STEALTH_OWN}', '--tag', STEALTH,
+             '--file', str(ROOT / 'infra/browser/stealth.Dockerfile'), str(ROOT / 'infra/browser')],
         ])
-        self.assertNotEqual(TODAY, OWN)
+        self.assertEqual(len({TODAY, OWN, STEALTH_OWN}), 3)
 
     def test_a_source_edit_changes_the_label_the_next_build_carries(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             copy = Path(folder)
-            for name in browser_images.browser_use_fingerprint(ROOT):
+            for name in browser_images.stealth_fingerprint(ROOT):
                 (copy / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, copy / name)
             self.assertIn(f'autobots.fingerprint={TODAY}', browser_images.build_commands(copy)[1])
@@ -115,6 +119,11 @@ class Build(unittest.TestCase):
             again = browser_images.build_commands(copy)
             self.assertEqual(again[0][3], edited[0][3])
             self.assertNotEqual(again[2][3], edited[2][3])
+            stealth = copy / 'infra/browser/stealth.Dockerfile'
+            stealth.write_text(stealth.read_text() + '# an edit to the stealth browser alone\n')
+            last = browser_images.build_commands(copy)
+            self.assertEqual([command[3] for command in last[:3]], [command[3] for command in again[:3]])
+            self.assertNotEqual(last[3][3], again[3][3])
 
     def test_build_runs_both_builds_with_buildkit_and_no_credential(self) -> None:
         docker = FakeDocker({})
@@ -137,6 +146,20 @@ class Build(unittest.TestCase):
         bases = re.findall(r'(?m)^FROM (\S+@sha256:[0-9a-f]{64})( AS uv)?$', own)
         self.assertEqual([base for base, _ in bases][1], re.search(r'(?m)^FROM (\S+)$', browser).group(1))  # type: ignore[union-attr]
         self.assertTrue(bases[0][0].startswith('ghcr.io/astral-sh/uv@sha256:') and bases[0][1] == ' AS uv')
+
+    def test_the_stealth_image_pins_the_same_base_and_chrome_by_version_and_digest(self) -> None:
+        browser = (ROOT / 'infra/browser/browser.Dockerfile').read_text()
+        stealth = (ROOT / 'infra/browser/stealth.Dockerfile').read_text()
+        base = re.search(r'(?m)^FROM (\S+)$', browser).group(1)  # type: ignore[union-attr]
+        self.assertEqual(re.findall(r'(?m)^FROM (\S+)(?: AS chrome)?$', stealth), [base, base])
+        self.assertRegex(stealth, r'ADD --checksum=sha256:[0-9a-f]{64} \\\n  https://dl\.google\.com/\S+/google-chrome-stable_[\d.]+-1_arm64\.deb')
+        # Unpacked, never installed: no install script runs and no package source is added.
+        self.assertIn('dpkg -x ', stealth)
+        self.assertNotRegex(stealth, r'apt(-get)? |dpkg -i|current_arm64')
+        # It names no identity of its own: only the mode, which the entrypoint reads.
+        self.assertEqual(re.findall(r'(?m)^ENV (.+)$', stealth), ['AUTOBOTS_BROWSER=stealth'])
+        entrypoint = ENTRYPOINT.read_text()
+        self.assertNotRegex(entrypoint, r'--user-agent|--uxr|AutomationControlled|--lang')
 
 
 class Check(unittest.TestCase):
@@ -166,15 +189,20 @@ class Check(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f'{BROWSER_USE}: not built, so browse_goal stays on the loop', result.stdout)
 
-    def test_a_stale_browser_use_image_fails_check(self) -> None:
-        for value in ('0' * 64, TODAY):
-            with self.subTest(value):
-                docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY, BROWSER_USE: value})
-                result = docker.run('check')
-                self.assertEqual(result.returncode, 1, result.stderr)
-                self.assertIn(f'{BROWSER_USE}: built from other sources', result.stdout)
-        docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY, BROWSER_USE: OWN})
-        self.assertEqual(docker.run('check').returncode, 0)
+    def test_without_the_stealth_image_check_passes_and_says_a_stealth_expert_cannot_browse(self) -> None:
+        result = FakeDocker({BROWSER: TODAY, PROXY: TODAY, BROWSER_USE: OWN}).run('check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"{STEALTH}: not built, so a stealth Expert can't browse", result.stdout)
+
+    def test_a_stale_optional_image_fails_check(self) -> None:
+        for tag, own in ((BROWSER_USE, OWN), (STEALTH, STEALTH_OWN)):
+            for value in ('0' * 64, TODAY):
+                with self.subTest((tag, value)):
+                    docker = FakeDocker({BROWSER: TODAY, PROXY: TODAY, tag: value})
+                    result = docker.run('check')
+                    self.assertEqual(result.returncode, 1, result.stderr)
+                    self.assertIn(f'{tag}: built from other sources', result.stdout)
+            self.assertEqual(FakeDocker({BROWSER: TODAY, PROXY: TODAY, tag: own}).run('check').returncode, 0)
 
     def test_without_docker_check_is_unavailable(self) -> None:
         docker = FakeDocker({})
@@ -223,14 +251,24 @@ const layout = {
   "/ms-playwright": failure === "no_chromium" ? ["ffmpeg-1011"] : ["ffmpeg-1011", "chromium-1200"],
   "/ms-playwright/chromium-1200": failure === "no_platform" ? ["chrome-mac"] : ["chrome-linux"],
 };
+const real = fs.existsSync;
+fs.existsSync = (path) => (path === "/tmp/.X11-unix/X99" ? failure !== "no_display" : real(path));
+let clock = 1_000;
+Date.now = () => (clock += 400);
 fs.readdirSync = (folder) => {
   if (failure === "no_folder" || !(folder in layout)) {
     throw Object.assign(new Error(`ENOENT: no such file or directory, scandir '${folder}'`), { code: "ENOENT" });
   }
   return layout[folder];
 };
-childProcess.spawn = () => {
+childProcess.spawn = (command, flags) => {
   const child = Object.assign(new EventEmitter(), { kill() {} });
+  if (process.env.ENTRYPOINT_SHOW) fs.writeSync(1, `${command} ${flags.join(" ")}\n`);
+  if (command === "Xvfb") {
+    if (failure === "xvfb") process.nextTick(() => child.emit("error", new Error("spawn Xvfb ENOENT")));
+    if (failure === "xvfb_exit") process.nextTick(() => child.emit("exit", 1));
+    return child;
+  }
   if (failure === "spawn") {
     process.nextTick(() => child.emit("error", Object.assign(new Error("spawn chrome EACCES"), { code: "EACCES" })));
   }
@@ -256,9 +294,9 @@ class Entrypoint(unittest.TestCase):
         self.preload = folder / 'stubs.js'
         self.preload.write_text(PRELOAD)
 
-    def start(self, failure: str) -> subprocess.CompletedProcess[str]:
+    def start(self, failure: str, **env: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run([self.node, '--require', str(self.preload), str(ENTRYPOINT)], cwd=self.preload.parent,
-                              env={'ENTRYPOINT_FAILURE': failure, 'PATH': '/usr/bin:/bin'}, capture_output=True,
+                              env={'ENTRYPOINT_FAILURE': failure, 'PATH': '/usr/bin:/bin', **env}, capture_output=True,
                               text=True, timeout=30, check=False)
 
     def test_the_stubs_alone_let_the_entrypoint_start(self) -> None:
@@ -275,6 +313,27 @@ class Entrypoint(unittest.TestCase):
                 self.assertEqual(len(lines), 1, result.stderr)
                 self.assertTrue(lines[0].startswith('browser-entrypoint: '), lines[0])
                 self.assertIn(cause, lines[0])
+
+    def test_the_box_starts_headless_and_the_stealth_browser_headed_on_its_display(self) -> None:
+        box = self.start('none', ENTRYPOINT_SHOW='1').stdout
+        self.assertIn('/chrome --headless=new --disable-gpu ', box)
+        self.assertNotIn('Xvfb', box)
+        stealth = self.start('none', ENTRYPOINT_SHOW='1', AUTOBOTS_BROWSER='stealth').stdout.splitlines()
+        self.assertEqual(stealth[0], 'Xvfb :99 -screen 0 1440x900x24 -nolisten tcp')
+        self.assertTrue(stealth[1].startswith('/opt/google/chrome/chrome --window-size=1440,900 '), stealth[1])
+        self.assertNotIn('headless', stealth[1])
+        # Everything else is the box's own start: the proxy, the resolver rule and the quiet flags.
+        self.assertEqual(stealth[1].split('--no-sandbox', 1)[1], box.strip().split('--no-sandbox', 1)[1])
+
+    def test_the_stealth_browser_waits_for_its_display_and_says_why_it_has_none(self) -> None:
+        for failure, cause in (('no_display', 'no display'), ('xvfb', 'Xvfb did not start'), ('xvfb_exit', 'Xvfb exited'),
+                               ('spawn', 'EACCES'), ('listen', 'EADDRINUSE')):
+            with self.subTest(failure):
+                result = self.start(failure, ENTRYPOINT_SHOW='1', AUTOBOTS_BROWSER='stealth')
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(cause, result.stderr)
+                if failure in ('no_display', 'xvfb', 'xvfb_exit'):
+                    self.assertNotIn('/opt/google/chrome/chrome', result.stdout)
 
 
 if __name__ == '__main__':

@@ -10,9 +10,11 @@ call and turning it on reaches only runs admitted afterwards (Y4).
 import json
 from dataclasses import dataclass
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from autobots.application.provider_settings import StaleVersion
 from autobots.application.sql import SqlConnection, one, optional_row
+from autobots.domain.browsing import BrowserKind
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,12 @@ class _Row:
 @dataclass(frozen=True)
 class _Domains:
     domains: str | None
+
+
+@dataclass(frozen=True)
+class _Browser:
+    browser: str | None
+    timezone: str | None
 
 
 async def load(connection: SqlConnection, workspace_id: UUID) -> BrowsingSetting:
@@ -115,3 +123,33 @@ async def expert_browse_domains(connection: SqlConnection, run_id: UUID) -> tupl
         return ()
     listed = json.loads(row.domains)
     return tuple(str(domain) for domain in listed) if isinstance(listed, list) else ()
+
+
+@dataclass(frozen=True)
+class ExpertBrowser:
+    """The browser a run's Expert names, and its workspace's time zone (Decision 0038 Z1, Z3)."""
+
+    kind: BrowserKind
+    timezone: str
+
+
+async def expert_browser(connection: SqlConnection, run_id: UUID) -> ExpertBrowser:
+    """The browser of the Expert version this run was admitted with. A run with no Expert, or an
+    Expert saved before the choice existed, has the box. An unknown time zone reads as UTC."""
+    row = await optional_row(
+        connection,
+        _Browser,
+        "select v.config ->> 'browser' as browser, w.timezone from public.runs r "
+        "join public.workspaces w on w.id = r.workspace_id "
+        "left join public.expert_versions v on v.expert_id = r.expert_id "
+        "and v.version = r.expert_version where r.id = %s",
+        (run_id,),
+    )
+    if row is None:
+        return ExpertBrowser("box", "UTC")
+    zone = row.timezone or "UTC"
+    try:
+        ZoneInfo(zone)
+    except (KeyError, ValueError, OSError):
+        zone = "UTC"
+    return ExpertBrowser("stealth" if row.browser == "stealth" else "box", zone)

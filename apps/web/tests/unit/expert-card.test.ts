@@ -203,6 +203,14 @@ test("an Expert that browses says where, or that it can't until its domains are 
     "Browses youtube.com, ytimg.com",
   );
   assert.equal(
+    browseDomainsLine({
+      tools: ["browse_goal"],
+      browse_domains: ["a.test"],
+      browser: "stealth",
+    }),
+    "Browses a.test, on the stealth browser",
+  );
+  assert.equal(
     browseDomainsLine({ tools: ["save_artifact"], browse_domains: ["a.test"] }),
     null,
   );

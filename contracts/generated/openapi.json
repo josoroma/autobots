@@ -1755,6 +1755,15 @@
             "title": "Browse Domains",
             "type": "array"
           },
+          "browser": {
+            "default": "box",
+            "enum": [
+              "box",
+              "stealth"
+            ],
+            "title": "Browser",
+            "type": "string"
+          },
           "instructions": {
             "default": "",
             "maxLength": 20000,
@@ -1828,6 +1837,15 @@
             },
             "title": "Browse Domains",
             "type": "array"
+          },
+          "browser": {
+            "default": "box",
+            "enum": [
+              "box",
+              "stealth"
+            ],
+            "title": "Browser",
+            "type": "string"
           },
           "instructions": {
             "default": "",

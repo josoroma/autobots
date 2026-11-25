@@ -10,6 +10,7 @@ import { test } from "node:test";
 import type { ExpertView, ModelList } from "@autobots/api-client";
 
 import {
+  browserChoice,
   domainsOf,
   draftOf,
   executorOptions,
@@ -71,6 +72,7 @@ const draft = (changes: Partial<Draft> = {}): Draft => ({
   groups: [],
   executor: WORKSPACE_SETTING,
   browseDomains: "",
+  browser: "box",
   ...changes,
 });
 
@@ -82,6 +84,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
     groups: [],
     executor: "",
     browseDomains: "",
+    browser: "box",
   });
   assert.deepEqual(
     draftOf(
@@ -95,6 +98,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
           coder: "openrouter_sol",
         },
         browse_domains: ["youtube.com", "ytimg.com"],
+        browser: "stealth",
       }),
     ),
     {
@@ -104,6 +108,7 @@ test("a draft comes from the latest version, with empty defaults", () => {
       groups: ["files"],
       executor: "openrouter_terra",
       browseDomains: "youtube.com\nytimg.com",
+      browser: "stealth",
     },
   );
 });
@@ -156,6 +161,7 @@ test("a revision keeps what the form doesn't edit, and binds the executor only w
         tools: ["calculate"],
         tool_groups: [],
         browse_domains: [],
+        browser: "box",
         role_bindings: { reviewer: "openrouter_terra" },
       },
     },
@@ -173,6 +179,18 @@ test("a revision keeps what the form doesn't edit, and binds the executor only w
     {},
   );
   assert.deepEqual(browsing.config.browse_domains, ["en.wikivoyage.org"]);
+  // Setting it back to the box replaces the saved choice.
+  const stealthy = expert({ browser: "stealth" }, 4);
+  assert.equal(revisionBody(stealthy, draft(), {}).config.browser, "box");
+  assert.equal(
+    revisionBody(stealthy, draft({ browser: "stealth" }), {}).config.browser,
+    "stealth",
+  );
+});
+
+test("only a browser an Expert may name is a choice", () => {
+  assert.equal(browserChoice("stealth"), "stealth");
+  assert.equal(browserChoice("cloud"), null);
 });
 
 test("each reply has its words, from one table of refusals", () => {

@@ -468,6 +468,14 @@ async def main() -> None:
               ((captcha.output or {}).get('stopped'), len(captcha_model.seen), (captcha.output or {}).get('model_calls')),
               (captcha.output or {}).get('stopped') == 'bot_check' and len(captcha_model.seen) == 1)
 
+        disguised, model, _ = await browse([cell("cdp('Emulation.setUserAgentOverride', userAgent='Mozilla/5.0 Fake/1')\n"
+                                                 "goto_url('https://example.com/?disguised')\nimport time; time.sleep(1)"),
+                                            finish('never')])
+        check('a changed user agent is refused and ends the call refused_action',
+              'the navigation under it is refused, refused_action after 1 model call',
+              ((disguised.output or {}).get('stopped'), len(model.seen)),
+              (disguised.output or {}).get('stopped') == 'refused_action' and len(model.seen) == 1)
+
         good = {'title': 'Example Domain', 'link': 'https://example.com/?ref=guide#top', 'other': 'https://example.com/x?q=secret'}
         valid, _, _ = await browse([cell("goto_url('https://example.com/')"), calls(('finish', {'result': good, 'success': True}))],
                                    {'output_schema': SCHEMA})
@@ -520,4 +528,5 @@ async def main() -> None:
     print(json.dumps({'cases': cases}))
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())

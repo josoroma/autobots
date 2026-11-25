@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from autobots.contracts.primitives import LAX_CONTRACT, Identifier, UtcTimestamp, Version
 from autobots.contracts.tool_catalog import ToolGroupName
 from autobots.contracts.tool_fields import DomainName
+from autobots.domain.browsing import BrowserKind
 from autobots.domain.models import ModelProfileId
 from autobots.domain.tool_catalog import ToolGroup
 
@@ -31,6 +32,9 @@ class ExpertConfig(BaseModel):
     browse_domains: list[DomainName] = Field(
         default_factory=list, max_length=10, exclude_if=lambda domains: not domains
     )
+    # Decision 0038 Z1: the browser a `browse_goal` call of this Expert drives. Left out while it is
+    # the default, for the same reason.
+    browser: BrowserKind = Field(default="box", exclude_if=lambda browser: browser == "box")
 
     @field_validator("browse_domains")
     @classmethod
@@ -69,6 +73,7 @@ class ExpertConfigView(BaseModel):
     skills: list[str] = Field(default_factory=list)
     role_bindings: dict[str, ModelProfileId] = Field(default_factory=dict)
     browse_domains: list[str] = Field(default_factory=list, exclude_if=lambda domains: not domains)
+    browser: BrowserKind = Field(default="box", exclude_if=lambda browser: browser == "box")
 
 
 class ExpertVersionView(BaseModel):

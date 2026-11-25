@@ -15,6 +15,10 @@ the call is YOLO and browser-use reports qualified, Autobots' loop otherwise. Ve
 browser-use's limits (Y9), and the loop caps any limit at its own. browser-use's model calls reach a
 per-browse endpoint on the worker's loopback, each one admitted on the run's frozen `researcher`
 route through the middleware of the loop that made this tool call (Y7).
+
+The browser is the Expert's choice, apart from the engine (Decision 0038 Z1, Z5): the box's, or the
+stealth one. No input names it. A call of an Expert set to `stealth` is refused before any container
+starts while the stealth browser isn't qualified, and never falls back to the box (Z6).
 """
 
 import asyncio
@@ -36,10 +40,17 @@ from autobots.adapters.browser_executor import (
     ExecutorUnavailable,
     ModelLink,
     RequestGuard,
+    Stealth,
     executor_qualified,
 )
 from autobots.adapters.browser_page import CdpPage, PageUnavailable
-from autobots.adapters.browser_use_box import BoxCall, BoxModel, browse_in_box, browser_use_ready
+from autobots.adapters.browser_use_box import (
+    BoxCall,
+    BoxModel,
+    browse_in_box,
+    browser_use_ready,
+    stealth_ready,
+)
 from autobots.adapters.provider_http import fit
 from autobots.application import browsing_settings
 from autobots.application.artifacts import ObjectStore
@@ -123,6 +134,8 @@ class BrowsingRuntime:
     route: ModelRoute
     settle: float = 2.0
     browser_use: Callable[[], bool] = browser_use_ready
+    # Read at each call of an Expert set to the stealth browser, for the same reason.
+    stealth: Callable[[], bool] = stealth_ready
     # The run's private storage, which keeps each browser-use step's screenshot (Decision 0035 Y11).
     store: ObjectStore | None = None
 
@@ -152,9 +165,12 @@ async def _yolo(context: ToolContext) -> bool:
     return await browsing_settings.call_is_yolo(context.connection, context.scope.run_id)
 
 
-async def _typing(context: ToolContext) -> Mapping[str, Any]:
-    """The tool row's `typing`, shown beside its domains for a call that is YOLO (Y2)."""
-    return {"typing": "on"} if await _yolo(context) else {}
+async def _shown(context: ToolContext) -> Mapping[str, Any]:
+    """What the tool row shows beside the domains: `typing` for a call that is YOLO (Decision 0035
+    Y2), and `browser` for an Expert set to the stealth one (Decision 0038 Z1)."""
+    shown: dict[str, Any] = {"typing": "on"} if await _yolo(context) else {}
+    chosen = await browsing_settings.expert_browser(context.connection, context.scope.run_id)
+    return shown if chosen.kind == "box" else {**shown, "browser": chosen.kind}
 
 
 def _watched(watcher: asyncio.Task[str]) -> str | None:
@@ -228,13 +244,15 @@ async def _session(
     args: Arguments,
     context: ToolContext,
     model: ModelLink | None = None,
+    stealth: Stealth | None = None,
 ) -> BrowserSession:
     scope = context.scope
+    chosen: dict[str, Any] = {} if stealth is None else {"stealth": stealth}
     try:
         hosts = (str(scope.run_id), scope.generation, tuple(args.allowed_domains))
         if model is None:
-            return await runtime.executor.start(*hosts)
-        return await runtime.executor.start(*hosts, model)
+            return await runtime.executor.start(*hosts, **chosen)
+        return await runtime.executor.start(*hosts, model, **chosen)
     except ExecutorUnavailable:
         raise ToolFailed("executor_unavailable") from None
 
@@ -252,6 +270,18 @@ async def _close(
         await runtime.executor.stop(session)
 
 
+async def _stealth(runtime: BrowsingRuntime, context: ToolContext) -> Stealth | None:
+    """The stealth browser, when the run's Expert is set to it and it is qualified (Decision 0038
+    Z1, Z6). Nothing of the executor is touched before this refuses."""
+    chosen = await browsing_settings.expert_browser(context.connection, context.scope.run_id)
+    if chosen.kind == "box":
+        return None
+    # Off the event loop, for the same reason as browser-use's check.
+    if not await asyncio.to_thread(runtime.stealth):
+        raise ToolFailed("stealth_browser_unqualified")
+    return Stealth(chosen.timezone)
+
+
 async def _browse(runtime: BrowsingRuntime, args: Arguments, context: ToolContext) -> BrowseOutcome:
     middleware = current_middleware()
     if middleware is None:
@@ -264,13 +294,14 @@ async def _browse(runtime: BrowsingRuntime, args: Arguments, context: ToolContex
         refused = domain_refusal(args.allowed_domains, granted)
         if refused is not None:
             raise ToolFailed(refused)
+    stealth = await _stealth(runtime, context)
     # Off the event loop, as an expired image check runs `docker image inspect`.
     on_browser_use = yolo and await asyncio.to_thread(runtime.browser_use)
     limits = resolved_limits(args, on_browser_use=on_browser_use)
     await _sweep(runtime, context)
     if on_browser_use:
-        return await _on_browser_use(runtime, args, context, middleware, limits)
-    session = await _session(runtime, args, context)
+        return await _on_browser_use(runtime, args, context, middleware, limits, stealth)
+    session = await _session(runtime, args, context, stealth=stealth)
 
     async def alive() -> bool:
         return await attempt_alive(context.connection, scope)
@@ -343,6 +374,7 @@ async def _on_browser_use(
     context: ToolContext,
     middleware: AdmittingLoop,
     limits: Limits,
+    stealth: Stealth | None,
 ) -> BrowseOutcome:
     """One browse on browser-use in the box (Decision 0035 Y5 to Y11, `browser_use_box`)."""
     scope = context.scope
@@ -352,7 +384,7 @@ async def _on_browser_use(
         return await attempt_alive(context.connection, scope)
 
     async def start(model: ModelLink) -> BrowserSession:
-        return await _session(runtime, args, context, model)
+        return await _session(runtime, args, context, model, stealth)
 
     call = BoxCall(
         args.task,
@@ -442,7 +474,7 @@ def browse_tool(
             if version >= 3
             else ("stopped", "steps", "visited_count")
         ),
-        public_context=_typing,
+        public_context=_shown,
         # Read at each use, so withdrawing the qualification takes effect without a restart.
         qualified=qualified or (lambda: executor_ready()),
         expert_only=True,

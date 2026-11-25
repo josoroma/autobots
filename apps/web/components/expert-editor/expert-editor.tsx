@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 
 import { BrowseDomainsField } from "@/components/expert-editor/browse-domains-field";
+import { BrowserField } from "@/components/expert-editor/browser-field";
 import { ExecutorField } from "@/components/expert-editor/executor-field";
 import { GrantSummary } from "@/components/expert-editor/grant-summary";
 import { GroupGrants } from "@/components/expert-editor/group-grants";
@@ -86,7 +87,14 @@ function EditorLayout({
             groups={draft.groups}
           />
           {grantsBrowsing(draft) ? (
-            <BrowseDomainsField draft={draft} held={held} onChange={setDraft} />
+            <>
+              <BrowseDomainsField
+                draft={draft}
+                held={held}
+                onChange={setDraft}
+              />
+              <BrowserField draft={draft} held={held} onChange={setDraft} />
+            </>
           ) : null}
           <ExecutorField
             value={draft.executor}

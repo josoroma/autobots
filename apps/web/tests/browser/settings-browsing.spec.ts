@@ -165,6 +165,10 @@ test("the owner lists an Expert's browse domains in the editor, and saving makes
     const field = page.getByLabel("Browse domains");
     await expect(field).toHaveValue("");
     await field.fill("en.wikivoyage.org");
+    // US-20.1: the browser, set beside the domains (Decision 0038 Z1).
+    const browser = page.getByLabel("Browser", { exact: true });
+    await expect(browser).toHaveValue("box");
+    await browser.selectOption("stealth");
     await page.getByRole("button", { name: "Save revision" }).click();
     await expect(page.locator('[data-message="save"]')).toContainText(
       "Saved as version 2",
@@ -172,7 +176,7 @@ test("the owner lists an Expert's browse domains in the editor, and saving makes
     await expectNoA11yViolations(page);
     await page.goto("/experts");
     await expect(card.locator('[data-field="browse-domains"]')).toHaveText(
-      "Browses en.wikivoyage.org",
+      "Browses en.wikivoyage.org, on the stealth browser",
     );
     await expectNoA11yViolations(page);
     const saved = await getJson(page, {
@@ -182,6 +186,9 @@ test("the owner lists an Expert's browse domains in the editor, and saving makes
     expect(
       saved.versions.map((version) => version.config.browse_domains ?? []),
     ).toEqual([[], ["en.wikivoyage.org"]]);
+    expect(
+      saved.versions.map((version) => version.config.browser ?? "box"),
+    ).toEqual(["box", "stealth"]);
   } finally {
     const after = await switchOf();
     expect(

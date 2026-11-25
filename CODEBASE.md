@@ -65,7 +65,7 @@ Versions as recorded in the previous refresh (2026-11-06). Neither the manifests
 - **Infrastructure:**
   - `infra/disposable/compose.yaml` pins images by digest.
   - `infra/supabase/compose.overlay.yaml` binds the gateway and database to `127.0.0.1`.
-  - `infra/browser/browser.Dockerfile` uses the Playwright image by digest. `infra/browser/proxy.Dockerfile` runs the standard-library egress proxy on a Python base pinned by digest.
+  - `infra/browser/browser.Dockerfile` uses the Playwright image by digest, and `stealth.Dockerfile` (US-20.1, after the analyzed revision) the same image with Google Chrome. `infra/browser/proxy.Dockerfile` runs the standard-library egress proxy on a Python base pinned by digest.
 - **Makefile:** `make help`, `first-time`, `install`, `owner`, `build`, `migrate`, `start`/`stop` (stack, api, web, worker), `status`, `logs`, `check`.
   - It wraps `scripts/persistent_install.py`, and its header says it removes no container or volume.
   - Inference stays off unless `INFERENCE=enabled` is named on the command line.
@@ -261,6 +261,11 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
     - **Screenshots.** At each model request the worker captures the box's page into the run's private storage, beside a row in `app_private.browse_steps` (migration 66, `application/browse_steps.py`). Members read them through `GET /v1/runs/{run_id}/tool-uses/{use_id}/steps` and its screenshot route, and the run's tool row shows them (`components/runs/tool-uses/browse-steps.tsx`).
     - **The use id.** `ToolContext.use_id` carries the dispatch's tool-use row to a read.
     - **Version 3.** `browse_goal` version 3 adds `output_schema`, validated with `jsonschema` (`application/typed_results.py`), and outputs `result`, `submits` and `bot_check`.
+- **The stealth browser (US-20.1, after the analyzed revision):**
+  - **The choice.** `ExpertConfig.browser` (`domain/browsing.BrowserKind`) is left out while `box`. `browsing_settings.expert_browser` reads it, with the workspace's time zone, from the Expert version the run was admitted with.
+  - **The session.** `BrowserExecutor.start(stealth=Stealth(timezone))` starts `autobots-browser-stealth:local` with `TZ` and a 512-process cap. `browser-entrypoint.js` has both modes.
+  - **The call.** `browsing_tool._stealth` refuses `stealth_browser_unqualified` before any container. `browser_qualification.stealth_qualified` reads its own report, fingerprint and image label.
+  - **The guard.** `RequestGuard` refuses a request whose user agent isn't the browser's own, and counts a top-frame navigation under one.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
 - **Tracing:** `forbid_remote_tracing` turns inherited LangSmith and OTLP settings off.
