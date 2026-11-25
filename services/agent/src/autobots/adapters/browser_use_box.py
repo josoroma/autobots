@@ -15,6 +15,9 @@ requests that reach the browse's model endpoint (`model_endpoint`).
   a box that ignored its limit can't spend more.
 - **A bot check (Y10).** A CAPTCHA frame, a challenge page or a "sorry" address the guard saw
   refuses the next request with `bot_check`, which outranks `refused_action`.
+- **A check that may clear (Decision 0038 Z8).** On the stealth browser the next request waits,
+  before admission, while a page shows a check that needs nobody. One that outlasts its time is a
+  bot check.
 - **What it saw (Y11).** At each model request, before admission, the worker captures the page
   over its own connection: each step's view as the step began, and where a refused request
   stopped. It is for people only (Y16). browser-use closes its tabs when it stops, so nothing is
@@ -37,12 +40,13 @@ from typing import Any
 
 import websockets
 
-from autobots.adapters.browser_cdp import Cdp, RequestGuard
+from autobots.adapters.browser_cdp import Cdp, Patience, RequestGuard
 from autobots.adapters.browser_executor import (
     BrowserExecutor,
     BrowserSession,
     ExecutorUnavailable,
     ModelLink,
+    Stealth,
 )
 from autobots.adapters.browser_qualification import browser_use_qualified, stealth_qualified
 from autobots.adapters.model_endpoint import Answer, EndpointRefused, ModelEndpoint, Reply
@@ -95,6 +99,7 @@ class BoxWatch:
     max_calls: int
     refused: Callable[[], bool]
     bot_check: Callable[[], bool] = lambda: False
+    settle: Callable[[], Awaitable[None]] | None = None
     model_calls: int = 0
     requests: int = 0
     stopped: str | None = None
@@ -129,6 +134,8 @@ def guarded(
         watch.requests += 1
         if before is not None:
             await before()
+        if watch.stopped is None and watch.settle is not None:
+            await watch.settle()
         if watch.stopped is None and watch.bot_check():
             watch.stopped = "bot_check"
         elif watch.stopped is None and (watch.refused() or notices_refusal(body)):
@@ -230,6 +237,8 @@ class BoxCall:
     max_seconds: int
     grace: int
     output_schema: Mapping[str, Any] | None = None
+    # The stealth browser, when the call's Expert is set to it (Decision 0038 Z1).
+    stealth: Stealth | None = None
 
     def spec(self) -> dict[str, Any]:
         spec: dict[str, Any] = {
@@ -239,6 +248,8 @@ class BoxCall:
             "max_steps": self.max_steps,
             "max_seconds": self.max_seconds,
         }
+        if self.stealth is not None:
+            spec["stealth"] = True
         if self.output_schema is not None:
             # The worker keeps link fields' queries itself, so the model never sees the extension.
             schema = {k: v for k, v in self.output_schema.items() if k != "x-link-fields"}
@@ -308,10 +319,18 @@ async def browse_in_box(
         if recorder:
             await recorder[0].take()
 
+    async def settle() -> None:
+        for guard in guards:
+            await guard.settle()
+
+    watched: dict[str, Any] = (
+        {} if call.stealth is None else {"patience": Patience(call.stealth.challenge_hosts)}
+    )
     watch = BoxWatch(
         max_calls=call.max_steps + 1,
         refused=lambda: any(g.refusals() for g in guards),
         bot_check=lambda: any(g.bot_checks for g in guards),
+        settle=None if call.stealth is None else settle,
     )
     answer = guarded(admitted(model.middleware, model.model, model.route), watch, step_ended)
     async with ModelEndpoint(answer) as endpoint:
@@ -324,7 +343,7 @@ async def browse_in_box(
         cdp: Cdp | None = None
         try:
             cdp = await Cdp.connect(await session.websocket_url())
-            guard = RequestGuard(cdp, submits=True)
+            guard = RequestGuard(cdp, submits=True, **watched)
             await guard.start()
             guards.append(guard)
             recorder.append(_Steps(cdp, guard, steps))
@@ -349,7 +368,7 @@ async def browse_in_box(
                 watch,
                 refused=guard.refusals() > 0,
                 visited=visited(guard.navigated),
-                bot_check=bool(guard.bot_checks),
+                bot_check=bool(guard.bot_checks) or (bool(watched) and bool(guard.checking)),
                 submits=tuple(guard.submitted),
             )
         except (ConnectionError, OSError, TimeoutError, websockets.WebSocketException):

@@ -162,6 +162,8 @@ An Expert that grants `browse_goal` drives the box's headless Chromium unless th
 - **No fallback.** While it isn't qualified, a call is refused `stealth_browser_unqualified` before any container starts (Z6).
 - **512 processes.** Headed Chrome reaches 256 on an ordinary page, so its container's cap is higher. The other caps are the box's (Z4).
 
+**Checks (US-20.2).** On browser-use and the stealth browser, a check that is the page gets 20 seconds to clear by itself while the model waits, and one that stays stops the call `bot_check` (Z8). A Turnstile frame isn't a check. A reCAPTCHA, hCaptcha or Arkose frame stops the call at first sight (Z9). Pages may load parts from `challenges.cloudflare.com`, `captcha-delivery.com` and `datadome.co`, never go to one (Z7). Nothing solves a check. browser-use is told never to press or answer one, and **that instruction isn't enforced on a Turnstile widget** (Z10).
+
 **Moving to a newer Chrome.** Google's package source keeps few old versions, so a first build can fail when the pinned one is gone, and a browser that meets hostile pages must be kept patched. Read the current version and SHA-256 from Google's own index, put both in `infra/browser/stealth.Dockerfile`, then build and qualify again:
 
 ```sh

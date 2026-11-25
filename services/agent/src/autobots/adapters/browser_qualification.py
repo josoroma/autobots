@@ -165,8 +165,21 @@ REQUIRED_STEALTH_CASES = (
     "the stealth browser says what it is, and names nothing it isn't",
     "a stealth Expert's browse runs on the stealth browser, and its tool row says so",
     "each stealth session starts with a fresh profile",
+    "Chrome applies the box's managed policy",
     "a stealth Expert is refused while the stealth browser isn't qualified, before any container",
     "a changed user agent is refused and ends the call refused_action",
+    # US-20.2: challenge hosts, and checks that clear, stay or ask a person.
+    "a challenge host loads as a part of a page, and going to it as a page ends the call "
+    "refused_action",
+    "a check that is the page clears by itself, with no model call meanwhile, and the browse goes "
+    "on",
+    "a check that stays ends the call bot_check after its time, with nothing solved or retried",
+    "a Turnstile frame on a page isn't a check, and one that asks a person ends the call bot_check "
+    "at first sight",
+    "nothing solves a check: browser-use is told never to answer one, no request carries an image "
+    "and no other host is reached",
+    "the box's browser is unchanged: a check ends the call at first sight and the challenge hosts "
+    "stay refused",
 )
 
 # Each tag's fingerprint label, or None when the image or its label is missing.

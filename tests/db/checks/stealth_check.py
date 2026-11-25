@@ -1,16 +1,21 @@
-"""The stealth browser live on a disposable stack, Decision 0038 Z1 to Z6 and Z13: what it says it is, which browser and
-engine each Expert's call runs on, its refusal while it isn't qualified, and a changed user agent. JSON cases, whose ids
-are among browser_qualification.REQUIRED_STEALTH_CASES.
+"""The stealth browser live on a disposable stack, Decision 0038 Z1 to Z10 and Z13: what it says it is, which browser and
+engine each Expert's call runs on, its refusal while it isn't qualified, a changed user agent, and checks that clear,
+stay or ask a person. JSON cases, whose ids are among browser_qualification.REQUIRED_STEALTH_CASES.
 
 browse_goal goes through the real gateway, approvals, admission, model endpoint, relay and executor. The model is
 scripted, so no inference provider is called. The browser reaches only Decision 0018's qualification hosts. The
 executor's own refusals on this image are tests/db/checks/browser_executor_check.py, run with `stealth`.
+
+No real bot check is met. Each is arranged on https://example.com/ by its address alone, and the challenge host is
+arranged as example.org (Decision 0018).
 """
 from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
+import time
 from typing import Any
 from uuid import UUID
 
@@ -48,8 +53,29 @@ screen: [screen.width, screen.height], languages: [...navigator.languages], webd
 zone: Intl.DateTimeFormat().resolvedOptions().timeZone, renderer: e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : null}; })()"""
 LEAVE = "(() => { localStorage.setItem('left', 'here'); document.cookie = 'left=here; max-age=3600'; return true; })()"
 FOUND = "[localStorage.getItem('left'), document.cookie]"
+POLICIES = ('DownloadRestrictions', 'AllowFileSelectionDialogs', 'PasswordManagerEnabled', 'AutofillCreditCardEnabled',
+            'AutofillAddressEnabled')
+WALK = ("(()=>{function w(n,o){if(!n)return;if(n.shadowRoot)w(n.shadowRoot,o);for(const c of n.childNodes){"
+        "if(c.nodeType===3&&c.textContent.trim())o.push(c.textContent.trim());w(c,o);}}const o=[];w(document.body,o);return o.join(' | ')})()")
 DISGUISE = ("cdp('Emulation.setUserAgentOverride', userAgent='Mozilla/5.0 Fake/1')\n"
             "goto_url('https://example.com/?disguised')\nimport time; time.sleep(1)")
+
+# The challenge host these checks arrange, and pages that show a check by its address alone.
+CHALLENGE = 'example.org'
+HOME = "goto_url('https://example.com/')\n"
+CHL = 'https://example.com/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1'
+# A check that is the page: the script a Cloudflare challenge loads from the site's own host.
+SHOWS = ("js(\"(()=>{const s=document.createElement('script');s.src='%s';document.head.appendChild(s);%s return 'ok'})()\")\n"
+         'import time; time.sleep(1)')
+CLEARS = SHOWS % (CHL, "setTimeout(()=>{location.href='https://example.com/?cleared'},6000);")
+STAYS = SHOWS % (CHL, '')
+FRAME = "js(\"document.body.insertAdjacentHTML('beforeend','<iframe src=%s></iframe>'); 'ok'\")\nimport time; time.sleep(2)"
+TURNSTILE = FRAME % 'https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if'
+PERSON = FRAME % '/recaptcha/api2/bframe?k=x'
+PARTS = (FRAME % 'https://example.org/') + (
+    "\njs(\"(()=>{const s=document.createElement('script');s.src='https://example.org/x.js';document.head.appendChild(s);return 'ok'})()\")"
+    '\ntime.sleep(2)')
+AS_A_PAGE = "js(\"location.href='https://example.org/'\")\nimport time; time.sleep(2)"
 
 
 async def offline(executor: Watching, *expressions: str) -> list[Any]:
@@ -98,6 +124,22 @@ async def fresh_profile(rig: Rig) -> None:
     found = await offline(rig.executor, FOUND)
     rig.cases.check('each stealth session starts with a fresh profile', 'what one session stored is in no later one',
                     (left[:2], found), left[1] == ['here', 'left=here'] and found[0] == [None, ''] and found[1] == [])
+
+
+async def policies(rig: Rig) -> None:
+    session = await rig.executor.start('stealth', 1, (), stealth=Stealth(ZONE))
+    try:
+        cdp = await Cdp.connect(await session.websocket_url())
+        target = (await cdp.send('Target.createTarget', {'url': 'chrome://policy'}))['result']['targetId']
+        page = (await cdp.send('Target.attachToTarget', {'targetId': target, 'flatten': True}))['result']['sessionId']
+        await asyncio.sleep(3)
+        shown = (await cdp.send('Runtime.evaluate', {'expression': WALK, 'returnByValue': True}, page))['result']['result']['value']
+        await cdp.close()
+    finally:
+        await rig.executor.stop(session)
+    applied = [name for name in POLICIES if re.search(rf'{name} \| (3|false) \| Platform \| Machine \| Mandatory \| (OK|Deprecated)', shown)]
+    rig.cases.check("Chrome applies the box's managed policy", 'downloads, file selection, the password manager and card and address autofill off',
+                    applied, applied == list(POLICIES))
 
 
 async def either_engine(rig: Rig) -> None:
@@ -160,11 +202,108 @@ async def changed_user_agent(rig: Rig) -> None:
         and not any('disguised' in url for url in guard.navigated))
 
 
-SCENARIOS = (says_what_it_is, fresh_profile, either_engine, no_fallback, changed_user_agent)
+def reached(rig: Rig, since: int) -> tuple[list[str], list[str]]:
+    """The hosts the sessions started after `since` reached, and those their proxies refused."""
+    entries = [entry for name in rig.executor.sessions[since:] for entry in rig.executor.logs[name]]
+    return (sorted({str(entry['host']) for entry in entries if entry.get('event') == 'allowed'}),
+            sorted({str(entry['host']) for entry in entries if entry.get('event') == 'refused'}))
+
+
+async def parts_only(rig: Rig) -> None:
+    before = len(rig.executor.sessions)
+    parts = await rig.browse('stealth', cell(HOME + PARTS), finish('Read.'))
+    loaded, _ = reached(rig, before)
+    Recorded.made.clear()
+    page = await rig.browse('stealth', cell(HOME + AS_A_PAGE), finish('never'))
+    rig.cases.check(
+        'a challenge host loads as a part of a page, and going to it as a page ends the call refused_action',
+        'the frame and script reach it and the call goes on; the navigation is refused, refused_action after 1 model call',
+        (parts.output.get('stopped'), loaded, page.output.get('stopped'), len(page.model.seen), Recorded.made[-1].navigated),
+        parts.output.get('stopped') == 'done' and loaded == ['example.com', 'example.org']
+        and page.output.get('stopped') == 'refused_action' and len(page.model.seen) == 1
+        and not any('example.org' in url for url in Recorded.made[-1].navigated))
+
+
+async def check_clears(rig: Rig) -> None:
+    moments: list[float] = []
+
+    def shown() -> Any:
+        moments.append(time.monotonic())
+        return cell(HOME + CLEARS)
+
+    def after() -> Any:
+        moments.append(time.monotonic())
+        return cell("print(page_info()['url'])")
+
+    cleared = await rig.browse('stealth', shown, after, finish('Read.'))
+    waited = moments[1] - moments[0]
+    rig.cases.check(
+        'a check that is the page clears by itself, with no model call meanwhile, and the browse goes on',
+        'the second request answered only after the page moved on, 6 to 20 seconds later, then done with 3 model calls',
+        (round(waited, 1), cleared.output.get('stopped'), cleared.output.get('model_calls'), last_result(cleared.model)[-120:]),
+        6 <= waited < 20 and cleared.output.get('stopped') == 'done' and cleared.output.get('model_calls') == 3
+        and '?cleared' in last_result(cleared.model))
+
+
+async def check_stays(rig: Rig) -> None:
+    began = time.monotonic()
+    stays = await rig.browse('stealth', cell(HOME + STAYS), finish('never'))
+    took = time.monotonic() - began
+    rig.cases.check(
+        "a check that stays ends the call bot_check after its time, with nothing solved or retried",
+        'bot_check after 20 seconds and 1 model call', (stays.output.get('stopped'), round(took, 1), len(stays.model.seen)),
+        stays.output.get('stopped') == 'bot_check' and took >= 20 and len(stays.model.seen) == 1)
+
+
+async def widget_and_person(rig: Rig) -> None:
+    widget = await rig.browse('stealth', cell(HOME + TURNSTILE), finish('Read.'))
+    began = time.monotonic()
+    person = await rig.browse('stealth', cell(HOME + PERSON), finish('never'))
+    took = time.monotonic() - began
+    rig.cases.check(
+        "a Turnstile frame on a page isn't a check, and one that asks a person ends the call bot_check at first sight",
+        'done beside the Turnstile frame; bot_check after 1 model call, without the wait',
+        (widget.output.get('stopped'), person.output.get('stopped'), len(person.model.seen), round(took, 1)),
+        widget.output.get('stopped') == 'done' and person.output.get('stopped') == 'bot_check' and len(person.model.seen) == 1
+        and took < 20)
+
+
+async def nothing_solves(rig: Rig) -> None:
+    before = len(rig.executor.sessions)
+    met = await rig.browse('stealth', cell(HOME + PERSON), finish('never'))
+    told = flat([[str(message.content) for message in messages] for messages in met.model.seen])
+    pictures = any(isinstance(message.content, list) and any(part.get('type') != 'text' for part in message.content)
+                   for messages in met.model.seen for message in messages)
+    allowed, _ = reached(rig, before)
+    rig.cases.check(
+        'nothing solves a check: browser-use is told never to answer one, no request carries an image and no other host is reached',
+        'told, no image, only the call\'s domain and the arranged challenge host',
+        ('Never press, type into or answer a CAPTCHA' in told, pictures, allowed, rig.executor.specs[-1].get('stealth')),
+        'Never press, type into or answer a CAPTCHA' in told and not pictures and set(allowed) <= {'example.com', 'example.org'}
+        and rig.executor.specs[-1].get('stealth') is True)
+
+
+async def box_unchanged(rig: Rig) -> None:
+    before = len(rig.executor.sessions)
+    began = time.monotonic()
+    ended = [(await rig.browse('box', cell(HOME + show), finish('never'))).output.get('stopped') for show in (TURNSTILE, STAYS)]
+    took = time.monotonic() - began
+    parts = await rig.browse('box', cell(HOME + FRAME % 'https://example.org/'), finish('Read.'))
+    _, refused = reached(rig, before)
+    rig.cases.check(
+        "the box's browser is unchanged: a check ends the call at first sight and the challenge hosts stay refused",
+        'bot_check twice without the wait, and example.org refused by the proxy',
+        (ended, round(took, 1), parts.output.get('stopped'), refused),
+        ended == ['bot_check', 'bot_check'] and took < 40 and 'example.org' in refused and parts.output.get('stopped') == 'done')
+
+
+SCENARIOS = (says_what_it_is, fresh_profile, policies, either_engine, no_fallback, changed_user_agent, parts_only, check_clears, check_stays,
+             widget_and_person, nothing_solves, box_unchanged)
 
 
 async def main(cases: Cases) -> None:
     os.environ[browsing_tool.ENABLE] = 'enabled'
+    browsing_tool.CHALLENGE_HOSTS = (CHALLENGE,)  # type: ignore[assignment]  # arranged
     record_guards()
     executor = Watching({**os.environ, **WORKER_SECRETS})
     async with await psycopg.AsyncConnection.connect(URL, autocommit=True) as db:

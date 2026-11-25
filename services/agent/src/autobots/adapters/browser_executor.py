@@ -33,7 +33,7 @@ from uuid import UUID
 
 import httpx
 
-from autobots.adapters.browser_cdp import Cdp, RequestGuard
+from autobots.adapters.browser_cdp import CHALLENGE_HOSTS, Cdp, RequestGuard
 from autobots.adapters.browser_qualification import (
     BROWSER,
     BROWSER_USE,
@@ -44,10 +44,11 @@ from autobots.adapters.browser_qualification import (
 )
 from autobots.application.browser_leases import attempt_alive, lease_alive
 
-# Cdp, RequestGuard and executor_qualified are named here too, because browsing_tool and
-# browser_page import them from this module; attempt_alive and lease_alive, because
-# tests/db/checks/browser_executor_check.py does.
+# CHALLENGE_HOSTS, Cdp, RequestGuard and executor_qualified are named here too, because
+# browsing_tool and browser_page import them from this module; attempt_alive and lease_alive,
+# because tests/db/checks/browser_executor_check.py does.
 __all__ = [
+    "CHALLENGE_HOSTS",
     "LABEL",
     "BrowserExecutor",
     "BrowserSession",
@@ -104,9 +105,11 @@ class ModelLink:
 
 @dataclass(frozen=True)
 class Stealth:
-    """The stealth browser for one session (Decision 0038 Z2, Z3): the workspace's time zone."""
+    """The stealth browser for one session (Decision 0038 Z2, Z3): the workspace's time zone, and
+    the challenge hosts its pages may load parts from, which only browser-use is given (Z7)."""
 
     timezone: str = "UTC"
+    challenge_hosts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -175,7 +178,8 @@ class BrowserExecutor:
         """`allowed_hosts` are the only hosts the browser may reach, with their subdomains. With
         `model`, the sidecar also relays the box's chat completions to the worker's endpoint. With
         `stealth`, the browser is the stealth one."""
-        for host in allowed_hosts:
+        reachable = allowed_hosts if stealth is None else allowed_hosts + stealth.challenge_hosts
+        for host in reachable:
             if not host or any(mark in host for mark in "/, \t") or host.startswith("."):
                 raise ExecutorUnavailable("allowed_host_malformed")
         name = f"autobots-browser-{secrets.token_hex(6)}"
@@ -207,7 +211,7 @@ class BrowserExecutor:
                 "-e", f"AUTOBOTS_BROWSER_HOST={name}-browser",
                 "-e", f"AUTOBOTS_MAX_REQUESTS={self.config.max_requests}",
                 "-e", f"AUTOBOTS_MAX_BYTES={self.config.max_bytes}",
-                "-e", f"AUTOBOTS_ALLOWED_HOSTS={','.join(allowed_hosts)}",
+                "-e", f"AUTOBOTS_ALLOWED_HOSTS={','.join(reachable)}",
                 self.config.proxy_image,
             )  # fmt: skip
             await self._docker(

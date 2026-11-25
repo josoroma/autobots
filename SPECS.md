@@ -778,13 +778,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-20.1#8 | Show that nothing is seeded with `stealth` (Z14). Checked by the db profile's disposable fixtures (`concept_seed_check`). | DONE | US-20.1 |
 | US-20.1#9 | Amend PRD-Tool-Catalog BX-01, BX-05, AB-02 and AB-03, and PRD-Studio EX-01 with the editor, as Decision 0038's "Requirements revised" lists. Checked by reading each against Z1, Z2, Z4, Z6 and Z13. | DONE | US-20.1 |
 | US-20.1#10 | Update the operations runbook (building, qualifying, moving with Chrome's version, reversal), `README.md`, `README-DEV.md` and `CODEBASE.md`. They say building the image accepts Google's terms for Chrome, that the owner reads a site's terms before listing it on a stealth Expert, and that the stealth browser is not for YouTube or Google (Z2, Z14). Checked by reading each against Z1 to Z6, Z13 and Z14. | DONE | US-20.1 |
-| US-20.2 | A check that clears by itself | READY | EPIC-20 |
-| US-20.2#1 | Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org. | TODO | US-20.2 |
-| US-20.2#2 | On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model. | TODO | US-20.2 |
-| US-20.2#3 | Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts. | TODO | US-20.2 |
-| US-20.2#4 | Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook. | TODO | US-20.2 |
-| US-20.2#5 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.2 |
-| US-20.2#6 | Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10. | TODO | US-20.2 |
+| US-20.2 | A check that clears by itself | DONE | EPIC-20 |
+| US-20.2#1 | Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org. | DONE | US-20.2 |
+| US-20.2#2 | On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model. | DONE | US-20.2 |
+| US-20.2#3 | Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts. | DONE | US-20.2 |
+| US-20.2#4 | Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook. | DONE | US-20.2 |
+| US-20.2#5 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | DONE | US-20.2 |
+| US-20.2#6 | Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10. | DONE | US-20.2 |
 | US-20.3 | Quiet on the page | READY | EPIC-20 |
 | US-20.3#1 | Turn browser-use's highlights off on stealth only (Z11). Checked by pytest under `services/agent/tests` and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
 | US-20.3#2 | Read each step's presses and typing from an isolated world the page can't see: up to ten elements by action, kind and label, never the typed value (Z11). Checked by pytest under `services/agent/tests` with a planted value, and by `scripts/qualify_browser_executor.py` on a disposable stack. | TODO | US-20.3 |
@@ -793,7 +793,7 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-20.3#5 | On stealth, keep steps at least 2 seconds apart on both engines, and run one browse of a site at a time across the install. A second waits within its own time limit or ends `max_seconds`, and a site is free again when its browse ends, is cancelled or loses its lease (Z12, BX-04). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures with scripted browses. | TODO | US-20.3 |
 | US-20.3#6 | Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts. | TODO | US-20.3 |
 | US-20.3#7 | Amend PRD-Tool-Catalog AB-01, and PRD-Studio for the run's tool row, as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z11 and Z12. | TODO | US-20.3 |
-| US-20.4 | A scoreboard the owner runs | BLOCKED | EPIC-20 |
+| US-20.4 | A scoreboard the owner runs | READY | EPIC-20 |
 | US-20.4#1 | Add `scripts/browser_scoreboard.py`, which opens each address the owner names once for each browser, with no model, and records `opened`, `check`, `blocked` or `error`, the bytes and the seconds, keeping hosts only (Z15). Checked by a harness test under `tests/harness` with scripted openings. | TODO | US-20.4 |
 | US-20.4#2 | Show that no verification profile runs it. Checked by a harness test under `tests/harness`. | TODO | US-20.4 |
 | US-20.4#3 | Run it on `https://example.com/` and `https://example.org/` only, and record what was observed. Checked by its output and the egress proxy's log. | TODO | US-20.4 |
@@ -9977,7 +9977,8 @@ Open Questions:
 
 ### US-20.2: A check that clears by itself
 
-Status: READY
+Status: DONE
+Change: `openspec/changes/archive/2026-11-25-us-20-2-check-that-clears-itself/`
 
 As a workspace owner
 I want a check that needs no person to finish
@@ -10047,12 +10048,12 @@ Dependencies:
 - US-20.1
 
 Tasks:
-- [ ] Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org.
-- [ ] On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model.
-- [ ] Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts.
-- [ ] Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook.
-- [ ] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
-- [ ] Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10.
+- [x] Keep the challenge hosts as a fixed list in code, reachable as parts of a page by a session of browser-use on stealth only. Refuse a top-frame navigation to one and end the call `refused_action` (Z5, Z7). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with a challenge host arranged as example.org.
+- [x] On browser-use and stealth, tell a check that is the page (Google's "sorry" page, a Cloudflare challenge on the site's own host, a DataDome frame) from a Turnstile frame, which isn't a check, and from a reCAPTCHA, hCaptcha or Arkose one, which ends the call at first sight (Z8, Z9). `box` keeps its present rule (AB-04). Checked by pytest under `services/agent/tests` with fixture pages and a scripted model.
+- [x] Give a check that is the page 20 seconds to clear, holding the model's next request before admission. Then continue, or end the call `bot_check` (Z8). Checked by pytest under `services/agent/tests`, and by `scripts/qualify_browser_executor.py` with checks arranged on the qualification hosts.
+- [x] Tell browser-use on stealth never to press or answer a check, and record that this isn't enforced on a Turnstile widget (Z10). Checked by pytest under `services/agent/tests` and by reading the runbook.
+- [x] Add these to the stealth browser's required cases, and qualify again what the changed files bind. Checked by `scripts/qualify_browser_executor.py` on disposable stacks, reaching only the qualification hosts.
+- [x] Amend PRD-Tool-Catalog BX-03 and AB-04 as Decision 0038's "Requirements revised" lists. Update the operations runbook, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against Z7 to Z10.
 
 Open Questions:
 - None.
@@ -10135,7 +10136,7 @@ Open Questions:
 
 ### US-20.4: A scoreboard the owner runs
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want to open the addresses I name once in each browser and see which open

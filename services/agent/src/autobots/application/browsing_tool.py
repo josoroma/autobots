@@ -26,7 +26,7 @@ import contextlib
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 import websockets
 
 from autobots.adapters.browser_executor import (
+    CHALLENGE_HOSTS,
     BrowserExecutor,
     BrowserSession,
     Cdp,
@@ -374,11 +375,13 @@ async def _on_browser_use(
     context: ToolContext,
     middleware: AdmittingLoop,
     limits: Limits,
-    stealth: Stealth | None,
+    chosen: Stealth | None,
 ) -> BrowseOutcome:
     """One browse on browser-use in the box (Decision 0035 Y5 to Y11, `browser_use_box`)."""
     scope = context.scope
     domains = list(args.allowed_domains)
+    # Only browser-use on the stealth browser reaches the challenge hosts (Decision 0038 Z7).
+    stealth = None if chosen is None else replace(chosen, challenge_hosts=CHALLENGE_HOSTS)
 
     async def alive() -> bool:
         return await attempt_alive(context.connection, scope)
@@ -394,6 +397,7 @@ async def _on_browser_use(
         limits.seconds,
         GRACE_SECONDS,
         args.output_schema if isinstance(args, BrowseGoalV3Input) else None,
+        stealth,
     )
     return await browse_in_box(
         runtime.executor,

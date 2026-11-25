@@ -17,7 +17,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from autobots.adapters.browser_cdp import RequestGuard
+from autobots.adapters.browser_cdp import CHALLENGE_HOSTS, RequestGuard
 from autobots.adapters.browser_executor import BrowserExecutor, BrowserSession, Stealth
 from autobots.adapters.browser_page import CdpPage
 from autobots.adapters.browser_qualification import (
@@ -275,12 +275,15 @@ def browse_call(
     return engine[0], executor
 
 
-@pytest.mark.parametrize(("on", "engine"), [(True, "browser_use"), (False, "loop")])
+@pytest.mark.parametrize(
+    ("on", "engine", "hosts"),
+    [(True, "browser_use", CHALLENGE_HOSTS), (False, "loop", ())],
+)
 def test_either_engine_drives_the_experts_browser(
-    monkeypatch: pytest.MonkeyPatch, on: bool, engine: str
+    monkeypatch: pytest.MonkeyPatch, on: bool, engine: str, hosts: tuple[str, ...]
 ) -> None:
     ran, executor = browse_call(monkeypatch, on=on, browser="stealth")
-    assert ran == engine and executor.started == [Stealth("America/Costa_Rica")]
+    assert ran == engine and executor.started == [Stealth("America/Costa_Rica", hosts)]
     ran, executor = browse_call(monkeypatch, on=on, browser=None)
     assert ran == engine and executor.started == [None]
 

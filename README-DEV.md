@@ -321,6 +321,7 @@ make browser-images && python3.12 scripts/qualify_browser_executor.py
   - **Qualified apart.** The same command's last phase writes `.checks/browser-executor/stealth.json` (`--stealth` runs only that). While it isn't qualified, a stealth Expert's call is refused `stealth_browser_unqualified`, with no fallback.
   - **The browser's own user agent.** On both browsers the worker's guard refuses a request under another one. A top-frame navigation under one ends the call `refused_action`.
   - **Not for YouTube or Google,** and nothing is seeded with it (Z14).
+  - **Checks (US-20.2, Z7 to Z10).** `browser_cdp.Patience` makes the guard of a stealth browse on browser-use wait up to 20 seconds, before the next model request is admitted, for a check that is the page to clear. `CHALLENGE_HOSTS` load as parts of a page only. A Turnstile frame isn't a check, and one that asks a person ends the call `bot_check` at once. On the box, and on the loop, nothing of this applies.
 - **Typing, bot checks and typed results (US-17.4):**
   - **Submitting.** On browser-use the worker's guard also lets `POST` with a body and `OPTIONS` through on `https`, and records each form submission as host and path.
   - **Bot checks.** A CAPTCHA frame or challenge page stops the call `bot_check`.

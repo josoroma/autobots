@@ -266,6 +266,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - **The session.** `BrowserExecutor.start(stealth=Stealth(timezone))` starts `autobots-browser-stealth:local` with `TZ` and a 512-process cap. `browser-entrypoint.js` has both modes.
   - **The call.** `browsing_tool._stealth` refuses `stealth_browser_unqualified` before any container. `browser_qualification.stealth_qualified` reads its own report, fingerprint and image label.
   - **The guard.** `RequestGuard` refuses a request whose user agent isn't the browser's own, and counts a top-frame navigation under one.
+  - **Checks (US-20.2, after the analyzed revision).** `browser_cdp.is_the_page` and `asks_a_person` tell checks apart for a guard with `Patience`. `RequestGuard.settle` is awaited by `browser_use_box.guarded` before admission. `Stealth.challenge_hosts` joins the sidecar's allowed hosts for browser-use on the stealth browser only.
 - **Supabase:** Auth, Storage and PostgREST, self-hosted and loopback-bound.
 - **MCP:** `langchain-mcp-adapters` is pinned but not imported under `src/`.
 - **Tracing:** `forbid_remote_tracing` turns inherited LangSmith and OTLP settings off.
