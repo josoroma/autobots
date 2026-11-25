@@ -107,7 +107,7 @@ Nothing checks a key against its provider automatically, because that costs a re
 
 The isolated browser executor ([Decision 0018](../decisions/0018-browser-executor.md), US-14.13) runs one disposable Chromium container per browsing call, behind an egress sidecar that is its only way out and the only door to its DevTools. `browse_goal` uses it, and stays disabled until the executor is qualified at the current code and turned on (below).
 
-Build the images on this Mac, through the one build entry point. The browser image starts from the Playwright 1.64.1 image pinned by digest, and the proxy from the Python 3.12.16 image (`python:3.12.16-slim-bookworm`) pinned by digest, so a build pulls a base only if it is absent. A third image, `autobots-browser-use:local`, holds browser-use 1.0.6 ([Decision 0035](../decisions/0035-browser-use-typing-and-transcripts.md) Y8): the same Playwright image, with its own environment installed by uv (copied from uv's official image, pinned by digest) from `services/browser-use/uv.lock` only:
+Build the images on this Mac, through the one build entry point. The browser image starts from the Playwright 1.65.1 image pinned by digest (Chromium 159.0.8154.6, which carries the fix for CVE-2026-125350), and the proxy from the Python 3.12.16 image (`python:3.12.16-slim-bookworm`) pinned by digest, so a build pulls a base only if it is absent. A third image, `autobots-browser-use:local`, holds browser-use 1.0.6 ([Decision 0035](../decisions/0035-browser-use-typing-and-transcripts.md) Y8): the same Playwright image, with its own environment installed by uv (copied from uv's official image, pinned by digest) from `services/browser-use/uv.lock` only:
 
 ```sh
 make browser-images

@@ -128,7 +128,7 @@ class Build(unittest.TestCase):
     def test_each_base_image_is_pinned_by_digest_and_names_its_version(self) -> None:
         browser = (ROOT / 'infra/browser/browser.Dockerfile').read_text()
         proxy = (ROOT / 'infra/browser/proxy.Dockerfile').read_text()
-        self.assertIn('Playwright (1.64.1)', browser)
+        self.assertIn('Playwright (1.65.1)', browser)
         self.assertRegex(proxy, r'Python 3\.12\.16 \(python:3\.12\.16-slim-bookworm\)')
         for text in (browser, proxy):
             self.assertEqual(len(re.findall(r'(?m)^FROM \S+@sha256:[0-9a-f]{64}$', text)), 1)

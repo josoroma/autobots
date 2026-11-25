@@ -3,7 +3,7 @@
 # `make browser-images` from services/browser-use, labelled with browser-use's own fingerprint. uv comes from
 # its official image, by digest, and installs only what the lock names.
 FROM ghcr.io/astral-sh/uv@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
-FROM mcr.microsoft.com/playwright@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+FROM mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /opt/browser-use
 COPY pyproject.toml uv.lock ./

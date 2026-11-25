@@ -18,6 +18,8 @@ from qualification.records import ModelTransport, VerificationClass
 # A step's deadline unless it names its own; the harness suite has used up to 27 of its 60 seconds (XTOL-16).
 SHORT = 120.0
 LONG = 600.0
+# The identity qualifier runs every browser suite and the slice; it took 615 seconds alone on 2026-11-25.
+IDENTITY_SECONDS = 900.0
 HARNESS_SECONDS = 60.0
 # A step whose test selection is a tuple takes each item as its own argument.
 SPREAD = '{toolchain_offline}'
@@ -109,9 +111,9 @@ APPLICATION_STEPS = (
 )
 
 
-def qualifier(step_id: str, script: str, *arguments: str, transport: ModelTransport = 'none') -> CheckStep:
+def qualifier(step_id: str, script: str, *arguments: str, transport: ModelTransport = 'none', timeout: float = LONG) -> CheckStep:
     """A disposable qualifier: it starts and removes its own Docker projects, and says when one can't start."""
-    return CheckStep(step_id, ('{python}', script, *arguments), timeout=LONG, klass='disposable', transport=transport,
+    return CheckStep(step_id, ('{python}', script, *arguments), timeout=timeout, klass='disposable', transport=transport,
                      self_reporting=True)
 
 
@@ -131,7 +133,7 @@ PROFILES: dict[str, Profile] = {profile.id: profile for profile in (
     Profile('db', (qualifier('disposable_qualification', 'scripts/disposable_db.py', 'qualify'),
                    qualifier('supabase_stack_qualification', 'scripts/supabase_stack.py', 'qualify'),
                    qualifier('app_db_qualification', 'scripts/app_db.py', 'qualify', transport='mock'),
-                   qualifier('identity_qualification', 'scripts/qualify_identity.py', transport='mock'),
+                   qualifier('identity_qualification', 'scripts/qualify_identity.py', transport='mock', timeout=IDENTITY_SECONDS),
                    qualifier('persistent_apply_qualification', 'scripts/qualify_persistent_apply.py')),
             'Harness checks plus the pinned release and the application migrations and seeds, on disposable targets',
             ('the persistent database', 'Claude event delivery', 'OpenRouter inference', 'complete H0/H1'), docker=True),
