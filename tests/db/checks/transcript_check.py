@@ -125,8 +125,8 @@ def transcribing(result: dict[str, Any] | None) -> list[Any]:
     sections = [item for k, section in enumerate(SECTIONS) for item in (
         calls(('read_run_file', {'path': TIMED, 'offset': 60 * k, 'limit': 60})),
         calls(('append_to_file', {'path': PROSE, 'content': section})))]
-    return [plan, browse, *sections, calls(('publish_artifact', {'path': PROSE, 'version': len(SECTIONS)})),
-            calls(('publish_artifact', {'path': TIMED, 'version': 1})),
+    return [plan, browse, *sections, calls(('publish_artifact', {'path': TIMED, 'version': 1})),
+            calls(('publish_artifact', {'path': PROSE, 'version': len(SECTIONS)})),
             calls(('complete_task', {'task_id': 't', 'evidence': [{'kind': 'artifact', 'reference': PROSE}], 'summary': 'published'})),
             say('Published transcript.md and transcript-timed.md.')]
 
@@ -278,6 +278,11 @@ async def main() -> None:
               sorted(files) == ['transcript-timed.md', 'transcript.md'] and prose == ''.join(SECTIONS)
               and f'# {TITLE}' in content and f'Source: {VIDEO}' in content and len(content) > 48_000
               and len(timed) == len(LINES) and timed == [f"{line['time']} {line['text']}" for line in LINES])
+        last = await value("select payload ->> 'name' from public.run_events where run_id = any(%s) "
+                           "and payload ->> 'type' = 'artifact.published' order by occurred_at desc, sequence desc limit 1",
+                           await children(transcribed))
+        check("the prose is the run's result", 'the timed file is published first, so the last published file is transcript.md',
+              last, last == 'transcript.md')
         everything = ' '.join(str(getattr(message, 'tool_calls', '')) for messages in model.seen for message in messages)
         reads = await (await db.execute(
             "select u.input_public, u.output_public from app_private.tool_uses u where u.tool_id = 'read_run_file' "

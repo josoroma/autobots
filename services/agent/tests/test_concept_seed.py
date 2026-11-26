@@ -172,6 +172,8 @@ def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_prose()
         "Never write two sections in one call",
         "keeps every point",
         "guess who is speaking",
+        "Publish the timed file first, then <outputs>/transcript.md",
+        "so the prose is the run's result",
         "Never sign in, comment",
     ):
         assert step in TRANSCRIPT_INSTRUCTIONS, step
