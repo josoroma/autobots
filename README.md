@@ -12,6 +12,7 @@
 
 <p align="center">
   <b>Product overview</b> ·
+  <a href="https://josoroma.github.io/autobots/">Website</a> ·
   <a href="README-DEV.md">Developer guide</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="README-Deep-Research-Content-Writer.md">Deep research, live</a> ·
@@ -44,14 +45,14 @@ Autobots is a studio for autonomous agents that runs on your Mac. You describe a
 ## Superpowers
 
 <p align="center">
-  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 37 tools in 14 groups, Experts and workflows, local by design." width="100%">
+  <img src="docs/assets/readme/superpowers.svg" alt="Six superpowers: runs that survive, spending you control, asks before it acts, 38 tools in 14 groups, Experts and workflows, local by design." width="100%">
 </p>
 
 - **Runs that survive.** A worker claims each run under a lease. Every checkpoint is fenced to that lease, so a crash, a restart or a sleeping Mac resumes the run instead of forking it. Each request carries a receipt, so a retry never starts a second run.
 - **Spending you control.** Pick US$0.25 to US$5.00 per run, never above what's left of the daily cap. Every model call reserves its worst-case cost before it's sent, and a call that can't be priced doesn't go out.
 - **Asks before it acts.** Opening a pull request or filing an issue needs an approval every time. The approval binds the exact arguments and diffs you saw, and a changed request needs a new one. Browsing asks too, unless you turn on its YOLO setting in Settings → Browsing (on by default). Then a browse starts without asking and runs browser-use in the isolated box, which may press, type and submit, but only on the domains its Expert lists. A bot check stops it, and each step keeps a screenshot you can open from the run's tool row. An Expert can drive the **stealth browser** instead, real headed Google Chrome in the same box, which opens some sites that refuse a headless browser and makes none of them allow automation: read a site's terms before listing it.
-- **37 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
-- **Experts and workflows.** Seven Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer, Google bot and Deep research writer. Seven workflows: Weekly competitor brief, Monthly FX note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence and Deep research content writer. An agent can hand work to a specialist, a workflow's agent steps read each other's published work, and a routine can run a goal on a schedule.
+- **38 tools in 14 groups.** Web search through Jina, Tavily and Google (through SerpApi), page extraction and site crawling, GitHub, run files, code, CSV and market data, and a browser that runs in its own container. The owner can switch tools, or whole groups, off for the workspace.
+- **Experts and workflows.** Eight Experts: Research analyst, Market watcher, Brief writer, Issue triager, Code maintainer, Google bot, Deep research writer and Transcript reader. Eight workflows: Weekly competitor brief, Monthly FX note, Nightly test triage, Interview synthesis, Release notes from merged PRs, Vendor due diligence, Deep research content writer and Transcript. An agent can hand work to a specialist, a workflow's agent steps read each other's published work, and a routine can run a goal on a schedule.
 - **Local by design.** The web app, API and worker run natively on your Mac, and Supabase runs in Docker, every port on loopback. Stored keys are encrypted. What leaves your Mac is what OpenRouter needs, to validate your key and run the model calls, and the calls of the tools you granted.
 
 ## How it works
@@ -88,19 +89,35 @@ One app for the whole loop, dark by default in the shadcn Luma theme:
 - **Build:** Experts, Workflows with drafts and executions, and Tools with the catalog and its switches.
 - **System:** Operations health, Models for the OpenRouter key and the model each role uses, and Settings for Keys & vars, appearance, notifications and your account.
 
-## See it work: deep research
+## See it work
+
+<p align="center">
+  <img src="docs/site/images/three-live-runs.png" alt="Experts. Workflows. Runs. Three live runs: Deep research, with 17 numbered sources, 49 tool calls and US$0.45 for the whole workflow. Market watcher Costa Rica, with 4 markets tracked, every figure from a tool and US$0.07 or less per run. YouTube transcript, polished, with 320 caption lines, 8,049 words of prose and US$0.16 per run." width="100%">
+</p>
+
+Three real runs on the owner's install, each at its real cost.
+
+### Deep research
 
 Give the Deep research writer a topic and it works like [Deep-Research-Content-Writer](https://github.com/josoroma/Deep-Research-Content-Writer): up to 30 Google results, the best pages read and numbered as sources, and one cited guide with a report on how well it went. As a workflow, a second agent then reads that work back, checks every citation against the saved excerpts and corrects what they don't support, and the result waits for your approval.
 
 On this Mac, for "langchain for deep agents", the Expert wrote a 12-source guide for US$0.52, and the workflow a 17-source guide, checked and corrected, for US$0.45. It took five attempts, and each failure led to a fix. [Deep research, live](README-Deep-Research-Content-Writer.md) tells the whole story, with every count and cost as observed. The video [Autonomous agents that do real work, on your own Mac](https://www.youtube.com/watch?v=i6JhWdaDm98) shows these runs in the Studio, from the Expert to the approval.
 
+### Market watcher Costa Rica
+
+An Expert made on the owner's install reads the colón against the dollar and the euro, Brent crude and arabica coffee, works out what moved over a month and a year, and explains it in Costa Rican Spanish. Every figure comes from a tool, never from the model's memory. Its Expert run cost US$0.061958, and the same Expert as a workflow step US$0.068171. [Market watcher Costa Rica, live](README-Market-Watcher-Costa-Rica.md) has the instructions and both runs.
+
+### YouTube transcript, polished
+
+The Transcript reader turns a YouTube address into readable prose. One browse in the isolated browser opens the video's transcript and the worker saves all its caption lines to `transcript-timed.md`, so the model retypes none of them. The model then reads that file 60 lines at a time and adds one polished section after each read to `transcript.md`, keeping the speaker's words and order. For a 44-minute video that made 320 caption lines into 8,049 words of prose in six sections, for US$0.155325. [YouTube transcript, live](README-YouTube-Transcript.md) tells how it got there, from a bot check to the polished result.
+
 ## By the numbers
 
 <p align="center">
-  <img src="docs/assets/readme/by-the-numbers.svg" alt="122 of 122 stories delivered, 38 agent tools in 14 groups, 7 Experts plus 7 workflows, 70 API paths, 64 SQL migrations, 44 browser suites with accessibility checks." width="100%">
+  <img src="docs/assets/readme/by-the-numbers.svg" alt="135 of 135 stories delivered, 38 agent tools in 14 groups, 8 Experts plus 8 workflows, 74 API paths, 67 SQL migrations, 46 browser suites with accessibility checks." width="100%">
 </p>
 
-Counted from the repository on 2026-11-19. Every story in [SPECS.md](SPECS.md) traces to its source requirements and was delivered as one [OpenSpec](openspec/) change, with its scenarios checked.
+Counted from the repository on 2026-11-26. Every story in [SPECS.md](SPECS.md) traces to its source requirements and was delivered as one [OpenSpec](openspec/) change, with its scenarios checked.
 
 ## Quick start
 
@@ -144,7 +161,7 @@ The engineering is held to the same standard as the agents:
 |---|---|
 | [README-DEV.md](README-DEV.md) | The developer guide: install, local URLs, architecture, conventions and how work is delivered |
 | [Deep research, live](README-Deep-Research-Content-Writer.md) | How Autobots researches and writes like Deep-Research-Content-Writer, as an Expert and as a workflow, and what its live runs did |
-| [YouTube transcript, live](README-YouTube-Transcript.md) | The Transcript reader Expert and workflow on browser-use, and its live runs: a YouTube bot check stopped the first, the second read the page and saved nothing, and the third, with `browse_goal` saving the file itself, published the whole transcript |
+| [YouTube transcript, live](README-YouTube-Transcript.md) | The Transcript reader Expert and workflow on browser-use, and its five live runs: a bot check stopped the first, the second saved nothing, the third saved every timed line, and the last two polished them into prose a section at a time |
 | [Market watcher Costa Rica, live](README-Market-Watcher-Costa-Rica.md) | An Expert and a workflow that turn the colón, oil and coffee into a short note in Costa Rican Spanish, and their two live runs |
 | [SPECS.md](SPECS.md) | The backlog: epics, stories, acceptance scenarios and status |
 | [CODEBASE.md](CODEBASE.md) | What the repository contains today |
@@ -155,4 +172,4 @@ The engineering is held to the same standard as the agents:
 
 ## Status
 
-All 122 stories in [SPECS.md](SPECS.md) are delivered and checked on this Mac. The [US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads the H1 baseline as met, with its stated limits, and release stays the owner's decision. Passing a check profile is not product acceptance, and the docs say which is which. [research/](research/) keeps the evaluations behind earlier designs, including local models that the current design doesn't use.
+All 135 stories in [SPECS.md](SPECS.md) are delivered and checked on this Mac. The [US-10.2 release record](docs/engineering/evidence/US-10.2/summary.md) reads the H1 baseline as met, with its stated limits, and release stays the owner's decision. Passing a check profile is not product acceptance, and the docs say which is which. [research/](research/) keeps the evaluations behind earlier designs, including local models that the current design doesn't use.

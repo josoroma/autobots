@@ -49,7 +49,7 @@ The worker claims and runs admitted jobs only when `AUTOBOTS_WORKER_INFERENCE=en
   - `templates/` and `prerequisite-inventory.md`.
 - **Design:** `docs/design/luma.css`, `docs/design/studio-extensions.css`, and the concept images in `docs/imagine/`.
 - **Research:** `research/`. `research/upstream/` is git-ignored (`.gitignore:7`) and is not repository input.
-- **No CI:** `.github/` has no tracked files, and no other CI configuration was found.
+- **No CI:** no check runs in CI. After the analyzed revision, `.github/workflows/pages.yml` publishes `docs/site/`, the project's one-page GitHub Pages site, on a push to `main` that changes it; it runs no check.
 
 ## Runtime and Tooling
 

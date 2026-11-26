@@ -16,7 +16,7 @@
 
 The Transcript reader turns a YouTube watch address into `transcript.md`, the video's captions as polished prose, and `transcript-timed.md`, every caption line with its timestamp ([Decision 0040](docs/engineering/decisions/0040-polished-transcript.md)). It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
 
-This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript.
+This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript, and [two more](#two-polished-runs-on-2026-11-26) polished it into prose.
 
 ## Contents
 
@@ -31,6 +31,7 @@ This page records the first live run, on the owner's install on 2026-11-20. That
   - [What it cost](#what-it-cost)
 - [A second run, on 2026-11-25](#a-second-run-on-2026-11-25)
 - [A third run, on 2026-11-25](#a-third-run-on-2026-11-25)
+- [Two polished runs, on 2026-11-26](#two-polished-runs-on-2026-11-26)
 - [What this shows, and what it doesn't](#what-this-shows-and-what-it-doesnt)
 - [Where it is defined](#where-it-is-defined)
 
@@ -140,6 +141,28 @@ After US-21.1, the install ran commit `dc75422`, and the owner saved Transcript 
 
 **Cost.** US$0.051799, against the US$0.25 budget.
 
+## Two polished runs, on 2026-11-26
+
+After US-22.1 the owner authorized a run that polishes the same 44-minute video into prose, up to US$0.75, and a second one to record it for a film. Both ran on the box's browser within the same four hosts, around 02:35 and 03:15 UTC.
+
+| | Run 4 | Run 5 |
+|---|---|---|
+| **Install** | Commit `71a554b`, Transcript reader version 4 | Commit `0e76a90`, Transcript reader version 5 |
+| **Execution** | `58e97526…` | `c776d40f…` |
+| **Browse** | `done` in 12 steps, with no bot check. The worker saved 320 lines to `transcript-timed.md` | `done`, with no bot check. 320 lines saved |
+| **Polishing** | Six reads of 60 lines with `read_run_file`, and after each an `append_to_file` call: `transcript.md` versions 1 to 6. No `save_artifact` | The same, six reads and six adds |
+| **Published** | `transcript.md`, then `transcript-timed.md` | `transcript-timed.md`, then `transcript.md` |
+| **Prose** | 8,068 words, 91 paragraphs | 8,049 words, 87 paragraphs |
+| **Cost** | US$0.161306, in 31 model calls | US$0.155325 |
+
+**What changed between them.** Run 4 published the prose first, so its run page showed the timed file as the Result, since the page shows the newest published file. Commit `0e76a90` changed the instructions to publish the timed file first. The owner saved them as version 5, with a Purpose that names both files, and run 5's Result is the prose. The step ran for about three and a half minutes.
+
+**The prose.** It was checked without printing it:
+- **The words.** Runs 4 and 5 kept 8,068 and 8,049 of the captions' 8,074 words. Nothing was summarised.
+- **The numbers.** Every number in the captions is in the prose, 73 of them in run 4.
+- **The layout.** No timestamps. The title and the source address are at the top, with the note that the text is edited from YouTube's own captions.
+- **Not compared word for word.** The captions had almost no "um" or "uh" to remove, so most of the polishing is punctuation, capitals and paragraphs.
+
 ## What this shows, and what it doesn't
 
 **It shows:**
@@ -147,9 +170,11 @@ After US-21.1, the install ran commit `dc75422`, and the owner saved Transcript 
 - **The domains.** Only the Expert's four hosts were requested.
 - **The bot check.** A real bot check stopped the browse at once, nothing was published, and the screenshots were kept.
 - **A whole transcript.** In the third run the worker saved every caption line itself, and the model published the file without a line passing through it ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)).
+- **Polished prose.** In runs 4 and 5 the model wrote the prose a section at a time with `append_to_file`, and kept all but 25 of the captions' words ([Decision 0040](docs/engineering/decisions/0040-polished-transcript.md)).
 
 **It doesn't show:**
-- **That it works every time.** YouTube refused the first run before any page loaded, and may refuse a later one. The third run is one success on one video.
+- **That it works every time.** YouTube refused the first run before any page loaded, and may refuse a later one. Runs 3 to 5 are successes on one video.
+- **That the prose is faithful.** A model can drop or change a sentence. The timed file is published beside it, to check against.
 - **The no-transcript path, live.** It and the bot check are covered by checks with a scripted model and scripted browses (`tests/db/checks/transcript_check.py`).
 - **H1 or product acceptance.**
 
@@ -172,5 +197,5 @@ No transcript text appears here. A video's captions are its creator's work (Deci
   - [`adapters/browser_use_box.py`](services/agent/src/autobots/adapters/browser_use_box.py) runs the browse and judges it.
   - [`adapters/browser_cdp.py`](services/agent/src/autobots/adapters/browser_cdp.py) holds the guard, with its submits and bot-check signals.
   - [`services/browser-use/`](services/browser-use) is the box's runner and lock.
-- **The checks.** [`tests/db/checks/transcript_check.py`](tests/db/checks/transcript_check.py) covers the seed, the pattern, a long published transcript nothing retyped, no transcript and a bot check. [`tests/db/checks/browser_use_check.py`](tests/db/checks/browser_use_check.py) is browser-use's qualification, run by `scripts/qualify_browser_executor.py`.
+- **The checks.** [`tests/db/checks/transcript_check.py`](tests/db/checks/transcript_check.py) covers the seed, the pattern, a long transcript saved with nothing retyped and polished in sections, the prose as the run's result, no transcript and a bot check. [`tests/db/checks/browser_use_check.py`](tests/db/checks/browser_use_check.py) is browser-use's qualification, run by `scripts/qualify_browser_executor.py`.
 - **The specs.** [`openspec/specs/transcript-reader`](openspec/specs/transcript-reader/spec.md), [`openspec/specs/browser-use-typing`](openspec/specs/browser-use-typing/spec.md) and [`openspec/specs/browser-use-engine`](openspec/specs/browser-use-engine/spec.md).
