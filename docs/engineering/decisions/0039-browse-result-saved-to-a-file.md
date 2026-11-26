@@ -26,7 +26,7 @@ This amends [Decision 0035](0035-browser-use-typing-and-transcripts.md) Y12 and 
 | **V6. When it isn't saved** | `not_saved` says why, and the result comes back as version 3's does: `no_items` when a layout's array is empty, `too_large` past a run file's 256,000 characters, and `lease_lost` when the attempt has ended or its use was never recorded. A call that ends any other way than `done` saves nothing, and `not_saved` is empty |
 | **V7. A repeat browses again** | As today, a browse repeated after a crash browses again. It saves a new version, and an earlier one stays as it was. The output names the version the call wrote |
 | **V8. The Transcript reader** | The seeded instructions save with `save`, then publish, and say never to retype a line. Its tools, its empty browse domains and its `box` browser are unchanged (Y14, [Decision 0038](0038-local-stealth-browser.md) Z14). The seed keeps what exists (Decision 0034 S1), so an Expert already seeded changes only when its owner saves a new version |
-| **V9. Not in this decision** | Saving another tool's output, adding to an existing file, and layouts beyond V2. Each needs its own decision |
+| **V9. Not in this decision** | Saving another tool's output, adding to an existing file, and layouts beyond V2. Each needs its own decision. [Decision 0040](0040-polished-transcript.md) decides adding to a file, and amends V8 |
 
 ## Requirements revised
 

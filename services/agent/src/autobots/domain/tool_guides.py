@@ -119,6 +119,12 @@ TOOL_GUIDES: dict[str, ToolGuide] = {
         "Whenever the run produces something worth keeping, such as a report or a draft.",
         "Work is kept, versioned and citable as evidence.",
     ),
+    # Decision 0040 P1.
+    "append_to_file": ToolGuide(
+        "Adds text to the end of a file under outputs/ as a new version.",
+        "When a document is longer than one reply, to write it a section at a time.",
+        "Nothing is retyped or lost: each section is added to what is already there.",
+    ),
     "publish_artifact": ToolGuide(
         "Publishes a saved file of this run as a verified private artifact.",
         "When a saved file is the run's deliverable.",

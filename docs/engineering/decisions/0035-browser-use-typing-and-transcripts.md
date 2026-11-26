@@ -78,4 +78,4 @@ Uncheck the setting, which returns browsing to the read-only loop with approval 
 
 [Decision 0038](0038-local-stealth-browser.md) amends Y10 and Y11 for an Expert set to the `stealth` browser: its Z3 and Z8 to Z11. For `box`, the default, both stand as written. Its Z13 enforces Y10's "no other user agent" on both.
 
-[Decision 0039](0039-browse-result-saved-to-a-file.md) amends Y12 and Y14: from `browse_goal` version 4 a typed result can be saved straight to a file, and the seeded Transcript reader saves that way.
+[Decision 0039](0039-browse-result-saved-to-a-file.md) amends Y12 and Y14: from `browse_goal` version 4 a typed result can be saved straight to a file, and the seeded Transcript reader saves that way. [Decision 0040](0040-polished-transcript.md) amends Y14 again: the reader publishes polished prose beside the timed file.

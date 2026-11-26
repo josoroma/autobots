@@ -35,6 +35,7 @@ from autobots.application.tool_definitions import (
     ToolRuntime,
 )
 from autobots.application.tools import (
+    APPEND_TO_FILE,
     CALCULATE,
     READ_CSV,
     READ_RUN_FILE,
@@ -58,6 +59,7 @@ def tool_definitions(
         READ_RUN_FILE_V2,
         READ_CSV,
         SAVE_ARTIFACT,
+        APPEND_TO_FILE,
         STORE_REMOTE_FILE,
         SEARCH_MEMORY,
         READ_OFFLOAD,

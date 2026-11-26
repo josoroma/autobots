@@ -753,6 +753,7 @@ test("US-14.9: up to five text files attach to a goal as run inputs, and the res
     .map((tool) => tool.tool_id)
     .sort();
   expect(files).toEqual([
+    "append_to_file",
     "publish_artifact",
     "read_artifact",
     "read_csv",

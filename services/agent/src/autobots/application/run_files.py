@@ -68,36 +68,69 @@ async def by_operation(context: ToolContext) -> RunFile | None:
     return None if row is None else run_file_of(row)
 
 
+async def _locked(context: ToolContext, path: str) -> None:
+    """Inside a write's transaction: the lease, then a lock that serializes writers to this path,
+    so two writes can't take one version and an add reads the version it extends."""
+    if path.startswith("inputs/"):
+        raise ToolFailed("inputs_read_only")
+    await hold_lease(context.connection, context.scope)
+    await context.connection.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"{context.scope.run_id}|{path}",),
+    )
+
+
 async def write(context: ToolContext, path: str, content: str, media_type: str) -> tuple[int, str]:
     """A new version of a run file under this attempt's operation ID, fenced by the lease. Its
     version and digest. `inputs/` is read-only."""
-    if path.startswith("inputs/"):
-        raise ToolFailed("inputs_read_only")
-    digest = hashlib.sha256(content.encode()).hexdigest()
     async with context.connection.transaction():
-        await hold_lease(context.connection, context.scope)
-        # Serializes writers to this path, so two saves can't take one version.
-        await context.connection.execute(
-            "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-            (f"{context.scope.run_id}|{path}",),
-        )
+        await _locked(context, path)
         (version,) = await one(
             context.connection,
             "select coalesce(max(version), 0) + 1 from app_private.run_files "
             "where run_id = %s and path = %s",
             (context.scope.run_id, path),
         )
-        await context.connection.execute(
-            "insert into app_private.run_files (run_id, path, version, content, sha256, "
-            "media_type, operation_id) values (%s, %s, %s, %s, %s, %s, %s)",
-            (
-                context.scope.run_id,
-                path,
-                version,
-                content,
-                digest,
-                media_type,
-                context.operation_id,
-            ),
+        return await _insert(context, path, version, content, media_type)
+
+
+async def append(context: ToolContext, path: str, content: str, limit: int) -> tuple[RunFile, int]:
+    """`content` added to the end of the latest version, as the next one under this attempt's
+    operation ID, read and written under one lock (Decision 0040 P1, P2). A missing file starts
+    empty, as Markdown. The new version and the length of its whole content. Past `limit`
+    characters it is refused `file_too_large`, and nothing is written."""
+    async with context.connection.transaction():
+        await _locked(context, path)
+        row = await optional_row(
+            context.connection,
+            RunFileRow,
+            f"select {_COLUMNS} from app_private.run_files "
+            "where run_id = %s and path = %s order by version desc limit 1",
+            (context.scope.run_id, path),
         )
+        before = RunFile(0, "", "", "text/markdown") if row is None else run_file_of(row)
+        whole = before.content + content
+        if len(whole) > limit:
+            raise ToolFailed("file_too_large")
+        version, digest = await _insert(context, path, before.version + 1, whole, before.media_type)
+    return RunFile(version, digest, whole, before.media_type), len(whole)
+
+
+async def _insert(
+    context: ToolContext, path: str, version: int, content: str, media_type: str
+) -> tuple[int, str]:
+    digest = hashlib.sha256(content.encode()).hexdigest()
+    await context.connection.execute(
+        "insert into app_private.run_files (run_id, path, version, content, sha256, "
+        "media_type, operation_id) values (%s, %s, %s, %s, %s, %s, %s)",
+        (
+            context.scope.run_id,
+            path,
+            version,
+            content,
+            digest,
+            media_type,
+            context.operation_id,
+        ),
+    )
     return version, digest

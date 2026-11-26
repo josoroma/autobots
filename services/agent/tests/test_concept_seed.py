@@ -150,11 +150,11 @@ def test_the_deep_research_workflow_reviews_its_first_step_and_needs_google() ->
     assert "google_search" in available_tools({"SERPAPI_API_KEY": "fake-serpapi-key"}, tools)
 
 
-def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_one_file() -> None:
-    """Decision 0035 Y13 and Y14: its grants, its purpose's hosts and terms, and its instructions'
-    browse, stops and file."""
+def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_prose() -> None:
+    """Decision 0035 Y13 and Y14 and Decision 0040 P3 to P6: its grants, its purpose's hosts and
+    terms, and its instructions' browse, stops, sections and files."""
     expert = next(item for item in EXPERTS if item.name == "Transcript reader")
-    assert expert.tools == ("browse_goal", "save_artifact", "publish_artifact")
+    assert expert.tools == ("browse_goal", "read_run_file", "append_to_file", "publish_artifact")
     for host in ("youtube.com", "ytimg.com", "ggpht.com", "gstatic.com", "googlevideo.com"):
         assert host in expert.purpose and host in TRANSCRIPT_INSTRUCTIONS, host
     assert "never googlevideo.com" in expert.purpose and "terms" in expert.purpose
@@ -163,9 +163,15 @@ def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_one_fil
         '"Show transcript"',
         "bot_check",
         "no transcript",
-        "transcript.md",
+        "<outputs>/transcript.md",
+        "<outputs>/transcript-timed.md",
         "Source: ",
         "YouTube's own captions",
+        "60 lines at a time",
+        "one append_to_file call",
+        "Never write two sections in one call",
+        "keeps every point",
+        "guess who is speaking",
         "Never sign in, comment",
     ):
         assert step in TRANSCRIPT_INSTRUCTIONS, step
@@ -178,9 +184,8 @@ def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_one_fil
         "save": json.loads(TRANSCRIPT_SAVE.replace("<outputs>", "outputs/child-1")),
     }
     save = BrowseGoalV4Input.model_validate(args).save
-    assert save is not None and save.path == "outputs/child-1/transcript.md"
+    assert save is not None and save.path == "outputs/child-1/transcript-timed.md"
     assert TRANSCRIPT_SAVE in TRANSCRIPT_INSTRUCTIONS
-    assert "Never retype" in TRANSCRIPT_INSTRUCTIONS
     assert "save_artifact" not in TRANSCRIPT_INSTRUCTIONS
     config = ExpertConfig(
         purpose=expert.purpose, instructions=expert.instructions, tools=list(expert.tools)

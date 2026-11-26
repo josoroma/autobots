@@ -75,6 +75,9 @@ EXPERT_TOOLS: Final[Mapping[str, int]] = MappingProxyType(
         # Reads a published artifact of the workspace, so a workflow step reads an earlier one's
         # work. Only an Expert grants it, never a plain goal (Decision 0034 A3).
         "read_artifact": 1,
+        # Adds to the end of a run file, so a document longer than one reply is written a section
+        # at a time. Only an Expert grants it (Decision 0040 P1).
+        "append_to_file": 1,
         # Code tools over the run's own files, for Experts that do code-shaped work (Decision 0017).
         "search_files": 1,
         "read_code_file": 1,

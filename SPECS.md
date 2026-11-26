@@ -165,6 +165,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-20.4: A scoreboard the owner runs](#us-204-a-scoreboard-the-owner-runs)
 - [EPIC-21: A browse's typed result saved straight to a file](#epic-21-a-browses-typed-result-saved-straight-to-a-file)
   - [US-21.1: A browse's result saved straight to a file](#us-211-a-browses-result-saved-straight-to-a-file)
+- [EPIC-22: A polished transcript, written a section at a time](#epic-22-a-polished-transcript-written-a-section-at-a-time)
+  - [US-22.1: The Transcript reader publishes polished prose](#us-221-the-transcript-reader-publishes-polished-prose)
 
 ## Work Item Status
 
@@ -808,6 +810,15 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-21.1#4 | Have the Transcript reader's seeded instructions save with `save`, then publish, and never retype a line, with its tools, empty browse domains and `box` browser unchanged and an Expert already seeded kept (V8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`). | DONE | US-21.1 |
 | US-21.1#5 | Amend PRD-Tool-Catalog AB-05, PRD-Studio SD-02's Transcript reader row, and Decision 0035 Y12 and Y14, as Decision 0039's "Requirements revised" lists. Checked by reading each against V1 to V8. | DONE | US-21.1 |
 | US-21.1#6 | Update `README-YouTube-Transcript.md`, `README-DEV.md`'s typed results, `browse_goal`'s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`. | DONE | US-21.1 |
+| EPIC-22 | A polished transcript, written a section at a time | — | — |
+| US-22.1 | The Transcript reader publishes polished prose | DONE | EPIC-22 |
+| US-22.1#1 | Add `append_to_file` version 1 in the Files group. Its contract takes `path` under `outputs/` and `content`, and returns `path`, `version`, `sha256` and `characters`. Its writer in `application/run_files.py` reads the latest version and writes the next under one lock and the run's lease. A missing file is created as `text/markdown`, an existing one keeps its media type, and a file past 256,000 characters fails `file_too_large` with nothing written. It keeps a receipt, and its readback goes by operation, as `save_artifact`'s does (P1, P2). Checked by pytest under `services/agent/tests`, and `contract_drift` in the fast profile. | DONE | US-22.1 |
+| US-22.1#2 | Register it in `adapters/tool_registry.py`, grant it only in `domain/tools.EXPERT_TOOLS`, add it to `domain/execution.TOOL_VERSIONS` and its digest to `services/agent/tests/fixtures/tool_schema_versions.json`, keep file content out of its public fields (TU-04), and give it a guide in `domain/tool_guides.py` (TG-01). Checked by pytest under `services/agent/tests`. | DONE | US-22.1 |
+| US-22.1#3 | Change the Transcript reader's seed. It grants `browse_goal`, `read_run_file`, `append_to_file` and `publish_artifact`, without `save_artifact`, and keeps its empty browse domains, the `box` browser, and an Expert already seeded. Its instructions save the browse as `transcript-timed.md`, read it 60 lines at a time, add one polished section per read to `transcript.md`, open the first section with the title, the source address and the note, and publish both. They also state P5's rules on polishing. Update the reader's description and the Transcript workflow's description, which name one timed file (P3 to P6). Checked by pytest under `services/agent/tests`. | DONE | US-22.1 |
+| US-22.1#4 | Extend the db profile's `tests/db/checks/transcript_check.py` for P3 to P6, with a scripted model and scripted browses. Add a db check for adding to a file, for P1 and P2, on disposable fixtures. Checked by the db profile. | DONE | US-22.1 |
+| US-22.1#5 | Keep PRD-Tool-Catalog FI-03 and its `append_to_file` row. Amend PRD-Studio SD-02's Transcript reader row to name its tools and both files. Keep Decision 0035's and Decision 0039's links to Decision 0040. All of this follows Decision 0040's "Requirements revised" list. Checked by reading each against P1 to P6. | DONE | US-22.1 |
+| US-22.1#6 | Update `README-YouTube-Transcript.md` with both files, the reader's tools, the added calls (P7), and that a reader already seeded changes only when its owner saves a new version. Update `README-DEV.md` and `CODEBASE.md`. Checked by reading each against P1 to P8. | DONE | US-22.1 |
+| US-22.1#7 | Show that the Tools page and the Expert editor list `append_to_file` in the Files group from the catalog, with no change to the web app's source. Checked by the web unit tests. | DONE | US-22.1 |
 
 ## Dependency Diagram
 
@@ -988,6 +999,9 @@ flowchart TD
   end
   subgraph EPIC_21["EPIC-21: A browse&#x27;s typed result saved straight to a file"]
     US_21_1["US-21.1: A browse&#x27;s result saved straight to a file"]
+  end
+  subgraph EPIC_22["EPIC-22: A polished transcript, written a section at a time"]
+    US_22_1["US-22.1: The Transcript reader publishes polished prose"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1350,6 +1364,7 @@ flowchart TD
   US_20_2 -.-> US_20_4
   US_17_4 -.-> US_21_1
   US_17_5 -.-> US_21_1
+  US_21_1 -.-> US_22_1
 ```
 
 ```mermaid
@@ -2575,6 +2590,27 @@ flowchart TD
     US_21_1 --> T_21_1_5
     T_21_1_6["US-21.1#6: Update `README-YouTube-Transcript.md`, `README-DEV.md`&#x27;s typed results, `browse_goal`&#x27;s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`."]
     US_21_1 --> T_21_1_6
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_22["EPIC-22 tasks"]
+    US_22_1["US-22.1: The Transcript reader publishes polished prose"]
+    T_22_1_1["US-22.1#1: Add `append_to_file` version 1 in the Files group. Its contract takes `path` under `outputs/` and `content`, and returns `path`, `version`, `sha256` and `characters`. Its writer in `application/run_files.py` reads the latest version and writes the next under one lock and the run&#x27;s lease. A missing file is created as `text/markdown`, an existing one keeps its media type, and a file past 256,000 characters fails `file_too_large` with nothing written. It keeps a receipt, and its readback goes by operation, as `save_artifact`&#x27;s does (P1, P2). Checked by pytest under `services/agent/tests`, and `contract_drift` in the fast profile."]
+    US_22_1 --> T_22_1_1
+    T_22_1_2["US-22.1#2: Register it in `adapters/tool_registry.py`, grant it only in `domain/tools.EXPERT_TOOLS`, add it to `domain/execution.TOOL_VERSIONS` and its digest to `services/agent/tests/fixtures/tool_schema_versions.json`, keep file content out of its public fields (TU-04), and give it a guide in `domain/tool_guides.py` (TG-01). Checked by pytest under `services/agent/tests`."]
+    US_22_1 --> T_22_1_2
+    T_22_1_3["US-22.1#3: Change the Transcript reader&#x27;s seed. It grants `browse_goal`, `read_run_file`, `append_to_file` and `publish_artifact`, without `save_artifact`, and keeps its empty browse domains, the `box` browser, and an Expert already seeded. Its instructions save the browse as `transcript-timed.md`, read it 60 lines at a time, add one polished section per read to `transcript.md`, open the first section with the title, the source address and the note, and publish both. They also state P5&#x27;s rules on polishing. Update the reader&#x27;s description and the Transcript workflow&#x27;s description, which name one timed file (P3 to P6). Checked by pytest under `services/agent/tests`."]
+    US_22_1 --> T_22_1_3
+    T_22_1_4["US-22.1#4: Extend the db profile&#x27;s `tests/db/checks/transcript_check.py` for P3 to P6, with a scripted model and scripted browses. Add a db check for adding to a file, for P1 and P2, on disposable fixtures. Checked by the db profile."]
+    US_22_1 --> T_22_1_4
+    T_22_1_5["US-22.1#5: Keep PRD-Tool-Catalog FI-03 and its `append_to_file` row. Amend PRD-Studio SD-02&#x27;s Transcript reader row to name its tools and both files. Keep Decision 0035&#x27;s and Decision 0039&#x27;s links to Decision 0040. All of this follows Decision 0040&#x27;s &quot;Requirements revised&quot; list. Checked by reading each against P1 to P6."]
+    US_22_1 --> T_22_1_5
+    T_22_1_6["US-22.1#6: Update `README-YouTube-Transcript.md` with both files, the reader&#x27;s tools, the added calls (P7), and that a reader already seeded changes only when its owner saves a new version. Update `README-DEV.md` and `CODEBASE.md`. Checked by reading each against P1 to P8."]
+    US_22_1 --> T_22_1_6
+    T_22_1_7["US-22.1#7: Show that the Tools page and the Expert editor list `append_to_file` in the Files group from the catalog, with no change to the web app&#x27;s source. Checked by the web unit tests."]
+    US_22_1 --> T_22_1_7
   end
 ```
 
@@ -10320,6 +10356,104 @@ Tasks:
 - [x] Have the Transcript reader's seeded instructions save with `save`, then publish, and never retype a line, with its tools, empty browse domains and `box` browser unchanged and an Expert already seeded kept (V8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures (`tests/db/checks/transcript_check.py`).
 - [x] Amend PRD-Tool-Catalog AB-05, PRD-Studio SD-02's Transcript reader row, and Decision 0035 Y12 and Y14, as Decision 0039's "Requirements revised" lists. Checked by reading each against V1 to V8.
 - [x] Update `README-YouTube-Transcript.md`, `README-DEV.md`'s typed results, `browse_goal`'s guide and `CODEBASE.md`. Checked by reading each against V1 to V8, and the guide by pytest under `services/agent/tests`.
+
+Open Questions:
+- None.
+
+# EPIC-22: A polished transcript, written a section at a time
+
+Scheduled by [Decision 0040](docs/engineering/decisions/0040-polished-transcript.md#decision), from the owner's choices of 2026-11-25: the transcript "without time and the content glued together with coherence", as "Model-polished prose", and "Replace, keep the timed file too". The rest was delegated and is decided there. It amends Decision 0039 V8 and V9, Decision 0035 Y14, and the PRD-Tool-Catalog and PRD-Studio rows it lists. A new Files tool, `append_to_file`, adds text to the end of a run file under `outputs/` as a new version, through the one writer of run files, so a document longer than one model reply is written a section at a time. Only an Expert grants it. The Transcript reader's browse saves the timed captions as `transcript-timed.md`. The model then reads that file 60 lines at a time, adds polished prose for those lines to `transcript.md`, and publishes both. Polishing keeps every point, example, number and name in the speaker's words and order, and never summarises or adds. A 44-minute video takes about a dozen more model calls, within the run's budget (P7). The seeded reader's tools become `browse_goal`, `read_run_file`, `append_to_file` and `publish_artifact`, and a reader already seeded is kept. Speaker labels, translation, summaries and polishing any other Expert's output aren't scheduled (P8). The story's checks use scripted models and scripted browses, and reach no YouTube. Nothing here establishes that a polished transcript is faithful, H1 or product acceptance ([what Decision 0040 doesn't establish](docs/engineering/decisions/0040-polished-transcript.md#what-this-doesnt-establish)).
+
+### US-22.1: The Transcript reader publishes polished prose
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-25-us-22-1-transcript-reader-publishes-polished/`
+
+As a workspace owner
+I want the Transcript reader to publish a video's captions as polished prose, written a section at a time, beside the timed file
+So that I can read a transcript without timestamps that reads as one coherent text, and still check it against YouTube's own captions.
+
+Source:
+- [Decision 0040, the owner's request, form and place](docs/engineering/decisions/0040-polished-transcript.md#decision-0040-the-transcript-reader-publishes-polished-prose)
+- [Decision 0040, P1 to P8](docs/engineering/decisions/0040-polished-transcript.md#decision)
+- [Decision 0040, context, on a reply too small for a whole transcript](docs/engineering/decisions/0040-polished-transcript.md#context)
+- [Decision 0040, requirements revised](docs/engineering/decisions/0040-polished-transcript.md#requirements-revised)
+- [Decision 0040, what this gives up](docs/engineering/decisions/0040-polished-transcript.md#what-this-gives-up)
+- [Decision 0040, what this doesn't establish](docs/engineering/decisions/0040-polished-transcript.md#what-this-doesnt-establish)
+- [Decision 0040, reversal](docs/engineering/decisions/0040-polished-transcript.md#reversal)
+- [Decision 0039, V3, V4, V8 and V9](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#decision)
+- [Decision 0035, Y14 and Y18](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, amended by Decisions 0039 and 0040](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#amended)
+- [Decision 0034, L1, a reply's output tokens](docs/engineering/decisions/0034-deep-research-like-content-writer.md#limits-for-every-run-us-166)
+- [Decision 0034, F3, agent steps get their Experts' tools](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-content-writer-workflow-us-166)
+- [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [File tools, FI-03 and the `append_to_file` row](docs/PRD/PRD-Tool-Catalog.md#file-tools)
+- [Catalog contract, TC-01 to TC-03](docs/PRD/PRD-Tool-Catalog.md#catalog-contract)
+- [Tools screen, TS-01 and TS-04](docs/PRD/PRD-Tool-Catalog.md#tools-screen)
+- [Tool-use record, TU-01 and TU-04](docs/PRD/PRD-Tool-Catalog.md#tool-use-record)
+- [Tool guide, TG-01](docs/PRD/PRD-Tool-Catalog.md#tool-guide)
+- [Seed, SD-01 and SD-02, the Transcript reader's row](docs/PRD/PRD-Studio.md#seed)
+- [Tool contract](docs/PRD/PRD-LangChain-Deep-Agents.md#91-tool-contract)
+- [SP-009](docs/engineering/option-b-contract.md#sp-009--types-and-ownership)
+- [SP-010, a call's receipt](docs/engineering/option-b-contract.md#tool-attempt-receipts-and-approval-requests)
+- [SP-012](docs/engineering/option-b-contract.md#sp-012--durable-job-ownership-and-recovery)
+- [SP-013](docs/engineering/option-b-contract.md#sp-013--tools-approvals-and-artifacts)
+- [SP-015](docs/engineering/option-b-contract.md#sp-015--migrations-and-seeds)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD 1a9f37c. `save_artifact`, `write_code_file` and `patch_code_file` each write a whole file, and no tool adds to one. `domain/tools.EXPERT_TOOLS` holds the Expert-only grants beside `GENERAL_TOOLS`, which a plain goal also gets. The seeded Transcript reader in `operations/concept_seed.py` grants `browse_goal`, `save_artifact` and `publish_artifact`. Its `TRANSCRIPT_SAVE` names `transcript.md`, and the reader's and the Transcript workflow's descriptions say each line has its timestamp. `tests/db/checks/transcript_check.py` expects one published `transcript.md` (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `application/run_files.write` takes the next version under the run's lease and an advisory lock on the run and path, and reads no content under that lock. `patch_code_file` reads the latest version before taking the lock. `run_files.by_operation` reads back the version an operation wrote, which `save_artifact`'s and the code tools' `reconcile` use. The gateway names an operation by its run, foreach item, tool, version and argument hash (`application/tool_gateway._identity`). `contracts/primitives.MAX_FILE_CHARACTERS` is 256,000, and no tool fails `file_too_large` (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: Adds to the end, as a new version
+  Given a run granted append_to_file through an Expert, whose path grant is outputs/child-1, and an existing text/plain run file under that grant
+  When the model adds to a missing file under outputs/child-1, adds to it again, adds to the text/plain file, and adds to a path outside outputs/ and to one under outputs/ outside the grant
+  Then the missing file is created as text/markdown at version 1, the next add makes version 2 with version 1's text followed by the new text, the text/plain file keeps its media type, each output holds the path, version, sha256 and characters its file has, the path outside outputs/ is refused invalid_arguments and the one outside the grant resource_not_granted, and neither writes
+
+Scenario: Two adds never lose one
+  Given a run file under outputs/ and two adds to it with different text, made at once on two connections under the run's lease
+  When both commit
+  Then the file has two new consecutive versions, and the latest holds the earlier text followed by both added texts, each once
+
+Scenario: Too large changes nothing
+  Given a run file under outputs/ whose characters, with an add's text, would pass 256,000
+  When the model makes that add
+  Then it fails file_too_large, no version is written, and the file's latest version is as it was
+
+Scenario: Read back after an interruption
+  Given an add whose write committed before its attempt ended without recording the outcome, and a run that makes one add to a file and then the same add again
+  When the run's next attempt makes the interrupted add again, and the repeated add is made
+  Then each returns the path, version, sha256 and characters of the version the first write made, read back from the file's row, no other version is written, and each file holds that text once
+
+Scenario: Only an Expert grants it
+  Given the tool catalog, a plain goal's run, and a run started from an Expert version that grants append_to_file
+  When the catalog is read and each run calls append_to_file
+  Then the catalog lists append_to_file version 1 in the Files group, grantable only to an Expert, the plain goal's call is refused tool_not_granted and writes nothing, and the Expert's run is granted version 1 and its call adds
+
+Scenario: A polished transcript in sections
+  Given YOLO on, a new workspace where the concept seed runs and its owner then adds youtube.com, ytimg.com, ggpht.com and gstatic.com to the Transcript reader's domains, a scripted model, and a scripted browse that returns a video's title and over 180 caption lines
+  When the Transcript workflow is executed with that video's https watch address
+  Then the browse saved transcript-timed.md as the title, the source address, the captions note and every line with its timestamp in order, the model read it with read_run_file 60 lines at a time from the first line to the last and added one section to transcript.md with append_to_file after each read, transcript.md's first section starts with the title, the source address and a note that the text is edited from YouTube's own captions, both files are published, no call holds more than one section, and the instructions the model was given say to continue a cut sentence in the next section, to keep every point, example, number and name in the speaker's words and order, to remove filler words, stutters and false starts, to fix punctuation, capitals and plainly misheard words, to break paragraphs where the topic turns, and never to summarise, shorten an argument, add anything or guess who is speaking
+
+Scenario: The seed and an Expert that exists
+  Given a workspace seeded before the change, and a new workspace where browse_goal is available
+  When the concept seed runs in the new workspace, and again in the earlier one
+  Then the new Transcript reader grants browse_goal, read_run_file, append_to_file and publish_artifact and not save_artifact, with no browse domains and the box's browser, and the earlier workspace's Transcript reader is unchanged
+```
+
+Dependencies:
+- US-21.1
+
+Tasks:
+- [x] Add `append_to_file` version 1 in the Files group. Its contract takes `path` under `outputs/` and `content`, and returns `path`, `version`, `sha256` and `characters`. Its writer in `application/run_files.py` reads the latest version and writes the next under one lock and the run's lease. A missing file is created as `text/markdown`, an existing one keeps its media type, and a file past 256,000 characters fails `file_too_large` with nothing written. It keeps a receipt, and its readback goes by operation, as `save_artifact`'s does (P1, P2). Checked by pytest under `services/agent/tests`, and `contract_drift` in the fast profile.
+- [x] Register it in `adapters/tool_registry.py`, grant it only in `domain/tools.EXPERT_TOOLS`, add it to `domain/execution.TOOL_VERSIONS` and its digest to `services/agent/tests/fixtures/tool_schema_versions.json`, keep file content out of its public fields (TU-04), and give it a guide in `domain/tool_guides.py` (TG-01). Checked by pytest under `services/agent/tests`.
+- [x] Change the Transcript reader's seed. It grants `browse_goal`, `read_run_file`, `append_to_file` and `publish_artifact`, without `save_artifact`, and keeps its empty browse domains, the `box` browser, and an Expert already seeded. Its instructions save the browse as `transcript-timed.md`, read it 60 lines at a time, add one polished section per read to `transcript.md`, open the first section with the title, the source address and the note, and publish both. They also state P5's rules on polishing. Update the reader's description and the Transcript workflow's description, which name one timed file (P3 to P6). Checked by pytest under `services/agent/tests`.
+- [x] Extend the db profile's `tests/db/checks/transcript_check.py` for P3 to P6, with a scripted model and scripted browses. Add a db check for adding to a file, for P1 and P2, on disposable fixtures. Checked by the db profile.
+- [x] Keep PRD-Tool-Catalog FI-03 and its `append_to_file` row. Amend PRD-Studio SD-02's Transcript reader row to name its tools and both files. Keep Decision 0035's and Decision 0039's links to Decision 0040. All of this follows Decision 0040's "Requirements revised" list. Checked by reading each against P1 to P6.
+- [x] Update `README-YouTube-Transcript.md` with both files, the reader's tools, the added calls (P7), and that a reader already seeded changes only when its owner saves a new version. Update `README-DEV.md` and `CODEBASE.md`. Checked by reading each against P1 to P8.
+- [x] Show that the Tools page and the Expert editor list `append_to_file` in the Files group from the catalog, with no change to the web app's source. Checked by the web unit tests.
 
 Open Questions:
 - None.

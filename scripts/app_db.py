@@ -126,6 +126,8 @@ TOOL_CHILDREN = (
     Child('checks/transcript_check.py', 'the transcript check', (), from_root=True),
     # US-21.1: a browse's typed result saved straight to a run file, with scripted browses.
     Child('checks/saved_browse_check.py', 'the saved browse check', ('{workspace}',), from_root=True),
+    # US-22.1: adding to a run file through the gateway, its lock, receipt and grants.
+    Child('checks/append_to_file_check.py', 'the append to file check', ('{workspace}',), from_root=True),
     # US-18.1: a retired tool in saved Experts, routines, workflows, runs in flight and history, with a scripted model.
     Child('checks/retired_tools_check.py', 'the retired tools check', (), from_root=True),
     # US-14.19: the cronjob tool through the gateway, approvals and the routine service, with no model.

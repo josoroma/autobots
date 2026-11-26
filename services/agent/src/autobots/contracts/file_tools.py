@@ -119,6 +119,23 @@ class SaveArtifactOutput(BaseModel):
     sha256: str
 
 
+# Decision 0040 P1: text added to the end of a file under outputs/.
+class AppendToFileInput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: OutputPath
+    content: str = Field(min_length=1, max_length=MAX_FILE_CHARACTERS)
+
+
+class AppendToFileOutput(BaseModel):
+    model_config = TOOL_CONTRACT
+
+    path: str
+    version: int
+    sha256: str
+    characters: int
+
+
 class StoreRemoteFileInput(BaseModel):
     model_config = TOOL_CONTRACT
 

@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-21.1 |
+| Target | US-22.1 |
 | Kind | story |
 | Focus | - |
 | Status | COMPLETE |
@@ -19,7 +19,7 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-21.1 | us-21-1-browse-s-result-saved | DONE | A browse's result saved straight to a file |
+| 1 | US-22.1 | us-22-1-transcript-reader-publishes-polished | DONE | The Transcript reader publishes polished prose |
 
 ## Next Action
 

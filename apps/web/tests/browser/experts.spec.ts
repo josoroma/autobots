@@ -331,9 +331,9 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
   ).toBeDisabled();
 
   await page.getByLabel("Calculate").check();
-  await page.getByLabel(/^Files group \(6 tools\)/).check();
+  await page.getByLabel(/^Files group \(7 tools\)/).check();
   await expect(page.locator('[data-field="expansion"]')).toHaveText(
-    "This version grants: calculate, publish_artifact, read_artifact, read_csv, read_run_file, save_artifact, store_remote_file, from the group files and the tools named.",
+    "This version grants: calculate, append_to_file, publish_artifact, read_artifact, read_csv, read_run_file, save_artifact, store_remote_file, from the group files and the tools named.",
   );
   await page.getByRole("button", { name: "Save revision" }).click();
   await expect(page.locator('[data-message="save"]')).toContainText(
@@ -341,7 +341,7 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
   );
   const version = page.locator('[data-version="2"]');
   await expect(version).toContainText(
-    "calculate, publish_artifact, read_artifact, read_csv, read_run_file, save_artifact, store_remote_file",
+    "calculate, append_to_file, publish_artifact, read_artifact, read_csv, read_run_file, save_artifact, store_remote_file",
   );
   await expect(version).toContainText("(groups: files)");
   await expect(page.locator('[data-version="1"]')).toContainText("no tools");
@@ -353,6 +353,7 @@ test("US-14.2: a group grant is previewed, saved as explicit tools, and an unava
   const stored = await readExpert(page, id);
   expect(stored.versions[1]?.config.tools).toEqual([
     "calculate",
+    "append_to_file",
     "publish_artifact",
     "read_artifact",
     "read_csv",

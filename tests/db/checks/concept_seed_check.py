@@ -142,9 +142,9 @@ def main() -> None:
                 'where e.workspace_id = %s', WORKSPACE)}
         reader = configs.get(READER, {})
         check('with no browser executor, the Transcript reader is saved without browse_goal, says so, and lists no browse domains',
-              'save_artifact and publish_artifact, "Saved without browse_goal" in its purpose, no browse domains',
+              'read_run_file, append_to_file and publish_artifact (Decision 0040 P6), "Saved without browse_goal" in its purpose, no browse domains',
               (reader.get('tools'), 'Saved without browse_goal' in reader.get('purpose', ''), reader.get('browse_domains', [])),
-              reader.get('tools') == ['save_artifact', 'publish_artifact'] and 'Saved without browse_goal' in reader.get('purpose', '')
+              reader.get('tools') == ['read_run_file', 'append_to_file', 'publish_artifact'] and 'Saved without browse_goal' in reader.get('purpose', '')
               and not reader.get('browse_domains'))
         check('no seeded Expert is set to the stealth browser (Decision 0038 Z14)', 'none names a browser',
               [name for name, config in configs.items() if 'browser' in config], not any('browser' in config for config in configs.values()))

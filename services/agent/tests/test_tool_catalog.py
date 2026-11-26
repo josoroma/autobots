@@ -167,6 +167,7 @@ def test_a_group_expands_to_the_tools_an_expert_may_name() -> None:
     expanded = expand_groups(ExpertConfig(tools=["calculate"], tool_groups=["files"]), CATALOG, {})
     assert expanded.tools == [
         "calculate",
+        "append_to_file",
         "publish_artifact",
         "read_artifact",
         "read_csv",

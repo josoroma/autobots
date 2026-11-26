@@ -186,10 +186,13 @@ By Decision 0033, W1 to W5.
 | `read_run_file` v2 | `read_only` | `path`, `offset`, `limit` (lines) → `content`, `media_type`, `version`, `sha256`, `total_lines`, `truncated` |
 | `read_csv` | `read_only` | `path`, `delimiter`, `has_header`, `max_rows` ≤ 500, `columns` → `columns[] {name, inferred_type}`, `rows`, `row_count`, `truncated` |
 | `store_remote_file` | `reversible_internal_write` | `url`, `path` under `outputs/` → `path`, `version`, `sha256`, `size_bytes`, `media_type`. Through the URL guard, text types only, 1 MiB |
+| `append_to_file` | `reversible_internal_write` | `path` under `outputs/`, `content` → `path`, `version`, `sha256`, `characters`. Adds to the end, FI-03 |
 
 **FI-01. Agent File Input.** The goal composer attaches up to 5 text files (plain text, markdown, JSON, CSV), 1 MiB each, as run inputs under `inputs/`, with their media type. It isn't a catalog tool.
 
 **FI-02. Reading a published artifact.** `read_artifact` reads one published artifact of the run's workspace by its ID, so a workflow's next step can read an earlier step's work ([Decision 0034](../engineering/decisions/0034-deep-research-like-content-writer.md) A1 to A4). It reads text only (markdown, plain text and JSON), in pages of lines as `read_run_file` version 2 does. It refuses `artifact_not_found` for an unknown ID, another workspace's artifact or one that isn't published, `artifact_missing` when the stored bytes are gone or fail their hash, and `artifact_not_text` otherwise. It is read-only, needs no key or approval, isn't metered, and only an Expert grants it.
+
+**FI-03. Adding to a file.** `append_to_file` adds text to the end of a run file under `outputs/` as a new version, so a document longer than one model reply is written a section at a time ([Decision 0040](../engineering/decisions/0040-polished-transcript.md) P1, P2). A missing file is created as Markdown, and an existing one keeps its media type. The latest version is read and the next written under one lock and the run's lease. A file past 256,000 characters is refused `file_too_large`, and nothing changes. It keeps a receipt and is read back after an interruption, as `save_artifact` is. It needs no key or approval, isn't metered, and only an Expert grants it.
 
 ## Market data
 

@@ -14,7 +14,7 @@
 
 # A YouTube video's transcript, as Markdown
 
-The Transcript reader turns a YouTube watch address into `transcript.md`: the video's title, its address, and every caption line with its timestamp. It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
+The Transcript reader turns a YouTube watch address into `transcript.md`, the video's captions as polished prose, and `transcript-timed.md`, every caption line with its timestamp ([Decision 0040](docs/engineering/decisions/0040-polished-transcript.md)). It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
 
 This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript.
 
@@ -41,16 +41,19 @@ This page records the first live run, on the owner's install on 2026-11-20. That
 | | |
 |---|---|
 | **Name** | Transcript reader |
-| **Tools** | `browse_goal` (version 4), `save_artifact`, `publish_artifact` |
+| **Tools** | `browse_goal` (version 4), `read_run_file`, `append_to_file`, `publish_artifact`. No `save_artifact`, so the model can't write a transcript whole |
 | **Browse domains** | None when seeded. The owner adds `youtube.com`, `ytimg.com`, `ggpht.com` and `gstatic.com`, never `googlevideo.com`, the host that streams the video itself. Adding them is where the owner accepts YouTube's terms on automated access (Decision 0035 Y14) |
 | **Model** | The run's `researcher` route drives each browse step through the admitted endpoint (Y7). The other roles follow the workspace policy |
 
-Its instructions ask for four things:
+Its instructions ask for five things:
 
 1. **One browse.** One `browse_goal` call on the watch address, within those four hosts. It passes an output schema for the title and the lines, each with `time` and `text`. Its task: press "...more" under the video, press "Show transcript", and read every line of the panel in order.
 2. **A bot check.** If the browse stops with `bot_check`, say so and publish nothing. Never try to pass it.
 3. **No transcript.** If no lines come back, say the video offers no transcript and publish nothing.
-4. **The file.** The same `browse_goal` call carries a `save`, so the worker writes `transcript.md` itself: the title as a heading, `Source:` and the address, a note that the lines are YouTube's own captions, then `time text` per line, in order ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)). The model publishes that file and never retypes a line.
+4. **The timed file.** The same `browse_goal` call carries a `save`, so the worker writes `transcript-timed.md` itself: the title as a heading, `Source:` and the address, a note that the lines are YouTube's own captions, then `time text` per line, in order ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)).
+5. **The prose.** The model reads the timed file 60 lines at a time with `read_run_file`, and after each read adds the polished prose of those lines to `transcript.md` with `append_to_file`. The first section opens with the title, the source and a note that the text is edited from YouTube's own captions. Polishing keeps every point, example, number and name in the speaker's words and order, removes filler words, stutters and false starts, fixes punctuation and plainly misheard words, and breaks paragraphs where the topic turns. It never summarises, adds anything or guesses who is speaking. Then both files are published. A 44-minute video takes about a dozen more model calls than the timed file alone, and a video over about three hours reaches a run's 64 model calls (Decision 0040 P4, P5, P7).
+
+The seed keeps an Expert that exists, so a Transcript reader seeded earlier changes only when its owner saves a new version with these instructions.
 
 It never signs in, comments, likes, subscribes or posts, and treats the page's text as data.
 

@@ -1,4 +1,5 @@
-"""Built-in local tools: a calculation, run-file reads and writes, CSV reads and artifact saves.
+"""Built-in local tools: a calculation, run-file reads and writes, CSV reads, artifact saves and
+adding to a file (Decision 0040).
 Each reads and writes run files through run_files.py (PTOL-11)."""
 
 import csv
@@ -10,6 +11,8 @@ from typing import Literal
 from autobots.application import run_files
 from autobots.application.tool_definitions import ToolContext, ToolDefinition, ToolFailed
 from autobots.contracts.file_tools import (
+    AppendToFileInput,
+    AppendToFileOutput,
     CsvColumn,
     ReadCsvInput,
     ReadCsvOutput,
@@ -20,6 +23,7 @@ from autobots.contracts.file_tools import (
     SaveArtifactInput,
     SaveArtifactOutput,
 )
+from autobots.contracts.primitives import MAX_FILE_CHARACTERS
 from autobots.contracts.tools import CalculateInput, CalculateOutput
 from autobots.domain.tool_catalog import ToolGroup
 from autobots.domain.tools import OperationClass
@@ -230,6 +234,53 @@ SAVE_ARTIFACT = ToolDefinition(
     timeout_seconds=5.0,
     resources=lambda arguments: (arguments.path,),
     reconcile=_existing_save,
+    # One transaction with a unique operation ID: if the row isn't there, it never happened.
+    safe_to_repeat=True,
+)
+
+
+async def _append(arguments: AppendToFileInput, context: ToolContext) -> AppendToFileOutput:
+    found, characters = await run_files.append(
+        context, arguments.path, arguments.content, MAX_FILE_CHARACTERS
+    )
+    return AppendToFileOutput(
+        path=arguments.path, version=found.version, sha256=found.sha256, characters=characters
+    )
+
+
+async def _existing_append(
+    arguments: AppendToFileInput, context: ToolContext
+) -> AppendToFileOutput | None:
+    """A crash after the add committed: the version under this operation ID says so (P2)."""
+    found = await run_files.by_operation(context)
+    if found is None:
+        return None
+    return AppendToFileOutput(
+        path=arguments.path,
+        version=found.version,
+        sha256=found.sha256,
+        characters=len(found.content),
+    )
+
+
+APPEND_TO_FILE = ToolDefinition(
+    tool_id="append_to_file",
+    title="Add to file",
+    group=ToolGroup.FILES,
+    public_input_fields=("path",),
+    public_output_fields=("path", "version", "sha256", "characters"),
+    version=1,
+    description=(
+        "Add text to the end of a file under outputs/ as a new version, creating it if it is "
+        "missing. Use it to write a document longer than one reply, a section at a time."
+    ),
+    input_model=AppendToFileInput,
+    output_model=AppendToFileOutput,
+    operation_class=OperationClass.REVERSIBLE_INTERNAL_WRITE,
+    handler=_append,
+    timeout_seconds=5.0,
+    resources=lambda arguments: (arguments.path,),
+    reconcile=_existing_append,
     # One transaction with a unique operation ID: if the row isn't there, it never happened.
     safe_to_repeat=True,
 )

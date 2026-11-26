@@ -19,6 +19,7 @@ COMPATIBLE_GRAPH_STATES = frozenset({1})
 # schemas as they were, so a changed schema is a new version here (Decision 0029 F13).
 TOOL_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
     {
+        "append_to_file": 1,
         "assign_specialist": 1,
         "calculate": 1,
         "complete_task": 1,
