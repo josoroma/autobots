@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-23.1 |
+| Target | US-23.2 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-23.1 | us-23-1-local-model-route-through | IN PROGRESS | A local model route through the shared gateway |
+| 1 | US-23.2 | us-23-2-local-route-qualification-offering | READY | Local route qualification and offering, at no spend |
 
 ## Next Action
 
-Action: apply
-Story: US-23.1
-Change: us-23-1-local-model-route-through
-Command: /ohmyorch:opsx-apply us-23-1-local-model-route-through
-Reason: 12/14 tasks complete
+Action: propose
+Story: US-23.2
+Change: us-23-2-local-route-qualification-offering
+Command: /ohmyorch:opsx-propose us-23-2-local-route-qualification-offering for US-23.2; then set US-23.2 to IN PROGRESS with a Change: line in SPECS.md
+Reason: US-23.2 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

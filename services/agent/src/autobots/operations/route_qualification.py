@@ -1,12 +1,18 @@
-"""Paid qualification of one OpenRouter route, US-3.4.
+"""Qualification of one route, US-3.4: paid for an OpenRouter route, and free for a local one.
 
 Run with `python -m autobots.operations.route_qualification`.
 
-Nothing is sent without `--paid`. Each call is written down at its worst-case price before it goes,
-so a crash can't lose track of spend, and an unclear outcome stays charged at that price. Calls are
-never retried and no other model is ever tried. Fixtures (`route_fixtures.py`) record what the route
-did, and a capability that fails or isn't supported stays recorded as such. The ledger, key and
-pricing are shared with the other paid entry points (`paid/`, POPS-05).
+An OpenRouter route sends nothing without `--paid`. Each call is written down at its worst-case
+price before it goes, so a crash can't lose track of spend, and an unclear outcome stays charged
+at that price. Calls are never retried and no other model is ever tried. Fixtures
+(`route_fixtures.py`) record what the route did, and a capability that fails or isn't supported
+stays recorded as such. The ledger, key and pricing are shared with the other paid entry points
+(`paid/`, POPS-05).
+
+A local route (`--profile local_...`, Decision 0041 A7, US-23.2) runs the same fixtures against the
+owner's llama-server on 127.0.0.1 on request, with no flag, cap, key or catalog. It checks the
+served model first, writes every call down at a worst case of 0, and its report says whether the
+five capabilities that gate offering passed in every trial.
 
 Exit codes: 0 done or not sent, 1 refused with nothing sent, 2 a malformed argument (`cli.py`).
 """
@@ -25,9 +31,19 @@ from typing import Any
 from pydantic import SecretStr, ValidationError
 
 from autobots.adapters.models.catalog import CatalogEntry, ModelUnavailable
-from autobots.adapters.models.factory import chat_model
+from autobots.adapters.models.factory import (
+    LocalServerUnavailable,
+    LoopbackClient,
+    PreparedAttempt,
+    chat_model,
+    check_served,
+    local_chat_model,
+)
+from autobots.adapters.models.local_server import local_port
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher
+from autobots.domain.models import PROFILES, ModelProfile, ModelRole
 from autobots.logs import configure_logging, forbid_remote_tracing
+from autobots.operations import local_route_measurements
 from autobots.operations.cli import Refused, command, counts_argument
 from autobots.operations.paid.attempts import Route, prepare
 from autobots.operations.paid.keys import read_key
@@ -56,6 +72,17 @@ AUTHORIZED_CAPS = {
     # Decision 0019 S4.
     "openai_gpt_6_1_sol": 1_200_000,
 }
+
+
+# Decision 0041 A7: what a local route must pass in all three trials before it is offered.
+GATING = ("plain_text", "tool_auto", "tool_required", "schema_flat", "stream_text")
+# Decision 0041's measurements table: how long one call on a local route may take.
+LOCAL_CALL_SECONDS = 1_800.0
+LOCAL_PROFILES: Mapping[str, ModelProfile] = {
+    profile.id.value: profile for profile in PROFILES.values() if profile.local is not None
+}
+LocalClient = Callable[[ModelProfile, int], LoopbackClient]
+Measure = Callable[[int, ModelProfile], Awaitable[dict[str, Any]]]
 
 
 def summarize(results: list[Trial]) -> dict[str, dict[str, int]]:
@@ -147,9 +174,149 @@ async def qualify(
     return report
 
 
+def gate(results: list[Trial]) -> tuple[bool, list[str]]:
+    """Whether every gating fixture passed in each of the three trials, and each fixture that
+    failed or wasn't supported in any trial, which stays disabled and listed in the limits."""
+    verdicts: dict[str, list[str]] = {}
+    for result in results:
+        verdicts.setdefault(result.fixture, []).append(result.verdict)
+    limits = sorted(
+        name for name, seen in verdicts.items() if any(verdict != "passed" for verdict in seen)
+    )
+    offerable = all(
+        len(verdicts.get(name, [])) == TRIALS and set(verdicts[name]) == {"passed"}
+        for name in GATING
+    )
+    return offerable, limits
+
+
+def limits_text(limits: list[str], summary: Mapping[str, Mapping[str, int]]) -> str:
+    """The sentence a migration stores, from the report itself, so the two can't disagree."""
+    if not limits:
+        return "Every fixture passed in all three trials."
+    parts = [
+        f"{name} passed {summary[name].get('passed', 0)} of {sum(summary[name].values())}"
+        for name in limits
+    ]
+    return "Not passed in every trial, so disabled: " + "; ".join(parts) + "."
+
+
+async def measure_route(port: int, profile: ModelProfile) -> dict[str, Any]:
+    """The live measurements, with the profile's thinking switch as the route sends it."""
+    thinking = dict(profile.local.thinking) if profile.local is not None else {}
+    extra = {"chat_template_kwargs": thinking} if thinking else {}
+    return await local_route_measurements.measure(port, profile.wire_id, extra)
+
+
+async def qualify_local(
+    profile_id: str,
+    out: Path,
+    port: int,
+    *,
+    client: LocalClient | None = None,
+    transport: Any = None,
+    measure: Measure | None = None,
+) -> dict[str, Any]:
+    """US-3.4's suite on a local route at no spend. `client` and `transport` are for a fake
+    server in tests. Nothing reads OpenRouter's catalog or a key."""
+    profile = LOCAL_PROFILES.get(profile_id)
+    if profile is None or profile.local is None:
+        raise Refused(f"{profile_id} isn't a local profile")
+    try:
+        await check_served(profile, port, transport=transport)
+    except LocalServerUnavailable:
+        raise Refused("the local model server isn't running, so nothing was sent") from None
+    except ModelUnavailable:
+        raise Refused(
+            "the local model server is serving another model, so nothing was sent"
+        ) from None
+    ledger = Ledger(out / f"ledger-{profile_id}.json", 0)
+    built_at = time.monotonic()
+
+    def build(max_tokens: int = OUTPUT_TOKENS) -> Any:
+        attempt = PreparedAttempt(profile, ModelRole.EXECUTOR, "local", {"max_tokens": max_tokens})
+        loopback = client(profile, port) if client is not None else None
+        return local_chat_model(attempt, port, client=loopback)
+
+    run = QualificationRun(
+        build, ledger, 0, prefix=f"{profile_id}:", call_seconds=LOCAL_CALL_SECONDS
+    )
+    results = await run.run()
+    summary = summarize(results)
+    offerable, limits = gate(results)
+    report: dict[str, Any] = {
+        "schema_version": "autobots.route-qualification/v1",
+        "completed_at_utc": datetime.now(UTC).isoformat(),
+        "evidence_class": "live_local" if client is None else "fake_server",
+        "profile": profile_id,
+        "served_model_id": profile.wire_id,
+        "canonical_id": profile.canonical_id,
+        # Field by field, as the thinking switch is a read-only mapping that can't be copied.
+        "pins": {
+            "repository": profile.local.repository,
+            "revision": profile.local.revision,
+            "file": profile.local.file,
+            "sha256": profile.local.sha256,
+            "chat_template_sha256": profile.local.chat_template_sha256,
+            "thinking": dict(profile.local.thinking),
+        },
+        "port": port,
+        "call_seconds": LOCAL_CALL_SECONDS,
+        "spent_usd": "0.00",
+        "committed_micro_usd": ledger.committed(),
+        "calls": len(ledger.entries),
+        "seconds": round(time.monotonic() - built_at, 1),
+        "summary": summary,
+        # A whole reply arrives at once, so its first token comes with it. A stream says its own.
+        "trials": [
+            {
+                **result.__dict__,
+                "first_token_seconds": result.observed.get("first_chunk_seconds") or result.seconds,
+            }
+            for result in results
+        ],
+        "gating": list(GATING),
+        "offerable": offerable,
+        "recorded_status": "qualified_with_limits" if offerable else "not_qualified",
+        "limits": limits,
+        "limits_text": limits_text(limits, summary),
+        "not_established": [
+            "H1",
+            "product acceptance",
+            "task quality",
+            "that a run on this route completes",
+        ],
+    }
+    if measure is not None:
+        report["measurements"] = await measure(port, profile)
+    (out / f"report-{profile_id}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))
+    return report
+
+
+async def _local_main(arguments: argparse.Namespace) -> int:
+    out = Path(arguments.out)
+    await asyncio.to_thread(out.mkdir, parents=True, exist_ok=True)
+    port = arguments.port if arguments.port is not None else local_port(os.environ)
+    try:
+        report = await qualify_local(
+            arguments.profile,
+            out,
+            port,
+            measure=None if arguments.no_measure else measure_route,
+        )
+    except (ModelUnavailable, ValidationError) as refusal:
+        raise Refused(f"nothing was sent: {refusal}") from None
+    names = ("evidence_class", "calls", "spent_usd", "summary", "offerable", "limits_text")
+    print(json.dumps({name: report[name] for name in names}, indent=1))
+    return 0
+
+
 async def _main(arguments: argparse.Namespace) -> int:
     forbid_remote_tracing(os.environ)
     configure_logging()
+    # A local route needs no flag: it spends nothing (Decision 0041 A7).
+    if getattr(arguments, "profile", None) in LOCAL_PROFILES:
+        return await _local_main(arguments)
     out = Path(arguments.out)
     if not arguments.paid:
         print(
@@ -194,6 +361,12 @@ def main() -> int:
     parser.add_argument("--key-file", default=".env")
     parser.add_argument("--out", required=True)
     parser.add_argument("--paid", action="store_true", help="Actually send paid model calls.")
+    parser.add_argument(
+        "--port", type=int, default=None, help="A local route's server port (default 9931)."
+    )
+    parser.add_argument(
+        "--no-measure", action="store_true", help="A local route: skip the speed and memory runs."
+    )
     parser.add_argument(
         "--only",
         dest="reruns",

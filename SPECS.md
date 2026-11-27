@@ -837,13 +837,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-23.1#7 | Amend `AGENTS.md`'s "Boundaries that matter" and `.claude/rules/model-gateway.md`: model calls use the approved OpenRouter profiles or, on the Local source, offered local profiles, through the shared gateway, still with no fallback, implicit evaluator, hosted tracing or other provider. Checked by reading them against Decision 0041's "Requirements revised", and by the harness profile's instruction-asset tests. | DONE | US-23.1 |
 | US-23.1#8 | Amend PRD-Model-Providers MP-02 (A3 proves a local route's identity in place of OpenRouter's catalog), MP-07's spend (a local call reserves US$0, A2) and MP-08 (a stopped or wrong server, A3), option-b-contract SP-008's budgets (A2), PRD-Local-Mac-Deployment LM-A03 and its resources section (LM-07) for the owner-started runtime (A4, A15), PRD-LangChain-Deep-Agents' scope, which puts local inference engines outside the design, and the rows Decision 0041 found at ingestion that bear on the route: PRD-Local-Mac-Deployment LM-01, PRD-LangChain-Deep-Agents 2.2's outcomes 7 to 9 and 6.3's model factory, and the `autobots-model-gateway` skill, as Decision 0041's "Requirements revised" lists. Checked by reading each against A2 to A4 and A15. | DONE | US-23.1 |
 | US-23.1#9 | Update `CODEBASE.md`'s model path and integration points, keeping its `Analyzed revision` honest. Checked by reading it against the code. | DONE | US-23.1 |
-| US-23.2 | Local route qualification and offering, at no spend | BLOCKED | EPIC-23 |
-| US-23.2#1 | Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback. | TODO | US-23.2 |
-| US-23.2#2 | Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report. | TODO | US-23.2 |
-| US-23.2#3 | Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals. | TODO | US-23.2 |
-| US-23.2#4 | On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration. | TODO | US-23.2 |
-| US-23.2#5 | Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7. | TODO | US-23.2 |
-| US-23.3 | The Model source setting in Settings → Models | BLOCKED | EPIC-23 |
+| US-23.2 | Local route qualification and offering, at no spend | DONE | EPIC-23 |
+| US-23.2#1 | Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback. | DONE | US-23.2 |
+| US-23.2#2 | Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report. | DONE | US-23.2 |
+| US-23.2#3 | Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals. | DONE | US-23.2 |
+| US-23.2#4 | On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration. | DONE | US-23.2 |
+| US-23.2#5 | Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7. | DONE | US-23.2 |
+| US-23.3 | The Model source setting in Settings → Models | READY | EPIC-23 |
 | US-23.3#1 | Store Model source per workspace, OpenRouter for every new and existing workspace, with the default profile and role overrides kept per source. Serve and change it through the settings API with owner-or-admin authority, Host/Origin and CSRF checks and an expected version (A1, MP-05), and regenerate OpenAPI and the TypeScript client. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the migration and its authorization, and `contract_drift` in the fast profile. | TODO | US-23.3 |
 | US-23.3#2 | Refuse a switch to Local, naming the roles missing, until offered local profiles cover `executor`, and `researcher` while any Expert grants `browse_goal`. On Local, resolve every role to the Local default profile, refuse saving a workspace role override, and refuse a run that names a role override as `model_not_offered` (A8), freeze the source with the route at admission, read no OpenRouter key, and list only the active source's offered profiles in every picker (A1, A7, A8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-23.3 |
 | US-23.3#3 | Refuse at dispatch, as `model_source_disabled`, a model call whose frozen route is on the source switched off, before anything is sent to either source. The run waits with that reason until the owner switches back, cancels it or continues it as a linked new run on the active source (A12, MP-01). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-23.3 |
@@ -1432,8 +1432,6 @@ flowchart TD
   US_17_5 -.-> US_21_1
   US_21_1 -.-> US_22_1
   US_23_1 -.-> US_23_2
-  EXT_US_23_2_1["External: the owner starts `llama-server` serving Bonsai 2.5&#x27;s pinned Q2_0 by the runbook command (Decision 0041 A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and asks for its route qualification, which runs only on request"]
-  EXT_US_23_2_1 -.-> US_23_2
   US_23_2 -.-> US_23_3
   US_23_3 -.-> US_23_4
   EXT_US_23_4_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the replays and the live runs (Decision 0041 A4 and A16)"]
@@ -10756,7 +10754,8 @@ Open Questions:
 
 ### US-23.2: Local route qualification and offering, at no spend
 
-Status: BLOCKED
+Status: DONE
+Change: `openspec/changes/archive/2026-11-27-us-23-2-local-route-qualification-offering/`
 
 As a workspace owner
 I want a local profile offered only once its route passes US-3.4's suite three times, at no spend
@@ -10781,6 +10780,7 @@ Source:
 - [MP-01, a profile not offered is refused with no substitute](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
 - [MP-02, capabilities per qualified route](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Decision 0041, the owner's later choices: "Start US-23.2", which meets this story's External dependency](docs/engineering/decisions/0041-local-model-source.md#the-owners-later-choices)
 
 Codebase Context:
 - [Entry Points](CODEBASE.md#entry-points): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `operations/route_qualification.py` is US-3.4's runner. It sends nothing without `--paid`, refuses a profile outside its table of OpenRouter routes and authorized caps, reads the OpenRouter catalog before anything is sent, and builds each call with `factory.chat_model`. `operations/route_fixtures.py` runs twelve fixtures with `TRIALS = 3` (checked at HEAD). Not product intent.
@@ -10818,21 +10818,20 @@ Scenario: Not offered on OpenRouter
 
 Dependencies:
 - US-23.1
-- External: the owner starts `llama-server` serving Bonsai 2.5's pinned Q2_0 by the runbook command (Decision 0041 A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and asks for its route qualification, which runs only on request
 
 Tasks:
-- [ ] Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback.
-- [ ] Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report.
-- [ ] Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals.
-- [ ] On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration.
-- [ ] Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7.
+- [x] Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback.
+- [x] Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report.
+- [x] Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals.
+- [x] On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration.
+- [x] Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7.
 
 Open Questions:
 - None.
 
 ### US-23.3: The Model source setting in Settings → Models
 
-Status: BLOCKED
+Status: READY
 
 As a workspace owner
 I want one setting in Settings → Models that sends every model call to OpenRouter or to offered local profiles only

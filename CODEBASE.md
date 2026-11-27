@@ -216,6 +216,7 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
   - `worker_inference` reads no catalog or credential for a local profile, and reserves 0.
   - The port is `AUTOBOTS_LOCAL_MODEL_PORT`, default 9931.
   - The profiles `local_bonsai_2_5_27b` and `local_inkling_2_mini` (migration `20261127000068`) are approved and not offered, and the model list leaves them out.
+  - US-23.2 adds a local branch to `operations/route_qualification.py`, `qualify_local`. It runs US-3.4's fixtures at no spend with a 1,800-second call time. It measures the route with `operations/local_route_measurements.py`, and its report's `offerable` gates on the five fixtures in `GATING`. `application/local_offering.local_offers` offers a local profile on the Local source from its stored `qualified_with_limits` row, and `OFFERED_FOR_NEW_RUNS` is unchanged.
   - Profiles: `openrouter_terra`, `openrouter_sol` (`openai/gpt-6.1-sol`) and `openrouter_deepseek_flash`, in `domain/models.py`.
   - The client is built inside each attempt from a key resolved there, with at most 512 output tokens, 4,096 since Decision 0034 L1 after the analyzed revision.
   - Every call is streamed.

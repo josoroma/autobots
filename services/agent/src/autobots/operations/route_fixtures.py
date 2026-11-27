@@ -138,29 +138,37 @@ class QualificationRun:
     results: list[Trial] = field(default_factory=list)
     reruns: dict[str, int] = field(default_factory=dict)
     prefix: str = ""
+    # How long one call may take. A local route's is its own (Decision 0041's measurements table).
+    call_seconds: float = CALL_SECONDS
+    first_chunk_seconds: float | None = None
 
     async def _call(self, label: str, send: Callable[[], Awaitable[AIMessage]]) -> AIMessage:
         async with self.ledger.charge(label, self.worst_case) as charge:
-            message = await asyncio.wait_for(send(), CALL_SECONDS)
+            message = await asyncio.wait_for(send(), self.call_seconds)
             charge.reported = reported_micro_usd(message)
         return message
 
     async def _stream(
         self, label: str, model: Streams, messages: Sequence[BaseMessage]
     ) -> tuple[AIMessageChunk, int, int]:
-        """The assembled message, plus how many chunks carried content and tool arguments."""
+        """The assembled message, plus how many chunks carried content and tool arguments. The
+        time its first chunk took is kept in `first_chunk_seconds`, for the fixture to record."""
         assembled: AIMessageChunk | None = None
         text_chunks = tool_chunks = 0
+        started = time.monotonic()
+        self.first_chunk_seconds = None
 
         async def run() -> None:
             nonlocal assembled, text_chunks, tool_chunks
             async for chunk in model.astream(messages):
+                if self.first_chunk_seconds is None:
+                    self.first_chunk_seconds = round(time.monotonic() - started, 2)
                 assembled = chunk if assembled is None else assembled + chunk
                 text_chunks += 1 if chunk.content else 0
                 tool_chunks += 1 if chunk.tool_call_chunks else 0
 
         async with self.ledger.charge(label, self.worst_case) as charge:
-            await asyncio.wait_for(run(), CALL_SECONDS)
+            await asyncio.wait_for(run(), self.call_seconds)
             charge.reported = reported_micro_usd(assembled)
         if assembled is None:
             raise ValueError("the stream ended without a chunk")
@@ -252,7 +260,7 @@ class QualificationRun:
     ) -> dict[str, Any]:
         async with self.ledger.charge(label, self.worst_case) as charge:
             reply: dict[str, Any] = await asyncio.wait_for(
-                model.ainvoke([HumanMessage(prompt)]), CALL_SECONDS
+                model.ainvoke([HumanMessage(prompt)]), self.call_seconds
             )
             charge.reported = reported_micro_usd(reply.get("raw"))
         return reply
@@ -266,6 +274,7 @@ class QualificationRun:
             **_facts(message),
             "text_chunks": chunks,
             "assembled_correctly": whole,
+            "first_chunk_seconds": self.first_chunk_seconds,
         }
 
     async def stream_tool_arguments(self, label: str) -> tuple[str, dict[str, Any]]:
@@ -279,6 +288,7 @@ class QualificationRun:
             "tool_chunks": chunks,
             "fragmented": chunks >= 2,
             "invalid_tool_calls": len(message.invalid_tool_calls),
+            "first_chunk_seconds": self.first_chunk_seconds,
         }
 
     async def continuation(self, label: str) -> tuple[str, dict[str, Any]]:
@@ -334,7 +344,7 @@ class QualificationRun:
             stream: AsyncGenerator[AIMessageChunk] = model.astream(
                 [HumanMessage("Write a 400 word description of volcanoes in Costa Rica.")]
             )
-            async with asyncio.timeout(CALL_SECONDS):
+            async with asyncio.timeout(self.call_seconds):
                 async for _ in stream:
                     chunks += 1
                     if chunks >= 3:

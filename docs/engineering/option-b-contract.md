@@ -141,6 +141,8 @@ A call on a local profile ([Decision 0041](decisions/0041-local-model-source.md)
 
 Qualify each enabled model through its actual SDK for auto/required/named tools, strict/nested JSON, fragmented streaming, continuation, refusal, truncation, cancellation and task correctness. Named-tool tests use competing tools. Server validation remains mandatory for every structured result. Keep paid qualification separate from default tests and record reported charges separately from estimates. Ambiguous accepted requests retain receipts/reservations pending reconciliation; do not blindly redispatch.
 
+A local route ([Decision 0041](decisions/0041-local-model-source.md) A7) is qualified with the same suite at no spend: no paid flag, cap, key or catalog, its served model checked first, three trials. It is offered on the Local source only once plain text, automatic and required tool calls, flat structured output and streamed text pass in all three, a result recorded by migration with its date, configuration and limits. Any fixture that fails stays disabled and is listed in its limits. OpenRouter's offering doesn't change, so on OpenRouter a local profile is still refused `model_not_offered`.
+
 ## 6. Domain contracts, types and state
 
 ### SP-009 — types and ownership

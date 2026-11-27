@@ -52,6 +52,10 @@ A15's measurements ran the same day: [both models on this Mac](../../../research
 | **Bonsai 2.5, Q2_0**, every role (A8) | When US-3.4's suite passes three times (A7). It passed every by-hand probe | 64K, as today | 4,096 tokens, with thinking off by `enable_thinking: false` (A9) | 1,800 seconds. A reply of 4,096 tokens took up to 17 minutes to write at 62K, and reading 30,000 new tokens up to 11 minutes | 240 minutes. Deep research is expected to take 1.5 to 3 hours | As today (Decision 0034 L2) |
 | **Inkling 2 Mini, UD-Q3_K_XL** | Not until US-3.4's suite passes. Under llama.cpp 1.1.0 a required tool call failed, so the suite can't pass yet | 64K | 8,192 tokens, because reasoning can't be turned off and counts against the reply (A9) | 1,800 seconds | 240 minutes | As today |
 
+## The owner's later choices
+
+- **2026-11-27, US-23.2:** "Start US-23.2", answering whether to start Bonsai 2.5's server and qualify its route. It meets the External dependency US-23.2 carried: `llama-server` is started by the runbook command (A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and the route's qualification is asked for.
+
 ## Requirements revised
 
 The stories amend these in their own changes:

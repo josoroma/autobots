@@ -142,7 +142,15 @@ Expected: one model, whose `id` is the alias. The worker reads `AUTOBOTS_LOCAL_M
 - **Another model or alias:** the call stops as `model_unavailable`.
 - **Spend:** each local call settles at US$0.
 
-**Stopping it:** `Ctrl-C` in its terminal. No local profile is offered for new runs until its route is qualified (US-23.2).
+**Qualify it,** on request, with the server running and nothing else using it (US-23.2). This spends nothing and needs no `--paid`:
+
+```sh
+services/agent/.venv/bin/python -m autobots.operations.route_qualification --profile local_bonsai_2_5_27b --out .checks/route-qualification
+```
+
+Expected: about 39 calls in three trials of US-3.4's twelve fixtures, then measurements at about 8K, 32K and 64K prompt tokens, in roughly half an hour on this Mac. It prints `"spent_usd": "0.00"` and whether the profile is `offerable`. `.checks/route-qualification/report-local_bonsai_2_5_27b.json` keeps every trial, the pins, the server's build and peak footprint, and the sentence a migration records. `--no-measure` skips the measurements, and `--port` names another port. A wrong model or no server refuses with nothing sent.
+
+**Stopping it:** `Ctrl-C` in its terminal. A local profile is offered on the Local source only once its qualification is recorded by migration as `qualified_with_limits`.
 
 ## Boundaries
 
