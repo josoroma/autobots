@@ -7,27 +7,27 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-22.1 |
+| Target | US-23.1 |
 | Kind | story |
 | Focus | - |
-| Status | COMPLETE |
+| Status | ACTIVE |
 | Reason | - |
-| Started | 2026-11-25 |
-| Updated | 2026-11-25 |
+| Started | 2026-11-27 |
+| Updated | 2026-11-27 |
 
 ## Stories
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-22.1 | us-22-1-transcript-reader-publishes-polished | DONE | The Transcript reader publishes polished prose |
+| 1 | US-23.1 | us-23-1-local-model-route-through | IN PROGRESS | A local model route through the shared gateway |
 
 ## Next Action
 
-Action: complete
-Story: -
-Change: -
-Command: none — every story in the goal is DONE
-Reason: all 1 story/stories are DONE
+Action: apply
+Story: US-23.1
+Change: us-23-1-local-model-route-through
+Command: /ohmyorch:opsx-apply us-23-1-local-model-route-through
+Reason: 12/14 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

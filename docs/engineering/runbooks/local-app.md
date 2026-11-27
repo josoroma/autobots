@@ -108,6 +108,42 @@ The API also needs `AUTOBOTS_CONFIG_ROOT`, the absolute directory holding any `.
 
 Only a user's **Run** reaches the credential gate. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser. With one, the goal is queued, and only a worker with [the inference switch](operations.md#turning-on-inference) runs it.
 
+## The owner's local model server
+
+A local profile's calls go to `llama-server` on this Mac. Neither the Studio nor a hook starts it or downloads weights, so the owner does both ([Decision 0041](../decisions/0041-local-model-source.md) A4, A5).
+
+Check the release and the weights first. Bonsai 2.5's Q2_0 needs b11556 or later: older builds load it without a warning and produce garbage.
+
+```sh
+llama-server --version
+python3.12 ~/Models/verify-models.py
+```
+
+Expected: `version: 1.1.0 (build 12774, ...)` or later. `verify-models.py` prints a `PASS` line for each pinned model in `~/Models/DOWNLOAD-MANIFEST.json`, including `prism-ml/Ternary-Bonsai-2.5-27B-GGUF` and `unsloth/Inkling-2-Mini-GGUF`. A manifest entry for a model no longer on disk fails its own line only.
+
+Start one model, bound to loopback only. Its `--alias` is the model ID its profile checks before each call:
+
+```sh
+llama-server -m ~/Models/Ternary-Bonsai-2.5-27B-GGUF/Ternary-Bonsai-2.5-27B-Q2_0.gguf --alias bonsai-2.5-27b-q2_0 \
+  --host 127.0.0.1 --port 9931 -c 65536 -np 1 -fa on -ngl 99 --jinja --reasoning-format deepseek \
+  --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5
+```
+
+For Inkling 2 Mini, use `-m ~/Models/Inkling-2-Mini-GGUF/Inkling-2-Mini-UD-Q3_K_XL.gguf --alias inkling-2-mini-ud-q3_k_xl --temp 1.0 --min-p 0` with the same other flags. Only one model fits in memory beside the Studio.
+
+```sh
+curl -s http://127.0.0.1:9931/v1/models
+```
+
+Expected: one model, whose `id` is the alias. The worker reads `AUTOBOTS_LOCAL_MODEL_PORT`, default 9931, and a value that isn't a port stops it at start with exit 2.
+
+**What a run shows:**
+- **Nothing listening:** a call on a local profile stops as `local_model_server_unavailable`, and the run waits until the server is started. Nothing is sent, and no other model or source is tried.
+- **Another model or alias:** the call stops as `model_unavailable`.
+- **Spend:** each local call settles at US$0.
+
+**Stopping it:** `Ctrl-C` in its terminal. No local profile is offered for new runs until its route is qualified (US-23.2).
+
 ## Boundaries
 
 The browser calls only `/api/v1/...` on the same origin. That route refuses a wrong `Host` or `Origin` and, on writes, a missing or mismatched CSRF token, then adds the internal credential on the server. The Supabase session lives in an HttpOnly, same-site cookie, through `@supabase/ssr` on the server only. The API requires the credential on every route, verifies the session token against the Auth JWT secret and checks membership in the database. Browser-supplied user and workspace IDs are not trusted, and errors carry only a code and a short message.

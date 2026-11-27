@@ -3223,7 +3223,9 @@
         "enum": [
           "openrouter_deepseek_flash",
           "openrouter_terra",
-          "openrouter_sol"
+          "openrouter_sol",
+          "local_bonsai_2_5_27b",
+          "local_inkling_2_mini"
         ],
         "title": "ModelProfileId",
         "type": "string"
@@ -6025,6 +6027,7 @@
           "credentials_required",
           "credential_unavailable",
           "model_unavailable",
+          "local_model_server_unavailable",
           "cost_unavailable",
           "invalid_credential",
           "insufficient_credits",

@@ -3224,7 +3224,9 @@ export const schemas = {
     "enum": [
       "openrouter_deepseek_flash",
       "openrouter_terra",
-      "openrouter_sol"
+      "openrouter_sol",
+      "local_bonsai_2_5_27b",
+      "local_inkling_2_mini"
     ],
     "title": "ModelProfileId",
     "type": "string"
@@ -6026,6 +6028,7 @@ export const schemas = {
       "credentials_required",
       "credential_unavailable",
       "model_unavailable",
+      "local_model_server_unavailable",
       "cost_unavailable",
       "invalid_credential",
       "insufficient_credits",
@@ -8899,7 +8902,7 @@ export function parseModelPolicyUpdate(value: unknown): ModelPolicyUpdate {
   return parseWith(schemas, "ModelPolicyUpdate", value) as ModelPolicyUpdate;
 }
 
-export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_terra" | "openrouter_sol";
+export type ModelProfileId = "openrouter_deepseek_flash" | "openrouter_terra" | "openrouter_sol" | "local_bonsai_2_5_27b" | "local_inkling_2_mini";
 
 export function parseModelProfileId(value: unknown): ModelProfileId {
   return parseWith(schemas, "ModelProfileId", value) as ModelProfileId;
@@ -9636,7 +9639,7 @@ export function parseSessionWorkspace(value: unknown): SessionWorkspace {
   return parseWith(schemas, "SessionWorkspace", value) as SessionWorkspace;
 }
 
-export type StopCode = "credentials_required" | "credential_unavailable" | "model_unavailable" | "cost_unavailable" | "invalid_credential" | "insufficient_credits" | "rate_limited" | "provider_error" | "network_before_acceptance" | "partial_stream" | "uncertain_acceptance" | "incomplete_output" | "other" | "admission_refused" | "budget_exceeded" | "no_inference_slot" | "uncertain_model_call" | "unadmitted_model_call" | "request_unencodable" | "route_not_bound" | "compaction_failed" | "incompatible_version" | "model_calls_limit" | "tool_dispatches_limit" | "repairs_limit" | "plan_revisions_limit" | "children_limit" | "active_time_limit" | "step_limit" | "lease_lost" | "run_not_running" | "run_not_found" | "approval_pending" | "parent_not_running" | "assignment_paused" | "assignment_lost" | "assignment_busy" | "outcome_unknown" | "output_too_large" | "command_refused" | "worker_failed" | "plan_missing" | "plan_incomplete" | "criteria_unmet" | "workflow_invalid" | "workflow_node_failed" | "workflow_stalled" | "cancelled" | "cancelled_with_unknown_outcomes" | "children_settling";
+export type StopCode = "credentials_required" | "credential_unavailable" | "model_unavailable" | "local_model_server_unavailable" | "cost_unavailable" | "invalid_credential" | "insufficient_credits" | "rate_limited" | "provider_error" | "network_before_acceptance" | "partial_stream" | "uncertain_acceptance" | "incomplete_output" | "other" | "admission_refused" | "budget_exceeded" | "no_inference_slot" | "uncertain_model_call" | "unadmitted_model_call" | "request_unencodable" | "route_not_bound" | "compaction_failed" | "incompatible_version" | "model_calls_limit" | "tool_dispatches_limit" | "repairs_limit" | "plan_revisions_limit" | "children_limit" | "active_time_limit" | "step_limit" | "lease_lost" | "run_not_running" | "run_not_found" | "approval_pending" | "parent_not_running" | "assignment_paused" | "assignment_lost" | "assignment_busy" | "outcome_unknown" | "output_too_large" | "command_refused" | "worker_failed" | "plan_missing" | "plan_incomplete" | "criteria_unmet" | "workflow_invalid" | "workflow_node_failed" | "workflow_stalled" | "cancelled" | "cancelled_with_unknown_outcomes" | "children_settling";
 
 export function parseStopCode(value: unknown): StopCode {
   return parseWith(schemas, "StopCode", value) as StopCode;

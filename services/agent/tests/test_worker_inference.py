@@ -400,7 +400,7 @@ class Current:
 
 def real_attempt(
     monkeypatch: pytest.MonkeyPatch, outcome: Any, fake: RecordingOpenRouter | None = None
-) -> tuple[Any, CredentialReference]:
+) -> tuple[Any, CredentialReference | None]:
     async def credential(*_: Any) -> Any:
         if isinstance(outcome, Exception):
             raise outcome

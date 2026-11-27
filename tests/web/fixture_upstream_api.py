@@ -17,7 +17,7 @@ from autobots.adapters.models.factory import OPENROUTER_BASE_URL
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, key_validator
 from autobots.api.main import create_configured_app
 from autobots.api.resources import resources_of
-from autobots.domain.models import PROFILES, ModelProfileId
+from autobots.domain.models import OPENROUTER_PROFILES, PROFILES, ModelProfileId
 
 LOG = Path(os.environ['AUTOBOTS_TEST_UPSTREAM_LOG'])
 PARAMETERS = ('max_tokens', 'response_format', 'tool_choice', 'tools')
@@ -36,9 +36,11 @@ def handle(request: httpx.Request) -> httpx.Response:
     if request.url.path.endswith('/models'):
         if Path(os.environ['AUTOBOTS_TEST_CATALOG_DOWN']).exists():
             return httpx.Response(503)
-        # US-15.8: listed prices and parameters, so Models shows catalog facts. USD per token.
+        # US-15.8: listed prices and parameters, so Models shows catalog facts. USD per token. OpenRouter's catalog
+        # lists OpenRouter's profiles only, never a local one (Decision 0041 A2).
         data = [{'id': p.wire_id, 'canonical_slug': p.canonical_id, 'supported_parameters': list(PARAMETERS),
-                 'pricing': {'prompt': PRICES[p.id][0], 'completion': PRICES[p.id][1]}} for p in PROFILES.values()]
+                 'pricing': {'prompt': PRICES[p.id][0], 'completion': PRICES[p.id][1]}}
+                for p in (PROFILES[profile] for profile in OPENROUTER_PROFILES)]
         return httpx.Response(200, content=json.dumps({'data': data}))
     return httpx.Response(599)
 

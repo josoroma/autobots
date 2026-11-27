@@ -76,7 +76,9 @@ def healthy_catalog(at: datetime = NOW) -> CatalogSnapshot:
     )
 
 
-def test_exactly_three_profiles_with_their_identities() -> None:
+def test_three_openrouter_profiles_and_two_local_ones_with_their_identities() -> None:
+    """Decision 0019's three OpenRouter profiles, and Decision 0041's two local ones, each pinned to
+    its repository's revision and file and named by the model ID its server reports."""
     assert {key.value: (p.canonical_id, p.wire_id) for key, p in PROFILES.items()} == {
         "openrouter_deepseek_flash": (
             "deepseek/deepseek-v4.1-flash-20261017",
@@ -84,7 +86,22 @@ def test_exactly_three_profiles_with_their_identities() -> None:
         ),
         "openrouter_terra": ("openai/gpt-6.1-terra-20261026", "openai/gpt-6.1-terra"),
         "openrouter_sol": ("openai/gpt-6.1-sol-20260929", "openai/gpt-6.1-sol"),
+        "local_bonsai_2_5_27b": (
+            "prism-ml/Ternary-Bonsai-2.5-27B-GGUF@28a7093cc25bc151cc2b284c5570f12ce343fdcf"
+            "/Ternary-Bonsai-2.5-27B-Q2_0.gguf",
+            "bonsai-2.5-27b-q2_0",
+        ),
+        "local_inkling_2_mini": (
+            "unsloth/Inkling-2-Mini-GGUF@8078d149286eec7193795413b9e0643da6d11fa1"
+            "/Inkling-2-Mini-UD-Q3_K_XL.gguf",
+            "inkling-2-mini-ud-q3_k_xl",
+        ),
     }
+    assert [p.id.value for p in PROFILES.values() if p.local is None] == [
+        "openrouter_deepseek_flash",
+        "openrouter_terra",
+        "openrouter_sol",
+    ]
     assert DEFAULT_PROFILE is TERRA
 
 

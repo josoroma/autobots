@@ -50,9 +50,9 @@ The deepest uncertainty is model behavior. An advertised capability, a valid JSO
 4. Every consequential tool operation is associated with a policy decision and an operation record.
 5. A model's assertion of success cannot alone mark a run successful.
 6. The same tool registry serves direct expert work, delegation, and visual workflows.
-7. All 14 inference roles are separately configurable and initially resolve to the approved Terra profile; every actual model call uses the run's explicit OpenRouter role snapshot.
+7. All 14 inference roles are separately configurable and initially resolve to the approved Terra profile; every actual model call uses the run's explicit role snapshot, on OpenRouter or, by [Decision 0041](../engineering/decisions/0041-local-model-source.md), on an offered local profile.
 8. A user can securely configure OpenRouter, understand what context leaves the device, and select an approved model without repeated approval for each bounded inference call.
-9. Application services, authentication, files, database, logs, and credentials remain on this Mac; inference sends only the authorized request context to OpenRouter and its serving provider.
+9. Application services, authentication, files, database, logs, and credentials remain on this Mac; inference sends only the authorized request context to OpenRouter and its serving provider, or, on a local profile ([Decision 0041](../engineering/decisions/0041-local-model-source.md)), to the owner's server on this Mac.
 
 ### 2.3 Explicit scope choices
 
@@ -62,7 +62,7 @@ The deepest uncertainty is model behavior. An advertised capability, a valid JSO
 
 **Later:** OAuth connector catalog, richer visual editing, imports/exports, safe sandbox execution, cross-workspace collaboration, and reviewed memory/skill improvement. Public marketplace, payment/credit systems, all AutoGPT integrations, unattended self-modification, and full graph-import compatibility are outside the first release.
 
-Hosted application/database/auth/storage/tracing deployments and local inference engines are outside the active design. Use Vercel-maintained packages where relevant without deploying the application to Vercel. Permissioned web research or connector calls remain tools executed by the local worker; they do not relocate application services or persistence.
+Hosted application/database/auth/storage/tracing deployments are outside the active design. A local inference engine is in it only as [Decision 0041](../engineering/decisions/0041-local-model-source.md) has it: the owner's `llama-server` on 127.0.0.1, answering a local profile through the same model factory, and started by the owner. Use Vercel-maintained packages where relevant without deploying the application to Vercel. Permissioned web research or connector calls remain tools executed by the local worker; they do not relocate application services or persistence.
 
 The product must accurately show unavailable capabilities. With the local host asleep, a scheduled run is delayed or missed according to its configured policy; it does not silently execute elsewhere. With tool calling unqualified, autonomous execution remains disabled and the application reports the specific unmet gate.
 
@@ -357,6 +357,8 @@ def openrouter_model(binding, resolved_secret) -> ChatOpenRouter:
         **binding.qualified_generation_parameters,
     )
 ```
+
+**Local profiles ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A2, A3).** The same factory builds the same `ChatOpenRouter` for a local profile, on a loopback client to the owner's `llama-server` at `http://127.0.0.1:<port>/v1`. It sends no key, makes no retries, sends none of OpenRouter's routing fields, and reports a cost of 0. Before the client is built, the server's `/v1/models` must report the profile's model ID. Otherwise the call is refused `model_unavailable`, and with nothing listening it is blocked as `local_model_server_unavailable`. Neither substitutes another model or source.
 
 `max_retries=0` centralizes retry accounting in the invocation controller; it does not mean no retries anywhere. The explicit resolved key and fixed HTTPS base prevent SDK defaults from bypassing credential precedence or redirecting secrets. No local endpoint adapter or direct model-vendor client is part of this factory. Validate complete tool JSON before dispatch; never execute streaming prefixes or use `eval` to interpret a model reply.
 

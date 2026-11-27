@@ -81,8 +81,9 @@ OLD_NOT_OURS = {"lease_lost", "run_not_running", "run_not_found", "approval_pend
 # A refused transition reports this instead of lease_lost, and releases the run (R-34, PRUN-03).
 ADDED_RELEASE = {"command_refused"}
 # A pass that kept raising an unclassified exception suspends the run at the bound (Decision 0028
-# E4, R-35).
-ADDED_SUSPEND = {"worker_failed"}
+# E4, R-35). A local route's stopped server suspends it until the owner starts the server
+# (Decision 0041 A3, US-23.1).
+ADDED_SUSPEND = {"worker_failed", "local_model_server_unavailable"}
 # Every other code that reached `finish` failed the run, these by name.
 OLD_FAILS = {
     "rate_limited",
@@ -287,7 +288,7 @@ def test_every_disposition_keeps_todays_behavior() -> None:
     }
     assert counts == {
         Disposition.VERIFY: 0,
-        Disposition.SUSPEND: 20,
+        Disposition.SUSPEND: 21,
         Disposition.FAIL: 22,
         Disposition.RELEASE: 5,
     }

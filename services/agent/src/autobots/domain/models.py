@@ -29,6 +29,25 @@ class ModelProfileId(StrEnum):
     DEEPSEEK_FLASH = "openrouter_deepseek_flash"
     TERRA = "openrouter_terra"
     SOL = "openrouter_sol"
+    # Served on this Mac by the owner's llama-server (Decision 0041 A2, A3).
+    LOCAL_BONSAI_2_5 = "local_bonsai_2_5_27b"
+    LOCAL_INKLING_2_MINI = "local_inkling_2_mini"
+
+
+@dataclass(frozen=True)
+class LocalServing:
+    """What pins a local profile (Decision 0041 A3, A5, A9). The served model ID is the profile's
+    `wire_id`, checked before each call. The weights' and template's hashes are checked by the
+    runbook's `verify-models.py` and the server's `/props`, since hashing gigabytes per call isn't
+    affordable."""
+
+    repository: str
+    revision: str
+    file: str
+    sha256: str
+    chat_template_sha256: str
+    # Sent as `chat_template_kwargs`: the model's thinking switch, where its template has one.
+    thinking: Mapping[str, object]
 
 
 @dataclass(frozen=True)
@@ -36,6 +55,12 @@ class ModelProfile:
     id: ModelProfileId
     canonical_id: str
     wire_id: str
+    # None for an OpenRouter profile.
+    local: LocalServing | None = None
+
+    @property
+    def is_local(self) -> bool:
+        return self.local is not None
 
 
 @dataclass(frozen=True)
@@ -51,6 +76,25 @@ class ModelRoute:
     # Where a higher rate starts, past the size assumed. Nothing is reserved at that rate.
     tier_from_tokens: int | None = None
 
+
+# The pins measured on 2026-11-27 (research/LOCAL-MODELS-INKLING-BONSAI.md, Decision 0041 A5).
+# Bonsai's template turns thinking off. Inkling's can't, so `none` is its least (A9).
+BONSAI_2_5 = LocalServing(
+    repository="prism-ml/Ternary-Bonsai-2.5-27B-GGUF",
+    revision="28a7093cc25bc151cc2b284c5570f12ce343fdcf",
+    file="Ternary-Bonsai-2.5-27B-Q2_0.gguf",
+    sha256="84496171ca79d4d33fb45612a2afd8303ec494baf916281023b7dc9cb3b3b9fa",
+    chat_template_sha256="c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    thinking=MappingProxyType({"enable_thinking": False}),
+)
+INKLING_2_MINI = LocalServing(
+    repository="unsloth/Inkling-2-Mini-GGUF",
+    revision="8078d149286eec7193795413b9e0643da6d11fa1",
+    file="Inkling-2-Mini-UD-Q3_K_XL.gguf",
+    sha256="e2d03e8c92ac21cff0e3309b95f40dfd27d1825184f0d2bc09db249797273639",
+    chat_template_sha256="a04653367fbabaf38e91c426b8572ec18b1342dee6675caa8ce9564b6877da94",
+    thinking=MappingProxyType({"reasoning_effort": "none"}),
+)
 
 PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
     {
@@ -69,7 +113,23 @@ PROFILES: Mapping[ModelProfileId, ModelProfile] = MappingProxyType(
             "openai/gpt-6.1-sol-20260929",
             "openai/gpt-6.1-sol",
         ),
+        ModelProfileId.LOCAL_BONSAI_2_5: ModelProfile(
+            ModelProfileId.LOCAL_BONSAI_2_5,
+            BONSAI_2_5.repository + "@" + BONSAI_2_5.revision + "/" + BONSAI_2_5.file,
+            "bonsai-2.5-27b-q2_0",
+            BONSAI_2_5,
+        ),
+        ModelProfileId.LOCAL_INKLING_2_MINI: ModelProfile(
+            ModelProfileId.LOCAL_INKLING_2_MINI,
+            INKLING_2_MINI.repository + "@" + INKLING_2_MINI.revision + "/" + INKLING_2_MINI.file,
+            "inkling-2-mini-ud-q3_k_xl",
+            INKLING_2_MINI,
+        ),
     }
+)
+# The profiles OpenRouter answers, in order. Paid trials and catalog checks cover these only.
+OPENROUTER_PROFILES: tuple[ModelProfileId, ...] = tuple(
+    profile for profile in ModelProfileId if PROFILES[profile].local is None
 )
 DEFAULT_PROFILE = ModelProfileId.TERRA
 # MP-07's budgets. Output is sent on every call, and is 4,096 tokens so one save holds a 2,000 to
@@ -103,6 +163,13 @@ NOT_OFFERED_MESSAGES: Mapping[ModelProfileId, str] = MappingProxyType(
     {
         ModelProfileId.DEEPSEEK_FLASH: NOT_OFFERED_MESSAGE,
         ModelProfileId.SOL: "Sol isn't offered for new runs until its route is qualified.",
+        # Decision 0041 A7: offered only once US-3.4's suite passes on its local route.
+        ModelProfileId.LOCAL_BONSAI_2_5: (
+            "Bonsai 2.5 isn't offered for new runs until its local route is qualified."
+        ),
+        ModelProfileId.LOCAL_INKLING_2_MINI: (
+            "Inkling 2 Mini isn't offered for new runs until its local route is qualified."
+        ),
     }
 )
 

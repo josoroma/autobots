@@ -15,7 +15,7 @@ The application, workers, authentication, database, files and durable state run 
 
 [Decision 0004](../engineering/decisions/0004-terra-replaces-astra.md) replaced Astra with Terra. The DeepSeek mapping is observed in the [dated public catalog snapshot](../../research/openrouter-model-catalog.json), and Terra's in the public catalog on 2026-11-05. Do not substitute a moving-family, Pro, batch or routing alias. In particular, Terra’s shorter request ID does not establish an immutable snapshot guarantee.
 
-The registry contains exactly these three profiles. DeepSeek isn't offered for new runs until it's qualified, by [Decision 0013](../engineering/decisions/0013-release-closure.md), and a choice saved earlier that names it is refused with no substitute. Sol isn't offered for new runs until its route is qualified, the same way, by Decision 0019. Provide a per-run profile, an owner/admin workspace default for future runs and advanced versioned role bindings. New workspaces assign all 14 roles to `openrouter_terra`, except that `researcher` resolves to `openrouter_sol` once Sol is offered (Decision 0019). Persist the canonical role keys `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator` and `general_purpose` consistently across languages.
+The registry contains exactly these three OpenRouter profiles, and the two local profiles of [Decision 0041](../engineering/decisions/0041-local-model-source.md) (MP-02's local routes), which are approved and not offered for new runs until their routes qualify. DeepSeek isn't offered for new runs until it's qualified, by [Decision 0013](../engineering/decisions/0013-release-closure.md), and a choice saved earlier that names it is refused with no substitute. Sol isn't offered for new runs until its route is qualified, the same way, by Decision 0019. Provide a per-run profile, an owner/admin workspace default for future runs and advanced versioned role bindings. New workspaces assign all 14 roles to `openrouter_terra`, except that `researcher` resolves to `openrouter_sol` once Sol is offered (Decision 0019). Persist the canonical role keys `coordinator`, `router`, `planner`, `executor`, `researcher`, `coder`, `reviewer`, `evaluator`, `summarizer`, `memory_curator`, `skill_learner`, `tool_repair`, `workflow_generator` and `general_purpose` consistently across languages.
 
 MVP retrieval uses local Postgres lexical/full-text search. No additional embedding/reranking model or inference endpoint is included.
 
@@ -48,6 +48,8 @@ Do not send a `models` fallback array, automatic routing names, provider plugins
 Maintain capabilities per model and qualified route. The current Terra catalog does not advertise `temperature`, `top_p` or `parallel_tool_calls`; omit them instead of copying another profile's settings. Serialize application tool execution where required without assuming that parameter is available. Reject required unsupported capabilities before dispatch. JSON requests use the qualified `response_format.json_schema` shape and independent final validation. [Structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
 
 Preserve opaque provider reasoning metadata needed for tool continuation as access-controlled protocol state, with the original ordering and content where the pinned SDK passes it on. Terra's encrypted `id` is removed by that SDK, a stated limit by [Decision 0013](../engineering/decisions/0013-release-closure.md). Do not display it as private thoughts or put it in ordinary activity logs. Present concise decision summaries and evidence instead. [Reasoning continuation requirements](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
+**Local routes ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A2, A3, A9).** A local profile's call doesn't use OpenRouter's catalog or API. It goes through the same factory to the owner's `llama-server` at `http://127.0.0.1:<port>/v1`, with no key and no retries, and OpenRouter's routing fields are not sent. Its identity is pinned instead: the Hugging Face repository at its revision, the weights file's SHA-256, the chat template's hash, and the model ID the server reports. Before each call, `/v1/models` must report exactly that model ID, or the call is refused `model_unavailable` with no substitute. The profile's thinking switch is sent as `chat_template_kwargs`, reasoning the server returns in its own field is dropped before the reply is used, and one named tool is sent as `required` with only that tool.
 
 ## MP-03. Configuration precedence
 
@@ -132,6 +134,8 @@ Default cloud caps are **US$1 per run** and **US$5 per workspace UTC day**, conf
 
 Warn at 80%; pause at 100%, including committed spend plus outstanding reservations. Settle against reported usage/cost when available, retain unresolved reservations after ambiguous failures and reconcile rather than inventing a charge. Display estimates separately from reported charges. These are application admission controls, not a guarantee against every OpenRouter billing overrun or a substitute for provider account limits. No actual cloud token charges were measured in this research.
 
+**Local routes ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A2).** A local call reserves US$0, reports a cost of 0 and settles at US$0, and it still counts against the run's model calls, tokens, tool dispatches and active time.
+
 ## MP-08. Failure and recovery
 
 | Condition | Required handling |
@@ -146,6 +150,8 @@ Warn at 80%; pause at 100%, including committed spend plus outstanding reservati
 | Incomplete/invalid tool arguments | Do not execute; record a bounded repair or failure under run policy. |
 
 Retries never bypass budgets or change the selected model. Streamed prefixes are progress, not executable arguments or committed results. Parse and validate completed tool calls, enforce permissions/approvals, and use operation receipts to prevent duplicate effects. A model retry does not establish that a tool failed to execute. Cancellation stops new admission and reports uncertainty for already dispatched model/tool work.
+
+**Local routes ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A3).** When nothing answers on a local route's port, the call is blocked as `local_model_server_unavailable` before anything is sent, and the run waits until the owner starts the server, as a missing key does. Settings, files and other work are unaffected, and no other model or source is tried.
 
 ## MP-09. Acceptance evidence
 

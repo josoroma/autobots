@@ -344,11 +344,13 @@ def test_only_the_authorized_routes_can_be_paid_for(tmp_path: Path) -> None:
     assert set(rq.ROUTES) == set(rq.AUTHORIZED_CAPS)
 
 
-def test_every_approved_profile_has_a_route_to_qualify() -> None:
-    """Otherwise "each enabled route" could quietly stop meaning the routes the app uses."""
+def test_every_openrouter_profile_has_a_route_to_qualify() -> None:
+    """Otherwise "each enabled route" could quietly stop meaning the routes the app uses. A local
+    profile is qualified on its own route, at no spend (Decision 0041 A7, US-23.2)."""
     routes = {(route.wire_id, route.canonical_id) for route in rq.ROUTES.values()}
     for profile in PROFILES.values():
-        assert (profile.wire_id, profile.canonical_id) in routes
+        if profile.local is None:
+            assert (profile.wire_id, profile.canonical_id) in routes
 
 
 def test_no_application_code_asks_for_strict_output() -> None:

@@ -39,6 +39,9 @@ export const PROFILE_NAME: Readonly<Record<ModelProfileId, string>> = {
   openrouter_terra: "Terra",
   openrouter_sol: "Sol",
   openrouter_deepseek_flash: "DeepSeek Flash",
+  // Served on this Mac by the owner's llama-server (Decision 0041 A2).
+  local_bonsai_2_5_27b: "Bonsai 2.5 (local)",
+  local_inkling_2_mini: "Inkling 2 Mini (local)",
 };
 
 function isProfile(value: string): value is ModelProfileId {

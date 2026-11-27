@@ -94,7 +94,7 @@ Layers under `services/agent/src/autobots/`:
   - Live text: `result_stream.py`.
   - Outbound HTTP: `provider_http.py`, `url_guard.py`, `remote_files.py`, `tavily.py`, `jina.py`, `market_data.py`, `github_connector.py`, `github_issues.py`, `github_reads.py`, `github_pulls.py`. Since R-62, after the analyzed revision, every client comes from `provider_http.http_client` (no redirects, no proxy or certificate variables, a required named timeout), provider replies are read through lenient adapter-private models, refused statuses are one table per write class, and each provider is a frozen connector with module-level handlers.
   - Browser: `browser_executor.py`, `browser_cdp.py`, `browser_qualification.py` (the images' source fingerprint, checked off the event loop and cached per digest), `browser_page.py`, `egress_proxy.py`, with the sweeper's lease and attempt queries in the fingerprinted `application/browser_leases.py`. `browser_use_box.py` runs a browse on browser-use in the box and judges its outcome (US-17.3, after the analyzed revision).
-  - Models: `models/` (`catalog.py`, `factory.py`, `openrouter_metadata.py`).
+  - Models: `models/` (`catalog.py`, `factory.py`, `openrouter_metadata.py`). After the analyzed revision, US-23.1 adds `local_server.py`, the loopback client a local profile's `ChatOpenRouter` uses (Decision 0041 A2, A3).
 - **`api/`:** `app.py` (factory), `main.py` (configured entry), 17 route modules, `dependencies.py`, `security.py`, `membership.py` and `errors.py`. Since R-55, after the analyzed revision, route modules hold no SQL but the stream's LISTEN, take their shared dependencies from `api/dependencies.py` (workspace and owner rules, readiness, the key check), decode the session token once per request, and cap stream listeners at 10; the model-policy write path is `application/model_policy.py`.
   - `contracts/generated/openapi.json` lists 66 paths under `/v1`.
   - Outside the schema (`include_in_schema=False`): artifact download and `/v1/runs/{id}/events/stream`.
@@ -210,7 +210,12 @@ Every admitted call streams. `_streamed` assembles the `astream` chunks and pars
 - `scripts/generate_contracts.py` (`write`, `check`) generates OpenAPI and the TypeScript client offline. `scripts/app_db.py types` generates the `public` row types.
 
 **External.** The variable names are in `.env.example`: `OPENROUTER_API_KEY`, `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_REPOSITORY`, `GITHUB_TOKEN`, `AUTOBOTS_BROWSER_EXECUTOR`.
-- **OpenRouter** is the only inference provider (`adapters/models/factory.py`, `openrouter_metadata.py`).
+- **OpenRouter** is the only inference provider (`adapters/models/factory.py`, `openrouter_metadata.py`). After the analyzed revision, US-23.1 adds local routes, answered by the owner's `llama-server` on 127.0.0.1 (Decision 0041):
+  - The same `ChatOpenRouter` runs on `adapters/models/local_server.LoopbackClient` over httpx, with no key or retries, the profile's `chat_template_kwargs`, reasoning removed and a reported cost of 0.
+  - `check_served` reads `/v1/models` before each call. A different model is `model_unavailable`, and nothing listening is the SUSPEND stop code `local_model_server_unavailable`.
+  - `worker_inference` reads no catalog or credential for a local profile, and reserves 0.
+  - The port is `AUTOBOTS_LOCAL_MODEL_PORT`, default 9931.
+  - The profiles `local_bonsai_2_5_27b` and `local_inkling_2_mini` (migration `20261127000068`) are approved and not offered, and the model list leaves them out.
   - Profiles: `openrouter_terra`, `openrouter_sol` (`openai/gpt-6.1-sol`) and `openrouter_deepseek_flash`, in `domain/models.py`.
   - The client is built inside each attempt from a key resolved there, with at most 512 output tokens, 4,096 since Decision 0034 L1 after the analyzed revision.
   - Every call is streamed.

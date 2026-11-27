@@ -12,7 +12,7 @@ import pytest
 from pydantic import SecretStr
 
 from autobots.application.model_admission import Pricing, worst_case_cost
-from autobots.domain.models import PROFILES, ModelProfileId
+from autobots.domain.models import OPENROUTER_PROFILES, PROFILES, ModelProfileId
 from autobots.operations import reasoning_trial as trial
 from autobots.operations.paid.ledger import Ledger
 from autobots.operations.paid.pricing import CONTEXT_TOKENS, OUTPUT_TOKENS
@@ -332,7 +332,8 @@ async def test_no_metadata_or_key_reaches_the_report_or_the_log(
     book = ledger(tmp_path)
     results = await trial.run_all(KEY, catalog(), book, 1, route.http)
     assert {result.outcome for result in results} == {"survived"}
-    assert {result.profile for result in results} == set(ModelProfileId)
+    # The paid trial covers the profiles OpenRouter answers (Decision 0041 A2).
+    assert {result.profile for result in results} == set(OPENROUTER_PROFILES)
     trial.write_report(tmp_path, results, book, {"usage": 1.0}, {"usage": 1.1})
     written = (tmp_path / "report.json").read_text() + (tmp_path / "ledger.json").read_text()
     assert MARKER not in written

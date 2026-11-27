@@ -518,7 +518,7 @@ CREATE TABLE app_private.model_invocations (
     CONSTRAINT model_invocations_attempt_check CHECK ((attempt >= 1)),
     CONSTRAINT model_invocations_charge_source_check CHECK ((charge_source = ANY (ARRAY['provider'::text, 'owner'::text]))),
     CONSTRAINT model_invocations_charged_micro_usd_check CHECK ((charged_micro_usd >= 0)),
-    CONSTRAINT model_invocations_profile_check CHECK ((profile = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text, 'openrouter_astra'::text]))),
+    CONSTRAINT model_invocations_profile_check CHECK ((profile = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text, 'openrouter_astra'::text, 'local_bonsai_2_5_27b'::text, 'local_inkling_2_mini'::text]))),
     CONSTRAINT model_invocations_reserved_micro_usd_check CHECK ((reserved_micro_usd >= 0)),
     CONSTRAINT model_invocations_status_check CHECK ((status = ANY (ARRAY['reserved'::text, 'dispatched'::text, 'succeeded'::text, 'failed_before_acceptance'::text, 'uncertain'::text, 'cancelled'::text])))
 );
@@ -532,7 +532,7 @@ CREATE TABLE app_private.model_policies (
     version integer NOT NULL,
     default_profile text,
     role_overrides jsonb DEFAULT '{}'::jsonb NOT NULL,
-    CONSTRAINT model_policies_default_profile_check CHECK ((default_profile = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text]))),
+    CONSTRAINT model_policies_default_profile_check CHECK ((default_profile = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text, 'local_bonsai_2_5_27b'::text, 'local_inkling_2_mini'::text]))),
     CONSTRAINT model_policies_version_check CHECK ((version >= 1))
 );
 
@@ -1078,7 +1078,7 @@ CREATE TABLE public.model_profiles (
     wire_id text NOT NULL,
     label text NOT NULL,
     seed_version integer NOT NULL,
-    CONSTRAINT model_profiles_profile_id_check CHECK ((profile_id = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text]))),
+    CONSTRAINT model_profiles_profile_id_check CHECK ((profile_id = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text, 'local_bonsai_2_5_27b'::text, 'local_inkling_2_mini'::text]))),
     CONSTRAINT model_profiles_seed_version_check CHECK ((seed_version >= 1))
 );
 

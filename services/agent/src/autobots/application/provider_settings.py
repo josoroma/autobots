@@ -343,6 +343,9 @@ class ProviderSettings:
         snapshot = parse_catalog(payload or {}, retrieved_at=now, revision="live")
         models = []
         for profile in PROFILES.values():
+            # A local profile is left out of every choice until it's offered (Decision 0041 A7).
+            if profile.is_local and not is_offered(profile.id):
+                continue
             entry = None
             try:
                 entry = validated_entry(profile, snapshot, now)

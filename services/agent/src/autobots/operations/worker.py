@@ -332,7 +332,12 @@ def inference_from_environment(
     if fetch_catalog is not None:
         context = replace(context, fetch_catalog=fetch_catalog)
     from autobots.adapters.browser_executor import BrowserExecutor
+    from autobots.adapters.models.local_server import local_port
 
+    try:
+        port = local_port(environ)
+    except ValueError as malformed:
+        raise MalformedSetting(str(malformed)) from None
     # Used only while the executor reports qualified, which `bind` checks for each job.
     return InferenceSource(
         database_url,
@@ -341,6 +346,7 @@ def inference_from_environment(
         client_factory,
         browser=BrowserExecutor(),
         store=store,
+        local_port=port,
     )
 
 

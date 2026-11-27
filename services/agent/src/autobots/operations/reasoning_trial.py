@@ -31,7 +31,7 @@ from autobots.adapters.models.factory import (
     default_sdk_client,
 )
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher, http_client
-from autobots.domain.models import PROFILES, ModelProfile, ModelProfileId
+from autobots.domain.models import OPENROUTER_PROFILES, PROFILES, ModelProfile, ModelProfileId
 from autobots.logs import configure_logging, forbid_remote_tracing, log_event
 from autobots.operations.cli import Refused, command
 from autobots.operations.paid.attempts import CALL_SECONDS, Route, prepare
@@ -299,7 +299,7 @@ async def run_all(
     ledger: Ledger,
     trials: int = TRIALS,
     make_http: HttpFactory = real_http,
-    profiles: Sequence[ModelProfileId] = tuple(ModelProfileId),
+    profiles: Sequence[ModelProfileId] = OPENROUTER_PROFILES,
 ) -> list[TrialResult]:
     results = []
     for profile_id in profiles:
@@ -369,7 +369,7 @@ async def _main(arguments: argparse.Namespace) -> int:
             arguments.trials,
             profiles=[ModelProfileId(arguments.profile)]
             if arguments.profile
-            else tuple(ModelProfileId),
+            else OPENROUTER_PROFILES,
         )
         after = await key_usage(key)
     except (Refused, ModelUnavailable, UnsupportedRequestOption) as refusal:
@@ -413,7 +413,7 @@ def main() -> int:
     parser.add_argument("--ledger", default=str(SHARED_LEDGER))
     parser.add_argument("--out", default=".checks/reasoning-trial")
     parser.add_argument("--trials", type=int, default=TRIALS)
-    parser.add_argument("--profile", choices=[profile.value for profile in ModelProfileId])
+    parser.add_argument("--profile", choices=[profile.value for profile in OPENROUTER_PROFILES])
     arguments = parser.parse_args()
     return command(lambda: asyncio.run(_main(arguments)))
 

@@ -39,7 +39,7 @@ from autobots.application.tool_keys import key_sources
 from autobots.application.worker_inference import CatalogCache, InferenceSource, frozen_policy
 from autobots.application.worker_leases import claim_next
 from autobots.contracts.experts import ExpertConfig
-from autobots.domain.models import PROFILES
+from autobots.domain.models import OPENROUTER_PROFILES, PROFILES
 from autobots.domain.tools import PLAN_TOOLS
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
@@ -49,7 +49,8 @@ SAVED_TOKEN = 'github_pat_fixtureSavedInSettings01'
 SECRETS = (ENV_TOKEN, SAVED_TOKEN)
 POLICY = frozen_policy({'version': 1, 'bindings': {'executor': 'openrouter_terra', 'researcher': 'openrouter_sol'}})
 CATALOG = {'data': [{'id': p.wire_id, 'canonical_slug': p.canonical_id, 'supported_parameters': ['max_tokens', 'tools', 'tool_choice'],
-                     'pricing': {'prompt': '0.000002', 'completion': '0.00001'}} for p in PROFILES.values()]}
+                     'pricing': {'prompt': '0.000002', 'completion': '0.00001'}}
+                     for p in (PROFILES[profile] for profile in OPENROUTER_PROFILES)]}
 cases: list[dict[str, Any]] = []
 
 

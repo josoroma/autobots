@@ -23,9 +23,14 @@ from autobots.adapters.models.catalog import (
     validated_entry,
 )
 from autobots.adapters.models.factory import (
+    DEFAULT_PORT,
+    LocalServerUnavailable,
+    LoopbackClient,
     PreparedAttempt,
     UnsupportedRequestOption,
     chat_model,
+    check_served,
+    local_chat_model,
     prepare_attempt,
 )
 from autobots.application import browsing_tool
@@ -58,6 +63,7 @@ from autobots.contracts.persisted import PolicySnapshot, read_policy_snapshot
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
     PROFILES,
+    ModelProfile,
     ModelRole,
     ModelRoute,
     RolePolicy,
@@ -135,10 +141,16 @@ def frozen_policy(snapshot: PolicySnapshot | Mapping[str, object] | None) -> Rol
 
 
 def prepared(
-    policy: RolePolicy, catalog: CatalogSnapshot, role: ModelRole = ROLE
+    policy: RolePolicy, catalog: CatalogSnapshot | None, role: ModelRole = ROLE
 ) -> tuple[PreparedAttempt, int]:
-    """Fresh exact mapping, options and tools, and the most one call is reserved for."""
+    """Fresh exact mapping, options and tools, and the most one call is reserved for. A local
+    profile needs no catalog and reserves nothing, since a local call costs nothing (Decision 0041
+    A2)."""
     attempt = prepare_attempt(policy, role, catalog, options=OPTIONS)
+    if attempt.profile.is_local:
+        return attempt, 0
+    if catalog is None:
+        raise ModelUnavailable("the model catalog could not be read")
     entry = validated_entry(attempt.profile, catalog, datetime.now(UTC))
     if "tools" not in entry.supported_parameters:
         raise UnsupportedRequestOption("this model's catalog entry does not support tools")
@@ -187,7 +199,7 @@ class AttemptModel:
         try:
             return await target.ainvoke(messages, stop=stop, **kwargs)
         except Exception as error:
-            if getattr(error, "status_code", None) == 401:
+            if used is not None and getattr(error, "status_code", None) == 401:
                 await self._source.reject_key(self._workspace_id, used)
             raise
 
@@ -204,7 +216,7 @@ class AttemptModel:
             async for chunk in target.astream(messages, stop=stop, **kwargs):
                 yield chunk
         except Exception as error:
-            if getattr(error, "status_code", None) == 401:
+            if used is not None and getattr(error, "status_code", None) == 401:
                 await self._source.reject_key(self._workspace_id, used)
             raise
 
@@ -221,6 +233,32 @@ class InferenceSource:
     browser: Any = None
     # The run's private storage, which keeps each browser-use step's screenshot (Decision 0035 Y11).
     store: Any = None
+    # The owner's llama-server for a local profile (Decision 0041 A2, local_server.local_port).
+    local_port: int = DEFAULT_PORT
+    # None in production, which means a real loopback client. Tests hand in one on a fake server.
+    local_client: Callable[[ModelProfile, int], LoopbackClient] | None = None
+    local_transport: Any = None
+
+    async def _catalog_for(self, profile: ModelProfile) -> CatalogSnapshot | None:
+        """OpenRouter's catalog, which a local profile never reads (Decision 0041 A13)."""
+        return None if profile.is_local else await self.catalog.current()
+
+    async def _open_local(self, policy: RolePolicy, role: ModelRole) -> Any:
+        """A local call's client, once the server shows it serves the profile's model (A3). No
+        credential is read, and a refusal here is before anything is sent."""
+        attempt, _ = prepared(policy, None, role)
+        try:
+            await check_served(attempt.profile, self.local_port, transport=self.local_transport)
+        except LocalServerUnavailable:
+            raise ProviderFailure(FailureClass.LOCAL_MODEL_SERVER_UNAVAILABLE) from None
+        except ModelUnavailable:
+            raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
+        client = (
+            self.local_client(attempt.profile, self.local_port)
+            if self.local_client is not None
+            else None
+        )
+        return local_chat_model(attempt, self.local_port, client=client)
 
     async def open_attempt(
         self,
@@ -228,8 +266,14 @@ class InferenceSource:
         policy: RolePolicy,
         reserved_micro_usd: int | None = None,
         role: ModelRole = ROLE,
-    ) -> tuple[Any, CredentialReference]:
-        """Inside the attempt. Every refusal here is before sending, and classed as such."""
+    ) -> tuple[Any, CredentialReference | None]:
+        """Inside the attempt. Every refusal here is before sending, and classed as such. A local
+        call has no credential, so none is returned."""
+        if policy.profile_for(role).is_local:
+            try:
+                return await self._open_local(policy, role), None
+            except UnsupportedRequestOption:
+                raise ProviderFailure(FailureClass.MODEL_UNAVAILABLE) from None
         try:
             attempt, fresh_worst = prepared(policy, await self.catalog.current(), role)
             if reserved_micro_usd is not None and fresh_worst > reserved_micro_usd:
@@ -286,8 +330,11 @@ class InferenceSource:
         """Why this job shouldn't start, and otherwise the most one call could cost.
 
         Everything a job's configuration can raise ends here. `bind` runs before the loop's own
-        gates, so an escape would keep a cancel or a finished candidate from ever settling.
+        gates, so an escape would keep a cancel or a finished candidate from ever settling. A local
+        route needs no OpenRouter key and no catalog, and costs nothing (Decision 0041 A2).
         """
+        if policy.profile_for(ROLE).is_local:
+            return None, 0
         try:
             code = await ProviderSettings(connection, self.context).run_intent(workspace_id)
         except (OSError, ValueError) as error:
@@ -303,7 +350,10 @@ class InferenceSource:
             return refused.code, 0
 
     async def _input_rate(self, profile: Any) -> tuple[int, int | None]:
-        """Zero where no price can be read, which `_refusal` has already stopped. And any tier."""
+        """Zero where no price can be read, which `_refusal` has already stopped. And any tier.
+        A local profile has no price."""
+        if profile.is_local:
+            return 0, None
         try:
             entry = validated_entry(profile, await self.catalog.current(), datetime.now(UTC))
         except ModelUnavailable:
@@ -364,7 +414,7 @@ class InferenceSource:
         except (UnknownModelProfile, KeyError, ValueError):
             return "route_not_bound"
         try:
-            worst_case = prepared(policy, await self.catalog.current(), role)[1]
+            worst_case = prepared(policy, await self._catalog_for(profile), role)[1]
         except UnsupportedRequestOption as unsupported:
             return unsupported.code
         except ModelUnavailable:

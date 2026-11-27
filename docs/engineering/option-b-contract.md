@@ -137,6 +137,8 @@ Initial application limits are two shared OpenRouter slots per workspace, 64K to
 
 Default spend caps are US$1 per root run and US$5 per workspace UTC day. Reserve conservative cost under database concurrency control before dispatch; descendants/retries share root/workspace accounting. Warn at 80%, pause at 100% of spend plus reservations. Mandatory reasoning consumes the qualified output allowance; truncated output is incomplete. Release inference slots before waiting for child work.
 
+A call on a local profile ([Decision 0041](decisions/0041-local-model-source.md) A2) reserves and settles US$0, since it costs nothing. It still counts against every other limit above, and against the run's model calls.
+
 Qualify each enabled model through its actual SDK for auto/required/named tools, strict/nested JSON, fragmented streaming, continuation, refusal, truncation, cancellation and task correctness. Named-tool tests use competing tools. Server validation remains mandatory for every structured result. Keep paid qualification separate from default tests and record reported charges separately from estimates. Ambiguous accepted requests retain receipts/reservations pending reconciliation; do not blindly redispatch.
 
 ## 6. Domain contracts, types and state

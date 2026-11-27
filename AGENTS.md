@@ -24,7 +24,7 @@ python3.12 scripts/verify.py --profile harness
 
 ## Boundaries that matter
 
-- All application model calls use the approved OpenRouter profiles (three, by Decision 0019) and the shared gateway. No fallback, local model server, implicit evaluator, hosted tracing or alternative provider. Keep runtime clients/keys out of durable state. Do not change developer-client model credentials as part of harness setup.
+- All application model calls use the approved OpenRouter profiles (three, by Decision 0019) or, by Decision 0041, an offered local profile served by the owner's `llama-server` on 127.0.0.1, through the shared gateway. No fallback between them, implicit evaluator, hosted tracing or alternative provider, and neither the app nor a hook starts the local server or downloads weights. Keep runtime clients/keys out of durable state. Do not change developer-client model credentials as part of harness setup.
 - Pydantic/OpenAPI owns public API contracts; generated TypeScript clients consume them. SQL owns persistent schema. LangGraph state/reducers and UI view models remain distinct. Use canonical states from the preserved Option B contract; terminal runs cannot resume.
 - Workers require leases/fencing, receipts, budgets and cancellation before live inference. Checkpoint ownership needs actual enforcement, not only a pre-dispatch check.
 - Migrations and repeatable seeds are separate. No persistent reset, volume removal or cloud project linking in ordinary checks. Use target-guarded disposable integration environments. Never seed real secrets or pending inference jobs.

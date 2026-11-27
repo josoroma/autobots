@@ -23,6 +23,8 @@ class FailureClass(StrEnum):
     CREDENTIALS_REQUIRED = "credentials_required"
     CREDENTIAL_UNAVAILABLE = "credential_unavailable"
     MODEL_UNAVAILABLE = "model_unavailable"
+    # Nothing answers on a local route's port: the owner's server isn't running (Decision 0041 A3).
+    LOCAL_MODEL_SERVER_UNAVAILABLE = "local_model_server_unavailable"
     COST_UNAVAILABLE = "cost_unavailable"
     INVALID_CREDENTIAL = "invalid_credential"
     INSUFFICIENT_CREDITS = "insufficient_credits"

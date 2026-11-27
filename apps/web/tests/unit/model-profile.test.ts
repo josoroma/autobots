@@ -36,6 +36,8 @@ test("each approved profile has one short name, for every screen that names it",
     openrouter_terra: "Terra",
     openrouter_sol: "Sol",
     openrouter_deepseek_flash: "DeepSeek Flash",
+    local_bonsai_2_5_27b: "Bonsai 2.5 (local)",
+    local_inkling_2_mini: "Inkling 2 Mini (local)",
   });
   assert.equal(profileName("openrouter_deepseek_flash"), "DeepSeek Flash");
 });
