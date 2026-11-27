@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-23.2 |
+| Target | US-23.7 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-23.2 | us-23-2-local-route-qualification-offering | READY | Local route qualification and offering, at no spend |
+| 1 | US-23.7 | us-23-7-local-route-enforces-required | IN PROGRESS | A local route enforces required tool calls, and Bonsai 2.5's route is qualified again |
 
 ## Next Action
 
-Action: propose
-Story: US-23.2
-Change: us-23-2-local-route-qualification-offering
-Command: /ohmyorch:opsx-propose us-23-2-local-route-qualification-offering for US-23.2; then set US-23.2 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-23.2 is READY and has no OpenSpec change
+Action: apply
+Story: US-23.7
+Change: us-23-7-local-route-enforces-required
+Command: /ohmyorch:opsx-apply us-23-7-local-route-enforces-required
+Reason: 8/10 tasks complete
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

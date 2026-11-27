@@ -106,6 +106,8 @@ TOOL_CHILDREN = (
     Child('checks/tool_use_check.py', 'the tool-use check', ('{workspace}',), from_root=True),
     # US-14.15: Sol's rows, researcher's resolution and frozen runs.
     Child('checks/sol_profile_check.py', 'the Sol profile check', ('{workspace}',), from_root=True),
+    # US-23.7: Bonsai 2.5's stored requalification, and the Local source's offering from it.
+    Child('checks/local_offering_check.py', 'the local offering check', (), from_root=True),
     # US-15.4: the run list's facts, groups, filters and paging, in workspaces of its own.
     Child('checks/run_list_check.py', 'the run list check', from_root=True),
     # US-14.14: the browsing loop's steps through real admission on the researcher route.
@@ -538,7 +540,8 @@ def lookup_cases(stack: AppStack, cases: Cases) -> None:
     caveat = "Concurrent admission on a live route wasn''t tested."
     stated = rows(stack, "select string_agg(profile || '=' || (position('" + caveat + "' in limits) > 0)::text, ',' order by profile) "
                          "from agent_runtime.route_qualifications where status = 'qualified_with_limits';")
-    expected = 'openrouter_deepseek_flash=true,openrouter_sol=true,openrouter_terra=true'
+    # US-23.7: Bonsai 2.5's local route, qualified again by migration 70, states it too.
+    expected = 'local_bonsai_2_5_27b=true,openrouter_deepseek_flash=true,openrouter_sol=true,openrouter_terra=true'
     cases.check('every qualified route says concurrent admission was not tested', expected, stated, stated == expected)
 
 

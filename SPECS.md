@@ -8,6 +8,8 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 
 CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-18.1 on 2026-11-20. Facts marked "checked at HEAD" were read at `5c00b04`; refreshing the whole analysis is separate work.
 
+CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness accepted) for US-23.7 on 2026-11-27. Facts marked "checked at HEAD" were read at `0659c19`; refreshing the whole analysis is separate work.
+
 ## Table of Contents
 
 - [EPIC-1: Development foundation and Gate 0](#epic-1-development-foundation-and-gate-0)
@@ -174,6 +176,7 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-23.4: The Market watcher Costa Rica on a local model](#us-234-the-market-watcher-costa-rica-on-a-local-model)
   - [US-23.5: The deep research workflow on a local model](#us-235-the-deep-research-workflow-on-a-local-model)
   - [US-23.6: The Transcript workflow on a local model](#us-236-the-transcript-workflow-on-a-local-model)
+  - [US-23.7: A local route enforces required tool calls, and Bonsai 2.5's route is qualified again](#us-237-a-local-route-enforces-required-tool-calls-and-bonsai-25s-route-is-qualified-again)
 
 ## Work Item Status
 
@@ -877,6 +880,15 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-23.6#6 | With the owner's approval of a video the owner names, run the Transcript workflow live on the owner's install on the Local source. Record its checks, model and tool calls, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads `transcript.md` beside run 5's. Checked by the run's record and the worker's log, and by the owner's reading. | TODO | US-23.6 |
 | US-23.6#7 | Record the profile's match of the Transcript run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install. | TODO | US-23.6 |
 | US-23.6#8 | Add a "Local" section to `README-YouTube-Transcript.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the runs' records and the code. | TODO | US-23.6 |
+| US-23.7 | A local route enforces required tool calls, and Bonsai 2.5's route is qualified again | DONE | EPIC-23 |
+| US-23.7#1 | In `adapters/models/local_server.py`, send a call whose `tool_choice` is `required` or names a tool with a JSON-schema constraint on the reply: one call of a tool the request offers, or of the named tool only, with arguments matching that tool's parameters. Turn the reply into that tool call, with none of it left as text (A18). Send a call that leaves the choice to the model, and structured output, nested schemas included, as before. Update the module's docstring, US-23.1's named-tool test where it describes the request A18 replaces, and Decision 0005's guard, which allows this one request outside the runner. Checked by pytest under `services/agent/tests` with a fake server on loopback, including MP-A07's two-tool counterexample against a server that prefers the other tool. | DONE | US-23.7 |
+| US-23.7#2 | Report a constrained reply cut off by its output cap as cut off, with no tool call, as `adapters/model_replies` reads one on any route. Fail a reply that otherwise doesn't parse, names a tool the request doesn't offer or other than the named one, or whose arguments don't match, never repairing, retrying or passing it on as text (A18, MP-08). Checked by pytest under `services/agent/tests` with fake servers that count the chat completions they receive. | DONE | US-23.7 |
+| US-23.7#3 | Do the same for a streamed call: the reply is asked for whole, becomes one tool call, no chunk carries it as text, and a reply cut off at its cap is reported as cut off. Checked by pytest under `services/agent/tests` with a fake server. | DONE | US-23.7 |
+| US-23.7#4 | Show that a run's required and named calls on a local route go to the loopback only, reserving US$0. Show that `qualify_local` runs `tool_required` and `tool_named_conflict` through the constraint, so the suite qualifies the route as the gateway sends it (A7, A18). Checked by pytest under `services/agent/tests` with a fake suite server that answers within the schema it is sent, and a fake OpenRouter client that fails if built. | DONE | US-23.7 |
+| US-23.7#5 | On the owner's request, start `llama-server` by the runbook command after `llama-server --version` and a check of the weights' SHA-256 against the profile's pin and `~/Models/DOWNLOAD-MANIFEST.json`. Run the suite's three trials on Bonsai 2.5's route, keep the raw report in the ignored `.checks/route-qualification/`, then stop the server. Checked by the live report, read for its `live_local` evidence class, US$0.00 and each gating fixture's verdicts. | DONE | US-23.7 |
+| US-23.7#6 | Record the result by a new forward migration that updates Bonsai 2.5's `agent_runtime.route_qualifications` row, for its own canonical ID, from the live report's status, date, configuration and limits sentence. Its evidence names this story beside US-23.2, as migration 50's did for Sol. Migration 69 keeps its name and bytes. The new migration opens with its traceability comment and its `-- Locks:`, `-- Data:` and `-- Recovery:` lines, and `application/schema_release.py` follows it. If the route qualifies, its limits also state that concurrent admission on a live route wasn't tested, as every qualified route's do (SQLI-12), and the db profile's check of that names Bonsai 2.5. Checked by the harness profile's migration-header test, `services/agent/tests/test_schema_release.py`, and the db profile's disposable fixtures for the migration, the stored status and the Local source's offering from it. | DONE | US-23.7 |
+| US-23.7#7 | Amend the "Local routes" paragraph of PRD-Model-Providers MP-02, as Decision 0041's "Requirements revised" lists. It should say that the route enforces a required or named tool call: it asks the server for a reply constrained by a JSON schema to one call of an offered tool, or of the named tool only, and turns it into the tool call. A reply that doesn't match fails, with no repair, retry or text. This replaces "one named tool is sent as `required` with only that tool" (A18). Checked by reading it against A18. | DONE | US-23.7 |
+| US-23.7#8 | Update the "Qualify it" step under "The owner's local model server" in the local app runbook: what the requalification records, and that a migration stores the result. Update `CODEBASE.md`'s model path, integration points and migrations for the constrained call and the stored qualification, keeping its `Analyzed revision` honest. Checked by reading each against A18 and the code. | DONE | US-23.7 |
 
 ## Dependency Diagram
 
@@ -1068,6 +1080,7 @@ flowchart TD
     US_23_4["US-23.4: The Market watcher Costa Rica on a local model"]
     US_23_5["US-23.5: The deep research workflow on a local model"]
     US_23_6["US-23.6: The Transcript workflow on a local model"]
+    US_23_7["US-23.7: A local route enforces required tool calls, and Bonsai 2.5&#x27;s route is qualified again"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1434,22 +1447,26 @@ flowchart TD
   US_23_1 -.-> US_23_2
   US_23_2 -.-> US_23_3
   US_23_3 -.-> US_23_4
+  US_23_7 -.-> US_23_4
   EXT_US_23_4_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the replays and the live runs (Decision 0041 A4 and A16)"]
   EXT_US_23_4_1 -.-> US_23_4
   EXT_US_23_4_2["External: the owner approves the live Expert run and workflow execution on real tools, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
   EXT_US_23_4_2 -.-> US_23_4
   US_23_3 -.-> US_23_5
+  US_23_7 -.-> US_23_5
   EXT_US_23_5_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the replays and the live run (Decision 0041 A4 and A16)"]
   EXT_US_23_5_1 -.-> US_23_5
   EXT_US_23_5_2["External: the owner approves the live workflow execution&#x27;s tool spend on real tools, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
   EXT_US_23_5_2 -.-> US_23_5
   US_23_3 -.-> US_23_6
+  US_23_7 -.-> US_23_6
   EXT_US_23_6_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the browse trial, the replays and the live run (Decision 0041 A4 and A16)"]
   EXT_US_23_6_1 -.-> US_23_6
   EXT_US_23_6_2["External: the owner approves one live browse from https://example.com/ with allowed domains example.com and iana.org on the local researcher route, as the plan&#x27;s section 8 asks and Decision 0019 S6 did"]
   EXT_US_23_6_2 -.-> US_23_6
   EXT_US_23_6_3["External: the owner names a video and approves one live Transcript run on it, within the Transcript reader&#x27;s four YouTube hosts, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
   EXT_US_23_6_3 -.-> US_23_6
+  US_23_2 -.-> US_23_7
 ```
 
 ```mermaid
@@ -2796,6 +2813,23 @@ flowchart TD
     US_23_6 --> T_23_6_7
     T_23_6_8["US-23.6#8: Add a &quot;Local&quot; section to `README-YouTube-Transcript.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan&#x27;s scoreboard for this run, and a claim only of a match Settings shows (A7, the plan&#x27;s P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the runs&#x27; records and the code."]
     US_23_6 --> T_23_6_8
+    US_23_7["US-23.7: A local route enforces required tool calls, and Bonsai 2.5&#x27;s route is qualified again"]
+    T_23_7_1["US-23.7#1: In `adapters/models/local_server.py`, send a call whose `tool_choice` is `required` or names a tool with a JSON-schema constraint on the reply: one call of a tool the request offers, or of the named tool only, with arguments matching that tool&#x27;s parameters. Turn the reply into that tool call, with none of it left as text (A18). Send a call that leaves the choice to the model, and structured output, nested schemas included, as before. Update the module&#x27;s docstring, US-23.1&#x27;s named-tool test where it describes the request A18 replaces, and Decision 0005&#x27;s guard, which allows this one request outside the runner. Checked by pytest under `services/agent/tests` with a fake server on loopback, including MP-A07&#x27;s two-tool counterexample against a server that prefers the other tool."]
+    US_23_7 --> T_23_7_1
+    T_23_7_2["US-23.7#2: Report a constrained reply cut off by its output cap as cut off, with no tool call, as `adapters/model_replies` reads one on any route. Fail a reply that otherwise doesn&#x27;t parse, names a tool the request doesn&#x27;t offer or other than the named one, or whose arguments don&#x27;t match, never repairing, retrying or passing it on as text (A18, MP-08). Checked by pytest under `services/agent/tests` with fake servers that count the chat completions they receive."]
+    US_23_7 --> T_23_7_2
+    T_23_7_3["US-23.7#3: Do the same for a streamed call: the reply is asked for whole, becomes one tool call, no chunk carries it as text, and a reply cut off at its cap is reported as cut off. Checked by pytest under `services/agent/tests` with a fake server."]
+    US_23_7 --> T_23_7_3
+    T_23_7_4["US-23.7#4: Show that a run&#x27;s required and named calls on a local route go to the loopback only, reserving US$0. Show that `qualify_local` runs `tool_required` and `tool_named_conflict` through the constraint, so the suite qualifies the route as the gateway sends it (A7, A18). Checked by pytest under `services/agent/tests` with a fake suite server that answers within the schema it is sent, and a fake OpenRouter client that fails if built."]
+    US_23_7 --> T_23_7_4
+    T_23_7_5["US-23.7#5: On the owner&#x27;s request, start `llama-server` by the runbook command after `llama-server --version` and a check of the weights&#x27; SHA-256 against the profile&#x27;s pin and `~/Models/DOWNLOAD-MANIFEST.json`. Run the suite&#x27;s three trials on Bonsai 2.5&#x27;s route, keep the raw report in the ignored `.checks/route-qualification/`, then stop the server. Checked by the live report, read for its `live_local` evidence class, US$0.00 and each gating fixture&#x27;s verdicts."]
+    US_23_7 --> T_23_7_5
+    T_23_7_6["US-23.7#6: Record the result by a new forward migration that updates Bonsai 2.5&#x27;s `agent_runtime.route_qualifications` row, for its own canonical ID, from the live report&#x27;s status, date, configuration and limits sentence. Its evidence names this story beside US-23.2, as migration 50&#x27;s did for Sol. Migration 69 keeps its name and bytes. The new migration opens with its traceability comment and its `-- Locks:`, `-- Data:` and `-- Recovery:` lines, and `application/schema_release.py` follows it. If the route qualifies, its limits also state that concurrent admission on a live route wasn&#x27;t tested, as every qualified route&#x27;s do (SQLI-12), and the db profile&#x27;s check of that names Bonsai 2.5. Checked by the harness profile&#x27;s migration-header test, `services/agent/tests/test_schema_release.py`, and the db profile&#x27;s disposable fixtures for the migration, the stored status and the Local source&#x27;s offering from it."]
+    US_23_7 --> T_23_7_6
+    T_23_7_7["US-23.7#7: Amend the &quot;Local routes&quot; paragraph of PRD-Model-Providers MP-02, as Decision 0041&#x27;s &quot;Requirements revised&quot; lists. It should say that the route enforces a required or named tool call: it asks the server for a reply constrained by a JSON schema to one call of an offered tool, or of the named tool only, and turns it into the tool call. A reply that doesn&#x27;t match fails, with no repair, retry or text. This replaces &quot;one named tool is sent as `required` with only that tool&quot; (A18). Checked by reading it against A18."]
+    US_23_7 --> T_23_7_7
+    T_23_7_8["US-23.7#8: Update the &quot;Qualify it&quot; step under &quot;The owner&#x27;s local model server&quot; in the local app runbook: what the requalification records, and that a migration stores the result. Update `CODEBASE.md`&#x27;s model path, integration points and migrations for the constrained call and the stored qualification, keeping its `Analyzed revision` honest. Checked by reading each against A18 and the code."]
+    US_23_7 --> T_23_7_8
   end
 ```
 
@@ -10645,7 +10679,7 @@ Open Questions:
 
 # EPIC-23: A Model source setting, and the live runs on a model served on this Mac
 
-Scheduled by [Decision 0041](docs/engineering/decisions/0041-local-model-source.md#decision), from the owner's request of 2026-11-27 for "a setting in settings page that allows to change from the openrouter models we have been using so far to use a SLM local model", scoped to the three live runs, and the owner's "Record the decisions" on [the plan's section 10](docs/plan/local-models-every-run.md#10-decisions-the-owner-makes). The rest was delegated and is decided there. It amends Decision 0019 S2, Decision 0035 Y7 and the rows its ["Requirements revised"](docs/engineering/decisions/0041-local-model-source.md#requirements-revised) lists, each in the story whose behaviour it describes. The plan's draft stories LS-1 to LS-6 become US-23.1 to US-23.6; the earlier plan's drafts US-17.1 to US-17.3 were never ingested, and those IDs belong to other stories. A workspace setting, Model source, sends every model call either to OpenRouter, as today and by default, or to offered local profiles only, never mixed and never as a fallback (A1). The shared gateway answers a local profile from `llama-server` on 127.0.0.1, which the owner starts, once the served model is checked. A local call reserves US$0, and every other limit still counts (A2 to A4). A local profile is offered once US-3.4's suite passes on its route three times at no spend (A7). Bonsai 2.5's Q2_0 is the first candidate, and Inkling 2 Mini stays not offered until its suite passes ([set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)). On Local one profile answers every role, browsing included, within limits set per local route (A8, A10, A11). Then, in A16's order and with one model served at a time, the Market watcher Costa Rica, the deep research workflow and the Transcript workflow are each replayed three times on recorded inputs in a disposable environment, then run live once the owner approves each live run's real tool calls ([the plan's section 8](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)). Checks use fake transports and fake servers by default. A check against a running `llama-server` runs only on the owner's request, and no story makes a paid model call. Choosing a source per run, two local models at once, other runtimes, images on local routes and a citation gate in code aren't scheduled (A17). Nothing here establishes that either model completes any run, that a note's Spanish or a transcript's prose is right, H1 or product acceptance ([what Decision 0041 doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)).
+Scheduled by [Decision 0041](docs/engineering/decisions/0041-local-model-source.md#decision), from the owner's request of 2026-11-27 for "a setting in settings page that allows to change from the openrouter models we have been using so far to use a SLM local model", scoped to the three live runs, and the owner's "Record the decisions" on [the plan's section 10](docs/plan/local-models-every-run.md#10-decisions-the-owner-makes). The rest was delegated and is decided there. It amends Decision 0019 S2, Decision 0035 Y7 and the rows its ["Requirements revised"](docs/engineering/decisions/0041-local-model-source.md#requirements-revised) lists, each in the story whose behaviour it describes. The plan's draft stories LS-1 to LS-6 become US-23.1 to US-23.6; the earlier plan's drafts US-17.1 to US-17.3 were never ingested, and those IDs belong to other stories. US-23.7, from A18, has a local route enforce a required or named tool call itself, and qualifies Bonsai 2.5's route again. A workspace setting, Model source, sends every model call either to OpenRouter, as today and by default, or to offered local profiles only, never mixed and never as a fallback (A1). The shared gateway answers a local profile from `llama-server` on 127.0.0.1, which the owner starts, once the served model is checked. A local call reserves US$0, and every other limit still counts (A2 to A4). A local profile is offered once US-3.4's suite passes on its route three times at no spend (A7). Bonsai 2.5's Q2_0 is the first candidate, and Inkling 2 Mini stays not offered until its suite passes ([set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)). On Local one profile answers every role, browsing included, within limits set per local route (A8, A10, A11). Then, in A16's order and with one model served at a time, the Market watcher Costa Rica, the deep research workflow and the Transcript workflow are each replayed three times on recorded inputs in a disposable environment, then run live once the owner approves each live run's real tool calls ([the plan's section 8](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)). Checks use fake transports and fake servers by default. A check against a running `llama-server` runs only on the owner's request, and no story makes a paid model call. Choosing a source per run, two local models at once, other runtimes, images on local routes and a citation gate in code aren't scheduled (A17). Nothing here establishes that either model completes any run, that a note's Spanish or a transcript's prose is right, H1 or product acceptance ([what Decision 0041 doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)).
 
 ### US-23.1: A local model route through the shared gateway
 
@@ -10994,6 +11028,7 @@ Scenario: A live run matches the OpenRouter run
 
 Dependencies:
 - US-23.3
+- US-23.7
 - External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the replays and the live runs (Decision 0041 A4 and A16)
 - External: the owner approves the live Expert run and workflow execution on real tools, on the owner's install rebuilt with this code and its migrations applied by the owner
 
@@ -11041,6 +11076,8 @@ Source:
 - [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
 - [`AGENTS.md`, no implicit evaluator](AGENTS.md#boundaries-that-matter)
 - [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Decision 0041, A18, which makes a required tool call constrained to its schema the local route's behaviour, not a run's](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, the owner's later choices: "Decide it", after US-23.2, which answers this story's question on tool calls constrained to their schema](docs/engineering/decisions/0041-local-model-source.md#the-owners-later-choices)
 
 Codebase Context:
 - [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `operations/concept_seed.py` seeds the Deep research writer with `google_search`, `google_extract`, `search_web`, `extract_website_content`, `read_artifact`, `read_run_file`, `save_artifact` and `publish_artifact`, and the Deep research content writer workflow with a "Research and write" and a "Check and report" step on it. No module under `services/agent/src` replays recorded tool results (checked at HEAD). Not product intent.
@@ -11062,6 +11099,7 @@ Scenario: A live run matches the OpenRouter run
 
 Dependencies:
 - US-23.3
+- US-23.7
 - External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the replays and the live run (Decision 0041 A4 and A16)
 - External: the owner approves the live workflow execution's tool spend on real tools, on the owner's install rebuilt with this code and its migrations applied by the owner
 
@@ -11077,7 +11115,6 @@ Tasks:
 Open Questions:
 - The replay reads workflow run 5's recorded tool results. Does the owner's install keep them whole, which the local small models plan's section 10 says must be verified first? If not, does the owner approve a recording run's tool spend on the Local source, and who exports the recording, whose page text is third-party, into the ignored `.checks`?
 - The plan's section 7 calls for a version of the Deep research writer that writes the document in parts (A14). Is it seeded or saved by the owner? How does a run on Local use it while a run on OpenRouter keeps today's version, given that a seed keeps an Expert that exists (Decision 0034 S1)?
-- The plan's section 7 also calls for tool calls constrained to their schema, which no Decision 0041 row decides. May a local route send a grammar or JSON-schema constraint with a required tool call, and is that the route's option or the run's?
 - Does the owner's reading of `content.md` and `review.md` decide whether the profile has matched this run (A7), or does the match follow R1 to R9's code checks, with the reading recorded beside it?
 
 ### US-23.6: The Transcript workflow on a local model
@@ -11136,6 +11173,7 @@ Scenario: A live run matches the OpenRouter run
 
 Dependencies:
 - US-23.3
+- US-23.7
 - External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the browse trial, the replays and the live run (Decision 0041 A4 and A16)
 - External: the owner approves one live browse from https://example.com/ with allowed domains example.com and iana.org on the local researcher route, as the plan's section 8 asks and Decision 0019 S6 did
 - External: the owner names a video and approves one live Transcript run on it, within the Transcript reader's four YouTube hosts, on the owner's install rebuilt with this code and its migrations applied by the owner
@@ -11155,3 +11193,110 @@ Open Questions:
 - The prose replay checks for "a word count near run 5's 8,049". What range holds?
 - Run 5's `transcript-timed.md` is a private artifact on the owner's install and another creator's work (Decision 0035). Who exports it for the replay? Is it kept only in the ignored `.checks`, and removed afterwards?
 - Does the owner's reading of `transcript.md` decide whether the profile has matched this run (A7), or does the match follow the code checks, with the reading recorded beside it?
+
+### US-23.7: A local route enforces required tool calls, and Bonsai 2.5's route is qualified again
+
+Status: DONE
+Change: `openspec/changes/archive/2026-11-27-us-23-7-local-route-enforces-required/`
+
+As a workspace owner
+I want a local route to enforce a required or named tool call itself, and Bonsai 2.5's route qualified again against my `llama-server` at no spend
+So that a local profile is offered only if its route passes US-3.4's suite as the gateway now sends it, with no tool call repaired, retried or passed on as text.
+
+Source:
+- [Decision 0041, A18, and the route it changes and qualifies: A2 to A4, A7 and A9](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, the owner's later choices: "Decide it", after US-23.2, which records A18 and asks for Bonsai 2.5's route to be qualified again against `llama-server` started by the runbook command](docs/engineering/decisions/0041-local-model-source.md#the-owners-later-choices)
+- [Decision 0041, requirements revised: MP-02's local routes](docs/engineering/decisions/0041-local-model-source.md#requirements-revised)
+- [Decision 0041, set from the measurements, Bonsai 2.5's row](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [The plan, section 5, on llama-server's JSON-schema constraint and the named tool it doesn't take](docs/plan/local-models-every-run.md#5-how-a-local-model-plugs-in)
+- [The plan, section 8, Q1 for every run](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)
+- [Measurements, correctness, on required tool calls](research/LOCAL-MODELS-INKLING-BONSAI.md#correctness)
+- [MP-01, no fallback](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02, local routes](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-08, incomplete or invalid tool arguments aren't run](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [MP-09, MP-A06 and MP-A07, the two-tool counterexample](docs/PRD/PRD-Model-Providers.md#mp-09-acceptance-evidence)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Decision 0019, S2 and what "qualified" means](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Decision 0005, nothing asks for strict output on a route where it failed](docs/engineering/decisions/0005-deepseek-strict-nested-unsupported.md#decision-0005-deepseeks-strict-nested-output-is-unsupported)
+- [The model gateway rule, a correct response doesn't prove an ignored tool constraint was enforced](.claude/rules/model-gateway.md#openrouter-application-inference)
+- [The local app runbook, the owner's local model server](docs/engineering/runbooks/local-app.md#the-owners-local-model-server)
+- [SQL review, SQLI-12, the caveat every qualified route states](docs/reviews/review-2026-11-12-09-52-30/findings/sql-infra.md#sqli-12)
+- [`AGENTS.md`, boundaries that matter](AGENTS.md#boundaries-that-matter)
+
+Codebase Context:
+- [Integration points](CODEBASE.md#integration-points): `CODEBASE.md` was analyzed at 095a976, behind HEAD 0659c19, and records US-23.1 and US-23.2 as after that revision. `adapters/models/local_server.LoopbackClient.body` drops OpenRouter's parameters, adds the profile's `chat_template_kwargs` and sends a named tool as `tool_choice` `required` with only that tool. It passes `required` and `auto` through as given, with no JSON-schema constraint. The whole and streamed paths return the server's reply with reasoning removed and a cost of 0, and never read its text for a tool call (checked at HEAD). Not product intent.
+- [Entry Points](CODEBASE.md#entry-points): `operations/route_qualification.qualify_local` builds each call with `factory.local_chat_model`, so it qualifies the route as the gateway sends it. It runs `route_fixtures.QualificationRun`'s twelve fixtures in three trials at 512 output tokens (`paid/pricing.OUTPUT_TOKENS`). `gate` sets `recorded_status` to `qualified_with_limits` only when `GATING`'s `plain_text`, `tool_auto`, `tool_required`, `schema_flat` and `stream_text` pass in all three, and `limits_text` is the sentence a migration stores. `tool_required` binds `Weather` with `tool_choice="any"`, sent as `required`, to "Say hello to me. Don't look anything up." `tool_named_conflict` names `Weather` beside `ClockTime` under a system prompt preferring `ClockTime` (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): the section lists 66 migrations, and HEAD has 69. `20261127000069_bonsai_local_route_qualification.sql` inserts Bonsai 2.5's row as `not_qualified` on 2026-11-27, with limits `schema_nested` 0 of 3, `tool_named_conflict` 2 of 3 and `tool_required` 0 of 3, `on conflict (profile) do nothing`. Migration 50 updated Sol's row in place when Sol was qualified again. `application/schema_release.py` holds `SHIPPED_MIGRATIONS = 69` and `NEWEST_MIGRATION` (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): `adapters/model_replies.finished` treats the finish reasons `length`, `error` and `content_filter` as incomplete, so such a reply is never run, and `loop_middleware`'s `cut_off` reads `length`. `_strictly_parsed` keeps a streamed call whose arguments aren't a whole JSON object as an invalid tool call. `application/local_offering.local_offers` offers a local profile only from a stored `qualified_with_limits` row for its own canonical ID (checked at HEAD). Not product intent.
+- [Tests and Quality Gates](CODEBASE.md#tests-and-quality-gates): the db check in `scripts/app_db.py` that every qualified route says concurrent admission wasn't tested expects exactly the three OpenRouter profiles among `qualified_with_limits` rows. `services/agent/tests/test_local_model_route.py` asserts that a named tool is sent as `required` with only that tool, and `test_route_qualification.py`'s Decision 0005 guard fails if application code outside the runner sets `response_format` (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A required tool call becomes one tool call
+  Given a local route, a model call offering Weather and LookupCode with tool_choice required, and a fake server on loopback that answers with one call matching the JSON schema it is sent
+  When the call is sent
+  Then the request asks for a reply constrained by a JSON schema to one call of Weather or LookupCode with arguments matching that tool's parameters, the reply becomes that one tool call, and none of the constrained reply is in the reply's text
+
+Scenario: A named tool call is constrained to that tool
+  Given a local route, a model call offering Weather and ClockTime that names Weather under a system prompt preferring ClockTime and never Weather, and a fake server that answers with a ClockTime call whenever the schema it is sent admits one
+  When the call is sent
+  Then the schema sent admits only a Weather call with Weather's parameters, and the reply becomes one Weather call
+
+Scenario: A constrained reply cut off by its output cap
+  Given a local route, a model call that requires a tool call, and a fake server whose constrained reply stops at the output cap with finish reason length, once whole and once streamed
+  When each call is sent
+  Then each reply is reported as cut off, as a cut-off reply on any route is, with no tool call, none of its text passed on and nothing run
+
+Scenario: A constrained reply that doesn't parse or doesn't match fails the call
+  Given a local route, model calls that require a tool call or name Weather, and a fake server whose constrained reply is, in turn, JSON that doesn't parse, a call of a tool the request doesn't offer, a call of a tool other than the named one, and arguments that don't match the tool's parameters
+  When each call is sent
+  Then each call fails with no tool run and nothing from the reply passed on as text, the route doesn't repair it, and the server receives one chat completion for each call
+
+Scenario: A call that leaves the choice to the model is sent as before
+  Given a local route, a model call with tool_choice auto, one with tools and no tool_choice, and one asking for structured output with a nested schema
+  When each request is sent
+  Then each body is what the route sent before A18, with its tools, tool choice and response format unchanged, and no JSON-schema constraint added for a tool call
+
+Scenario: A streamed required tool call
+  Given a local route, a streamed model call that requires a tool call, and a fake server that answers the constrained request
+  When the stream is read to its end
+  Then the server was asked for the reply whole, since only a complete call can be checked, the assembled message holds the one tool call the reply gave with its arguments whole and its usage, and no chunk carries any of the constrained reply as text
+
+Scenario: Nothing reaches OpenRouter
+  Given a run whose frozen route is on Bonsai 2.5's local profile, a fake local server, and a fake OpenRouter client that fails if it is built
+  When the run makes a model call that requires a tool call and one that names a tool
+  Then each goes to the loopback server only and reserves US$0, no other model or source is tried, and nothing reaches OpenRouter, its catalog included
+
+Scenario: The suite qualifies the route as the gateway sends it
+  Given a fake suite server that answers each tool call within the JSON schema its request carries, and every other fixture as US-23.2's fake suite server does
+  When the route qualification runner runs US-3.4's suite on a local route without --paid
+  Then tool_required and tool_named_conflict pass in each of three trials through the route's constraint, each verdict is recorded as fake-server evidence, nothing is reserved, and nothing reaches OpenRouter
+
+Scenario: Bonsai 2.5's route is qualified again on this Mac
+  Given the owner's request, and llama-server started by the runbook command, serving Bonsai 2.5's pinned Q2_0 on 127.0.0.1 with its weights checked against the download manifest
+  When US-3.4's suite runs on Bonsai 2.5's local route in three trials
+  Then each result is recorded as live local evidence apart from fake-server results, with the served model ID and the profile's pins, US$0.00 is spent, and nothing is sent to OpenRouter
+
+Scenario: The new result is stored and decides offering
+  Given the live report of Bonsai 2.5's requalification, and Bonsai 2.5's row stored by migration 69 as not_qualified
+  When a new forward migration is applied on a disposable target after migration 69
+  Then Bonsai 2.5's row holds the report's date, configuration and limits, its status is qualified_with_limits only if plain_text, tool_auto, tool_required, schema_flat and stream_text passed in all three trials and not_qualified otherwise, each fixture that didn't pass in every trial is listed in its limits, migration 69 keeps its bytes, and the Local source offers Bonsai 2.5 only when its status is qualified_with_limits
+```
+
+Dependencies:
+- US-23.2
+
+Tasks:
+- [x] In `adapters/models/local_server.py`, send a call whose `tool_choice` is `required` or names a tool with a JSON-schema constraint on the reply: one call of a tool the request offers, or of the named tool only, with arguments matching that tool's parameters. Turn the reply into that tool call, with none of it left as text (A18). Send a call that leaves the choice to the model, and structured output, nested schemas included, as before. Update the module's docstring, US-23.1's named-tool test where it describes the request A18 replaces, and Decision 0005's guard, which allows this one request outside the runner. Checked by pytest under `services/agent/tests` with a fake server on loopback, including MP-A07's two-tool counterexample against a server that prefers the other tool.
+- [x] Report a constrained reply cut off by its output cap as cut off, with no tool call, as `adapters/model_replies` reads one on any route. Fail a reply that otherwise doesn't parse, names a tool the request doesn't offer or other than the named one, or whose arguments don't match, never repairing, retrying or passing it on as text (A18, MP-08). Checked by pytest under `services/agent/tests` with fake servers that count the chat completions they receive.
+- [x] Do the same for a streamed call: the reply is asked for whole, becomes one tool call, no chunk carries it as text, and a reply cut off at its cap is reported as cut off. Checked by pytest under `services/agent/tests` with a fake server.
+- [x] Show that a run's required and named calls on a local route go to the loopback only, reserving US$0. Show that `qualify_local` runs `tool_required` and `tool_named_conflict` through the constraint, so the suite qualifies the route as the gateway sends it (A7, A18). Checked by pytest under `services/agent/tests` with a fake suite server that answers within the schema it is sent, and a fake OpenRouter client that fails if built.
+- [x] On the owner's request, start `llama-server` by the runbook command after `llama-server --version` and a check of the weights' SHA-256 against the profile's pin and `~/Models/DOWNLOAD-MANIFEST.json`. Run the suite's three trials on Bonsai 2.5's route, keep the raw report in the ignored `.checks/route-qualification/`, then stop the server. Checked by the live report, read for its `live_local` evidence class, US$0.00 and each gating fixture's verdicts.
+- [x] Record the result by a new forward migration that updates Bonsai 2.5's `agent_runtime.route_qualifications` row, for its own canonical ID, from the live report's status, date, configuration and limits sentence. Its evidence names this story beside US-23.2, as migration 50's did for Sol. Migration 69 keeps its name and bytes. The new migration opens with its traceability comment and its `-- Locks:`, `-- Data:` and `-- Recovery:` lines, and `application/schema_release.py` follows it. If the route qualifies, its limits also state that concurrent admission on a live route wasn't tested, as every qualified route's do (SQLI-12), and the db profile's check of that names Bonsai 2.5. Checked by the harness profile's migration-header test, `services/agent/tests/test_schema_release.py`, and the db profile's disposable fixtures for the migration, the stored status and the Local source's offering from it.
+- [x] Amend the "Local routes" paragraph of PRD-Model-Providers MP-02, as Decision 0041's "Requirements revised" lists. It should say that the route enforces a required or named tool call: it asks the server for a reply constrained by a JSON schema to one call of an offered tool, or of the named tool only, and turns it into the tool call. A reply that doesn't match fails, with no repair, retry or text. This replaces "one named tool is sent as `required` with only that tool" (A18). Checked by reading it against A18.
+- [x] Update the "Qualify it" step under "The owner's local model server" in the local app runbook: what the requalification records, and that a migration stores the result. Update `CODEBASE.md`'s model path, integration points and migrations for the constrained call and the stored qualification, keeping its `Analyzed revision` honest. Checked by reading each against A18 and the code.
+
+Open Questions:
+- None.

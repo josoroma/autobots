@@ -142,15 +142,15 @@ Expected: one model, whose `id` is the alias. The worker reads `AUTOBOTS_LOCAL_M
 - **Another model or alias:** the call stops as `model_unavailable`.
 - **Spend:** each local call settles at US$0.
 
-**Qualify it,** on request, with the server running and nothing else using it (US-23.2). This spends nothing and needs no `--paid`:
+**Qualify it,** on request, with the server running and nothing else using it (US-23.2, US-23.7). This spends nothing and needs no `--paid`:
 
 ```sh
 services/agent/.venv/bin/python -m autobots.operations.route_qualification --profile local_bonsai_2_5_27b --out .checks/route-qualification
 ```
 
-Expected: about 39 calls in three trials of US-3.4's twelve fixtures, then measurements at about 8K, 32K and 64K prompt tokens, in roughly half an hour on this Mac. It prints `"spent_usd": "0.00"` and whether the profile is `offerable`. `.checks/route-qualification/report-local_bonsai_2_5_27b.json` keeps every trial, the pins, the server's build and peak footprint, and the sentence a migration records. `--no-measure` skips the measurements, and `--port` names another port. A wrong model or no server refuses with nothing sent.
+Expected: about 39 calls in three trials of US-3.4's twelve fixtures, then measurements at about 8K, 32K and 64K prompt tokens, in roughly half an hour on this Mac. It prints `"spent_usd": "0.00"` and whether the profile is `offerable`. `.checks/route-qualification/report-local_bonsai_2_5_27b.json` keeps every trial, the pins, the server's build and peak footprint, and the sentence a migration records. `--no-measure` skips the measurements, which only a change of server, weights or flags calls for again, and `--port` names another port. A wrong model or no server refuses with nothing sent. A required or named tool call is held to a JSON schema by the route itself ([Decision 0041](../decisions/0041-local-model-source.md) A18), so the suite qualifies the route as runs send it. Move the earlier report and ledger aside first, since a new run writes over the report and adds its calls to the ledger.
 
-**Stopping it:** `Ctrl-C` in its terminal. A local profile is offered on the Local source only once its qualification is recorded by migration as `qualified_with_limits`.
+**Stopping it:** `Ctrl-C` in its terminal. A local profile is offered on the Local source only once its qualification is recorded by migration as `qualified_with_limits`. Bonsai 2.5's is, by migration `20261127000070` (US-23.7), which the owner applies to the install. Its report records each fixture's verdicts in three trials, US$0.00 and the sentence the migration stores, and Inkling 2 Mini has none.
 
 ## Boundaries
 

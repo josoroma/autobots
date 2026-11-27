@@ -27,7 +27,7 @@ Decided by the user. A Given such as "required items are absent" holds if any re
 ## When the next story stays `BLOCKED`
 
 - **An `External:` dependency, open question or `NEEDS CLARIFICATION`:** a real decision. Stop and report it.
-- **Any undelivered story dependency:** story order, not a product decision. Run `delivery stop`, deliver the prerequisite with `/ohmyorch:deliver <US-id>`, then resume the epic. Within an epic this currently affects US-2.3 (needs US-2.4, US-2.5) and US-4.3 (needs US-4.4). Do not reorder the backlog without explicit authority.
+- **Any undelivered story dependency:** story order, not a product decision. Run `delivery stop`, deliver the prerequisite with `/ohmyorch:deliver <US-id>`, then resume the epic. Within an epic this currently affects US-2.3 (needs US-2.4, US-2.5), US-4.3 (needs US-4.4), and US-23.4 to US-23.6 (need US-23.7). Do not reorder the backlog without explicit authority.
 
 ## Stopping
 

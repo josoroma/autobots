@@ -354,7 +354,10 @@ def test_every_openrouter_profile_has_a_route_to_qualify() -> None:
 
 
 def test_no_application_code_asks_for_strict_output() -> None:
-    """Decision 0005: a capability that failed qualification stays disabled until it passes."""
+    """Decision 0005: a capability that failed qualification stays disabled until it passes. The
+    one exception is a local route's required tool call, held to a JSON schema by the route itself
+    (Decision 0041 A18), whose flat structured output passed qualification. OpenRouter routes still
+    ask for none."""
     asks = re.compile(r"with_structured_output|response_format|bind_tools\([^)]*strict")
     source = Path(fixtures.__file__).parents[1]
     found = [
@@ -362,7 +365,7 @@ def test_no_application_code_asks_for_strict_output() -> None:
         for path in source.rglob("*.py")
         if path != Path(fixtures.__file__) and asks.search(path.read_text())
     ]
-    assert found == []
+    assert found == ["adapters/models/local_server.py"]
 
 
 def _with_terra() -> dict[str, Any]:

@@ -78,11 +78,16 @@ class FakeLlamaServer:
         reasoning: str | None = None,
         tool_call: dict[str, Any] | None = None,
         down: bool = False,
+        content: str | None = None,
+        finish: str | None = None,
     ) -> None:
         self.served = served
         self.reasoning = reasoning
         self.tool_call = tool_call
         self.down = down
+        # What a reply held to a schema says, and how it ended (Decision 0041 A18).
+        self.content = content
+        self.finish = finish
         self.requests: list[httpx.Request] = []
         self.transport = httpx.MockTransport(self.handle)
 
@@ -96,6 +101,8 @@ class FakeLlamaServer:
         if self.tool_call is not None:
             message["content"] = None
             message["tool_calls"] = [self.tool_call]
+        if self.content is not None:
+            message["content"] = self.content
         return message
 
     def handle(self, request: httpx.Request) -> httpx.Response:
@@ -105,7 +112,7 @@ class FakeLlamaServer:
         if request.url.path == "/v1/models":
             return httpx.Response(200, json={"object": "list", "data": [{"id": self.served}]})
         body = json.loads(request.content)
-        finish = "tool_calls" if self.tool_call else "stop"
+        finish = self.finish or ("tool_calls" if self.tool_call else "stop")
         if body.get("stream"):
             delta = self.message()
             chunks = [
@@ -314,26 +321,6 @@ async def test_bonsai_turns_thinking_off_and_inklings_reasoning_never_reaches_th
     assert "secret plan" not in json.dumps(
         [message.content, message.tool_calls, message.additional_kwargs, message.response_metadata]
     )
-
-
-def test_one_named_tool_is_sent_as_required_with_only_that_tool() -> None:
-    tools = [
-        {"type": "function", "function": {"name": name, "parameters": {"type": "object"}}}
-        for name in ("calculate", "market_history", "save_artifact")
-    ]
-    client = LoopbackClient(BONSAI, DEFAULT_PORT, 30.0)
-    body = client.body(
-        [{"role": "user", "content": "go"}],
-        {
-            "tools": tools,
-            "tool_choice": {"type": "function", "function": {"name": "market_history"}},
-            "provider": {"allow_fallbacks": False},
-            "model": "openai/gpt-6.1-terra",
-        },
-    )
-    assert body["tool_choice"] == "required"
-    assert [tool["function"]["name"] for tool in body["tools"]] == ["market_history"]
-    assert "provider" not in body and body["model"] == BONSAI.wire_id
 
 
 @pytest.mark.asyncio

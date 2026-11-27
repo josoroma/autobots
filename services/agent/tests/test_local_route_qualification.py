@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 import pytest
 
-from autobots.adapters.models.local_server import DEFAULT_PORT, LoopbackClient
+from autobots.adapters.models.local_server import DEFAULT_PORT, TOOL_CALL_SCHEMA, LoopbackClient
 from autobots.application.local_offering import local_offers, offered_locally
 from autobots.application.model_policy import validated_choice
 from autobots.application.provider_settings import qualification_from_record
@@ -46,7 +46,7 @@ PLAN = {
 class FakeSuiteServer:
     """llama-server as US-3.4's fixtures need it: text, tool calls, JSON schema output, streams,
     a tool result, truncation and a decline. `fail_required` makes the required tool call answer
-    with text instead in those trials (1-based), as Inkling 2 Mini's did by hand."""
+    with text instead in those trials (1-based), as a server that ignored its schema would."""
 
     def __init__(self, served: str, fail_required: frozenset[int] = frozenset()) -> None:
         self.served = served
@@ -63,15 +63,13 @@ class FakeSuiteServer:
             return {"role": "assistant", "content": "The central valley is"}, "length"
         if body.get("response_format"):
             schema = body["response_format"]["json_schema"]["schema"]
+            if body["response_format"]["json_schema"]["name"] == TOOL_CALL_SCHEMA:
+                return self.constrained_call(schema, last)
             value = DECISION if "choice" in schema.get("properties", {}) else PLAN
             return {"role": "assistant", "content": json.dumps(value, ensure_ascii=False)}, "stop"
         if messages[-1].get("role") == "tool":
             return {"role": "assistant", "content": "The code for alpha is 73914."}, "stop"
         if tools:
-            if body.get("tool_choice") == "required" and "Say hello" in last:
-                self.required_seen += 1
-                if self.required_seen in self.fail_required:
-                    return {"role": "assistant", "content": "Hello!"}, "stop"
             name = tools[0]["function"]["name"]
             args = {"item": "alpha"} if name == "LookupCode" else {"city": "Heredia"}
             call = {
@@ -87,6 +85,18 @@ class FakeSuiteServer:
         if "volcanoes" in last:
             return {"role": "assistant", "content": "Arenal Poas Irazu Rincon Turrialba"}, "stop"
         return {"role": "assistant", "content": "ready"}, "stop"
+
+    def constrained_call(self, schema: dict[str, Any], last: str) -> tuple[dict[str, Any], str]:
+        """A reply held to the tool call schema (Decision 0041 A18): the first tool it allows. A
+        trial in `fail_required` answers in text, as a server that ignored the schema would."""
+        if "Say hello" in last:
+            self.required_seen += 1
+            if self.required_seen in self.fail_required:
+                return {"role": "assistant", "content": "Hello!"}, "stop"
+        name = schema.get("anyOf", [schema])[0]["properties"]["name"]["enum"][0]
+        args = {"item": "alpha"} if name == "LookupCode" else {"city": "Heredia"}
+        call = json.dumps({"name": name, "arguments": args})
+        return {"role": "assistant", "content": call}, "stop"
 
     def stream(self, message: dict[str, Any], finish: str) -> str:
         chunks: list[dict[str, Any]] = []
@@ -168,6 +178,36 @@ async def test_a_local_route_qualifies_in_three_trials_with_nothing_spent(tmp_pa
     assert ledger["cap_micro_usd"] == 0 and ledger["committed"] == 0
     assert {entry["worst_case"] for entry in ledger["entries"]} == {0}
     assert (tmp_path / f"report-{BONSAI.id.value}.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_the_suite_sends_required_and_named_calls_through_the_routes_constraint(
+    tmp_path: Path,
+) -> None:
+    """US-23.7, Decision 0041 A18: the suite qualifies the route as runs send it. Each required or
+    named call reaches the server held to the tool call schema, with no tool choice of its own, and
+    passes in all three trials only because the fake answers within that schema."""
+    server = FakeSuiteServer(BONSAI.wire_id)
+    report = await qualified(server, tmp_path)
+    assert report["summary"]["tool_required"] == {"passed": 3}
+    assert report["summary"]["tool_named_conflict"] == {"passed": 3}
+    assert report["evidence_class"] == "fake_server" and report["committed_micro_usd"] == 0
+    chats = [json.loads(r.content) for r in server.requests if r.url.path.endswith("/completions")]
+    constrained = [
+        chat
+        for chat in chats
+        if (chat.get("response_format") or {}).get("json_schema", {}).get("name")
+        == TOOL_CALL_SCHEMA
+    ]
+    asked = [chat["messages"][-1]["content"] for chat in constrained]
+    # tool_required and tool_named_conflict, and the streamed named call, in each of three trials.
+    assert sum("Say hello" in text for text in asked) == 3
+    assert sum("What time is it in Heredia?" in text for text in asked) == 3
+    assert all(chat["tool_choice"] == "none" and "stream" not in chat for chat in constrained)
+    assert not any(chat.get("tool_choice") == "required" for chat in chats)
+    # Nothing reached OpenRouter: every request went to the loopback, and none carried a key.
+    assert {(r.url.host, r.url.port) for r in server.requests} == {("127.0.0.1", DEFAULT_PORT)}
+    assert all("authorization" not in r.headers for r in server.requests)
 
 
 def _fixture_names() -> list[tuple[str, object]]:

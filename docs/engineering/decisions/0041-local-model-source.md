@@ -42,6 +42,7 @@ This amends [Decision 0019](0019-sol-profile-and-browser-use.md) S2, [Decision 0
 | **A15. Measure first** (D4) | Before any story, each model is served by hand and measured with the whole Studio running: reading and writing speed, time to the first token and peak memory at 8K, 32K and 64K, each chat template's tool format, and which thinking switches it honours. The owner lowers Docker's VM memory limit to what Supabase uses plus headroom. The GPU's wired limit stays at the macOS default unless the measurements show it binds. Both are the owner's own settings |
 | **A16. The order** | Market watcher, then deep research, then the Transcript, which adds browsing. Only one model is served at a time. Each run's checks are [the plan's section 8](../../plan/local-models-every-run.md#8-qualifying-run-by-run) |
 | **A17. Not in this decision** | Choosing a source per run, two local models at once, other runtimes for new models (mlx-lm, MTPLX), images on local routes, a remote or cloud GPU, a citation gate in code (D6), and any model but the two candidates and the baseline. Each needs its own decision |
+| **A18. Required tool calls on a local route** | A call that requires a tool call, by `tool_choice` `required` or a named tool, is enforced by the local route itself. It asks the server for a reply constrained by a JSON schema to one call of a tool the request offers, or of the named tool only, with arguments matching that tool's parameters, and turns that reply into the tool call. A reply cut off by its output cap is reported as cut off, as on any route. A reply that otherwise doesn't parse or doesn't match fails that call, and the route never repairs it, retries it or passes it on as text. A call that leaves the choice to the model is sent as before. This is the route's behaviour, not a run's option, so US-3.4's suite qualifies the route as the gateway sends it (A7). Structured output, nested schemas included, is not changed by this row |
 
 ## Set from the measurements
 
@@ -55,6 +56,7 @@ A15's measurements ran the same day: [both models on this Mac](../../../research
 ## The owner's later choices
 
 - **2026-11-27, US-23.2:** "Start US-23.2", answering whether to start Bonsai 2.5's server and qualify its route. It meets the External dependency US-23.2 carried: `llama-server` is started by the runbook command (A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and the route's qualification is asked for.
+- **2026-11-27, after US-23.2:** "Decide it", answering "Should I record the decision for option 1 (have local routes enforce required tool calls themselves, then requalify Bonsai), or deliver US-23.3 first?" US-23.2 had recorded Bonsai 2.5's route as not qualified, because llama.cpp 1.1.0 didn't enforce a required tool call for its template. That answer records A18 and asks for Bonsai 2.5's route to be qualified again, against `llama-server` started by the runbook command (A4). A18 also answers US-23.5's open question on tool calls constrained to their schema: a local route sends the constraint with a required tool call, and it's the route's behaviour, not the run's.
 
 ## Requirements revised
 
@@ -63,9 +65,11 @@ The stories amend these in their own changes:
 - **PRD-Model-Providers:**
   - Its introduction and MP-01: the source, and resolution within it (A1, A8).
   - MP-02: A3 proves a local route's identity in place of OpenRouter's catalog.
+  - MP-02's local routes: a required or named tool call is enforced by the route (A18).
   - MP-04 and MP-05: the setting's states and who changes it (A1, A7, A13).
   - MP-07: US$0 spend and the disclosure (A2, A13).
   - MP-08: a stopped or wrong server (A3).
+- **[Decision 0005](0005-deepseek-strict-nested-unsupported.md)'s "nothing in the application asks for it":** it still holds for every OpenRouter route. On a local route, A18's constraint on a required tool call is the one request outside the qualification runner that sets `response_format`, and the local route's flat structured output passed qualification (A7).
 - **[Option B contract](../option-b-contract.md):** SP-006 (approved profiles, A1) and SP-008 (budgets and qualification, A2, A7, A11).
 - **[PRD-Local-Mac-Deployment](../../PRD/PRD-Local-Mac-Deployment.md):** LM-A03, the inference boundary, and its resources section, for the owner-started runtime (A4, A15).
 - **[PRD-LangChain-Deep-Agents](../../PRD/PRD-LangChain-Deep-Agents.md):** its scope, which puts local inference engines outside the design.
