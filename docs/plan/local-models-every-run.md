@@ -1,6 +1,6 @@
 # Plan: every live run on a local model, chosen in Settings
 
-**Date:** 2026-11-27. **Status:** decided the same day as [Decision 0041](../engineering/decisions/0041-local-model-source.md), which records [section 10](#10-decisions-the-owner-makes)'s answers. Nothing is implemented, downloaded or measured yet. The stories wait for P0's measurements.
+**Date:** 2026-11-27. **Status:** decided the same day as [Decision 0041](../engineering/decisions/0041-local-model-source.md), which records [section 10](#10-decisions-the-owner-makes)'s answers. P0's measurements are in [research/LOCAL-MODELS-INKLING-BONSAI.md](../../research/LOCAL-MODELS-INKLING-BONSAI.md). The stories are ingested as EPIC-23 in `SPECS.md`, US-23.1 to US-23.6.
 
 The aim is to repeat the three live runs on a model served on this Mac, with no OpenRouter call:
 - the deep research content writer;
@@ -90,6 +90,8 @@ Read from their pages on 2026-11-27. Every figure below is the publisher's own c
 **The baseline stays.** `Ternary-Bonsai-2-27B-MTPLX-Optimized-Speed` in `~/Models` (8.2 GiB, on MTPLX 2.12.2) passed tool calls in the [earlier test](../../research/LOCAL-MODEL-EVIDENCE.md), and failed strict JSON schema without `llguidance`. A new model should beat it.
 
 ## 4. This Mac
+
+**Measured later the same day:** [both models on this Mac](../../research/LOCAL-MODELS-INKLING-BONSAI.md). The estimates in this section are replaced there.
 
 Observed on 2026-11-27:
 - An Apple M3 Pro with 36 GiB of memory (38,654,705,664 bytes), on macOS 27.2.1.

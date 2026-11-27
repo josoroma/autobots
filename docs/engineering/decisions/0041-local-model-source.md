@@ -8,7 +8,7 @@ The owner's own choices:
 
 The rest are the session's choices, under the owner's standing delegation, as in Decisions 0035 to 0040. Where two options were close, the choice keeps today's behaviour, adds the least or is easier to reverse. The owner can change any of them.
 
-This amends [Decision 0019](0019-sol-profile-and-browser-use.md) S2, [Decision 0035](0035-browser-use-typing-and-transcripts.md) Y7, and the requirements below. It schedules nothing yet. Its stories are ingested after A15's measurements ([the plan's P1](../../plan/local-models-every-run.md#9-phases)).
+This amends [Decision 0019](0019-sol-profile-and-browser-use.md) S2, [Decision 0035](0035-browser-use-typing-and-transcripts.md) Y7, and the requirements below. It schedules EPIC-23, ingested after A15's measurements ([the plan's P1](../../plan/local-models-every-run.md#9-phases)).
 
 ## Context
 
@@ -32,7 +32,7 @@ This amends [Decision 0019](0019-sol-profile-and-browser-use.md) S2, [Decision 0
 | **A5. Downloads** (L3) | llama.cpp, Bonsai 2.5's Q2_0 (about 7.5 GB) and one Inkling 2 Mini GGUF that fits. Before each is fetched, its size, source and license are shown and the owner says yes. Each is pinned in `~/Models` with its revision and SHA-256 in `DOWNLOAD-MANIFEST.json`, and checked by `verify-models.py`. No weights enter the repository, a run's files or evidence |
 | **A6. Inkling's policy** (L7) | Before Inkling is downloaded, the owner reads Thinking Machines' Model Acceptable Use Policy, as Decision 0035 Y14 had the owner read YouTube's terms |
 | **A7. Offered, matched and switching** (L6, reshaped) | A local profile is **offered** once US-3.4's suite passes on its route three times, at no spend. Switching to Local is refused until offered profiles cover `executor`, and also `researcher` while any Expert grants `browse_goal`. The refusal names what is missing. A profile has **matched** a run once that run's live check holds on the Local source. Settings shows which runs each profile has matched, and a README claims only those. The recommended L6 made matching a gate, but a live check runs on the Local source itself, so a gate would make it impossible to run |
-| **A8. One model for every role** (L4, D11) | The Local source sets every role to one local profile, since two models don't fit in memory together. A second profile for `researcher` waits until measurements show both fit |
+| **A8. One model for every role** (L4, D11) | The Local source sets every role to one local profile, since two models don't fit in memory together. A second profile for `researcher` waits until measurements show both fit. So on Local, role overrides aren't offered. The Local default profile answers every role, a workspace role override can't be saved, and a run that names a role override is refused `model_not_offered`. OpenRouter's saved overrides are kept (A1) |
 | **A9. Thinking** (L5) | A local route asks the server to turn reasoning off where the model's template allows, and otherwise to return it in its own field, outside the reply. If reasoning still counts against the reply, that route gets a larger output cap, set under A11 |
 | **A10. Browsing follows the source** | The admitted endpoint answers on the run's frozen `researcher` route, so on Local, browser-use's calls reach the local model. The box is unchanged and never learns the server's address. Y16 still refuses an image the route isn't qualified for, so on Local, browsing works from text until a local route qualifies for images |
 | **A11. Limits per local route** (D5) | The call time (Decision 0034 L4, 300 seconds), the active minutes (L2, 45), the context (L6, 64K) and the output cap (4,096 tokens) are set for each local route from A15's measurements. Until then, today's limits apply |
@@ -42,6 +42,15 @@ This amends [Decision 0019](0019-sol-profile-and-browser-use.md) S2, [Decision 0
 | **A15. Measure first** (D4) | Before any story, each model is served by hand and measured with the whole Studio running: reading and writing speed, time to the first token and peak memory at 8K, 32K and 64K, each chat template's tool format, and which thinking switches it honours. The owner lowers Docker's VM memory limit to what Supabase uses plus headroom. The GPU's wired limit stays at the macOS default unless the measurements show it binds. Both are the owner's own settings |
 | **A16. The order** | Market watcher, then deep research, then the Transcript, which adds browsing. Only one model is served at a time. Each run's checks are [the plan's section 8](../../plan/local-models-every-run.md#8-qualifying-run-by-run) |
 | **A17. Not in this decision** | Choosing a source per run, two local models at once, other runtimes for new models (mlx-lm, MTPLX), images on local routes, a remote or cloud GPU, a citation gate in code (D6), and any model but the two candidates and the baseline. Each needs its own decision |
+
+## Set from the measurements
+
+A15's measurements ran the same day: [both models on this Mac](../../../research/LOCAL-MODELS-INKLING-BONSAI.md). These are the session's choices under A11, from what was measured. The owner can change any of them.
+
+| Route | Offered? | Context | Output cap | Call time | Active time | Calls and tools |
+|---|---|---|---|---|---|---|
+| **Bonsai 2.5, Q2_0**, every role (A8) | When US-3.4's suite passes three times (A7). It passed every by-hand probe | 64K, as today | 4,096 tokens, with thinking off by `enable_thinking: false` (A9) | 1,800 seconds. A reply of 4,096 tokens took up to 17 minutes to write at 62K, and reading 30,000 new tokens up to 11 minutes | 240 minutes. Deep research is expected to take 1.5 to 3 hours | As today (Decision 0034 L2) |
+| **Inkling 2 Mini, UD-Q3_K_XL** | Not until US-3.4's suite passes. Under llama.cpp 1.1.0 a required tool call failed, so the suite can't pass yet | 64K | 8,192 tokens, because reasoning can't be turned off and counts against the reply (A9) | 1,800 seconds | 240 minutes | As today |
 
 ## Requirements revised
 
@@ -58,6 +67,15 @@ The stories amend these in their own changes:
 - **[PRD-LangChain-Deep-Agents](../../PRD/PRD-LangChain-Deep-Agents.md):** its scope, which puts local inference engines outside the design.
 - **Decision 0019 S2:** the three OpenRouter profiles, plus offered local profiles on the Local source.
 - **Decision 0035 Y7:** on Local, the browser box's calls reach the local model (A10).
+- **Rows found at ingestion that say "OpenRouter only" too:**
+  - PRD-Local-Mac-Deployment LM-01, LM-06 and LM-A06;
+  - option-b-contract SP-007, under which a missing OpenRouter key blocks every inference path, which is not so on Local;
+  - PRD-LangChain-Deep-Agents 2.2's outcomes 7 to 9, and 6.3's OpenRouter-only model factory;
+  - PRD-Tool-Catalog BM-01 and BM-03, for the browser model's route;
+  - PRD-Studio HM-05 and MD-01, for Home's service chip and the model's facts;
+  - the `autobots-model-gateway` skill.
+
+  Each is amended by the story whose behavior it describes.
 
 ## What this gives up
 

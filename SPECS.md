@@ -167,6 +167,13 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
   - [US-21.1: A browse's result saved straight to a file](#us-211-a-browses-result-saved-straight-to-a-file)
 - [EPIC-22: A polished transcript, written a section at a time](#epic-22-a-polished-transcript-written-a-section-at-a-time)
   - [US-22.1: The Transcript reader publishes polished prose](#us-221-the-transcript-reader-publishes-polished-prose)
+- [EPIC-23: A Model source setting, and the live runs on a model served on this Mac](#epic-23-a-model-source-setting-and-the-live-runs-on-a-model-served-on-this-mac)
+  - [US-23.1: A local model route through the shared gateway](#us-231-a-local-model-route-through-the-shared-gateway)
+  - [US-23.2: Local route qualification and offering, at no spend](#us-232-local-route-qualification-and-offering-at-no-spend)
+  - [US-23.3: The Model source setting in Settings → Models](#us-233-the-model-source-setting-in-settings--models)
+  - [US-23.4: The Market watcher Costa Rica on a local model](#us-234-the-market-watcher-costa-rica-on-a-local-model)
+  - [US-23.5: The deep research workflow on a local model](#us-235-the-deep-research-workflow-on-a-local-model)
+  - [US-23.6: The Transcript workflow on a local model](#us-236-the-transcript-workflow-on-a-local-model)
 
 ## Work Item Status
 
@@ -819,6 +826,57 @@ CODEBASE Context: consumed (095a97614b4fe65427072c74c166218a70213723, staleness 
 | US-22.1#5 | Keep PRD-Tool-Catalog FI-03 and its `append_to_file` row. Amend PRD-Studio SD-02's Transcript reader row to name its tools and both files. Keep Decision 0035's and Decision 0039's links to Decision 0040. All of this follows Decision 0040's "Requirements revised" list. Checked by reading each against P1 to P6. | DONE | US-22.1 |
 | US-22.1#6 | Update `README-YouTube-Transcript.md` with both files, the reader's tools, the added calls (P7), and that a reader already seeded changes only when its owner saves a new version. Update `README-DEV.md` and `CODEBASE.md`. Checked by reading each against P1 to P8. | DONE | US-22.1 |
 | US-22.1#7 | Show that the Tools page and the Expert editor list `append_to_file` in the Files group from the catalog, with no change to the web app's source. Checked by the web unit tests. | DONE | US-22.1 |
+| EPIC-23 | A Model source setting, and the live runs on a model served on this Mac | — | — |
+| US-23.1 | A local model route through the shared gateway | READY | EPIC-23 |
+| US-23.1#1 | Add a local profile to `domain/models.py` that names its Hugging Face repository at its revision, its weights file's SHA-256, its chat template's hash, the model ID the server reports and its thinking switch, with a route that reserves US$0 (A2, A3, A9). Add Bonsai 2.5's Q2_0 and Inkling 2 Mini's UD-Q3_K_XL profiles from the pins in `~/Models/DOWNLOAD-MANIFEST.json` that the measurements name, approved and not offered, with the migration and regenerated clients a new profile needs, as US-14.15 added Sol's. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the migration, and `contract_drift` in the fast profile. | TODO | US-23.1 |
+| US-23.1#2 | Give `adapters/models/factory.py` its one local branch: an OpenAI-compatible client on `http://127.0.0.1:<port>/v1`, its port ordinary non-secret configuration, with no key and no SDK retries, and `FORBIDDEN_OPTIONS` still refused (A2). Lock a client package for it, repo-local and pinned, only if the locked ones can't serve it (the local small models plan's 7.2 names `langchain-openai`). Checked by pytest under `services/agent/tests` with a fake server on loopback. | TODO | US-23.1 |
+| US-23.1#3 | Before each local call, read the server's `/v1/models`. Refuse `model_unavailable` when its model ID isn't the profile's, and block with a typed reason the run shows when nothing answers on the port. Neither sends a chat completion or tries another model or source, and a local call reads no OpenRouter catalog (A3, MP-08). Checked by pytest under `services/agent/tests` with fake servers. | TODO | US-23.1 |
+| US-23.1#4 | Reserve US$0 for a local call in model admission, keeping its invocation ticket, receipt, `model_calls`, tokens, tool dispatches, active time and compaction as for an OpenRouter call (A2). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the ledger rows. | TODO | US-23.1 |
+| US-23.1#5 | Turn thinking off where the profile's template allows, and keep reasoning the server returns in its own field out of the reply's text, its tool arguments and activity logs (A9, MP-02). Send a single named tool as `required` with only that tool (the plan's section 5). Checked by pytest under `services/agent/tests` with a fake server. | TODO | US-23.1 |
+| US-23.1#6 | Add a runbook section beside the worker's start in `docs/engineering/runbooks/local-app.md`, in which the owner checks that `llama-server` is release b11556 or later and the weights pass `verify-models.py`, starts it bound to 127.0.0.1 only with the profile's model ID, and stops it. Neither the Studio nor a hook starts it or downloads weights (A4, A5). Checked by reading it against A4 and A5. | TODO | US-23.1 |
+| US-23.1#7 | Amend `AGENTS.md`'s "Boundaries that matter" and `.claude/rules/model-gateway.md`: model calls use the approved OpenRouter profiles or, on the Local source, offered local profiles, through the shared gateway, still with no fallback, implicit evaluator, hosted tracing or other provider. Checked by reading them against Decision 0041's "Requirements revised", and by the harness profile's instruction-asset tests. | TODO | US-23.1 |
+| US-23.1#8 | Amend PRD-Model-Providers MP-02 (A3 proves a local route's identity in place of OpenRouter's catalog), MP-07's spend (a local call reserves US$0, A2) and MP-08 (a stopped or wrong server, A3), option-b-contract SP-008's budgets (A2), PRD-Local-Mac-Deployment LM-A03 and its resources section (LM-07) for the owner-started runtime (A4, A15), PRD-LangChain-Deep-Agents' scope, which puts local inference engines outside the design, and the rows Decision 0041 found at ingestion that bear on the route: PRD-Local-Mac-Deployment LM-01, PRD-LangChain-Deep-Agents 2.2's outcomes 7 to 9 and 6.3's model factory, and the `autobots-model-gateway` skill, as Decision 0041's "Requirements revised" lists. Checked by reading each against A2 to A4 and A15. | TODO | US-23.1 |
+| US-23.1#9 | Update `CODEBASE.md`'s model path and integration points, keeping its `Analyzed revision` honest. Checked by reading it against the code. | TODO | US-23.1 |
+| US-23.2 | Local route qualification and offering, at no spend | BLOCKED | EPIC-23 |
+| US-23.2#1 | Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback. | TODO | US-23.2 |
+| US-23.2#2 | Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report. | TODO | US-23.2 |
+| US-23.2#3 | Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals. | TODO | US-23.2 |
+| US-23.2#4 | On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration. | TODO | US-23.2 |
+| US-23.2#5 | Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7. | TODO | US-23.2 |
+| US-23.3 | The Model source setting in Settings → Models | BLOCKED | EPIC-23 |
+| US-23.3#1 | Store Model source per workspace, OpenRouter for every new and existing workspace, with the default profile and role overrides kept per source. Serve and change it through the settings API with owner-or-admin authority, Host/Origin and CSRF checks and an expected version (A1, MP-05), and regenerate OpenAPI and the TypeScript client. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the migration and its authorization, and `contract_drift` in the fast profile. | TODO | US-23.3 |
+| US-23.3#2 | Refuse a switch to Local, naming the roles missing, until offered local profiles cover `executor`, and `researcher` while any Expert grants `browse_goal`. On Local, resolve every role to the Local default profile, refuse saving a workspace role override, and refuse a run that names a role override as `model_not_offered` (A8), freeze the source with the route at admission, read no OpenRouter key, and list only the active source's offered profiles in every picker (A1, A7, A8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-23.3 |
+| US-23.3#3 | Refuse at dispatch, as `model_source_disabled`, a model call whose frozen route is on the source switched off, before anything is sent to either source. The run waits with that reason until the owner switches back, cancels it or continues it as a linked new run on the active source (A12, MP-01). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures. | TODO | US-23.3 |
+| US-23.3#4 | On Local, send nothing to OpenRouter, its catalog included (A13). Let the admitted endpoint answer browser-use on the run's frozen local `researcher` route, with Y16's refusal of an image unchanged and the box never given the server's address (A10). Checked by pytest under `services/agent/tests` with a fake local server and a fake OpenRouter transport that fails if touched. | TODO | US-23.3 |
+| US-23.3#5 | Set each local route's limits from Decision 0041's measurements table, frozen with the route: Bonsai 2.5 at 64K context, 4,096 output tokens with thinking off, 1,800 seconds a call and 240 active minutes, and Inkling 2 Mini at 64K, 8,192 output tokens, 1,800 seconds and 240 minutes, both with Decision 0034 L2's model calls and tool dispatches. OpenRouter routes keep today's limits, and the local client's own request timeout sits above its call time (A11). Checked by pytest under `services/agent/tests`. | TODO | US-23.3 |
+| US-23.3#6 | Add the Model source panel to Settings → Models above the provider panel and the model policy, showing what A13 lists. Make the composer's disclosure follow the source, and on Local make Home's service chip read "Local model ready" from the runtime's health check (A13). Checked by the web unit tests and the db profile's browser suites. | TODO | US-23.3 |
+| US-23.3#7 | Amend PRD-Model-Providers' introduction and MP-01 (the source, and resolution within it, A1, A8), MP-04 and MP-05 (the setting's states and who changes it, A1, A7, A13) and MP-07's disclosure (A13), option-b-contract SP-006 (approved profiles, A1) and SP-008's limits (A11), Decision 0019 S2 (the three OpenRouter profiles, plus offered local profiles on the Local source) and Decision 0035 Y7 (on Local, the browser box's calls reach the local model, A10), and the rows Decision 0041 found at ingestion that bear on the setting: option-b-contract SP-007 and PRD-Local-Mac-Deployment LM-06 and LM-A06 (no OpenRouter key is needed on Local), PRD-Tool-Catalog BM-01 and BM-03 (the browser model's route), and PRD-Studio HM-05 and MD-01 (Home's service chip and the model's facts), as Decision 0041's "Requirements revised" lists. Checked by reading each against A1, A7, A8, A10, A11 and A13. | TODO | US-23.3 |
+| US-23.3#8 | Update the local app runbook's OpenRouter settings section, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against A1 and A13. | TODO | US-23.3 |
+| US-23.4 | The Market watcher Costa Rica on a local model | BLOCKED | EPIC-23 |
+| US-23.4#1 | Add a replay runner, in no verification profile and run only on the owner's request. It runs a run on the Local source in a guarded disposable environment against the owner's `llama-server`, answers each recorded tool call from a recording kept in the ignored `.checks` and refuses one outside it, and records each run's time, model calls, tool calls and the server's peak memory (the plan's section 8, the local small models plan's Q2). Checked by pytest under `services/agent/tests` with a fake server and a recording. | TODO | US-23.4 |
+| US-23.4#2 | Make Market watcher Costa Rica version 2 and the Costa Rica market note workflow in the disposable environment from the README's "Making them on an install". Checked by the replay's record. | TODO | US-23.4 |
+| US-23.4#3 | Add the code check: `market-note.md` is published, and every number in it appears in a `market_history` or `calculate` result of the same run (the plan's sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic notes and tool results that pass and fail it. | TODO | US-23.4 |
+| US-23.4#4 | Replay the Expert run three times on the offered local profile, and keep each run's check, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8. | TODO | US-23.4 |
+| US-23.4#5 | With the owner's approval, run the Expert run and the workflow execution live on the owner's install on the Local source. Record their checks, model and tool calls, tokens, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads the Spanish. Checked by the runs' records and the worker's log, and by the owner's reading. | TODO | US-23.4 |
+| US-23.4#6 | Record the profile's match of the Market watcher run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install. | TODO | US-23.4 |
+| US-23.4#7 | Add a "Local" section to `README-Market-Watcher-Costa-Rica.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` for the replay runner. Checked by reading each against the runs' records and the code. | TODO | US-23.4 |
+| US-23.5 | The deep research workflow on a local model | BLOCKED | EPIC-23 |
+| US-23.5#1 | Extend the replay runner, adding it where no earlier story has, to answer `google_search`, `google_extract`, `search_web` and `extract_website_content` from a recording of workflow run 5's tool results kept in the ignored `.checks`, and to decide the approval gate. Checked by pytest under `services/agent/tests` with a fake server and a recording. | TODO | US-23.5 |
+| US-23.5#2 | Score R2 to R6 and R8 of the local small models plan's section 1 in code from a run's plan, events, tool record and artifacts. Checked by pytest under `services/agent/tests` on synthetic runs that pass and fail each rule. | TODO | US-23.5 |
+| US-23.5#3 | Write the version of the Deep research writer for a local model that the plan's section 7 calls for. It writes the document in parts, keeps its tool grant and outputs unchanged so it counts as the same Expert (A14), and is kept where the open question below decides. Checked by pytest under `services/agent/tests` for its tool grant and outputs. | TODO | US-23.5 |
+| US-23.5#4 | Replay the workflow three times on the offered local profile, and keep each run's scores, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8. | TODO | US-23.5 |
+| US-23.5#5 | With the owner's approval, run the workflow live on the owner's install on the Local source, the owner deciding its gate. Record R1 to R9 against run 5's figures, the tool spend, US$0.00 model spend and that no request reached OpenRouter. The owner reads `content.md` and `review.md` beside run 5's. Checked by the run's record and the worker's log, and by the owner's reading. | TODO | US-23.5 |
+| US-23.5#6 | Record the profile's match of the deep research run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install. | TODO | US-23.5 |
+| US-23.5#7 | Add a "Local" section to `README-Deep-Research-Content-Writer.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the run's record and the code. | TODO | US-23.5 |
+| US-23.6 | The Transcript workflow on a local model | BLOCKED | EPIC-23 |
+| US-23.6#1 | Let the browse trial (`operations/browse_trial.py`) run on browser-use on a run's local `researcher` route with no key, still in no verification profile and still refusing a repeat without the owner's request. Run the plan's scripted browse on that route first, as the open question below decides. Checked by pytest under `services/agent/tests` with a fake local server. | TODO | US-23.6 |
+| US-23.6#2 | With the owner's approval, run that trial once from https://example.com/ with allowed domains example.com and iana.org, and record its stop reason, model calls, US$0.00 spend and the hosts the proxy connected to. Checked by the trial's record. | TODO | US-23.6 |
+| US-23.6#3 | Extend the replay runner, adding it where no earlier story has, with a scripted browse that saves run 5's `transcript-timed.md` lines, kept in the ignored `.checks`, and reaches no site. Checked by pytest under `services/agent/tests` with a fake server and synthetic lines. | TODO | US-23.6 |
+| US-23.6#4 | Add the code checks: `transcript-timed.md` has no empty or repeated line; the model read it 60 lines at a time from the first line to the last and made one `append_to_file` after each read, in order; `transcript.md` is published last and is the run's Result; its word count is near run 5's 8,049 (the plan's sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic run records that pass and fail each check. | TODO | US-23.6 |
+| US-23.6#5 | Replay the prose three times on the offered local profile, and keep each run's checks, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8. | TODO | US-23.6 |
+| US-23.6#6 | With the owner's approval of a video the owner names, run the Transcript workflow live on the owner's install on the Local source. Record its checks, model and tool calls, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads `transcript.md` beside run 5's. Checked by the run's record and the worker's log, and by the owner's reading. | TODO | US-23.6 |
+| US-23.6#7 | Record the profile's match of the Transcript run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install. | TODO | US-23.6 |
+| US-23.6#8 | Add a "Local" section to `README-YouTube-Transcript.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the runs' records and the code. | TODO | US-23.6 |
 
 ## Dependency Diagram
 
@@ -1002,6 +1060,14 @@ flowchart TD
   end
   subgraph EPIC_22["EPIC-22: A polished transcript, written a section at a time"]
     US_22_1["US-22.1: The Transcript reader publishes polished prose"]
+  end
+  subgraph EPIC_23["EPIC-23: A Model source setting, and the live runs on a model served on this Mac"]
+    US_23_1["US-23.1: A local model route through the shared gateway"]
+    US_23_2["US-23.2: Local route qualification and offering, at no spend"]
+    US_23_3["US-23.3: The Model source setting in Settings → Models"]
+    US_23_4["US-23.4: The Market watcher Costa Rica on a local model"]
+    US_23_5["US-23.5: The deep research workflow on a local model"]
+    US_23_6["US-23.6: The Transcript workflow on a local model"]
   end
   US_1_1 -.-> US_1_2
   US_1_1 -.-> US_1_3
@@ -1365,6 +1431,27 @@ flowchart TD
   US_17_4 -.-> US_21_1
   US_17_5 -.-> US_21_1
   US_21_1 -.-> US_22_1
+  US_23_1 -.-> US_23_2
+  EXT_US_23_2_1["External: the owner starts `llama-server` serving Bonsai 2.5&#x27;s pinned Q2_0 by the runbook command (Decision 0041 A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and asks for its route qualification, which runs only on request"]
+  EXT_US_23_2_1 -.-> US_23_2
+  US_23_2 -.-> US_23_3
+  US_23_3 -.-> US_23_4
+  EXT_US_23_4_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the replays and the live runs (Decision 0041 A4 and A16)"]
+  EXT_US_23_4_1 -.-> US_23_4
+  EXT_US_23_4_2["External: the owner approves the live Expert run and workflow execution on real tools, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
+  EXT_US_23_4_2 -.-> US_23_4
+  US_23_3 -.-> US_23_5
+  EXT_US_23_5_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the replays and the live run (Decision 0041 A4 and A16)"]
+  EXT_US_23_5_1 -.-> US_23_5
+  EXT_US_23_5_2["External: the owner approves the live workflow execution&#x27;s tool spend on real tools, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
+  EXT_US_23_5_2 -.-> US_23_5
+  US_23_3 -.-> US_23_6
+  EXT_US_23_6_1["External: the owner starts `llama-server` serving the offered local profile&#x27;s pinned model by the runbook command, for the browse trial, the replays and the live run (Decision 0041 A4 and A16)"]
+  EXT_US_23_6_1 -.-> US_23_6
+  EXT_US_23_6_2["External: the owner approves one live browse from https://example.com/ with allowed domains example.com and iana.org on the local researcher route, as the plan&#x27;s section 8 asks and Decision 0019 S6 did"]
+  EXT_US_23_6_2 -.-> US_23_6
+  EXT_US_23_6_3["External: the owner names a video and approves one live Transcript run on it, within the Transcript reader&#x27;s four YouTube hosts, on the owner&#x27;s install rebuilt with this code and its migrations applied by the owner"]
+  EXT_US_23_6_3 -.-> US_23_6
 ```
 
 ```mermaid
@@ -2611,6 +2698,106 @@ flowchart TD
     US_22_1 --> T_22_1_6
     T_22_1_7["US-22.1#7: Show that the Tools page and the Expert editor list `append_to_file` in the Files group from the catalog, with no change to the web app&#x27;s source. Checked by the web unit tests."]
     US_22_1 --> T_22_1_7
+  end
+```
+
+```mermaid
+flowchart TD
+  subgraph EPIC_23["EPIC-23 tasks"]
+    US_23_1["US-23.1: A local model route through the shared gateway"]
+    T_23_1_1["US-23.1#1: Add a local profile to `domain/models.py` that names its Hugging Face repository at its revision, its weights file&#x27;s SHA-256, its chat template&#x27;s hash, the model ID the server reports and its thinking switch, with a route that reserves US$0 (A2, A3, A9). Add Bonsai 2.5&#x27;s Q2_0 and Inkling 2 Mini&#x27;s UD-Q3_K_XL profiles from the pins in `~/Models/DOWNLOAD-MANIFEST.json` that the measurements name, approved and not offered, with the migration and regenerated clients a new profile needs, as US-14.15 added Sol&#x27;s. Checked by pytest under `services/agent/tests`, the db profile&#x27;s disposable fixtures for the migration, and `contract_drift` in the fast profile."]
+    US_23_1 --> T_23_1_1
+    T_23_1_2["US-23.1#2: Give `adapters/models/factory.py` its one local branch: an OpenAI-compatible client on `http://127.0.0.1:&lt;port&gt;/v1`, its port ordinary non-secret configuration, with no key and no SDK retries, and `FORBIDDEN_OPTIONS` still refused (A2). Lock a client package for it, repo-local and pinned, only if the locked ones can&#x27;t serve it (the local small models plan&#x27;s 7.2 names `langchain-openai`). Checked by pytest under `services/agent/tests` with a fake server on loopback."]
+    US_23_1 --> T_23_1_2
+    T_23_1_3["US-23.1#3: Before each local call, read the server&#x27;s `/v1/models`. Refuse `model_unavailable` when its model ID isn&#x27;t the profile&#x27;s, and block with a typed reason the run shows when nothing answers on the port. Neither sends a chat completion or tries another model or source, and a local call reads no OpenRouter catalog (A3, MP-08). Checked by pytest under `services/agent/tests` with fake servers."]
+    US_23_1 --> T_23_1_3
+    T_23_1_4["US-23.1#4: Reserve US$0 for a local call in model admission, keeping its invocation ticket, receipt, `model_calls`, tokens, tool dispatches, active time and compaction as for an OpenRouter call (A2). Checked by pytest under `services/agent/tests`, and by the db profile&#x27;s disposable fixtures for the ledger rows."]
+    US_23_1 --> T_23_1_4
+    T_23_1_5["US-23.1#5: Turn thinking off where the profile&#x27;s template allows, and keep reasoning the server returns in its own field out of the reply&#x27;s text, its tool arguments and activity logs (A9, MP-02). Send a single named tool as `required` with only that tool (the plan&#x27;s section 5). Checked by pytest under `services/agent/tests` with a fake server."]
+    US_23_1 --> T_23_1_5
+    T_23_1_6["US-23.1#6: Add a runbook section beside the worker&#x27;s start in `docs/engineering/runbooks/local-app.md`, in which the owner checks that `llama-server` is release b11556 or later and the weights pass `verify-models.py`, starts it bound to 127.0.0.1 only with the profile&#x27;s model ID, and stops it. Neither the Studio nor a hook starts it or downloads weights (A4, A5). Checked by reading it against A4 and A5."]
+    US_23_1 --> T_23_1_6
+    T_23_1_7["US-23.1#7: Amend `AGENTS.md`&#x27;s &quot;Boundaries that matter&quot; and `.claude/rules/model-gateway.md`: model calls use the approved OpenRouter profiles or, on the Local source, offered local profiles, through the shared gateway, still with no fallback, implicit evaluator, hosted tracing or other provider. Checked by reading them against Decision 0041&#x27;s &quot;Requirements revised&quot;, and by the harness profile&#x27;s instruction-asset tests."]
+    US_23_1 --> T_23_1_7
+    T_23_1_8["US-23.1#8: Amend PRD-Model-Providers MP-02 (A3 proves a local route&#x27;s identity in place of OpenRouter&#x27;s catalog), MP-07&#x27;s spend (a local call reserves US$0, A2) and MP-08 (a stopped or wrong server, A3), option-b-contract SP-008&#x27;s budgets (A2), PRD-Local-Mac-Deployment LM-A03 and its resources section (LM-07) for the owner-started runtime (A4, A15), PRD-LangChain-Deep-Agents&#x27; scope, which puts local inference engines outside the design, and the rows Decision 0041 found at ingestion that bear on the route: PRD-Local-Mac-Deployment LM-01, PRD-LangChain-Deep-Agents 2.2&#x27;s outcomes 7 to 9 and 6.3&#x27;s model factory, and the `autobots-model-gateway` skill, as Decision 0041&#x27;s &quot;Requirements revised&quot; lists. Checked by reading each against A2 to A4 and A15."]
+    US_23_1 --> T_23_1_8
+    T_23_1_9["US-23.1#9: Update `CODEBASE.md`&#x27;s model path and integration points, keeping its `Analyzed revision` honest. Checked by reading it against the code."]
+    US_23_1 --> T_23_1_9
+    US_23_2["US-23.2: Local route qualification and offering, at no spend"]
+    T_23_2_1["US-23.2#1: Let `operations/route_qualification.py` run US-3.4&#x27;s suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1&#x27;s identity check first, each call built by the factory&#x27;s local branch, and each call given as long as the route&#x27;s call time in Decision 0041&#x27;s measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback."]
+    US_23_2 --> T_23_2_1
+    T_23_2_2["US-23.2#2: Add to a local route&#x27;s report the reading and writing speed, the time to the first token and the server&#x27;s peak memory at 8K, 32K and 64K, with the served model ID, the profile&#x27;s pins, US$0.00 and what it doesn&#x27;t establish (the plan&#x27;s section 8, Q1). Checked by pytest under `services/agent/tests` for the report&#x27;s shape, and by reading the live report."]
+    US_23_2 --> T_23_2_2
+    T_23_2_3["US-23.2#3: Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn&#x27;t offered. A capability that failed or isn&#x27;t supported stays disabled and listed in its limits (A7, Decision 0019&#x27;s meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile&#x27;s disposable fixtures for the stored qualification and the refusals."]
+    US_23_2 --> T_23_2_3
+    T_23_2_4["US-23.2#4: On the owner&#x27;s request, run the suite&#x27;s three trials and the measurements on Bonsai 2.5&#x27;s route against the owner&#x27;s `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol&#x27;s was. Checked by the live report, and by the db profile&#x27;s disposable fixtures for the migration."]
+    US_23_2 --> T_23_2_4
+    T_23_2_5["US-23.2#5: Amend option-b-contract SP-008&#x27;s qualification: a local route qualifies with US-3.4&#x27;s suite at no spend, and that gates offering (A7), as Decision 0041&#x27;s &quot;Requirements revised&quot; lists. Update the local app runbook&#x27;s Qualify section and `CODEBASE.md`. Checked by reading each against A7."]
+    US_23_2 --> T_23_2_5
+    US_23_3["US-23.3: The Model source setting in Settings → Models"]
+    T_23_3_1["US-23.3#1: Store Model source per workspace, OpenRouter for every new and existing workspace, with the default profile and role overrides kept per source. Serve and change it through the settings API with owner-or-admin authority, Host/Origin and CSRF checks and an expected version (A1, MP-05), and regenerate OpenAPI and the TypeScript client. Checked by pytest under `services/agent/tests`, the db profile&#x27;s disposable fixtures for the migration and its authorization, and `contract_drift` in the fast profile."]
+    US_23_3 --> T_23_3_1
+    T_23_3_2["US-23.3#2: Refuse a switch to Local, naming the roles missing, until offered local profiles cover `executor`, and `researcher` while any Expert grants `browse_goal`. On Local, resolve every role to the Local default profile, refuse saving a workspace role override, and refuse a run that names a role override as `model_not_offered` (A8), freeze the source with the route at admission, read no OpenRouter key, and list only the active source&#x27;s offered profiles in every picker (A1, A7, A8). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_23_3 --> T_23_3_2
+    T_23_3_3["US-23.3#3: Refuse at dispatch, as `model_source_disabled`, a model call whose frozen route is on the source switched off, before anything is sent to either source. The run waits with that reason until the owner switches back, cancels it or continues it as a linked new run on the active source (A12, MP-01). Checked by pytest under `services/agent/tests` and the db profile&#x27;s disposable fixtures."]
+    US_23_3 --> T_23_3_3
+    T_23_3_4["US-23.3#4: On Local, send nothing to OpenRouter, its catalog included (A13). Let the admitted endpoint answer browser-use on the run&#x27;s frozen local `researcher` route, with Y16&#x27;s refusal of an image unchanged and the box never given the server&#x27;s address (A10). Checked by pytest under `services/agent/tests` with a fake local server and a fake OpenRouter transport that fails if touched."]
+    US_23_3 --> T_23_3_4
+    T_23_3_5["US-23.3#5: Set each local route&#x27;s limits from Decision 0041&#x27;s measurements table, frozen with the route: Bonsai 2.5 at 64K context, 4,096 output tokens with thinking off, 1,800 seconds a call and 240 active minutes, and Inkling 2 Mini at 64K, 8,192 output tokens, 1,800 seconds and 240 minutes, both with Decision 0034 L2&#x27;s model calls and tool dispatches. OpenRouter routes keep today&#x27;s limits, and the local client&#x27;s own request timeout sits above its call time (A11). Checked by pytest under `services/agent/tests`."]
+    US_23_3 --> T_23_3_5
+    T_23_3_6["US-23.3#6: Add the Model source panel to Settings → Models above the provider panel and the model policy, showing what A13 lists. Make the composer&#x27;s disclosure follow the source, and on Local make Home&#x27;s service chip read &quot;Local model ready&quot; from the runtime&#x27;s health check (A13). Checked by the web unit tests and the db profile&#x27;s browser suites."]
+    US_23_3 --> T_23_3_6
+    T_23_3_7["US-23.3#7: Amend PRD-Model-Providers&#x27; introduction and MP-01 (the source, and resolution within it, A1, A8), MP-04 and MP-05 (the setting&#x27;s states and who changes it, A1, A7, A13) and MP-07&#x27;s disclosure (A13), option-b-contract SP-006 (approved profiles, A1) and SP-008&#x27;s limits (A11), Decision 0019 S2 (the three OpenRouter profiles, plus offered local profiles on the Local source) and Decision 0035 Y7 (on Local, the browser box&#x27;s calls reach the local model, A10), and the rows Decision 0041 found at ingestion that bear on the setting: option-b-contract SP-007 and PRD-Local-Mac-Deployment LM-06 and LM-A06 (no OpenRouter key is needed on Local), PRD-Tool-Catalog BM-01 and BM-03 (the browser model&#x27;s route), and PRD-Studio HM-05 and MD-01 (Home&#x27;s service chip and the model&#x27;s facts), as Decision 0041&#x27;s &quot;Requirements revised&quot; lists. Checked by reading each against A1, A7, A8, A10, A11 and A13."]
+    US_23_3 --> T_23_3_7
+    T_23_3_8["US-23.3#8: Update the local app runbook&#x27;s OpenRouter settings section, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against A1 and A13."]
+    US_23_3 --> T_23_3_8
+    US_23_4["US-23.4: The Market watcher Costa Rica on a local model"]
+    T_23_4_1["US-23.4#1: Add a replay runner, in no verification profile and run only on the owner&#x27;s request. It runs a run on the Local source in a guarded disposable environment against the owner&#x27;s `llama-server`, answers each recorded tool call from a recording kept in the ignored `.checks` and refuses one outside it, and records each run&#x27;s time, model calls, tool calls and the server&#x27;s peak memory (the plan&#x27;s section 8, the local small models plan&#x27;s Q2). Checked by pytest under `services/agent/tests` with a fake server and a recording."]
+    US_23_4 --> T_23_4_1
+    T_23_4_2["US-23.4#2: Make Market watcher Costa Rica version 2 and the Costa Rica market note workflow in the disposable environment from the README&#x27;s &quot;Making them on an install&quot;. Checked by the replay&#x27;s record."]
+    US_23_4 --> T_23_4_2
+    T_23_4_3["US-23.4#3: Add the code check: `market-note.md` is published, and every number in it appears in a `market_history` or `calculate` result of the same run (the plan&#x27;s sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic notes and tool results that pass and fail it."]
+    US_23_4 --> T_23_4_3
+    T_23_4_4["US-23.4#4: Replay the Expert run three times on the offered local profile, and keep each run&#x27;s check, time, calls and peak memory. Checked by the replay runner&#x27;s report, read against the plan&#x27;s section 8."]
+    US_23_4 --> T_23_4_4
+    T_23_4_5["US-23.4#5: With the owner&#x27;s approval, run the Expert run and the workflow execution live on the owner&#x27;s install on the Local source. Record their checks, model and tool calls, tokens, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads the Spanish. Checked by the runs&#x27; records and the worker&#x27;s log, and by the owner&#x27;s reading."]
+    US_23_4 --> T_23_4_5
+    T_23_4_6["US-23.4#6: Record the profile&#x27;s match of the Market watcher run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install."]
+    US_23_4 --> T_23_4_6
+    T_23_4_7["US-23.4#7: Add a &quot;Local&quot; section to `README-Market-Watcher-Costa-Rica.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan&#x27;s scoreboard for this run, and a claim only of a match Settings shows (A7, the plan&#x27;s P6). Update `CODEBASE.md` for the replay runner. Checked by reading each against the runs&#x27; records and the code."]
+    US_23_4 --> T_23_4_7
+    US_23_5["US-23.5: The deep research workflow on a local model"]
+    T_23_5_1["US-23.5#1: Extend the replay runner, adding it where no earlier story has, to answer `google_search`, `google_extract`, `search_web` and `extract_website_content` from a recording of workflow run 5&#x27;s tool results kept in the ignored `.checks`, and to decide the approval gate. Checked by pytest under `services/agent/tests` with a fake server and a recording."]
+    US_23_5 --> T_23_5_1
+    T_23_5_2["US-23.5#2: Score R2 to R6 and R8 of the local small models plan&#x27;s section 1 in code from a run&#x27;s plan, events, tool record and artifacts. Checked by pytest under `services/agent/tests` on synthetic runs that pass and fail each rule."]
+    US_23_5 --> T_23_5_2
+    T_23_5_3["US-23.5#3: Write the version of the Deep research writer for a local model that the plan&#x27;s section 7 calls for. It writes the document in parts, keeps its tool grant and outputs unchanged so it counts as the same Expert (A14), and is kept where the open question below decides. Checked by pytest under `services/agent/tests` for its tool grant and outputs."]
+    US_23_5 --> T_23_5_3
+    T_23_5_4["US-23.5#4: Replay the workflow three times on the offered local profile, and keep each run&#x27;s scores, time, calls and peak memory. Checked by the replay runner&#x27;s report, read against the plan&#x27;s section 8."]
+    US_23_5 --> T_23_5_4
+    T_23_5_5["US-23.5#5: With the owner&#x27;s approval, run the workflow live on the owner&#x27;s install on the Local source, the owner deciding its gate. Record R1 to R9 against run 5&#x27;s figures, the tool spend, US$0.00 model spend and that no request reached OpenRouter. The owner reads `content.md` and `review.md` beside run 5&#x27;s. Checked by the run&#x27;s record and the worker&#x27;s log, and by the owner&#x27;s reading."]
+    US_23_5 --> T_23_5_5
+    T_23_5_6["US-23.5#6: Record the profile&#x27;s match of the deep research run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install."]
+    US_23_5 --> T_23_5_6
+    T_23_5_7["US-23.5#7: Add a &quot;Local&quot; section to `README-Deep-Research-Content-Writer.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan&#x27;s scoreboard for this run, and a claim only of a match Settings shows (A7, the plan&#x27;s P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the run&#x27;s record and the code."]
+    US_23_5 --> T_23_5_7
+    US_23_6["US-23.6: The Transcript workflow on a local model"]
+    T_23_6_1["US-23.6#1: Let the browse trial (`operations/browse_trial.py`) run on browser-use on a run&#x27;s local `researcher` route with no key, still in no verification profile and still refusing a repeat without the owner&#x27;s request. Run the plan&#x27;s scripted browse on that route first, as the open question below decides. Checked by pytest under `services/agent/tests` with a fake local server."]
+    US_23_6 --> T_23_6_1
+    T_23_6_2["US-23.6#2: With the owner&#x27;s approval, run that trial once from https://example.com/ with allowed domains example.com and iana.org, and record its stop reason, model calls, US$0.00 spend and the hosts the proxy connected to. Checked by the trial&#x27;s record."]
+    US_23_6 --> T_23_6_2
+    T_23_6_3["US-23.6#3: Extend the replay runner, adding it where no earlier story has, with a scripted browse that saves run 5&#x27;s `transcript-timed.md` lines, kept in the ignored `.checks`, and reaches no site. Checked by pytest under `services/agent/tests` with a fake server and synthetic lines."]
+    US_23_6 --> T_23_6_3
+    T_23_6_4["US-23.6#4: Add the code checks: `transcript-timed.md` has no empty or repeated line; the model read it 60 lines at a time from the first line to the last and made one `append_to_file` after each read, in order; `transcript.md` is published last and is the run&#x27;s Result; its word count is near run 5&#x27;s 8,049 (the plan&#x27;s sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic run records that pass and fail each check."]
+    US_23_6 --> T_23_6_4
+    T_23_6_5["US-23.6#5: Replay the prose three times on the offered local profile, and keep each run&#x27;s checks, time, calls and peak memory. Checked by the replay runner&#x27;s report, read against the plan&#x27;s section 8."]
+    US_23_6 --> T_23_6_5
+    T_23_6_6["US-23.6#6: With the owner&#x27;s approval of a video the owner names, run the Transcript workflow live on the owner&#x27;s install on the Local source. Record its checks, model and tool calls, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads `transcript.md` beside run 5&#x27;s. Checked by the run&#x27;s record and the worker&#x27;s log, and by the owner&#x27;s reading."]
+    US_23_6 --> T_23_6_6
+    T_23_6_7["US-23.6#7: Record the profile&#x27;s match of the Transcript run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install."]
+    US_23_6 --> T_23_6_7
+    T_23_6_8["US-23.6#8: Add a &quot;Local&quot; section to `README-YouTube-Transcript.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan&#x27;s scoreboard for this run, and a claim only of a match Settings shows (A7, the plan&#x27;s P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the runs&#x27; records and the code."]
+    US_23_6 --> T_23_6_8
   end
 ```
 
@@ -10457,3 +10644,514 @@ Tasks:
 
 Open Questions:
 - None.
+
+# EPIC-23: A Model source setting, and the live runs on a model served on this Mac
+
+Scheduled by [Decision 0041](docs/engineering/decisions/0041-local-model-source.md#decision), from the owner's request of 2026-11-27 for "a setting in settings page that allows to change from the openrouter models we have been using so far to use a SLM local model", scoped to the three live runs, and the owner's "Record the decisions" on [the plan's section 10](docs/plan/local-models-every-run.md#10-decisions-the-owner-makes). The rest was delegated and is decided there. It amends Decision 0019 S2, Decision 0035 Y7 and the rows its ["Requirements revised"](docs/engineering/decisions/0041-local-model-source.md#requirements-revised) lists, each in the story whose behaviour it describes. The plan's draft stories LS-1 to LS-6 become US-23.1 to US-23.6; the earlier plan's drafts US-17.1 to US-17.3 were never ingested, and those IDs belong to other stories. A workspace setting, Model source, sends every model call either to OpenRouter, as today and by default, or to offered local profiles only, never mixed and never as a fallback (A1). The shared gateway answers a local profile from `llama-server` on 127.0.0.1, which the owner starts, once the served model is checked. A local call reserves US$0, and every other limit still counts (A2 to A4). A local profile is offered once US-3.4's suite passes on its route three times at no spend (A7). Bonsai 2.5's Q2_0 is the first candidate, and Inkling 2 Mini stays not offered until its suite passes ([set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)). On Local one profile answers every role, browsing included, within limits set per local route (A8, A10, A11). Then, in A16's order and with one model served at a time, the Market watcher Costa Rica, the deep research workflow and the Transcript workflow are each replayed three times on recorded inputs in a disposable environment, then run live once the owner approves each live run's real tool calls ([the plan's section 8](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)). Checks use fake transports and fake servers by default. A check against a running `llama-server` runs only on the owner's request, and no story makes a paid model call. Choosing a source per run, two local models at once, other runtimes, images on local routes and a citation gate in code aren't scheduled (A17). Nothing here establishes that either model completes any run, that a note's Spanish or a transcript's prose is right, H1 or product acceptance ([what Decision 0041 doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)).
+
+### US-23.1: A local model route through the shared gateway
+
+Status: READY
+
+As a workspace owner
+I want a model served by `llama-server` on this Mac to answer model calls through the shared gateway, with the served model checked before each call
+So that a call on a local route spends nothing on models and keeps its admission, receipts and limits, and a stopped or wrong server blocks it with nothing put in its place.
+
+Source:
+- [Decision 0041, the owner's request and record](docs/engineering/decisions/0041-local-model-source.md#decision-0041-a-model-source-setting-openrouter-or-a-local-model-on-this-mac)
+- [Decision 0041, A2 to A5, A7 and A9, and A1's new install on OpenRouter](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, context](docs/engineering/decisions/0041-local-model-source.md#context)
+- [Decision 0041, set from the measurements, on Bonsai 2.5's thinking switch](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, requirements revised: `AGENTS.md`, the model gateway rule, MP-02, MP-07's spend, MP-08, SP-008's budgets, LM-A03 and PRD-LangChain-Deep-Agents' scope](docs/engineering/decisions/0041-local-model-source.md#requirements-revised)
+- [Decision 0041, what this gives up](docs/engineering/decisions/0041-local-model-source.md#what-this-gives-up)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [Decision 0041, reversal](docs/engineering/decisions/0041-local-model-source.md#reversal)
+- [The plan for every live run on a local model, section 5](docs/plan/local-models-every-run.md#5-how-a-local-model-plugs-in)
+- [The plan, section 11, LS-1](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The plan, section 12, on Bonsai 2.5 and old llama.cpp builds](docs/plan/local-models-every-run.md#12-risks)
+- [The local small models plan, section 6, what any runtime must pass and its lifecycle](docs/plan/local-small-models.md#6-serving-them)
+- [The local small models plan, 7.2, where code changes](docs/plan/local-small-models.md#72-where-code-changes)
+- [The local small models plan, draft US-17.1, never ingested under that ID](docs/plan/local-small-models.md#us-171-a-local-model-route)
+- [Measurements, what ran](research/LOCAL-MODELS-INKLING-BONSAI.md#what-ran)
+- [Measurements, correctness](research/LOCAL-MODELS-INKLING-BONSAI.md#correctness)
+- [`AGENTS.md`, boundaries that matter](AGENTS.md#boundaries-that-matter)
+- [The model gateway rule](.claude/rules/model-gateway.md#openrouter-application-inference)
+- [MP-01, no fallback and frozen routes](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [MP-07 spend](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [MP-08](docs/PRD/PRD-Model-Providers.md#mp-08-failure-and-recovery)
+- [LM-A03, the inference boundary](docs/PRD/PRD-Local-Mac-Deployment.md#lm-08-implementation-acceptance-and-closure)
+- [LM-07, measured resource limits](docs/PRD/PRD-Local-Mac-Deployment.md#lm-07-persistence-and-operations)
+- [PRD-LangChain-Deep-Agents, explicit scope choices](docs/PRD/PRD-LangChain-Deep-Agents.md#23-explicit-scope-choices)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Decision 0019, S2, approved and not offered until qualified](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+
+Codebase Context:
+- [Architecture](CODEBASE.md#architecture): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `adapters/models/factory.py` is "the one OpenRouter factory": `chat_model` builds a `ChatOpenRouter` on `https://openrouter.ai/api/v1` with `max_retries=0`, MP-02's routing flags and an SDK client with `NO_SDK_RETRIES` and a 130,000 ms request timeout, and `checked_options` refuses `base_url`, `api_key`, `model` and `provider` among `FORBIDDEN_OPTIONS`. `prepare_attempt` validates every attempt against an OpenRouter catalog entry and refuses `model_unavailable` (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): `domain/models.py` holds three `ModelProfileId`s, `ModelRoute.worst_case_micro_usd`, `OFFERED_FOR_NEW_RUNS` of Terra and Sol, `MAX_OUTPUT_TOKENS` 4,096, `CONTEXT_TOKENS` 64,000 and `MODEL_CALL_SECONDS` 300. `application/worker_inference.InferenceSource` prepares each attempt from a `CatalogCache` refreshed every four minutes before it builds the client (checked at HEAD). Not product intent.
+- [Integration points](CODEBASE.md#integration-points): OpenRouter is the only inference provider. `services/agent/uv.lock` locks `langchain-openrouter` and `openrouter`, and no OpenAI-compatible client package such as `langchain-openai` (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A local route answers through the shared gateway
+  Given Bonsai 2.5's local profile, whose route names an OpenAI-compatible server on 127.0.0.1 at the configured port, a fake server on that port reporting the profile's model ID, a run whose frozen executor route is on that profile, and a fake OpenRouter transport that fails if it is touched
+  When the run makes a model call
+  Then the call is sent to the loopback server with the profile's model ID through the one model factory, with no SDK retries and no key, it is admitted with an invocation ticket and a receipt, reserves US$0, is counted in model_calls with its tokens, and nothing reaches OpenRouter, its catalog included
+
+Scenario: The served model is checked before each call
+  Given a fake server on the local route's port whose /v1/models reports a model ID other than the profile's
+  When a run on that profile makes a model call
+  Then the call is refused model_unavailable, no chat completion is sent to the server, and no other model or source is tried
+
+Scenario: A stopped server blocks inference only
+  Given nothing listening on the local route's port
+  When a run on a local profile makes a model call, and a member then reads the workspace's settings and the run's files
+  Then the call is blocked with a typed reason saying the local model server isn't running, nothing is sent and no other model or source is tried, and the settings and files read as before
+
+Scenario: The run's limits still count
+  Given a run on a local profile whose model calls, tool dispatches or active time is used up
+  When it makes another model call
+  Then it stops with the same code a run on an OpenRouter route stops with, and nothing is sent to the server
+
+Scenario: Thinking stays out of the reply
+  Given Bonsai 2.5's local profile, which turns thinking off with enable_thinking false, Inkling 2 Mini's, whose reasoning can't be turned off, and a fake server for each, Inkling 2 Mini's answering with reasoning in its own field
+  When a run on each makes a model call
+  Then Bonsai 2.5's request turns thinking off, and Inkling 2 Mini's reasoning is in neither the reply's text nor its tool arguments, nor in any activity log
+
+Scenario: One named tool is sent as required
+  Given a local route, and a model call among several tools that names one in tool_choice
+  When the request is sent
+  Then its tool_choice is required and it carries only that tool
+
+Scenario: OpenRouter routes are unchanged
+  Given a run whose frozen route is on Terra, and a fake OpenRouter transport
+  When it makes a model call
+  Then the call passes the catalog check and goes to OpenRouter with MP-02's routing flags and the reservation it had before, and nothing is sent to the loopback
+
+Scenario: A local profile isn't offered before it qualifies
+  Given Bonsai 2.5's and Inkling 2 Mini's local profiles with no qualification stored
+  When a new run, the workspace default, a role override or an Expert's role binding names either
+  Then it is refused model_not_offered with a reason naming the model, no run starts, no other model is substituted, nothing stored changes, and no picker lists it
+```
+
+Dependencies:
+- None
+
+Tasks:
+- [ ] Add a local profile to `domain/models.py` that names its Hugging Face repository at its revision, its weights file's SHA-256, its chat template's hash, the model ID the server reports and its thinking switch, with a route that reserves US$0 (A2, A3, A9). Add Bonsai 2.5's Q2_0 and Inkling 2 Mini's UD-Q3_K_XL profiles from the pins in `~/Models/DOWNLOAD-MANIFEST.json` that the measurements name, approved and not offered, with the migration and regenerated clients a new profile needs, as US-14.15 added Sol's. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the migration, and `contract_drift` in the fast profile.
+- [ ] Give `adapters/models/factory.py` its one local branch: an OpenAI-compatible client on `http://127.0.0.1:<port>/v1`, its port ordinary non-secret configuration, with no key and no SDK retries, and `FORBIDDEN_OPTIONS` still refused (A2). Lock a client package for it, repo-local and pinned, only if the locked ones can't serve it (the local small models plan's 7.2 names `langchain-openai`). Checked by pytest under `services/agent/tests` with a fake server on loopback.
+- [ ] Before each local call, read the server's `/v1/models`. Refuse `model_unavailable` when its model ID isn't the profile's, and block with a typed reason the run shows when nothing answers on the port. Neither sends a chat completion or tries another model or source, and a local call reads no OpenRouter catalog (A3, MP-08). Checked by pytest under `services/agent/tests` with fake servers.
+- [ ] Reserve US$0 for a local call in model admission, keeping its invocation ticket, receipt, `model_calls`, tokens, tool dispatches, active time and compaction as for an OpenRouter call (A2). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the ledger rows.
+- [ ] Turn thinking off where the profile's template allows, and keep reasoning the server returns in its own field out of the reply's text, its tool arguments and activity logs (A9, MP-02). Send a single named tool as `required` with only that tool (the plan's section 5). Checked by pytest under `services/agent/tests` with a fake server.
+- [ ] Add a runbook section beside the worker's start in `docs/engineering/runbooks/local-app.md`, in which the owner checks that `llama-server` is release b11556 or later and the weights pass `verify-models.py`, starts it bound to 127.0.0.1 only with the profile's model ID, and stops it. Neither the Studio nor a hook starts it or downloads weights (A4, A5). Checked by reading it against A4 and A5.
+- [ ] Amend `AGENTS.md`'s "Boundaries that matter" and `.claude/rules/model-gateway.md`: model calls use the approved OpenRouter profiles or, on the Local source, offered local profiles, through the shared gateway, still with no fallback, implicit evaluator, hosted tracing or other provider. Checked by reading them against Decision 0041's "Requirements revised", and by the harness profile's instruction-asset tests.
+- [ ] Amend PRD-Model-Providers MP-02 (A3 proves a local route's identity in place of OpenRouter's catalog), MP-07's spend (a local call reserves US$0, A2) and MP-08 (a stopped or wrong server, A3), option-b-contract SP-008's budgets (A2), PRD-Local-Mac-Deployment LM-A03 and its resources section (LM-07) for the owner-started runtime (A4, A15), PRD-LangChain-Deep-Agents' scope, which puts local inference engines outside the design, and the rows Decision 0041 found at ingestion that bear on the route: PRD-Local-Mac-Deployment LM-01, PRD-LangChain-Deep-Agents 2.2's outcomes 7 to 9 and 6.3's model factory, and the `autobots-model-gateway` skill, as Decision 0041's "Requirements revised" lists. Checked by reading each against A2 to A4 and A15.
+- [ ] Update `CODEBASE.md`'s model path and integration points, keeping its `Analyzed revision` honest. Checked by reading it against the code.
+
+Open Questions:
+- None.
+
+### US-23.2: Local route qualification and offering, at no spend
+
+Status: BLOCKED
+
+As a workspace owner
+I want a local profile offered only once its route passes US-3.4's suite three times, at no spend
+So that the Local source never depends on a model that fails the calls the gateway relies on.
+
+Source:
+- [Decision 0041, A1, A4, A7, A8 and A15](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, requirements revised: SP-008's qualification](docs/engineering/decisions/0041-local-model-source.md#requirements-revised)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [The plan, section 8, Q1 for every run](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)
+- [The plan, section 9, P2](docs/plan/local-models-every-run.md#9-phases)
+- [The plan, section 11, LS-2](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The local small models plan, section 10, Q1](docs/plan/local-small-models.md#10-qualifying-without-guessing)
+- [The local small models plan, 7.2, qualification](docs/plan/local-small-models.md#72-where-code-changes)
+- [The local small models plan, draft US-17.2, never ingested under that ID](docs/plan/local-small-models.md#us-172-local-route-qualification-and-offering)
+- [Measurements, correctness](research/LOCAL-MODELS-INKLING-BONSAI.md#correctness)
+- [Measurements, speed](research/LOCAL-MODELS-INKLING-BONSAI.md#speed)
+- [Measurements, memory](research/LOCAL-MODELS-INKLING-BONSAI.md#memory)
+- [Measurements, what it settles](research/LOCAL-MODELS-INKLING-BONSAI.md#what-it-settles-and-what-it-doesnt)
+- [Decision 0019, S2 and what "qualified" means](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [MP-01, a profile not offered is refused with no substitute](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-02, capabilities per qualified route](docs/PRD/PRD-Model-Providers.md#mp-02-catalog-and-request-contract)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Codebase Context:
+- [Entry Points](CODEBASE.md#entry-points): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `operations/route_qualification.py` is US-3.4's runner. It sends nothing without `--paid`, refuses a profile outside its table of OpenRouter routes and authorized caps, reads the OpenRouter catalog before anything is sent, and builds each call with `factory.chat_model`. `operations/route_fixtures.py` runs twelve fixtures with `TRIALS = 3` (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `agent_runtime.route_qualifications` holds stored qualifications, Sol's row added by migration 41, and `contracts/settings.RouteQualification` carries a profile's status, date, configuration and limits (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): offering is the constant `domain/models.OFFERED_FOR_NEW_RUNS`, which gained Sol once its route qualified (US-14.15), and `require_offered` refuses `model_not_offered` with a reason per profile (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A local route qualifies without spending
+  Given a fake OpenAI-compatible server on 127.0.0.1 that answers US-3.4's fixtures as a local profile's model, and a fake OpenRouter transport that fails if it is touched
+  When the route qualification runner runs the suite on that local route without --paid
+  Then each fixture's verdict in each of three trials is recorded as fake-server evidence with its calls and time to the first token, nothing is reserved or charged, and nothing reaches OpenRouter, its catalog included
+
+Scenario: Bonsai 2.5's route qualifies on this Mac
+  Given the owner's request, and llama-server started by the owner, serving Bonsai 2.5's pinned Q2_0 on 127.0.0.1
+  When US-3.4's suite runs on Bonsai 2.5's local route in three trials, and reading and writing speed, time to the first token and the server's peak memory are measured at 8K, 32K and 64K
+  Then each result is recorded as live local evidence apart from fake-server results, with the served model ID and the profile's pins, US$0.00 is spent, and nothing is sent to OpenRouter
+
+Scenario: Offered only once the suite passes
+  Given Bonsai 2.5's stored qualification with plain text, automatic and required tool calls, flat structured output and streamed text each passing in all three trials, and no passing qualification for Inkling 2 Mini
+  When the profiles offered on the Local source are read
+  Then Bonsai 2.5's is offered with its qualification's date, configuration and limits, and Inkling 2 Mini's isn't, with a reason that names what hasn't passed
+
+Scenario: A failed capability keeps a profile from being offered
+  Given a fake server whose required tool call fails in one of three trials, as Inkling 2 Mini's did by hand
+  When the suite runs on that local route
+  Then the failure is recorded against its fixture, the profile isn't offered, the capability stays disabled and is listed in its limits, and no other model is tried
+
+Scenario: Not offered on OpenRouter
+  Given Bonsai 2.5's profile offered on the Local source, in a workspace on OpenRouter
+  When a new run, the workspace default, a role override or an Expert's role binding names it
+  Then it is refused model_not_offered, no run starts, no other model is substituted, and nothing stored changes
+```
+
+Dependencies:
+- US-23.1
+- External: the owner starts `llama-server` serving Bonsai 2.5's pinned Q2_0 by the runbook command (Decision 0041 A4), with its weights checked against `~/Models/DOWNLOAD-MANIFEST.json` (A5), and asks for its route qualification, which runs only on request
+
+Tasks:
+- [ ] Let `operations/route_qualification.py` run US-3.4's suite on a local route at no spend: no `--paid` flag or cap, no OpenRouter key or catalog, US-23.1's identity check first, each call built by the factory's local branch, and each call given as long as the route's call time in Decision 0041's measurements table. OpenRouter routes keep their flag and caps (A7). Checked by pytest under `services/agent/tests` with a fake server on loopback.
+- [ ] Add to a local route's report the reading and writing speed, the time to the first token and the server's peak memory at 8K, 32K and 64K, with the served model ID, the profile's pins, US$0.00 and what it doesn't establish (the plan's section 8, Q1). Checked by pytest under `services/agent/tests` for the report's shape, and by reading the live report.
+- [ ] Offer a local profile on the Local source only once its stored qualification has plain text, automatic and required tool calls, flat structured output and streamed text passing in all three trials, and give the reason one isn't offered. A capability that failed or isn't supported stays disabled and listed in its limits (A7, Decision 0019's meaning of qualified). New work on OpenRouter naming a local profile is refused `model_not_offered` (A1). Checked by pytest under `services/agent/tests`, and by the db profile's disposable fixtures for the stored qualification and the refusals.
+- [ ] On the owner's request, run the suite's three trials and the measurements on Bonsai 2.5's route against the owner's `llama-server`, keep the raw report in the ignored `.checks`, and record its qualification with its date, configuration and limits by a migration, as Sol's was. Checked by the live report, and by the db profile's disposable fixtures for the migration.
+- [ ] Amend option-b-contract SP-008's qualification: a local route qualifies with US-3.4's suite at no spend, and that gates offering (A7), as Decision 0041's "Requirements revised" lists. Update the local app runbook's Qualify section and `CODEBASE.md`. Checked by reading each against A7.
+
+Open Questions:
+- None.
+
+### US-23.3: The Model source setting in Settings → Models
+
+Status: BLOCKED
+
+As a workspace owner
+I want one setting in Settings → Models that sends every model call to OpenRouter or to offered local profiles only
+So that I choose where prompts go, with today's OpenRouter behaviour unless I switch, and switching back restores my choices.
+
+Source:
+- [Decision 0041, A1, A7, A8 and A10 to A13](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, requirements revised: PRD-Model-Providers' introduction, MP-01, MP-04, MP-05 and MP-07's disclosure, SP-006, SP-008's limits, Decision 0019 S2 and Decision 0035 Y7](docs/engineering/decisions/0041-local-model-source.md#requirements-revised)
+- [Decision 0041, what this gives up](docs/engineering/decisions/0041-local-model-source.md#what-this-gives-up)
+- [Decision 0041, reversal](docs/engineering/decisions/0041-local-model-source.md#reversal)
+- [The plan, section 5](docs/plan/local-models-every-run.md#5-how-a-local-model-plugs-in)
+- [The plan, section 6](docs/plan/local-models-every-run.md#6-the-setting-in-settings--models)
+- [The plan, section 11, LS-3 and the scenario it adds](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The local small models plan, 7.1](docs/plan/local-small-models.md#71-the-model-source-setting)
+- [The local small models plan, 7.2](docs/plan/local-small-models.md#72-where-code-changes)
+- [The local small models plan, draft US-17.3, never ingested under that ID](docs/plan/local-small-models.md#us-173-a-model-source-setting-openrouter-or-local)
+- [Measurements, speed](research/LOCAL-MODELS-INKLING-BONSAI.md#speed)
+- [Measurements, what this means for the runs](research/LOCAL-MODELS-INKLING-BONSAI.md#what-this-means-for-the-runs)
+- [MP-01](docs/PRD/PRD-Model-Providers.md#mp-01-approved-models-and-selection)
+- [MP-04](docs/PRD/PRD-Model-Providers.md#mp-04-settings-flow-and-states)
+- [MP-05](docs/PRD/PRD-Model-Providers.md#mp-05-application-apis-and-authorization)
+- [MP-07](docs/PRD/PRD-Model-Providers.md#mp-07-disclosure-resources-and-spend)
+- [SP-006](docs/engineering/option-b-contract.md#sp-006--approved-model-profiles)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+- [Decision 0019, S2](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Decision 0035, Y7 and Y16](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0034, L2 and L4](docs/engineering/decisions/0034-deep-research-like-content-writer.md#limits-for-every-run-us-166)
+- [Decision 0034, L6](docs/engineering/decisions/0034-deep-research-like-content-writer.md#a-64k-working-context-us-168)
+- [Admitted browser model, BM-05](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
+- [PRD-Studio, Models, MD-01 to MD-03](docs/PRD/PRD-Studio.md#models)
+- [PRD-Studio, Home, HM-05](docs/PRD/PRD-Studio.md#home)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `apps/web/app/settings/models/page.tsx` renders `ProviderSettingsPanel`, a link back to the draft, then `ModelPolicyPanel`. The composer's disclosure reads "Sent to OpenRouter" (`components/runs/disclosure/disclosure-parts.tsx`), and Home's service chip reads "OpenRouter authenticated" from `lib/readiness.ts` (checked at HEAD). Not product intent.
+- [Current capabilities](CODEBASE.md#current-capabilities): `adapters/model_endpoint.py` admits each chat completion from the box on the run's frozen `researcher` route, ignores the model a request names, holds no key or client of its own, and refuses an image part as `content_not_qualified` (Y16) (checked at HEAD). Not product intent.
+- [Data and Persistence](CODEBASE.md#data-and-persistence): `app_private.model_policies` holds one `default_profile` and one `role_overrides` per workspace, read by `application/run_admission.saved_workspace_policy`. `contracts/settings.ModelPolicyState` carries them, and `ProviderStatus.provider` is the literal `openrouter` (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): `application/run_admission.require_model_ready` refuses model-backed work without a usable OpenRouter key, and the worker checks again before it dispatches. `domain/models.resolve_role_policy` resolves MP-01's order over the three OpenRouter profiles, and a run dispatches through its `executor` binding. `application/run_usage.RootLimits` gives every run 64 model calls, 96 tool dispatches and 2,700 active seconds, and `MODEL_CALL_SECONDS`, `MAX_OUTPUT_TOKENS` and `CONTEXT_TOKENS` are constants, not set per route (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: OpenRouter is the default, as today
+  Given a new workspace, and one that existed before the change with a saved default and role overrides
+  When their model policies are shown and a run is admitted in each
+  Then Model source is OpenRouter in both, the saved choices are as they were, every role resolves as MP-01 says today with researcher on Sol, and no picker lists a local profile
+
+Scenario: Local can't be chosen before offered profiles cover the roles
+  Given no offered local profile, a workspace with an Expert that grants browse_goal, and a workspace with none
+  When the owner of each switches Model source to Local
+  Then each switch is refused with the roles that have no offered local profile, executor and researcher in the first and executor in the second, and both stay on OpenRouter
+
+Scenario: Only an owner or admin switches
+  Given Bonsai 2.5 offered, a member who isn't an owner or admin, and an owner holding a stale settings version
+  When each switches Model source to Local
+  Then the member is refused as forbidden, the stale switch is refused as a conflict, and the source stays OpenRouter
+
+Scenario: On Local every role is on one local profile
+  Given Bonsai 2.5 offered, and the owner has switched Model source to Local
+  When the model policy is shown and a run is admitted
+  Then every role resolves to Bonsai 2.5's profile, the run freezes the Local source with its route, every picker lists offered local profiles only, saving a workspace role override is refused, and a run that names a role override is refused model_not_offered
+
+Scenario: Limits follow the local route
+  Given Bonsai 2.5 offered, one run admitted on Local and one admitted on OpenRouter
+  When their frozen limits are read
+  Then the Local run's are 64K context, 4,096 output tokens with thinking off, 1,800 seconds a call, 240 active minutes, 64 model calls and 96 tool dispatches, and the OpenRouter run keeps 300 seconds a call and 45 active minutes
+
+Scenario: Local sends nothing to OpenRouter
+  Given Model source is Local, no OpenRouter key set, a fake local server serving Bonsai 2.5's pinned model ID, and a fake OpenRouter transport that fails if it is touched
+  When the composer is opened and a run runs to the end
+  Then the disclosure said nothing goes to OpenRouter and that tool calls still leave the Mac, every model call went to the local server reserving US$0, no key was read, and no request reached OpenRouter, its catalog included
+
+Scenario: The browser box's model calls follow the source
+  Given Model source is Local, and an offered local profile covers the researcher role
+  When a run's browse_goal starts browser-use in the box and it sends a chat completion to the admitted endpoint, and then one carrying an image
+  Then the first call is admitted on the run's frozen local researcher route, answered by the local runtime, reserves US$0, and nothing reaches OpenRouter, and the second is refused content_not_qualified before anything is sent
+
+Scenario: A run on a switched-off source waits
+  Given Bonsai 2.5 offered, and a run admitted on an OpenRouter route waiting for an approval
+  When the owner switches Model source to Local and approves, and then switches back, cancels the run or continues it as a linked new run
+  Then its next model call is refused model_source_disabled before anything is sent to either source, the run waits with that reason, after the switch back its call goes to OpenRouter on its frozen route, a cancel ends it, and the linked new run is admitted on Local
+
+Scenario: Switching back restores saved choices
+  Given a default and role overrides saved under OpenRouter, and Bonsai 2.5 offered
+  When the owner switches to Local and back to OpenRouter
+  Then the OpenRouter default and role overrides are as they were
+
+Scenario: The Model source panel
+  Given Bonsai 2.5 offered with no matched run, Inkling 2 Mini not offered, and a fake local server serving Bonsai 2.5's model ID
+  When the owner opens Settings → Models
+  Then a Model source panel sits above the provider panel and the model policy, and shows each local profile as offered or not with the reason, the runs it has matched, the runtime's health with the model ID it serves and whether the pinned SHA-256 matches, the roles it covers, and "US$0.00 per model call" with a note that tool calls such as SerpApi, Jina and YouTube still leave the Mac
+
+Scenario: Home shows the local model's health
+  Given Model source is Local
+  When a member opens Home while a fake local server serves Bonsai 2.5's model ID, and again with nothing on its port
+  Then the service chip reads "Local model ready" the first time and says the local model isn't running the second, from the runtime's health check, and no request reaches OpenRouter
+```
+
+Dependencies:
+- US-23.2
+
+Tasks:
+- [ ] Store Model source per workspace, OpenRouter for every new and existing workspace, with the default profile and role overrides kept per source. Serve and change it through the settings API with owner-or-admin authority, Host/Origin and CSRF checks and an expected version (A1, MP-05), and regenerate OpenAPI and the TypeScript client. Checked by pytest under `services/agent/tests`, the db profile's disposable fixtures for the migration and its authorization, and `contract_drift` in the fast profile.
+- [ ] Refuse a switch to Local, naming the roles missing, until offered local profiles cover `executor`, and `researcher` while any Expert grants `browse_goal`. On Local, resolve every role to the Local default profile, refuse saving a workspace role override, and refuse a run that names a role override as `model_not_offered` (A8), freeze the source with the route at admission, read no OpenRouter key, and list only the active source's offered profiles in every picker (A1, A7, A8). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [ ] Refuse at dispatch, as `model_source_disabled`, a model call whose frozen route is on the source switched off, before anything is sent to either source. The run waits with that reason until the owner switches back, cancels it or continues it as a linked new run on the active source (A12, MP-01). Checked by pytest under `services/agent/tests` and the db profile's disposable fixtures.
+- [ ] On Local, send nothing to OpenRouter, its catalog included (A13). Let the admitted endpoint answer browser-use on the run's frozen local `researcher` route, with Y16's refusal of an image unchanged and the box never given the server's address (A10). Checked by pytest under `services/agent/tests` with a fake local server and a fake OpenRouter transport that fails if touched.
+- [ ] Set each local route's limits from Decision 0041's measurements table, frozen with the route: Bonsai 2.5 at 64K context, 4,096 output tokens with thinking off, 1,800 seconds a call and 240 active minutes, and Inkling 2 Mini at 64K, 8,192 output tokens, 1,800 seconds and 240 minutes, both with Decision 0034 L2's model calls and tool dispatches. OpenRouter routes keep today's limits, and the local client's own request timeout sits above its call time (A11). Checked by pytest under `services/agent/tests`.
+- [ ] Add the Model source panel to Settings → Models above the provider panel and the model policy, showing what A13 lists. Make the composer's disclosure follow the source, and on Local make Home's service chip read "Local model ready" from the runtime's health check (A13). Checked by the web unit tests and the db profile's browser suites.
+- [ ] Amend PRD-Model-Providers' introduction and MP-01 (the source, and resolution within it, A1, A8), MP-04 and MP-05 (the setting's states and who changes it, A1, A7, A13) and MP-07's disclosure (A13), option-b-contract SP-006 (approved profiles, A1) and SP-008's limits (A11), Decision 0019 S2 (the three OpenRouter profiles, plus offered local profiles on the Local source) and Decision 0035 Y7 (on Local, the browser box's calls reach the local model, A10), and the rows Decision 0041 found at ingestion that bear on the setting: option-b-contract SP-007 and PRD-Local-Mac-Deployment LM-06 and LM-A06 (no OpenRouter key is needed on Local), PRD-Tool-Catalog BM-01 and BM-03 (the browser model's route), and PRD-Studio HM-05 and MD-01 (Home's service chip and the model's facts), as Decision 0041's "Requirements revised" lists. Checked by reading each against A1, A7, A8, A10, A11 and A13.
+- [ ] Update the local app runbook's OpenRouter settings section, `README-DEV.md` and `CODEBASE.md`. Checked by reading each against A1 and A13.
+
+Open Questions:
+- None.
+
+### US-23.4: The Market watcher Costa Rica on a local model
+
+Status: BLOCKED
+
+As a workspace owner
+I want the Market watcher Costa Rica, as an Expert run and as a workflow step, repeated on the Local source
+So that I can see whether a model served on this Mac publishes the same kind of note, with every figure from a tool, at US$0 in model spend.
+
+Source:
+- [Decision 0041, A7, A11 and A16](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, what this gives up, on Spanish](docs/engineering/decisions/0041-local-model-source.md#what-this-gives-up)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [The plan, section 2, the Market watcher's rows](docs/plan/local-models-every-run.md#2-the-runs-to-repeat)
+- [The plan, section 7, starting with the Market watcher](docs/plan/local-models-every-run.md#7-fitting-each-run)
+- [The plan, section 8, the Market watcher's row and the scoreboard](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)
+- [The plan, section 9, P3 and P6](docs/plan/local-models-every-run.md#9-phases)
+- [The plan, section 11, LS-4 and the shared scenarios](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The plan, section 12, on Spanish](docs/plan/local-models-every-run.md#12-risks)
+- [The local small models plan, section 10, Q2, Q3 and what Q2 needs first](docs/plan/local-small-models.md#10-qualifying-without-guessing)
+- [Measurements, correctness, on Spanish](research/LOCAL-MODELS-INKLING-BONSAI.md#correctness)
+- [Measurements, what this means for the runs](research/LOCAL-MODELS-INKLING-BONSAI.md#what-this-means-for-the-runs)
+- [Market watcher README, the Expert](README-Market-Watcher-Costa-Rica.md#the-expert)
+- [Market watcher README, what keeps it honest](README-Market-Watcher-Costa-Rica.md#what-keeps-it-honest)
+- [Market watcher README, making them on an install](README-Market-Watcher-Costa-Rica.md#making-them-on-an-install)
+- [Market watcher README, the live runs](README-Market-Watcher-Costa-Rica.md#the-live-runs)
+- [`AGENTS.md`, no implicit evaluator](AGENTS.md#boundaries-that-matter)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `operations/concept_seed.py` seeds a "Market watcher" and "Monthly FX note", not the Market watcher Costa Rica or the "Costa Rica market note" workflow. No module under `services/agent/src` replays recorded tool results (checked at HEAD by search). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A frozen replay matches the run's checks
+  Given Model source is Local in a disposable environment, the runtime serving the offered profile's pinned model, the Market watcher Costa Rica version 2 made there from its README, and the recorded market_history results of its OpenRouter Expert run
+  When its Expert run is replayed three times on that run's goal
+  Then in at least two of the three market-note.md is published and every number in it appears in a market_history or calculate result of that run, with time, model calls, tool calls and the server's peak memory recorded for each, and no tool reaches a real site
+
+Scenario: A live run matches the OpenRouter run
+  Given Model source is Local on the owner's install, rebuilt by the owner with this code, and the owner approves the live runs' tool calls
+  When the Market watcher Costa Rica runs as an Expert run and as the Costa Rica market note workflow's step on real tools
+  Then each publishes market-note.md with every number in it from a market_history or calculate result, no request reaches OpenRouter, its model spend is US$0.00, and the owner reads each note's Spanish beside the OpenRouter run's
+```
+
+Dependencies:
+- US-23.3
+- External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the replays and the live runs (Decision 0041 A4 and A16)
+- External: the owner approves the live Expert run and workflow execution on real tools, on the owner's install rebuilt with this code and its migrations applied by the owner
+
+Tasks:
+- [ ] Add a replay runner, in no verification profile and run only on the owner's request. It runs a run on the Local source in a guarded disposable environment against the owner's `llama-server`, answers each recorded tool call from a recording kept in the ignored `.checks` and refuses one outside it, and records each run's time, model calls, tool calls and the server's peak memory (the plan's section 8, the local small models plan's Q2). Checked by pytest under `services/agent/tests` with a fake server and a recording.
+- [ ] Make Market watcher Costa Rica version 2 and the Costa Rica market note workflow in the disposable environment from the README's "Making them on an install". Checked by the replay's record.
+- [ ] Add the code check: `market-note.md` is published, and every number in it appears in a `market_history` or `calculate` result of the same run (the plan's sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic notes and tool results that pass and fail it.
+- [ ] Replay the Expert run three times on the offered local profile, and keep each run's check, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8.
+- [ ] With the owner's approval, run the Expert run and the workflow execution live on the owner's install on the Local source. Record their checks, model and tool calls, tokens, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads the Spanish. Checked by the runs' records and the worker's log, and by the owner's reading.
+- [ ] Record the profile's match of the Market watcher run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install.
+- [ ] Add a "Local" section to `README-Market-Watcher-Costa-Rica.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` for the replay runner. Checked by reading each against the runs' records and the code.
+
+Open Questions:
+- The replay reads the 2026-11-20 Expert run's recorded `market_history` results (the plan's section 8). Does the owner's install keep them whole, which the local small models plan's section 10 says must be verified first? If not, does the owner approve a recording run on the Local source, and who exports the recording from the persistent install into the ignored `.checks`?
+- The plan's section 8 scoreboard covers Inkling 2 Mini, which isn't offered, and the Bonsai 2 baseline on MTPLX, which no story gives a profile or route. Do the replays run either, and how, or does the scoreboard cover offered profiles only?
+- Does the owner's reading of the note's Spanish decide whether the profile has matched this run (A7), or does the match follow the code checks, with the reading recorded beside it?
+
+### US-23.5: The deep research workflow on a local model
+
+Status: BLOCKED
+
+As a workspace owner
+I want the Deep research content writer workflow repeated on the Local source
+So that I can see whether a model served on this Mac matches workflow run 5, or where it falls short, at US$0 in model spend.
+
+Source:
+- [Decision 0041, A7, A9, A11, A14 and A16](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, what this gives up, on speed and quality](docs/engineering/decisions/0041-local-model-source.md#what-this-gives-up)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [The plan, section 2, the deep research row](docs/plan/local-models-every-run.md#2-the-runs-to-repeat)
+- [The plan, section 7, deep research](docs/plan/local-models-every-run.md#7-fitting-each-run)
+- [The plan, section 8, the deep research row](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)
+- [The plan, section 9, P4 and P6](docs/plan/local-models-every-run.md#9-phases)
+- [The plan, section 11, LS-5 and the shared scenarios](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The local small models plan, section 1, R1 to R9](docs/plan/local-small-models.md#1-the-result-to-match)
+- [The local small models plan, section 8](docs/plan/local-small-models.md#8-making-small-models-do-this-run)
+- [The local small models plan, section 10, Q2 and Q3](docs/plan/local-small-models.md#10-qualifying-without-guessing)
+- [The local small models plan, drafts US-17.4 and US-17.5, never ingested under those IDs](docs/plan/local-small-models.md#us-174-a-frozen-web-replay-of-the-deep-research-workflow)
+- [Measurements, what this means for the runs](research/LOCAL-MODELS-INKLING-BONSAI.md#what-this-means-for-the-runs)
+- [Deep research README, the workflow execution](README-Deep-Research-Content-Writer.md#the-workflow-execution)
+- [Deep research README, the limits that make it fit](README-Deep-Research-Content-Writer.md#the-limits-that-make-it-fit)
+- [Decision 0034, the Deep research writer Expert](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-writer-expert-us-166)
+- [Decision 0034, the Deep research content writer workflow](docs/engineering/decisions/0034-deep-research-like-content-writer.md#the-deep-research-content-writer-workflow-us-166)
+- [Decision 0034, S1, a seed that keeps what exists](docs/engineering/decisions/0034-deep-research-like-content-writer.md#seed-us-166)
+- [`AGENTS.md`, no implicit evaluator](AGENTS.md#boundaries-that-matter)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. `operations/concept_seed.py` seeds the Deep research writer with `google_search`, `google_extract`, `search_web`, `extract_website_content`, `read_artifact`, `read_run_file`, `save_artifact` and `publish_artifact`, and the Deep research content writer workflow with a "Research and write" and a "Check and report" step on it. No module under `services/agent/src` replays recorded tool results (checked at HEAD). Not product intent.
+- [Architecture](CODEBASE.md#architecture): `application/run_usage.RootLimits` gives every run 64 model calls, 96 tool dispatches and 2,700 active seconds (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A frozen replay matches the run's checks
+  Given Model source is Local in a disposable environment, the runtime serving the offered profile's pinned model, the concept seed's Deep research content writer, and the recorded tool results of workflow run 5
+  When the workflow is replayed three times on "langchain for deep agents", with its approval gate decided in each
+  Then R2 to R6 and R8 of the local small models plan hold in at least two of the three, scored in code, with time, model calls, tool calls and the server's peak memory recorded for each, and no tool reaches a real site
+
+Scenario: A live run matches the OpenRouter run
+  Given Model source is Local on the owner's install, rebuilt by the owner with this code, and the owner approves the workflow execution's tool spend
+  When the workflow runs on "langchain for deep agents" on real tools and the owner decides its gate
+  Then R1 to R9 are recorded against run 5's figures, no request reaches OpenRouter, its model spend is US$0.00, its tool spend is recorded, and the owner reads content.md and review.md beside run 5's
+```
+
+Dependencies:
+- US-23.3
+- External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the replays and the live run (Decision 0041 A4 and A16)
+- External: the owner approves the live workflow execution's tool spend on real tools, on the owner's install rebuilt with this code and its migrations applied by the owner
+
+Tasks:
+- [ ] Extend the replay runner, adding it where no earlier story has, to answer `google_search`, `google_extract`, `search_web` and `extract_website_content` from a recording of workflow run 5's tool results kept in the ignored `.checks`, and to decide the approval gate. Checked by pytest under `services/agent/tests` with a fake server and a recording.
+- [ ] Score R2 to R6 and R8 of the local small models plan's section 1 in code from a run's plan, events, tool record and artifacts. Checked by pytest under `services/agent/tests` on synthetic runs that pass and fail each rule.
+- [ ] Write the version of the Deep research writer for a local model that the plan's section 7 calls for. It writes the document in parts, keeps its tool grant and outputs unchanged so it counts as the same Expert (A14), and is kept where the open question below decides. Checked by pytest under `services/agent/tests` for its tool grant and outputs.
+- [ ] Replay the workflow three times on the offered local profile, and keep each run's scores, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8.
+- [ ] With the owner's approval, run the workflow live on the owner's install on the Local source, the owner deciding its gate. Record R1 to R9 against run 5's figures, the tool spend, US$0.00 model spend and that no request reached OpenRouter. The owner reads `content.md` and `review.md` beside run 5's. Checked by the run's record and the worker's log, and by the owner's reading.
+- [ ] Record the profile's match of the deep research run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install.
+- [ ] Add a "Local" section to `README-Deep-Research-Content-Writer.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the run's record and the code.
+
+Open Questions:
+- The replay reads workflow run 5's recorded tool results. Does the owner's install keep them whole, which the local small models plan's section 10 says must be verified first? If not, does the owner approve a recording run's tool spend on the Local source, and who exports the recording, whose page text is third-party, into the ignored `.checks`?
+- The plan's section 7 calls for a version of the Deep research writer that writes the document in parts (A14). Is it seeded or saved by the owner? How does a run on Local use it while a run on OpenRouter keeps today's version, given that a seed keeps an Expert that exists (Decision 0034 S1)?
+- The plan's section 7 also calls for tool calls constrained to their schema, which no Decision 0041 row decides. May a local route send a grammar or JSON-schema constraint with a required tool call, and is that the route's option or the run's?
+- Does the owner's reading of `content.md` and `review.md` decide whether the profile has matched this run (A7), or does the match follow R1 to R9's code checks, with the reading recorded beside it?
+
+### US-23.6: The Transcript workflow on a local model
+
+Status: BLOCKED
+
+As a workspace owner
+I want the Transcript workflow's browse and its prose repeated on the Local source
+So that I can see whether a model served on this Mac can drive browser-use and polish a transcript a section at a time, at US$0 in model spend.
+
+Source:
+- [Decision 0041, A7, A9, A10, A11 and A16](docs/engineering/decisions/0041-local-model-source.md#decision)
+- [Decision 0041, set from the measurements](docs/engineering/decisions/0041-local-model-source.md#set-from-the-measurements)
+- [Decision 0041, what this gives up, on images while browsing](docs/engineering/decisions/0041-local-model-source.md#what-this-gives-up)
+- [Decision 0041, what this doesn't establish](docs/engineering/decisions/0041-local-model-source.md#what-this-doesnt-establish)
+- [The plan, section 2, the Transcript row](docs/plan/local-models-every-run.md#2-the-runs-to-repeat)
+- [The plan, section 7, the Transcript](docs/plan/local-models-every-run.md#7-fitting-each-run)
+- [The plan, section 8, the Transcript's rows](docs/plan/local-models-every-run.md#8-qualifying-run-by-run)
+- [The plan, section 9, P5 and P6](docs/plan/local-models-every-run.md#9-phases)
+- [The plan, section 11, LS-6 and the shared scenarios](docs/plan/local-models-every-run.md#11-draft-stories)
+- [The plan, section 12, the browse as the least likely to pass](docs/plan/local-models-every-run.md#12-risks)
+- [Measurements, what this means for the runs](research/LOCAL-MODELS-INKLING-BONSAI.md#what-this-means-for-the-runs)
+- [Transcript README, two polished runs](README-YouTube-Transcript.md#two-polished-runs-on-2026-11-26)
+- [Transcript README, what this shows](README-YouTube-Transcript.md#what-this-shows-and-what-it-doesnt)
+- [Decision 0040, P1 to P8](docs/engineering/decisions/0040-polished-transcript.md#decision)
+- [Decision 0039, V8](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md#decision)
+- [Decision 0035, Y7, Y14 and Y16](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#decision)
+- [Decision 0035, what this gives up, on another creator's transcript](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md#what-this-gives-up)
+- [Decision 0019, S6, the live browse trial](docs/engineering/decisions/0019-sol-profile-and-browser-use.md#decision)
+- [Decision 0018, the qualification host](docs/engineering/decisions/0018-browser-executor.md#the-qualification-host)
+- [Admitted browser model, BM-05](docs/PRD/PRD-Tool-Catalog.md#admitted-browser-model)
+- [SP-008](docs/engineering/option-b-contract.md#sp-008--budgets-and-model-qualification)
+
+Codebase Context:
+- [Current capabilities](CODEBASE.md#current-capabilities): `CODEBASE.md` was analyzed at 095a976, behind HEAD f320d14. The seeded Transcript reader grants `browse_goal`, `read_run_file`, `append_to_file` and `publish_artifact`, and its instructions save the browse to `transcript-timed.md` with `browse_goal` version 4's `save`. `browse_goal` runs on browser-use in the box under YOLO, and otherwise on the read-only loop, each on the `researcher` route. `tests/db/checks/transcript_check.py` uses a scripted model and scripted browses (checked at HEAD). Not product intent.
+- [Entry Points](CODEBASE.md#entry-points): `operations/browse_trial.py` starts at `https://example.com/` with domains `example.com` and `iana.org`, reads the owner's OpenRouter key from a key file, and refuses a repeat without `--owner-requested-repeat` (checked at HEAD). Not product intent.
+
+Acceptance Criteria:
+
+```gherkin
+Scenario: A live browse on the local researcher route
+  Given Model source is Local on the owner's install or a disposable stack, the runtime serving the offered profile's pinned model, and the owner's approval of one live browse
+  When browse_goal runs on browser-use from https://example.com/ with allowed_domains example.com and iana.org
+  Then it ends with a stop reason and a summary, every model call browser-use makes is admitted on the run's frozen local researcher route reserving US$0, nothing reaches OpenRouter, and the egress proxy connects to no host outside example.com and iana.org
+
+Scenario: A frozen replay of the prose matches the run's checks
+  Given Model source is Local in a disposable environment, the runtime serving the offered profile's pinned model, and a scripted browse that saves run 5's transcript-timed.md lines
+  When the Transcript workflow is replayed three times on run 5's watch address
+  Then in at least two of the three the model read transcript-timed.md 60 lines at a time from the first line to the last, made one append_to_file per section in order, and wrote a word count near run 5's 8,049, with time, model calls and the server's peak memory recorded for each, and nothing reached YouTube or OpenRouter
+
+Scenario: A live run matches the OpenRouter run
+  Given Model source is Local on the owner's install, rebuilt by the owner with this code, and a video the owner names and approves a run on
+  When the Transcript workflow runs on that video's watch address on real tools
+  Then transcript-timed.md holds the video's caption lines with none empty or repeated, transcript.md is published last and is the run's Result, its prose covers every 60-line section in order, no request reaches OpenRouter, its model spend is US$0.00, and the owner reads it beside run 5's
+```
+
+Dependencies:
+- US-23.3
+- External: the owner starts `llama-server` serving the offered local profile's pinned model by the runbook command, for the browse trial, the replays and the live run (Decision 0041 A4 and A16)
+- External: the owner approves one live browse from https://example.com/ with allowed domains example.com and iana.org on the local researcher route, as the plan's section 8 asks and Decision 0019 S6 did
+- External: the owner names a video and approves one live Transcript run on it, within the Transcript reader's four YouTube hosts, on the owner's install rebuilt with this code and its migrations applied by the owner
+
+Tasks:
+- [ ] Let the browse trial (`operations/browse_trial.py`) run on browser-use on a run's local `researcher` route with no key, still in no verification profile and still refusing a repeat without the owner's request. Run the plan's scripted browse on that route first, as the open question below decides. Checked by pytest under `services/agent/tests` with a fake local server.
+- [ ] With the owner's approval, run that trial once from https://example.com/ with allowed domains example.com and iana.org, and record its stop reason, model calls, US$0.00 spend and the hosts the proxy connected to. Checked by the trial's record.
+- [ ] Extend the replay runner, adding it where no earlier story has, with a scripted browse that saves run 5's `transcript-timed.md` lines, kept in the ignored `.checks`, and reaches no site. Checked by pytest under `services/agent/tests` with a fake server and synthetic lines.
+- [ ] Add the code checks: `transcript-timed.md` has no empty or repeated line; the model read it 60 lines at a time from the first line to the last and made one `append_to_file` after each read, in order; `transcript.md` is published last and is the run's Result; its word count is near run 5's 8,049 (the plan's sections 2 and 8). Checked by pytest under `services/agent/tests` on synthetic run records that pass and fail each check.
+- [ ] Replay the prose three times on the offered local profile, and keep each run's checks, time, calls and peak memory. Checked by the replay runner's report, read against the plan's section 8.
+- [ ] With the owner's approval of a video the owner names, run the Transcript workflow live on the owner's install on the Local source. Record its checks, model and tool calls, time, US$0.00 model spend and that no request reached OpenRouter. The owner reads `transcript.md` beside run 5's. Checked by the run's record and the worker's log, and by the owner's reading.
+- [ ] Record the profile's match of the Transcript run where Settings shows it, once its live check holds as the open question below decides (A7, A13). Checked by pytest under `services/agent/tests` and by reading Settings on the install.
+- [ ] Add a "Local" section to `README-YouTube-Transcript.md` and to the Pages site (`docs/site/index.html`), with what was observed, the plan's scoreboard for this run, and a claim only of a match Settings shows (A7, the plan's P6). Update `CODEBASE.md` where the code changed. Checked by reading each against the runs' records and the code.
+
+Open Questions:
+- The plan's section 8 asks for "a scripted browse" before the live browse on the local researcher route. Is that the local model driving browser-use against scripted pages in a disposable environment, or a scripted model, which US-23.3's browser scenario already covers?
+- The prose replay checks for "a word count near run 5's 8,049". What range holds?
+- Run 5's `transcript-timed.md` is a private artifact on the owner's install and another creator's work (Decision 0035). Who exports it for the replay? Is it kept only in the ignored `.checks`, and removed afterwards?
+- Does the owner's reading of `transcript.md` decide whether the profile has matched this run (A7), or does the match follow the code checks, with the reading recorded beside it?
