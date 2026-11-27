@@ -73,8 +73,8 @@ The stories amend these in their own changes:
 - **[Option B contract](../option-b-contract.md):** SP-006 (approved profiles, A1) and SP-008 (budgets and qualification, A2, A7, A11).
 - **[PRD-Local-Mac-Deployment](../../PRD/PRD-Local-Mac-Deployment.md):** LM-A03, the inference boundary, and its resources section, for the owner-started runtime (A4, A15).
 - **[PRD-LangChain-Deep-Agents](../../PRD/PRD-LangChain-Deep-Agents.md):** its scope, which puts local inference engines outside the design.
-- **Decision 0019 S2:** the three OpenRouter profiles, plus offered local profiles on the Local source.
-- **Decision 0035 Y7:** on Local, the browser box's calls reach the local model (A10).
+- **Decision 0019 S2:** the three OpenRouter profiles, plus offered local profiles on the Local source. US-23.3 applies it: on Local, the offered local profiles are the approved set.
+- **Decision 0035 Y7:** on Local, the browser box's calls reach the local model (A10). US-23.3 applies it: the admitted endpoint answers on the run's frozen local `researcher` route.
 - **Rows found at ingestion that say "OpenRouter only" too:**
   - PRD-Local-Mac-Deployment LM-01, LM-06 and LM-A06;
   - option-b-contract SP-007, under which a missing OpenRouter key blocks every inference path, which is not so on Local;

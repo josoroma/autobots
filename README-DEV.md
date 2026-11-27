@@ -132,7 +132,7 @@ Then:
 
 1. Start everything with `make start`.
 2. Open http://127.0.0.1:3000 and sign in as the generated owner. The email and password are `OWNER_EMAIL` and `OWNER_PASSWORD` in the install's owner file, which [the persistent install runbook](docs/engineering/runbooks/local-supabase.md#the-persistent-install) locates.
-3. Add your OpenRouter key at **Settings → Models → OpenRouter → Save & validate**. Saving it doesn't start a run or spend money.
+3. Add your OpenRouter key at **Settings → Models → OpenRouter → Save & validate**. Saving it doesn't start a run or spend money. Or switch **Settings → Models → Model source** to **Local** to run on a model served on this Mac at US$0, with no key ([the local app runbook](docs/engineering/runbooks/local-app.md#openrouter-settings)).
 4. Set up backups with [the backup runbook](docs/engineering/runbooks/backup-restore.md). Saving a key creates the master key that encrypts stored credentials, and losing it loses them.
 
 ### Every day
@@ -394,7 +394,7 @@ flowchart LR
 - **API:** answers the BFF, checks every request, and reads and writes Postgres as the restricted runtime role.
 - **Worker:** claims queued work, runs the goal loop, and makes model calls only when it was started with inference on.
 - **Supabase:** Auth, REST, Storage and Studio sit behind one gateway. Realtime, Edge Functions and the pooler are not part of the install.
-- **OpenRouter:** the only inference provider. There is no fallback provider and no local model server.
+- **OpenRouter:** the inference provider, unless a workspace's Model source is Local, where the owner's `llama-server` on 127.0.0.1 answers every model call (Decision 0041). There is no fallback between them.
 
 ### Auth, layer by layer
 
@@ -522,7 +522,7 @@ The point of the order: rules sit at the bottom with no I/O, so they're tested w
 
 | Module | What it decides |
 |---|---|
-| [models.py](services/agent/src/autobots/domain/models.py) | The three approved OpenRouter profiles, the model roles, where a run's model binding comes from, and `ModelRoute` |
+| [models.py](services/agent/src/autobots/domain/models.py) | The approved OpenRouter and local profiles, the model roles, where a run's model binding comes from, `ModelRoute`, the Model source and each route's limits |
 | [budgets.py](services/agent/src/autobots/domain/budgets.py) | Allowed run budgets, US$0.25 to US$5.00 in US$0.25 steps |
 | [runs.py](services/agent/src/autobots/domain/runs.py) | Run statuses, the commands, which status each command leads to, and which actors may send each one |
 | [effects.py](services/agent/src/autobots/domain/effects.py) | The receipt and approval state machines |
@@ -575,7 +575,7 @@ The SQL statements live in the `application/` modules that need them. They're ty
 
 | Area | Modules | What they wrap |
 |---|---|---|
-| Models | [models/](services/agent/src/autobots/adapters/models), [loop_middleware.py](services/agent/src/autobots/adapters/loop_middleware.py), [model_replies.py](services/agent/src/autobots/adapters/model_replies.py) | OpenRouter, the only inference provider. `AdmittedModel` refuses any call outside an admitted dispatch, and every call streams. |
+| Models | [models/](services/agent/src/autobots/adapters/models), [loop_middleware.py](services/agent/src/autobots/adapters/loop_middleware.py), [model_replies.py](services/agent/src/autobots/adapters/model_replies.py) | OpenRouter, or on the Local source the owner's `llama-server` through the same factory. `AdmittedModel` refuses any call outside an admitted dispatch, and every call streams. |
 | Tool dispatch | [tool_registry.py](services/agent/src/autobots/adapters/tool_registry.py), [tool_middleware.py](services/agent/src/autobots/adapters/tool_middleware.py) | Builds the tool registry once, where the API and worker are composed |
 | Checkpoints and files | [checkpoints.py](services/agent/src/autobots/adapters/checkpoints.py), [object_storage.py](services/agent/src/autobots/adapters/object_storage.py), [result_stream.py](services/agent/src/autobots/adapters/result_stream.py) | LangGraph's Postgres checkpointer, private Supabase Storage for artifacts, and live result text |
 | Outbound HTTP | [provider_http.py](services/agent/src/autobots/adapters/provider_http.py), [url_guard.py](services/agent/src/autobots/adapters/url_guard.py), [tavily.py](services/agent/src/autobots/adapters/tavily.py), [jina.py](services/agent/src/autobots/adapters/jina.py), [market_data.py](services/agent/src/autobots/adapters/market_data.py), `github_*.py` | One HTTP client factory with no redirects, no proxy variables and a required timeout. The URL guard admits only `https` to public addresses. |

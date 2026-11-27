@@ -170,7 +170,8 @@ class RetentionApplied(BaseModel):
     objects_pending: int = Field(ge=0)
 
 
-ServiceName = Literal["api", "worker", "database", "openrouter"]
+# On Local, `local_model` takes the place of `openrouter` (Decision 0041 A13).
+ServiceName = Literal["api", "worker", "database", "openrouter", "local_model"]
 
 
 class ServiceReadiness(BaseModel):

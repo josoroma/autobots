@@ -95,7 +95,7 @@ A database commit and an object upload are not one atomic operation. Persist art
 
 All processes use the shared configuration root and environment precedence in the provider PRD. Distinguish these values:
 
-- **OPENROUTER_API_KEY:** server-only inference credential; environment first, encrypted in-app setup when absent.
+- **OPENROUTER_API_KEY:** server-only inference credential; environment first, encrypted in-app setup when absent. A workspace on the Local source needs none ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A1).
 - **SUPABASE_URL:** local gateway URL for server clients.
 - **NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:** local URL and intentionally public client key, permitted only with correct Auth/RLS policies.
 - **SUPABASE_SECRET_KEY:** privileged server-only key matching the self-hosted release; a legacy service-role deployment must use its matching configuration, never expose either credential to the browser.
@@ -127,7 +127,7 @@ Collect logs and metrics locally with secret redaction. Begin with bounded conta
 | LM-A03: Inference boundary | Every role/request targets only the approved OpenRouter models or, by [Decision 0041](../engineering/decisions/0041-local-model-source.md), a local profile's owner-started `llama-server` on 127.0.0.1; the application starts no local model, and there is no SDK fallback or Studio assistant inference, even when unrelated provider/tracing variables exist in the host environment |
 | LM-A04: Persistence | Restart UI/worker and this project's containers and recover state/artifacts; ordinary stop/start preserves data |
 | LM-A05: Authorization | Auth, workspace RLS, private buckets, private schemas and privileged-client separation pass negative tests |
-| LM-A06: Credentials | Environment and in-app setup pass; absent key blocks every inference path but preserves local non-AI use |
+| LM-A06: Credentials | Environment and in-app setup pass; on OpenRouter an absent key blocks every inference path but preserves local non-AI use, and on the Local source no key is needed (Decision 0041 A1) |
 | LM-A07: Recovery | Sleep/network loss and interrupted effects preserve truthful status, receipts and cost reservations |
 | LM-A08: Backup | Restore database plus Storage and separate key backup into an isolated instance; verify actual readable artifacts and records |
 | LM-A09: Runtime compatibility | ARM64 images, direct database adapters, schema migrations and complete-stack resource envelope measured |

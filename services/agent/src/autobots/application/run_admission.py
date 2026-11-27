@@ -22,6 +22,7 @@ from uuid import UUID
 from autobots.application.experts import RunBinding, resolve_binding
 from autobots.application.experts import expert_overrides as expert_overrides
 from autobots.application.model_admission import remaining_daily_micro_usd
+from autobots.application.model_source import not_offered_locally, offered_local_profiles
 from autobots.application.runs import AdmissionResult, Fresh, RunAdmission, admit
 from autobots.application.sql import SqlConnection, SqlPool
 from autobots.application.tool_catalog import Catalog
@@ -32,6 +33,7 @@ from autobots.domain.budgets import require_budget
 from autobots.domain.errors import Refusal, RefusalKind
 from autobots.domain.models import (
     ModelProfileId,
+    ModelSource,
     ProfileNotOffered,
     RolePolicy,
     is_offered,
@@ -83,12 +85,24 @@ async def require_model_ready(check: CredentialCheck, workspace_id: UUID, *, nee
         raise ModelNotReady(code)
 
 
+# Decision 0041 A8: one local model answers every role, so on Local a role can't be given another.
+ROLE_OVERRIDE_ON_LOCAL = (
+    "On the Local source, one local model answers every role, so a role override isn't offered."
+)
+NO_LOCAL_DEFAULT = "The Local source has no local profile chosen. Switch Model source again."
+
+
 @dataclass(frozen=True)
 class WorkspacePolicy:
-    """A workspace's saved model policy: its default and its role overrides, or neither."""
+    """A workspace's saved model policy: its default and its role overrides, or neither, and its
+    Model source (Decision 0041 A1). On Local, `local_profile` answers every role, and
+    `offered_local` is what the Local source offers now."""
 
     default_profile: str | None = None
     role_overrides: Mapping[str, str] | None = None
+    model_source: ModelSource = ModelSource.OPENROUTER
+    local_profile: str | None = None
+    offered_local: frozenset[ModelProfileId] = frozenset()
 
     def for_new_work(
         self,
@@ -100,6 +114,8 @@ class WorkspacePolicy:
         """The policy a run started now freezes, in MP-01's order over the run's overrides and this
         saved policy (PRD-Model-Providers MP-01). With `require_offer`, a profile not offered for
         new runs refuses, and no other is put in its place."""
+        if self.model_source is ModelSource.LOCAL:
+            return self._on_local(run_role_overrides, run_profile, require_offer=require_offer)
         policy = resolve_role_policy(
             run_role_overrides=run_role_overrides,
             run_profile=run_profile.value if run_profile else None,
@@ -114,15 +130,43 @@ class WorkspacePolicy:
                 raise PolicyNotOffered(refused.reason, named=named) from None
         return policy
 
+    def _on_local(
+        self,
+        run_role_overrides: Mapping[str, str] | None,
+        run_profile: ModelProfileId | None,
+        *,
+        require_offer: bool,
+    ) -> RolePolicy:
+        """Every role on one offered local profile: the run's own, if it names one, else the Local
+        default. OpenRouter's saved choices don't apply (Decision 0041 A1, A8)."""
+        if run_role_overrides:
+            raise PolicyNotOffered(ROLE_OVERRIDE_ON_LOCAL, named=True)
+        chosen = run_profile if run_profile is not None else self.local_profile
+        if chosen is None:
+            raise PolicyNotOffered(NO_LOCAL_DEFAULT, named=False)
+        profile = ModelProfileId(chosen)
+        if require_offer and profile not in self.offered_local:
+            raise PolicyNotOffered(not_offered_locally(profile), named=run_profile is not None)
+        return resolve_role_policy(
+            run_profile=run_profile.value if run_profile else None,
+            workspace_default=profile.value,
+        )
+
 
 async def saved_workspace_policy(connection: SqlConnection, workspace_id: UUID) -> WorkspacePolicy:
     cursor = await connection.execute(
-        "select default_profile, role_overrides from app_private.model_policies "
-        "where workspace_id = %s",
+        "select default_profile, role_overrides, model_source, local_profile "
+        "from app_private.model_policies where workspace_id = %s",
         (workspace_id,),
     )
     row = await cursor.fetchone()
-    return WorkspacePolicy() if row is None else WorkspacePolicy(row[0], row[1])
+    if row is None:
+        return WorkspacePolicy()
+    source = ModelSource(row[2])
+    if source is ModelSource.OPENROUTER:
+        return WorkspacePolicy(row[0], row[1])
+    offered = await offered_local_profiles(connection)
+    return WorkspacePolicy(row[0], row[1], source, row[3], offered)
 
 
 async def workspace_role_policy(

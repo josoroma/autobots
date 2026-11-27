@@ -22,9 +22,11 @@ from autobots.domain.models import ModelProfileId, ProfileNotOffered
 from fake_api import MEMBER, OWNER, WORKSPACE, ApiClient, FakeDatabase
 
 READ = (
-    "select version, default_profile, role_overrides from app_private.model_policies "
-    "where workspace_id = %s"
+    "select version, default_profile, role_overrides, model_source, local_profile "
+    "from app_private.model_policies where workspace_id = %s"
 )
+# Decision 0041 A1: a save and a reset read the Model source first, in the same connection.
+SOURCE = "select model_source from app_private.model_policies where workspace_id = %s"
 SAVE_LOCK = "select version from app_private.model_policies where workspace_id = %s for update"
 RESET_LOCK = (
     "select version, default_profile from app_private.model_policies "
@@ -67,7 +69,14 @@ def test_a_workspace_with_no_saved_policy_reads_version_0_with_no_default(
 
 def test_a_saved_policy_reads_as_saved(api_client: ApiClient) -> None:
     api_client.database.answer(
-        READ, {"version": 4, "default_profile": SOL, "role_overrides": {"executor": TERRA}}
+        READ,
+        {
+            "version": 4,
+            "default_profile": SOL,
+            "role_overrides": {"executor": TERRA},
+            "model_source": "openrouter",
+            "local_profile": None,
+        },
     )
     body = api_client.http.get("/v1/settings/model-policy", headers=api_client.headers()).json()
     assert (body["version"], body["default_profile"], body["role_overrides"]) == (
@@ -95,8 +104,8 @@ def test_a_save_locks_the_row_then_writes_the_next_version_in_one_transaction(
         {"executor": TERRA},
     )
     log = statements(api_client)
-    assert log[:3] == ["connect", "begin", SAVE_LOCK]
-    assert log[3].startswith(UPSERT) and log[4:] == ["commit", "release"]
+    assert log[:4] == ["connect", SOURCE, "begin", SAVE_LOCK]
+    assert log[4].startswith(UPSERT) and log[5:] == ["commit", "release"]
     (written,) = api_client.database.written("app_private.model_policies")
     assert written == (WORKSPACE, 3, SOL, json.dumps({"executor": TERRA}))
 
@@ -116,7 +125,14 @@ def test_a_stale_save_writes_nothing_and_rolls_back(api_client: ApiClient) -> No
         api_client, {"expected_version": 4, "default_profile": SOL, "role_overrides": {}}
     )
     assert (status, body) == (409, STALE)
-    assert statements(api_client) == ["connect", "begin", SAVE_LOCK, "rollback", "release"]
+    assert statements(api_client) == [
+        "connect",
+        SOURCE,
+        "begin",
+        SAVE_LOCK,
+        "rollback",
+        "release",
+    ]
     assert api_client.database.changes() == []
 
 
@@ -158,9 +174,9 @@ def test_a_reset_clears_every_override_and_keeps_the_default(api_client: ApiClie
     assert status == 200 and isinstance(body, dict)
     assert (body["version"], body["default_profile"], body["role_overrides"]) == (8, SOL, {})
     log = statements(api_client)
-    assert log[:3] == ["connect", "begin", RESET_LOCK]
-    assert log[3].startswith(UPSERT) and "'{}'" in log[3]
-    assert log[4:] == ["commit", "release"]
+    assert log[:4] == ["connect", SOURCE, "begin", RESET_LOCK]
+    assert log[4].startswith(UPSERT) and "'{}'" in log[4]
+    assert log[5:] == ["commit", "release"]
     (written,) = api_client.database.written("app_private.model_policies")
     assert written == (WORKSPACE, 8, SOL)
 
@@ -174,7 +190,14 @@ def test_a_reset_with_no_saved_policy_starts_at_version_1(api_client: ApiClient)
 def test_a_stale_reset_writes_nothing_and_rolls_back(api_client: ApiClient) -> None:
     api_client.database.answer(RESET_LOCK, (7, SOL))
     assert reset(api_client, 6) == (409, STALE)
-    assert statements(api_client) == ["connect", "begin", RESET_LOCK, "rollback", "release"]
+    assert statements(api_client) == [
+        "connect",
+        SOURCE,
+        "begin",
+        RESET_LOCK,
+        "rollback",
+        "release",
+    ]
     assert api_client.database.changes() == []
 
 

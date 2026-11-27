@@ -101,13 +101,15 @@ export function DisclosureNotice({
   );
 }
 
-/** The executor's model once it's shown, and the run's budget. */
+/** The executor's model once it's shown, where it runs, and the run's budget. */
 export function ModelAndBudget({
   model,
   budgetMicroUsd,
+  local = false,
 }: {
   model: string | null;
   budgetMicroUsd: number;
+  local?: boolean;
 }) {
   return (
     <div
@@ -126,7 +128,9 @@ export function ModelAndBudget({
           </Eyebrow>{" "}
           <span className="font-medium wrap-anywhere">{model}</span>
           <span className="sr-only">,</span>{" "}
-          <span className="text-muted-foreground">through OpenRouter.</span>
+          <span className="text-muted-foreground">
+            {local ? "served on this Mac." : "through OpenRouter."}
+          </span>
         </p>
       )}
       <p
@@ -190,12 +194,16 @@ export function RoleDetails({
   );
 }
 
-/** What is sent to OpenRouter, and that nothing is until Run is pressed. */
+/** Where model calls go and what they carry, and that nothing is sent until Run is pressed. On
+ * Local, nothing goes to OpenRouter, but tool calls still leave the Mac (Decision 0041 A13). */
 export function DataNotice({
   sendsOnlyIfAgent,
+  local = false,
 }: {
   sendsOnlyIfAgent: boolean;
+  local?: boolean;
 }) {
+  const ifAgent = sendsOnlyIfAgent ? ", if an agent step runs" : "";
   return (
     <div className="flex flex-col gap-1.5 border-t pt-3 text-ui">
       <p
@@ -203,13 +211,21 @@ export function DataNotice({
         className="text-muted-foreground flex items-start gap-2"
       >
         <Send aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-        <span>
-          Sent to OpenRouter
-          {sendsOnlyIfAgent ? ", if an agent step runs" : ""}: selected
-          instructions, conversation and context excerpts, retrieved material,
-          tool outputs and required protocol metadata. App records stay on this
-          Mac.
-        </span>
+        {local ? (
+          <span>
+            Nothing goes to OpenRouter. Sent to the local model on this Mac
+            {ifAgent}: selected instructions, conversation and context excerpts,
+            retrieved material and tool outputs. Tool calls such as SerpApi,
+            Jina and YouTube still leave the Mac. App records stay on this Mac.
+          </span>
+        ) : (
+          <span>
+            Sent to OpenRouter
+            {ifAgent}: selected instructions, conversation and context excerpts,
+            retrieved material, tool outputs and required protocol metadata. App
+            records stay on this Mac.
+          </span>
+        )}
       </p>
       <p
         data-disclosure="consent"

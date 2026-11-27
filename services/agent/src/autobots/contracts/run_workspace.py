@@ -181,6 +181,11 @@ class RunBudgets(BaseModel):
 
     context_tokens: int
     max_output_tokens_per_call: int
+    # The frozen executor route's, local or OpenRouter (Decision 0041 A11).
+    call_seconds: float
+    active_seconds: float
+    model_calls: int
+    tool_dispatches: int
 
 
 class FrozenBinding(BaseModel):

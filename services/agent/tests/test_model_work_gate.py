@@ -57,7 +57,8 @@ ROUTINE = UUID("0b000000-0000-4000-8000-0000000000b1")
 DEEPSEEK = ModelProfileId.DEEPSEEK_FLASH
 DEEPSEEK_REASON = "DeepSeek isn't offered for new runs until it's qualified."
 POLICY_READ = (
-    "select default_profile, role_overrides from app_private.model_policies where workspace_id = %s"
+    "select default_profile, role_overrides, model_source, local_profile "
+    "from app_private.model_policies where workspace_id = %s"
 )
 
 
@@ -115,9 +116,7 @@ def test_a_ready_key_passes() -> None:
 def test_the_saved_policy_is_read_with_one_statement_and_none_saved_is_empty() -> None:
     database, connection = fresh()
     assert run(saved_workspace_policy(connection, WORKSPACE)) == WorkspacePolicy()
-    database.answer(
-        "app_private.model_policies", ("openrouter_sol", {"executor": "openrouter_terra"})
-    )
+    database.saved_policy("openrouter_sol", {"executor": "openrouter_terra"})
     saved = run(saved_workspace_policy(connection, WORKSPACE))
     assert saved == WorkspacePolicy("openrouter_sol", {"executor": "openrouter_terra"})
     assert database.statements == [(POLICY_READ, (WORKSPACE,))] * 2
@@ -170,7 +169,7 @@ def test_without_the_offered_check_a_profile_not_offered_is_resolved_as_admissio
 
 def test_workspace_role_policy_reads_then_resolves() -> None:
     database, connection = fresh()
-    database.answer("app_private.model_policies", (DEEPSEEK.value, {}))
+    database.saved_policy(DEEPSEEK.value, {})
     with pytest.raises(PolicyNotOffered):
         run(workspace_role_policy(connection, WORKSPACE, require_offer=True))
     shown = run(workspace_role_policy(connection, WORKSPACE, require_offer=False))
@@ -273,7 +272,7 @@ def test_a_resume_checks_the_key_with_the_goal_runs_wording(api_client: ApiClien
 
 def test_a_resume_keeps_its_frozen_policy_so_offering_isnt_checked(api_client: ApiClient) -> None:
     overridden(api_client, "ready")
-    api_client.database.answer("app_private.model_policies", (DEEPSEEK.value, {}))
+    api_client.database.saved_policy(DEEPSEEK.value, {})
     reply = api_client.http.post(
         f"/v1/runs/{RUN}/resume",
         headers=api_client.headers(OWNER, **{"Idempotency-Key": "k"}),
@@ -306,7 +305,7 @@ def test_a_replay_checks_the_key_with_its_own_wording(api_client: ApiClient) -> 
 
 def test_a_replay_refuses_a_saved_profile_not_offered_as_a_conflict(api_client: ApiClient) -> None:
     overridden(api_client, "ready")
-    api_client.database.answer("app_private.model_policies", (DEEPSEEK.value, {}))
+    api_client.database.saved_policy(DEEPSEEK.value, {})
     assert replay(api_client) == (409, {"code": "model_not_offered", "message": DEEPSEEK_REASON})
 
 
@@ -427,7 +426,7 @@ def test_every_agent_step_shows_the_workflow_runs_executor_from_one_policy_read(
         },
         {"id": str(SECOND_EXPERT), "name": "Writer", "config": {"tools": ["calculate"]}},
     )
-    database.answer("app_private.model_policies", ("openrouter_sol", {}))
+    database.saved_policy("openrouter_sol", {})
     steps = {step.id: step for step in run(preview_steps(connection, WORKSPACE, graph))}
     sol = PROFILES[ModelProfileId.SOL].canonical_id
     assert (steps["ask"].model, steps["again"].model, steps["in"].model) == (sol, sol, None)
@@ -585,7 +584,7 @@ AFTER_THE_POLICY = ["connect", "daily cap", "spent today", "release"]
 def test_without_a_usable_key_the_intent_check_reports_it_and_reads_no_policy(
     api_client: ApiClient, code: str
 ) -> None:
-    api_client.database.answer("app_private.model_policies", (DEEPSEEK.value, {}))
+    api_client.database.saved_policy(DEEPSEEK.value, {})
     reported = intent(api_client, code)
     assert reported == {"schema_version": 1, "ready": False, "code": code, "budget": FULL_BUDGET}
     assert consulted(api_client) == ["run_intent", *AFTER_THE_POLICY]
@@ -617,7 +616,7 @@ def test_with_a_usable_key_and_offered_profiles_the_intent_check_is_ready(
 def test_the_intent_check_reports_a_saved_profile_not_offered(
     api_client: ApiClient, saved: tuple[str | None, dict[str, str]], ready: bool
 ) -> None:
-    api_client.database.answer("app_private.model_policies", saved)
+    api_client.database.saved_policy(*saved)
     reported = intent(api_client, "ready")
     assert (reported["ready"], reported["code"]) == (
         ready,

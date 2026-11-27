@@ -1,12 +1,13 @@
 import {
   parseModelList,
   parseModelPolicyState,
+  parseModelSourceState,
   type ModelPolicyState,
 } from "@autobots/api-client";
 import type { Page } from "@playwright/test";
 
 import { expectNoA11yViolations } from "./support/a11y.ts";
-import { getJson } from "./support/api.ts";
+import { getJson, send } from "./support/api.ts";
 import { signIn, users } from "./support/auth.ts";
 import { need } from "./support/env.ts";
 import { expect, test } from "./support/fixtures.ts";
@@ -78,6 +79,51 @@ test("each profile shows catalog prices, capabilities and the fetch time, apart 
   expect(Date.now() - Date.parse(models.fetched_at ?? "")).toBeLessThan(
     120_000,
   );
+  await expectNoA11yViolations(page);
+});
+
+// US-23.3, Decision 0041 A13: on OpenRouter, the Model source panel shows what Local would offer,
+// above the provider panel and the policy. Migration 70 stores Bonsai 2.5's qualification, and no
+// llama-server answers on the fixture's port.
+test("the Model source panel sits above the provider panel and shows each local profile", async ({
+  page,
+}) => {
+  await signIn(page, users.models);
+  await page.goto("/settings/models");
+  const panel = page.locator('[data-panel="model-source"]');
+  await expect(panel).toBeVisible();
+  await expect(
+    panel.locator('[data-source-choice="openrouter"] input'),
+  ).toBeChecked();
+  await expect(
+    panel.locator('[data-local-profile="local_bonsai_2_5_27b"]'),
+  ).toContainText("Qualified 2026-11-27");
+  await expect(
+    panel.locator('[data-local-profile="local_inkling_2_mini"]'),
+  ).toContainText("isn't offered");
+  await expect(panel.locator('[data-source-field="runtime"]')).toContainText(
+    "127.0.0.1:",
+  );
+  const spend = panel.locator('[data-source-field="spend"]');
+  await expect(spend).toContainText("US$0.00 per model call");
+  await expect(spend).toContainText(
+    "SerpApi, Jina and YouTube still leave the Mac",
+  );
+  const above = await page.evaluate(() => {
+    const source = document.querySelector('[data-panel="model-source"]');
+    const provider = document.getElementById("openrouter-heading");
+    return source !== null && provider !== null
+      ? (source.compareDocumentPosition(provider) &
+          Node.DOCUMENT_POSITION_FOLLOWING) !==
+          0
+      : false;
+  });
+  expect(above).toBe(true);
+  const state = await getJson(page, {
+    path: "/api/settings/model-source",
+    parse: parseModelSourceState,
+  });
+  expect(state.source).toBe("openrouter");
   await expectNoA11yViolations(page);
 });
 
@@ -188,4 +234,62 @@ test("Discard restores the saved form, Reset all clears overrides, and a stale R
     "14 of 14 roles follow the workspace default",
   );
   await expectNoA11yViolations(page);
+});
+
+// US-23.3, Decision 0041 A13: on Local, the composer says nothing goes to OpenRouter and that tool
+// calls still leave the Mac, and Home's model chip reads the local runtime, which isn't running in
+// this fixture. The owner switches back, so OpenRouter's saved choices are as they were.
+test("on Local the composer, Home and the panel say where model calls go", async ({
+  page,
+}) => {
+  await signIn(page, users.models);
+  const before = await stored(page);
+  const start = await getJson(page, {
+    path: "/api/settings/model-source",
+    parse: parseModelSourceState,
+  });
+  const local = await send(page, {
+    method: "PUT",
+    path: "/api/settings/model-source",
+    data: { expected_version: start.version, source: "local" },
+    key: null,
+    status: 200,
+    parse: parseModelSourceState,
+  });
+  expect(local.source).toBe("local");
+  try {
+    await page.goto("/");
+    const data = page.locator('[data-disclosure="data"]');
+    await expect(data).toContainText("Nothing goes to OpenRouter");
+    await expect(data).toContainText(
+      "SerpApi, Jina and YouTube still leave the Mac",
+    );
+    await expect(page.locator('[data-disclosure="model"]')).toContainText(
+      "served on this Mac",
+    );
+    await expect(
+      page.getByText("Local model isn't running").first(),
+    ).toBeVisible();
+    await page.goto("/settings/models");
+    await expect(
+      page.locator(
+        '[data-panel="model-source"] [data-source-choice="local"] input',
+      ),
+    ).toBeChecked();
+  } finally {
+    const back = await send(page, {
+      method: "PUT",
+      path: "/api/settings/model-source",
+      data: { expected_version: local.version, source: "openrouter" },
+      key: null,
+      status: 200,
+      parse: parseModelSourceState,
+    });
+    expect(back.source).toBe("openrouter");
+  }
+  const after = await stored(page);
+  expect([after.default_profile, after.role_overrides]).toEqual([
+    before.default_profile,
+    before.role_overrides,
+  ]);
 });

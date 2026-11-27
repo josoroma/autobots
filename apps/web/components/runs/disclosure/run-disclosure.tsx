@@ -61,11 +61,15 @@ export function RunDisclosure({
             : null
         }
         budgetMicroUsd={budgetMicroUsd}
+        local={reads.source === "local"}
       />
       {shown.showModel ? (
         <RoleDetails bindings={shown.bindings} canonical={canonical} />
       ) : null}
-      <DataNotice sendsOnlyIfAgent={sendsOnlyIfAgent} />
+      <DataNotice
+        sendsOnlyIfAgent={sendsOnlyIfAgent}
+        local={reads.source === "local"}
+      />
     </div>
   );
 }

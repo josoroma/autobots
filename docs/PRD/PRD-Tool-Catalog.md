@@ -233,11 +233,11 @@ By [Decision 0018](../engineering/decisions/0018-browser-executor.md) B1 to B3.
 
 By Decision 0018 B4 and Decision 0020, which replaced browser-use with Autobots' own browsing loop.
 
-**BM-01.** The browsing loop runs in the worker over the isolated browser executor. Each step shows the model the current page as text (its URL, title, a cut of its readable text and its numbered links) and is one admitted call of the run: a reservation, an invocation ticket and receipt, the run's frozen `researcher` route on an approved OpenRouter profile, the shared transport, and settled spend. Uncertain outcomes follow the existing rules.
+**BM-01.** The browsing loop runs in the worker over the isolated browser executor. Each step shows the model the current page as text (its URL, title, a cut of its readable text and its numbered links) and is one admitted call of the run: a reservation, an invocation ticket and receipt, the run's frozen `researcher` route on an approved OpenRouter profile, or on the Local source the offered local profile ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A10), the shared transport, and settled spend. Uncertain outcomes follow the existing rules.
 
 **BM-02.** The loop has no model client of its own. A call made outside admission fails as unadmitted, and an exhausted budget refuses the call before it is sent.
 
-**BM-03.** The model answers each step with exactly one action, as a required tool call with typed arguments: open a numbered link, go to a URL, scroll, or finish with a summary. A route whose catalog entry lacks tool support is refused with a typed code before anything is sent, and an answer that isn't one valid action ends the call.
+**BM-03.** The model answers each step with exactly one action, as a required tool call with typed arguments: open a numbered link, go to a URL, scroll, or finish with a summary. A route whose catalog entry lacks tool support is refused with a typed code before anything is sent, and an answer that isn't one valid action ends the call. On a local route the required call is held to its tools' JSON schema by the route itself (Decision 0041 A18).
 
 **BM-04.** No package is added for it: the loop drives the executor over CDP with the locked `websockets` client, and it is tested offline with a scripted model.
 

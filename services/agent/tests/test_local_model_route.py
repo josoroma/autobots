@@ -6,7 +6,7 @@ middleware. The admission ledger and usage row are the in-memory stand-ins
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -53,6 +53,7 @@ from autobots.domain.models import (
     ModelProfileId,
     ModelRole,
     ModelRoute,
+    ModelSource,
     ProfileNotOffered,
     require_offered,
 )
@@ -157,7 +158,18 @@ def local_source(server: FakeLlamaServer) -> InferenceSource:
         untouched_catalog(),
         local_client=client,
         local_transport=server.transport,
+        source_check=on(ModelSource.LOCAL),
     )
+
+
+def on(source: ModelSource) -> Callable[[UUID], Awaitable[ModelSource]]:
+    """The workspace's Model source, as the worker reads it before each attempt (Decision 0041
+    A12), with no database."""
+
+    async def check(_workspace: UUID) -> ModelSource:
+        return source
+
+    return check
 
 
 def local_model(server: FakeLlamaServer, profile: ModelProfile = BONSAI) -> AttemptModel:

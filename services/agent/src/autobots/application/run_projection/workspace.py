@@ -38,7 +38,13 @@ from autobots.contracts.run_workspace import (
     UserRunCommand,
     VerificationSummary,
 )
-from autobots.domain.models import CONTEXT_TOKENS, MAX_OUTPUT_TOKENS, UnknownModelProfile
+from autobots.domain.models import (
+    OPENROUTER_LIMITS,
+    PROFILES,
+    ModelProfileId,
+    UnknownModelProfile,
+    limits_for,
+)
 from autobots.domain.runs import TERMINAL, Actor, CommandRefused, RunCommand, RunStatus, next_status
 from autobots.domain.tools import PLAN_TOOLS
 from autobots.persistence.rows import (
@@ -347,7 +353,23 @@ async def read_workspace(
         role_map=roles,
         metered_tool_calls=metered,
         metered_tool_call_limit=METERED_TOOL_CALLS,
-        budgets=RunBudgets(
-            context_tokens=CONTEXT_TOKENS, max_output_tokens_per_call=MAX_OUTPUT_TOKENS
-        ),
+        budgets=run_budgets(roles),
+    )
+
+
+def run_budgets(roles: list[FrozenBinding]) -> RunBudgets:
+    """The limits of the run's frozen executor route, which later settings don't change (Decision
+    0041 A11). A retired or unknown profile reads as OpenRouter's limits."""
+    executor = next((binding.profile for binding in roles if binding.role == "executor"), None)
+    known = {profile.value for profile in PROFILES}
+    limits = (
+        limits_for(PROFILES[ModelProfileId(executor)]) if executor in known else OPENROUTER_LIMITS
+    )
+    return RunBudgets(
+        context_tokens=limits.context_tokens,
+        max_output_tokens_per_call=limits.output_tokens,
+        call_seconds=limits.call_seconds,
+        active_seconds=limits.active_seconds,
+        model_calls=limits.model_calls,
+        tool_dispatches=limits.tool_dispatches,
     )

@@ -97,7 +97,7 @@ def post(client: ApiClient, arranged: Arranged, idempotency_key: str = "key-1") 
     if arranged.daily_cap is not None:
         database.answer("from app_private.model_spend_limits", (arranged.daily_cap,))
     if arranged.saved_policy is not None:
-        database.answer("from app_private.model_policies", arranged.saved_policy)
+        database.saved_policy(*arranged.saved_policy)
     if arranged.session is not None:
         database.answer("from public.sessions", arranged.session)
     if arranged.expert is not None:

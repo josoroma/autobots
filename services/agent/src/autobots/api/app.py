@@ -17,6 +17,7 @@ from autobots.api.improvement_routes import router as improvement_router
 from autobots.api.keys_and_vars_routes import router as keys_and_vars_router
 from autobots.api.memory_routes import router as memory_router
 from autobots.api.model_policy_routes import router as model_policy_router
+from autobots.api.model_source_routes import router as model_source_router
 from autobots.api.operation_routes import router as operation_router
 from autobots.api.pool import Pool, default_pool
 from autobots.api.provider_routes import router as provider_router
@@ -71,6 +72,7 @@ def create_app(
     app.include_router(keys_and_vars_router, responses=ERROR_RESPONSES)
     app.include_router(browsing_router, responses=ERROR_RESPONSES)
     app.include_router(model_policy_router, responses=ERROR_RESPONSES)
+    app.include_router(model_source_router, responses=ERROR_RESPONSES)
     app.include_router(run_router, responses=ERROR_RESPONSES)
     app.include_router(run_command_router, responses=ERROR_RESPONSES)
     app.include_router(run_reconcile_router, responses=ERROR_RESPONSES)

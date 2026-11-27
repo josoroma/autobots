@@ -689,6 +689,8 @@ class ModelPolicyRow:
     version: int
     default_profile: str | None
     role_overrides: dict[str, str] | None
+    model_source: str
+    local_profile: str | None
 
 
 # Run usage (application/run_usage.py)

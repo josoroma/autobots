@@ -154,6 +154,68 @@ class ModelPolicyState(BaseModel):
     policy: EffectiveRolePolicy
 
 
+ModelSourceName = Literal["openrouter", "local"]
+# The owner's llama-server for the Local default: serving its model, serving another, or not there.
+LocalRuntimeStatus = Literal["ready", "other_model", "not_running"]
+
+
+class LocalRuntime(BaseModel):
+    """The runtime's health for one local profile (Decision 0041 A3, A13). Its address is the
+    owner's loopback, never anything a run's box sees."""
+
+    model_config = STRICT_CONTRACT
+
+    status: LocalRuntimeStatus
+    port: int
+    served_model_id: str | None
+    # Whether the file the server reports serving has the profile's pinned SHA-256. None while
+    # it's still being hashed, or when the server doesn't report its file.
+    sha256_matches: bool | None
+    sha256_checking: bool
+
+
+class LocalProfileState(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    profile: ModelProfileId
+    name: str
+    offered: bool
+    # Why it isn't offered, safe to show. None when it is.
+    reason: str | None
+    qualified_on: date | None
+    limits: str | None
+    # The runs this profile has matched on Local (A7). None is recorded before US-23.4 to US-23.6.
+    matched_runs: list[str]
+
+
+class ModelSourceState(BaseModel):
+    model_config = STRICT_CONTRACT
+
+    schema_version: Literal[1]
+    # The model policy row's version, which a switch and a policy save both expect.
+    version: int
+    source: ModelSourceName
+    local_profile: ModelProfileId | None
+    local_profiles: list[LocalProfileState]
+    # The roles Local must cover: executor, and researcher while an Expert grants browse_goal.
+    roles_needed: list[str]
+    # Those no offered local profile covers, so a switch to Local would be refused.
+    roles_uncovered: list[str]
+    # The runtime for the Local default, or the first offered local profile. None when none is.
+    runtime: LocalRuntime | None
+
+
+class ModelSourceUpdate(BaseModel):
+    # Not strict, so JSON strings become enums. Unknown fields and values are still refused.
+
+    model_config = LAX_CONTRACT
+
+    expected_version: Count
+    source: ModelSourceName
+    # The Local default to keep. None keeps the saved one while it's offered, else the first.
+    local_profile: ModelProfileId | None = None
+
+
 class BudgetRange(BaseModel):
     """US$0.25 to US$5.00 in US$0.25 steps, never above what's left of the daily cap (D11)."""
 

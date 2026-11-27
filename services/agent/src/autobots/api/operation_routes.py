@@ -19,12 +19,15 @@ from autobots.api.dependencies import (
     readiness_workspace,
     require_ready,
 )
+from autobots.api.model_source_routes import local_health
 from autobots.api.pool import Pool
 from autobots.api.resources import app_resources, request_pool
 from autobots.api.security import app_settings, require_internal
 from autobots.application.backups import BackupStatus, backup_status
 from autobots.application.catalog_check import OPERATIONS_SECONDS, CatalogCheck, check_catalog
 from autobots.application.job_activity import delayed_occurrences, delayed_view, job_hours
+from autobots.application.model_policy import read_model_policy
+from autobots.application.model_source import offered_local_profiles
 from autobots.application.operation_values import disk_bytes, loopback_only, stored_bytes
 from autobots.application.operations import (
     Condition,
@@ -38,7 +41,11 @@ from autobots.application.operations import (
     queue_counts,
     worker_condition,
 )
-from autobots.application.provider_settings import ProviderSettings, read_route_qualifications
+from autobots.application.provider_settings import (
+    ProviderSettings,
+    read_route_qualifications,
+    workspace_model_source,
+)
 from autobots.application.retention import (
     RetentionPolicy,
     apply_retention,
@@ -63,6 +70,7 @@ from autobots.contracts.operations import (
     ServiceReadiness,
 )
 from autobots.contracts.settings import RouteQualification
+from autobots.domain.models import ModelProfileId, ModelSource
 from autobots.logs import remote_tracing_disabled
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_internal)])
@@ -97,6 +105,7 @@ class _WorkspaceOperations:
     workers: int
     migrations: int | None
     storage_used: int
+    source: ModelSource = ModelSource.OPENROUTER
 
 
 async def _workspace_operations(pool: Pool, workspace_id: UUID) -> _WorkspaceOperations:
@@ -113,6 +122,7 @@ async def _workspace_operations(pool: Pool, workspace_id: UUID) -> _WorkspaceOpe
         workers = await live_workers(connection)
         migrations = await applied_migrations(connection)
         storage_used = await stored_bytes(connection, workspace_id)
+        source = await workspace_model_source(connection, workspace_id)
     return _WorkspaceOperations(
         conditions=(queue, worker),
         queue=QueueStatus(
@@ -127,6 +137,7 @@ async def _workspace_operations(pool: Pool, workspace_id: UUID) -> _WorkspaceOpe
         workers=workers,
         migrations=migrations,
         storage_used=storage_used,
+        source=source,
     )
 
 
@@ -201,8 +212,10 @@ async def get_local_status(
         else await _workspace_operations(request_pool(request), workspace_id)
     )
     context = app_resources(request).provider_context
+    # On Local nothing is sent to OpenRouter, its catalog included (Decision 0041 A13).
+    local = workspace is not None and workspace.source is ModelSource.LOCAL
     catalog = await check_catalog(
-        None if context is None else context.fetch_catalog, OPERATIONS_SECONDS
+        None if context is None or local else context.fetch_catalog, OPERATIONS_SECONDS
     )
     settings = app_settings(request)
     backups = await backup_status(settings.backup_dir, datetime.now(UTC))
@@ -295,6 +308,22 @@ async def post_retention_apply(request: Request, workspace_id: OwnerWorkspace) -
     )
 
 
+async def _local_model_service(
+    request: Request, chosen: str | None, offered: list[ModelProfileId]
+) -> ServiceReadiness:
+    """On Local, the model service is the owner's llama-server, from its model ID check alone, so
+    Home never waits on a hash and nothing reaches OpenRouter (Decision 0041 A13)."""
+    profile = ModelProfileId(chosen) if chosen is not None else (offered[0] if offered else None)
+    if profile is None:
+        return ServiceReadiness(name="local_model", state="not_ready", code="local_not_offered")
+    health = await local_health(app_resources(request), profile, with_digest=False)
+    return ServiceReadiness(
+        name="local_model",
+        state="ready" if health.status == "ready" else "not_ready",
+        code=f"local_{health.status}",
+    )
+
+
 @router.get("/readiness", operation_id="getReadiness", response_model=MemberReadiness)
 async def get_readiness(
     request: Request,
@@ -321,25 +350,30 @@ async def get_readiness(
         return MemberReadiness(schema_version=1, ready=False, services=services)
     async with request_pool(request).connection() as connection:
         worker = await worker_condition(connection, QueueCounts(0, 0, 0, 0))
+        stored = await read_model_policy(connection, workspace_id)
         context = app_resources(request).provider_context
         auth = (
             await ProviderSettings(connection, context).auth_status(workspace_id)
-            if context is not None
+            if context is not None and stored.model_source is ModelSource.OPENROUTER
             else "unavailable"
         )
+        offered = sorted(await offered_local_profiles(connection))
     services.append(
         ServiceReadiness(
             name="worker", state="ready" if worker.state == "ok" else "not_ready", code=worker.code
         )
     )
     services.append(ServiceReadiness(name="database", state="ready", code="database_ready"))
-    services.append(
-        ServiceReadiness(
-            name="openrouter",
-            state="ready" if auth == "configured" else "not_ready",
-            code=f"auth_{auth}",
+    if stored.model_source is ModelSource.LOCAL:
+        services.append(await _local_model_service(request, stored.local_profile, offered))
+    else:
+        services.append(
+            ServiceReadiness(
+                name="openrouter",
+                state="ready" if auth == "configured" else "not_ready",
+                code=f"auth_{auth}",
+            )
         )
-    )
     return MemberReadiness(
         schema_version=1,
         ready=all(item.state == "ready" for item in services),

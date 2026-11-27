@@ -26,6 +26,7 @@ from autobots.application.credentials.store import (
     ResolvedCredential,
     resolve_for_attempt,
 )
+from autobots.application.local_offering import offered_locally
 from autobots.application.sql import SqlConnection, all_rows, optional_row, stored
 from autobots.contracts.settings import (
     AUTH_STATUSES,
@@ -38,7 +39,7 @@ from autobots.contracts.settings import (
     RouteQualification,
 )
 from autobots.domain.errors import FixedRefusal, RefusalKind
-from autobots.domain.models import PROFILES, ModelProfileId, is_offered
+from autobots.domain.models import PROFILES, ModelProfileId, ModelSource, is_offered
 from autobots.persistence.rows import ProviderSettingsRow, RouteQualificationRow
 
 
@@ -64,6 +65,29 @@ class InvalidKey(FixedRefusal):
 class ValidationUnavailable(FixedRefusal):
     code = "validation_unavailable"
     kind = RefusalKind.UNAVAILABLE
+
+
+class SourceIsLocal(FixedRefusal):
+    """Model source is Local, so nothing is sent to OpenRouter, a key check included (Decision 0041
+    A13). Nothing changes."""
+
+    code = "model_source_local"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Model source is Local, so nothing is sent to OpenRouter. Switch to OpenRouter to "
+            "check a key."
+        )
+
+
+async def workspace_model_source(connection: SqlConnection, workspace_id: UUID) -> ModelSource:
+    """The workspace's Model source. No policy row yet reads as OpenRouter (Decision 0041 A1)."""
+    cursor = await connection.execute(
+        "select model_source from app_private.model_policies where workspace_id = %s",
+        (workspace_id,),
+    )
+    row = await cursor.fetchone()
+    return ModelSource.OPENROUTER if row is None else ModelSource(row[0])
 
 
 class CredentialRefused(Exception):
@@ -206,7 +230,13 @@ class ProviderSettings:
             return "unavailable"
         return auth_status
 
+    async def model_source(self, workspace_id: UUID) -> ModelSource:
+        return await workspace_model_source(self._connection, workspace_id)
+
     async def status(self, workspace_id: UUID) -> ProviderStatus:
+        """On Local, OpenRouter's catalog isn't fetched, so it reads as unknown (Decision 0041
+        A13)."""
+        local = await self.model_source(workspace_id) is ModelSource.LOCAL
         version, auth_status, validated_at = await self._rows.read(workspace_id)
         source: CredentialSource = "none"
         credential_id = None
@@ -230,7 +260,7 @@ class ProviderSettings:
             settings_version=version,
             source=source,
             auth_status=auth_status,
-            catalog_status=await self.catalog_status(),
+            catalog_status="unknown" if local else await self.catalog_status(),
             qualification=await self.route_qualifications(),
             credential_id=credential_id,
             credential_version=credential_version,
@@ -242,7 +272,10 @@ class ProviderSettings:
             raise StaleVersion("the settings changed; reload them")
 
     async def save_credential(self, workspace_id: UUID, draft: str, expected: int) -> None:
-        """Validate first. Only a valid key commits, so a bad draft leaves the prior key alone."""
+        """Validate first. Only a valid key commits, so a bad draft leaves the prior key alone. On
+        Local, nothing is sent to OpenRouter to validate it."""
+        if await self.model_source(workspace_id) is ModelSource.LOCAL:
+            raise SourceIsLocal
         if await self._effective_environment(workspace_id) is not None:
             raise EnvironmentManaged("the environment supplies this key; change it there")
         current, _, _ = await self._rows.read(workspace_id)
@@ -275,7 +308,10 @@ class ProviderSettings:
             await self._rows.record(workspace_id, "missing")
 
     async def revalidate(self, workspace_id: UUID) -> None:
-        """Checks the effective key's metadata. A failure never falls through to another source."""
+        """Checks the effective key's metadata. A failure never falls through to another source.
+        On Local, nothing is sent to OpenRouter."""
+        if await self.model_source(workspace_id) is ModelSource.LOCAL:
+            raise SourceIsLocal
         environment = await self._effective_environment(workspace_id)
         if environment is not None:
             secret = SecretStr(environment.value)
@@ -293,7 +329,13 @@ class ProviderSettings:
         await self._rows.record(workspace_id, status)
 
     async def run_intent(self, workspace_id: UUID) -> str:
-        """Every model call's gate. Saved drafts and page loads never reach past this into a run."""
+        """Every model call's gate. Saved drafts and page loads never reach past this into a run.
+        On Local, no OpenRouter key is needed or read (Decision 0041 A1, A13)."""
+        if await self.model_source(workspace_id) is ModelSource.LOCAL:
+            return "ready"
+        return await self._key_intent(workspace_id)
+
+    async def _key_intent(self, workspace_id: UUID) -> str:
         environment = await self._effective_environment(workspace_id)
         _, stored_status, _ = await self._rows.read(workspace_id)
         if environment is not None:
@@ -311,8 +353,9 @@ class ProviderSettings:
         return "credential_unavailable" if stored_status == "unavailable" else "ready"
 
     async def credential_for_attempt(self, workspace_id: UUID) -> ResolvedCredential:
-        """The same gate as `run_intent`, then the current key. Hold it only to build a client."""
-        code = await self.run_intent(workspace_id)
+        """The key gate `run_intent` uses on OpenRouter, then the current key. Hold it only to build
+        a client. A worker checks the source before it gets here (worker_inference)."""
+        code = await self._key_intent(workspace_id)
         if code != "ready":
             raise CredentialRefused(code)
         return await resolve_for_attempt(self._store, workspace_id, self._environment_candidate())
@@ -335,9 +378,12 @@ class ProviderSettings:
             await self._rows.ensure(workspace_id)
             await self._rows.record(workspace_id, "invalid")
 
-    async def models(self) -> ModelList:
+    async def models(self, workspace_id: UUID | None = None) -> ModelList:
         """Within the HTTP client's own limit. A catalog that doesn't answer, or answers with
-        something that isn't JSON, lists every profile as unavailable."""
+        something that isn't JSON, lists every profile as unavailable. On Local, only the offered
+        local profiles are listed, and OpenRouter's catalog isn't fetched (Decision 0041 A13)."""
+        if workspace_id is not None and await self.model_source(workspace_id) is ModelSource.LOCAL:
+            return await self._local_models()
         payload = (await check_catalog(self._context.fetch_catalog, SETTINGS_SECONDS)).payload
         now = datetime.now(UTC)
         snapshot = parse_catalog(payload or {}, retrieved_at=now, revision="live")
@@ -371,6 +417,25 @@ class ProviderSettings:
             fetched_at=now if payload is not None else None,
             models=models,
         )
+
+    async def _local_models(self) -> ModelList:
+        """The Local source's choices: its offered local profiles, at no price."""
+        offered = offered_locally(await self.route_qualifications())
+        models = [
+            ModelAvailability(
+                profile=profile.id,
+                canonical_id=profile.canonical_id,
+                wire_id=profile.wire_id,
+                available=True,
+                offered=True,
+                input_per_million_micro_usd=0,
+                output_per_million_micro_usd=0,
+                capabilities=[],
+            )
+            for profile in PROFILES.values()
+            if profile.id in offered
+        ]
+        return ModelList(schema_version=1, catalog_status="unknown", fetched_at=None, models=models)
 
 
 async def read_route_qualifications(connection: SqlConnection) -> list[RouteQualification]:

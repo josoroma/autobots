@@ -50,6 +50,7 @@ class StopCode(_Code):
     CREDENTIAL_UNAVAILABLE = "credential_unavailable"
     MODEL_UNAVAILABLE = "model_unavailable"
     LOCAL_MODEL_SERVER_UNAVAILABLE = "local_model_server_unavailable"
+    MODEL_SOURCE_DISABLED = "model_source_disabled"
     COST_UNAVAILABLE = "cost_unavailable"
     INVALID_CREDENTIAL = "invalid_credential"
     INSUFFICIENT_CREDITS = "insufficient_credits"
@@ -124,6 +125,9 @@ DISPOSITION: Final[Mapping[StopCode, Disposition]] = MappingProxyType(
         StopCode.MODEL_UNAVAILABLE: Disposition.SUSPEND,
         # The owner starting the local server resolves it (Decision 0041 A3).
         StopCode.LOCAL_MODEL_SERVER_UNAVAILABLE: Disposition.SUSPEND,
+        # The owner switching the Model source back, or cancelling the run, resolves it (Decision
+        # 0041 A12).
+        StopCode.MODEL_SOURCE_DISABLED: Disposition.SUSPEND,
         StopCode.NETWORK_BEFORE_ACCEPTANCE: Disposition.SUSPEND,
         StopCode.INVALID_CREDENTIAL: Disposition.SUSPEND,
         StopCode.INSUFFICIENT_CREDITS: Disposition.SUSPEND,

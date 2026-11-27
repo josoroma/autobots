@@ -108,6 +108,8 @@ TOOL_CHILDREN = (
     Child('checks/sol_profile_check.py', 'the Sol profile check', ('{workspace}',), from_root=True),
     # US-23.7: Bonsai 2.5's stored requalification, and the Local source's offering from it.
     Child('checks/local_offering_check.py', 'the local offering check', (), from_root=True),
+    # US-23.3: a workspace's Model source switched to Local and back, admission on it, and the worker's refusal.
+    Child('checks/model_source_check.py', 'the model source check', (), from_root=True),
     # US-15.4: the run list's facts, groups, filters and paging, in workspaces of its own.
     Child('checks/run_list_check.py', 'the run list check', from_root=True),
     # US-14.14: the browsing loop's steps through real admission on the researcher route.

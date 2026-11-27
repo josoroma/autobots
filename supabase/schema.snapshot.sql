@@ -532,7 +532,11 @@ CREATE TABLE app_private.model_policies (
     version integer NOT NULL,
     default_profile text,
     role_overrides jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model_source text DEFAULT 'openrouter'::text NOT NULL,
+    local_profile text,
     CONSTRAINT model_policies_default_profile_check CHECK ((default_profile = ANY (ARRAY['openrouter_deepseek_flash'::text, 'openrouter_terra'::text, 'openrouter_sol'::text, 'local_bonsai_2_5_27b'::text, 'local_inkling_2_mini'::text]))),
+    CONSTRAINT model_policies_local_profile_check CHECK ((local_profile = ANY (ARRAY['local_bonsai_2_5_27b'::text, 'local_inkling_2_mini'::text]))),
+    CONSTRAINT model_policies_model_source_check CHECK ((model_source = ANY (ARRAY['openrouter'::text, 'local'::text]))),
     CONSTRAINT model_policies_version_check CHECK ((version >= 1))
 );
 

@@ -72,7 +72,14 @@ test("a summarizer bound apart from the executor is called out", () => {
 test("context is said in thousands of tokens, rounded", () => {
   const view = toWorkspaceView(
     workspace({
-      budgets: { context_tokens: 131_500, max_output_tokens_per_call: 8 },
+      budgets: {
+        context_tokens: 131_500,
+        max_output_tokens_per_call: 8,
+        call_seconds: 1_800,
+        active_seconds: 14_400,
+        model_calls: 64,
+        tool_dispatches: 96,
+      },
     }),
   );
   assert.equal(view.contextThousands, 132);

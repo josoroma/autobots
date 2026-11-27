@@ -62,4 +62,4 @@ async def validate_credential(
 @router.get("/models", operation_id="getModels", response_model=ModelList)
 async def get_models(settings: ProviderSettingsDep, _workspace_id: MemberWorkspace) -> ModelList:
     async with settings.opened() as provider:
-        return await provider.models()
+        return await provider.models(_workspace_id)

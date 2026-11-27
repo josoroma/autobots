@@ -149,6 +149,51 @@ RESERVED_PROMPT_TOKENS = 64_000
 ROLE_POLICY_VERSION = 1
 
 
+class ModelSource(StrEnum):
+    """Where a workspace's model calls go: one source at a time, never mixed, never a fallback
+    (Decision 0041 A1). A run's own source is its frozen executor route's."""
+
+    OPENROUTER = "openrouter"
+    LOCAL = "local"
+
+
+@dataclass(frozen=True)
+class RouteLimits:
+    """What one run on a route may use (Decision 0041 A11). Model calls and tool dispatches stay
+    Decision 0034 L2's on every route."""
+
+    call_seconds: float
+    active_seconds: float
+    output_tokens: int
+    context_tokens: int = CONTEXT_TOKENS
+    model_calls: int = 64
+    tool_dispatches: int = 96
+
+
+# Decision 0034 L1, L2, L4 and L6.
+OPENROUTER_LIMITS = RouteLimits(MODEL_CALL_SECONDS, 2_700.0, MAX_OUTPUT_TOKENS)
+# Decision 0041's "Set from the measurements": a 4,096-token reply took up to 17 minutes at 62K on
+# this Mac, and deep research is expected to take 1.5 to 3 hours. Inkling's reasoning can't be
+# turned off and counts against its reply, so it gets twice the cap.
+LOCAL_LIMITS: Mapping[ModelProfileId, RouteLimits] = MappingProxyType(
+    {
+        ModelProfileId.LOCAL_BONSAI_2_5: RouteLimits(1_800.0, 14_400.0, 4_096),
+        ModelProfileId.LOCAL_INKLING_2_MINI: RouteLimits(1_800.0, 14_400.0, 8_192),
+    }
+)
+
+
+def limits_for(profile: "ModelProfile") -> RouteLimits:
+    """A run's limits, from its frozen route's profile, so they hold for the run's life."""
+    if not profile.is_local:
+        return OPENROUTER_LIMITS
+    return LOCAL_LIMITS.get(profile.id, OPENROUTER_LIMITS)
+
+
+def source_of(profile: "ModelProfile") -> ModelSource:
+    return ModelSource.LOCAL if profile.is_local else ModelSource.OPENROUTER
+
+
 class UnknownModelProfile(ValueError):
     """A profile or role outside the approved set. It is refused, never mapped to a default."""
 

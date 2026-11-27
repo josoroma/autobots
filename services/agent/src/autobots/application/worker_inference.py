@@ -52,6 +52,7 @@ from autobots.application.provider_settings import (
     CredentialRefused,
     ProviderContext,
     ProviderSettings,
+    workspace_model_source,
 )
 from autobots.application.run_lifecycle import LoopConfig
 from autobots.application.runs import frozen_snapshot
@@ -66,16 +67,26 @@ from autobots.domain.models import (
     ModelProfile,
     ModelRole,
     ModelRoute,
+    ModelSource,
     RolePolicy,
     UnknownModelProfile,
     approved_profile,
     approved_role,
+    limits_for,
+    source_of,
 )
 from autobots.logs import log_event
 
 logger = logging.getLogger("autobots.worker")
 ROLE = ModelRole.EXECUTOR
 OPTIONS: Mapping[str, Any] = {"max_tokens": MAX_OUTPUT_TOKENS}
+
+
+def options_for(profile: ModelProfile) -> Mapping[str, Any]:
+    """The request's output cap is the route's (Decision 0041 A11)."""
+    return {"max_tokens": limits_for(profile).output_tokens}
+
+
 # Sooner than MP-02's five minutes, so a slow call doesn't turn into an expired catalog.
 CATALOG_REFRESH = timedelta(minutes=4)
 INTENT_FAILURES = {
@@ -146,7 +157,7 @@ def prepared(
     """Fresh exact mapping, options and tools, and the most one call is reserved for. A local
     profile needs no catalog and reserves nothing, since a local call costs nothing (Decision 0041
     A2)."""
-    attempt = prepare_attempt(policy, role, catalog, options=OPTIONS)
+    attempt = prepare_attempt(policy, role, catalog, options=options_for(policy.profile_for(role)))
     if attempt.profile.is_local:
         return attempt, 0
     if catalog is None:
@@ -238,6 +249,17 @@ class InferenceSource:
     # None in production, which means a real loopback client. Tests hand in one on a fake server.
     local_client: Callable[[ModelProfile, int], LoopbackClient] | None = None
     local_transport: Any = None
+    # The workspace's Model source now, read before each attempt (Decision 0041 A12). None in
+    # production, which means the database. Tests hand in their own.
+    source_check: Callable[[UUID], Awaitable[ModelSource]] | None = None
+
+    async def _current_source(self, workspace_id: UUID) -> ModelSource:
+        if self.source_check is not None:
+            return await self.source_check(workspace_id)
+        async with await psycopg.AsyncConnection.connect(
+            self.database_url, autocommit=True
+        ) as connection:
+            return await workspace_model_source(connection, workspace_id)
 
     async def _catalog_for(self, profile: ModelProfile) -> CatalogSnapshot | None:
         """OpenRouter's catalog, which a local profile never reads (Decision 0041 A13)."""
@@ -268,7 +290,10 @@ class InferenceSource:
         role: ModelRole = ROLE,
     ) -> tuple[Any, CredentialReference | None]:
         """Inside the attempt. Every refusal here is before sending, and classed as such. A local
-        call has no credential, so none is returned."""
+        call has no credential, so none is returned. A route on the Model source switched off is
+        refused before either source is asked anything (Decision 0041 A12)."""
+        if source_of(policy.profile_for(role)) is not await self._current_source(workspace_id):
+            raise ProviderFailure(FailureClass.MODEL_SOURCE_DISABLED)
         if policy.profile_for(role).is_local:
             try:
                 return await self._open_local(policy, role), None
@@ -333,6 +358,14 @@ class InferenceSource:
         gates, so an escape would keep a cancel or a finished candidate from ever settling. A local
         route needs no OpenRouter key and no catalog, and costs nothing (Decision 0041 A2).
         """
+        source = (
+            await self.source_check(workspace_id)
+            if self.source_check is not None
+            else await workspace_model_source(connection, workspace_id)
+        )
+        if source_of(policy.profile_for(ROLE)) is not source:
+            # Decision 0041 A12: the run waits, and nothing is sent to either source.
+            return FailureClass.MODEL_SOURCE_DISABLED.value, 0
         if policy.profile_for(ROLE).is_local:
             return None, 0
         try:
@@ -372,11 +405,28 @@ class InferenceSource:
             return _no_model, replace(config, route=UNBOUND)
         refusal, worst_case = await self._refusal(connection, lease.workspace_id, policy)
         profile = policy.profile_for(ROLE)
-        rate, tier = await self._input_rate(profile)
+        # A run on the source switched off asks neither source anything, not even for a price.
+        switched_off = refusal == FailureClass.MODEL_SOURCE_DISABLED.value
+        rate, tier = (0, None) if switched_off else await self._input_rate(profile)
         route = ModelRoute(ROLE.value, profile.id.value, profile.wire_id, worst_case, rate, tier)
         model = AttemptModel(self, lease.workspace_id, policy, reserved_micro_usd=worst_case)
-        browsing = await self._browsing(connection, lease)
-        return lambda: model, replace(config, route=route, refusal=refusal, browsing=browsing)
+        browsing = None if switched_off else await self._browsing(connection, lease)
+        # The frozen route's limits, so a run keeps them for its life (Decision 0041 A11).
+        limits = limits_for(profile)
+        bounded = replace(
+            config.limits,
+            active_seconds=limits.active_seconds,
+            model_calls=limits.model_calls,
+            tool_dispatches=limits.tool_dispatches,
+        )
+        return lambda: model, replace(
+            config,
+            route=route,
+            refusal=refusal,
+            browsing=browsing,
+            limits=bounded,
+            model_call_seconds=limits.call_seconds,
+        )
 
     async def _browsing(self, connection: SqlConnection, lease: Lease) -> Browsing | None:
         """`browse_goal` for this job, bound to the run's researcher route, while browsing is

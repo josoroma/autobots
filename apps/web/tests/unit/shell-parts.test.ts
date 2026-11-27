@@ -65,6 +65,20 @@ test("each service state has its words, OpenRouter's own, and one tone for both 
     stateWords({ name: "database", state: "unknown", code: "x" }),
     "unknown",
   );
+  // Decision 0041 A13: on Local, Home's model service reads from the runtime's health check.
+  assert.equal(SERVICE_LABEL.local_model, "Local model");
+  assert.equal(
+    stateWords({ name: "local_model", state: "ready", code: "local_ready" }),
+    "ready",
+  );
+  assert.equal(
+    stateWords({
+      name: "local_model",
+      state: "not_ready",
+      code: "local_not_running",
+    }),
+    "isn't running",
+  );
   assert.deepEqual(
     Object.fromEntries(
       Object.entries(READINESS).map(([state, entry]) => [state, entry.tone]),

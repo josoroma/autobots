@@ -14,6 +14,16 @@ export const SERVICE_LABEL: Readonly<Record<Service["name"], string>> = {
   worker: "Worker",
   database: "Database",
   openrouter: "OpenRouter",
+  local_model: "Local model",
+};
+
+// Decision 0041 A13: on Local, Home's model service is the owner's llama-server, read from its
+// health check by code, as the API reports it.
+const LOCAL_MODEL_WORDS: Readonly<Record<string, string>> = {
+  local_ready: "ready",
+  local_not_running: "isn't running",
+  local_other_model: "is serving another model",
+  local_not_offered: "isn't offered yet",
 };
 
 export const READINESS: Readonly<
@@ -33,6 +43,9 @@ export const READINESS: Readonly<
 
 export function stateWords(service: Service): string {
   const entry = READINESS[service.state];
+  if (service.name === "local_model") {
+    return LOCAL_MODEL_WORDS[service.code] ?? entry.words;
+  }
   return service.name === "openrouter" ? entry.openrouterWords : entry.words;
 }
 

@@ -56,6 +56,7 @@ from autobots.application.worker_leases import Lease
 from autobots.domain.models import (
     MAX_OUTPUT_TOKENS,
     ModelRole,
+    ModelSource,
     UnknownModelProfile,
     resolve_role_policy,
 )
@@ -298,11 +299,22 @@ class Rows(ScriptedConnection):
         super().__init__([(value,)])
 
 
+async def on_openrouter(_workspace: object) -> ModelSource:
+    """The workspace is on OpenRouter, as the worker reads it before each attempt (Decision 0041
+    A12), with no database."""
+    return ModelSource.OPENROUTER
+
+
 def real_source(pricing: object = PRICE) -> InferenceSource:
     async def fetch() -> dict[str, Any]:
         return catalog_payload(pricing=pricing)
 
-    return InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
+    return InferenceSource(
+        "postgresql://unused",
+        provider_context(fetch),
+        CatalogCache(fetch),
+        source_check=on_openrouter,
+    )
 
 
 def bind_with(
@@ -452,7 +464,12 @@ async def test_a_price_gone_mid_job_stops_the_next_attempt_before_any_key_is_rea
     async def fetch() -> dict[str, Any]:
         return catalog_payload(pricing=None)
 
-    source = InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
+    source = InferenceSource(
+        "postgresql://unused",
+        provider_context(fetch),
+        CatalogCache(fetch),
+        source_check=on_openrouter,
+    )
     with pytest.raises(ProviderFailure) as caught:
         await source.open_attempt(uuid4(), frozen_policy(snapshot()))
     assert caught.value.failure is FailureClass.COST_UNAVAILABLE
@@ -516,7 +533,12 @@ def _role_route(value: Any, *drop: str) -> Any:
     async def fetch() -> dict[str, Any]:
         return catalog_payload(*drop)
 
-    source = InferenceSource("postgresql://unused", provider_context(fetch), CatalogCache(fetch))
+    source = InferenceSource(
+        "postgresql://unused",
+        provider_context(fetch),
+        CatalogCache(fetch),
+        source_check=on_openrouter,
+    )
     return asyncio.run(source.role_route(Rows(value), lease(), ModelRole.RESEARCHER))
 
 
@@ -599,7 +621,12 @@ async def test_a_price_above_the_reservation_is_refused_before_sending() -> None
     async def catalog() -> dict[str, Any]:
         return catalog_payload(pricing={"prompt": "0.001", "completion": "0.001"})
 
-    source = InferenceSource("postgresql://never", provider_context(), CatalogCache(catalog))
+    source = InferenceSource(
+        "postgresql://never",
+        provider_context(),
+        CatalogCache(catalog),
+        source_check=on_openrouter,
+    )
     policy = resolve_role_policy()
     assert ModelRole.EXECUTOR in policy.bindings
     with pytest.raises(ProviderFailure) as refused:

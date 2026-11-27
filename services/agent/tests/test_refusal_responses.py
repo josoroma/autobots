@@ -891,7 +891,7 @@ def test_each_route_words_a_missing_key_for_its_own_work(
 
 
 def test_a_replay_under_a_saved_profile_not_offered_is_a_conflict(client: ApiClient) -> None:
-    client.database.answer("from app_private.model_policies", ("openrouter_deepseek_flash", {}))
+    client.database.saved_policy("openrouter_deepseek_flash", {})
     reply = answer(client, f"POST /v1/improvements/{CANDIDATE}/replay", REPLAY)
     assert reply == (409, "model_not_offered", DEEPSEEK)
 

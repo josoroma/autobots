@@ -53,7 +53,7 @@ The concepts' sample data is illustrative. Each screen shows only real data.
 - **Needs you** lists pending approvals, linking to Review, and runs `waiting_input`, linking to Reply on the run.
 - **Recent runs** lists the five newest, with state, progress or spend, and relative time.
 
-**HM-05. Service chips.** Home shows the readiness of the API, worker and database (SH-04), and the OpenRouter authentication status.
+**HM-05. Service chips.** Home shows the readiness of the API, worker and database (SH-04), and the OpenRouter authentication status. On the Local source it shows the local model's health instead, "Local model ready" or that it isn't running, from the runtime's model ID check ([Decision 0041](../engineering/decisions/0041-local-model-source.md) A13).
 
 **HM-06. YOLO notice.** The first time the owner opens Home with browsing's YOLO setting on, a notice says so and links to Settings → Browsing. It shows once (Decision 0035 Y1).
 
@@ -225,7 +225,7 @@ All are stored in the browser and change presentation only.
 
 ## Models
 
-**MD-01. Catalog facts.** For each approved profile: input and output price per 1M tokens from the catalog, the supported parameters shown as capabilities (labelled "from the catalog", separate from qualification), and the catalog's fetch time.
+**MD-01. Catalog facts.** For each approved profile: input and output price per 1M tokens from the catalog, the supported parameters shown as capabilities (labelled "from the catalog", separate from qualification), and the catalog's fetch time. On the Local source the catalog isn't fetched: the offered local profiles are listed at US$0, with no catalog time (Decision 0041 A13).
 
 **MD-02. Binding source.** Each role's binding says whether it comes from a run override, a workspace override, the workspace default, or the built-in default (for example, `researcher` → Sol).
 

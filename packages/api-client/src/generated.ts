@@ -2609,6 +2609,128 @@ export const schemas = {
     "title": "KnowledgeHead",
     "type": "object"
   },
+  "LocalProfileState": {
+    "additionalProperties": false,
+    "properties": {
+      "limits": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Limits"
+      },
+      "matched_runs": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Matched Runs",
+        "type": "array"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "offered": {
+        "title": "Offered",
+        "type": "boolean"
+      },
+      "profile": {
+        "$ref": "#/components/schemas/ModelProfileId"
+      },
+      "qualified_on": {
+        "anyOf": [
+          {
+            "format": "date",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qualified On"
+      },
+      "reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Reason"
+      }
+    },
+    "required": [
+      "profile",
+      "name",
+      "offered",
+      "reason",
+      "qualified_on",
+      "limits",
+      "matched_runs"
+    ],
+    "title": "LocalProfileState",
+    "type": "object"
+  },
+  "LocalRuntime": {
+    "additionalProperties": false,
+    "description": "The runtime's health for one local profile (Decision 0041 A3, A13). Its address is the\nowner's loopback, never anything a run's box sees.",
+    "properties": {
+      "port": {
+        "title": "Port",
+        "type": "integer"
+      },
+      "served_model_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Served Model Id"
+      },
+      "sha256_checking": {
+        "title": "Sha256 Checking",
+        "type": "boolean"
+      },
+      "sha256_matches": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Sha256 Matches"
+      },
+      "status": {
+        "enum": [
+          "ready",
+          "other_model",
+          "not_running"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "port",
+      "served_model_id",
+      "sha256_matches",
+      "sha256_checking"
+    ],
+    "title": "LocalRuntime",
+    "type": "object"
+  },
   "LocalStatus": {
     "additionalProperties": false,
     "description": "`scope` is `installation` when the database is down, as no workspace can be verified.",
@@ -3250,6 +3372,115 @@ export const schemas = {
     ],
     "title": "ModelRole",
     "type": "string"
+  },
+  "ModelSourceState": {
+    "additionalProperties": false,
+    "properties": {
+      "local_profile": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "local_profiles": {
+        "items": {
+          "$ref": "#/components/schemas/LocalProfileState"
+        },
+        "title": "Local Profiles",
+        "type": "array"
+      },
+      "roles_needed": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Roles Needed",
+        "type": "array"
+      },
+      "roles_uncovered": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Roles Uncovered",
+        "type": "array"
+      },
+      "runtime": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/LocalRuntime"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "source": {
+        "enum": [
+          "openrouter",
+          "local"
+        ],
+        "title": "Source",
+        "type": "string"
+      },
+      "version": {
+        "title": "Version",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "schema_version",
+      "version",
+      "source",
+      "local_profile",
+      "local_profiles",
+      "roles_needed",
+      "roles_uncovered",
+      "runtime"
+    ],
+    "title": "ModelSourceState",
+    "type": "object"
+  },
+  "ModelSourceUpdate": {
+    "additionalProperties": false,
+    "properties": {
+      "expected_version": {
+        "minimum": 0.0,
+        "title": "Expected Version",
+        "type": "integer"
+      },
+      "local_profile": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ModelProfileId"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "source": {
+        "enum": [
+          "openrouter",
+          "local"
+        ],
+        "title": "Source",
+        "type": "string"
+      }
+    },
+    "required": [
+      "expected_version",
+      "source"
+    ],
+    "title": "ModelSourceUpdate",
+    "type": "object"
   },
   "OccurrenceView": {
     "additionalProperties": false,
@@ -4744,6 +4975,14 @@ export const schemas = {
     "additionalProperties": false,
     "description": "MP-07's limits this run works under. Spend is on the run itself.",
     "properties": {
+      "active_seconds": {
+        "title": "Active Seconds",
+        "type": "number"
+      },
+      "call_seconds": {
+        "title": "Call Seconds",
+        "type": "number"
+      },
       "context_tokens": {
         "title": "Context Tokens",
         "type": "integer"
@@ -4751,11 +4990,23 @@ export const schemas = {
       "max_output_tokens_per_call": {
         "title": "Max Output Tokens Per Call",
         "type": "integer"
+      },
+      "model_calls": {
+        "title": "Model Calls",
+        "type": "integer"
+      },
+      "tool_dispatches": {
+        "title": "Tool Dispatches",
+        "type": "integer"
       }
     },
     "required": [
       "context_tokens",
-      "max_output_tokens_per_call"
+      "max_output_tokens_per_call",
+      "call_seconds",
+      "active_seconds",
+      "model_calls",
+      "tool_dispatches"
     ],
     "title": "RunBudgets",
     "type": "object"
@@ -5810,7 +6061,8 @@ export const schemas = {
           "api",
           "worker",
           "database",
-          "openrouter"
+          "openrouter",
+          "local_model"
         ],
         "title": "Name",
         "type": "string"
@@ -6029,6 +6281,7 @@ export const schemas = {
       "credential_unavailable",
       "model_unavailable",
       "local_model_server_unavailable",
+      "model_source_disabled",
       "cost_unavailable",
       "invalid_credential",
       "insufficient_credits",
@@ -8760,6 +9013,32 @@ export function parseKnowledgeHead(value: unknown): KnowledgeHead {
   return parseWith(schemas, "KnowledgeHead", value) as KnowledgeHead;
 }
 
+export interface LocalProfileState {
+  limits: string | null;
+  matched_runs: string[];
+  name: string;
+  offered: boolean;
+  profile: ModelProfileId;
+  qualified_on: string | null;
+  reason: string | null;
+}
+
+export function parseLocalProfileState(value: unknown): LocalProfileState {
+  return parseWith(schemas, "LocalProfileState", value) as LocalProfileState;
+}
+
+export interface LocalRuntime {
+  port: number;
+  served_model_id: string | null;
+  sha256_checking: boolean;
+  sha256_matches: boolean | null;
+  status: "ready" | "other_model" | "not_running";
+}
+
+export function parseLocalRuntime(value: unknown): LocalRuntime {
+  return parseWith(schemas, "LocalRuntime", value) as LocalRuntime;
+}
+
 export interface LocalStatus {
   backup_age_hours: number | null;
   conditions: OperationCondition[];
@@ -8912,6 +9191,31 @@ export type ModelRole = "coordinator" | "router" | "planner" | "executor" | "res
 
 export function parseModelRole(value: unknown): ModelRole {
   return parseWith(schemas, "ModelRole", value) as ModelRole;
+}
+
+export interface ModelSourceState {
+  local_profile: ModelProfileId | null;
+  local_profiles: LocalProfileState[];
+  roles_needed: string[];
+  roles_uncovered: string[];
+  runtime: LocalRuntime | null;
+  schema_version: 1;
+  source: "openrouter" | "local";
+  version: number;
+}
+
+export function parseModelSourceState(value: unknown): ModelSourceState {
+  return parseWith(schemas, "ModelSourceState", value) as ModelSourceState;
+}
+
+export interface ModelSourceUpdate {
+  expected_version: number;
+  local_profile?: ModelProfileId | null;
+  source: "openrouter" | "local";
+}
+
+export function parseModelSourceUpdate(value: unknown): ModelSourceUpdate {
+  return parseWith(schemas, "ModelSourceUpdate", value) as ModelSourceUpdate;
 }
 
 export interface OccurrenceView {
@@ -9322,8 +9626,12 @@ export function parseRunAccepted(value: unknown): RunAccepted {
 }
 
 export interface RunBudgets {
+  active_seconds: number;
+  call_seconds: number;
   context_tokens: number;
   max_output_tokens_per_call: number;
+  model_calls: number;
+  tool_dispatches: number;
 }
 
 export function parseRunBudgets(value: unknown): RunBudgets {
@@ -9577,7 +9885,7 @@ export function parseServiceHealth(value: unknown): ServiceHealth {
 
 export interface ServiceReadiness {
   code: string;
-  name: "api" | "worker" | "database" | "openrouter";
+  name: "api" | "worker" | "database" | "openrouter" | "local_model";
   state: "ready" | "not_ready" | "unknown";
 }
 
@@ -9639,7 +9947,7 @@ export function parseSessionWorkspace(value: unknown): SessionWorkspace {
   return parseWith(schemas, "SessionWorkspace", value) as SessionWorkspace;
 }
 
-export type StopCode = "credentials_required" | "credential_unavailable" | "model_unavailable" | "local_model_server_unavailable" | "cost_unavailable" | "invalid_credential" | "insufficient_credits" | "rate_limited" | "provider_error" | "network_before_acceptance" | "partial_stream" | "uncertain_acceptance" | "incomplete_output" | "other" | "admission_refused" | "budget_exceeded" | "no_inference_slot" | "uncertain_model_call" | "unadmitted_model_call" | "request_unencodable" | "route_not_bound" | "compaction_failed" | "incompatible_version" | "model_calls_limit" | "tool_dispatches_limit" | "repairs_limit" | "plan_revisions_limit" | "children_limit" | "active_time_limit" | "step_limit" | "lease_lost" | "run_not_running" | "run_not_found" | "approval_pending" | "parent_not_running" | "assignment_paused" | "assignment_lost" | "assignment_busy" | "outcome_unknown" | "output_too_large" | "command_refused" | "worker_failed" | "plan_missing" | "plan_incomplete" | "criteria_unmet" | "workflow_invalid" | "workflow_node_failed" | "workflow_stalled" | "cancelled" | "cancelled_with_unknown_outcomes" | "children_settling";
+export type StopCode = "credentials_required" | "credential_unavailable" | "model_unavailable" | "local_model_server_unavailable" | "model_source_disabled" | "cost_unavailable" | "invalid_credential" | "insufficient_credits" | "rate_limited" | "provider_error" | "network_before_acceptance" | "partial_stream" | "uncertain_acceptance" | "incomplete_output" | "other" | "admission_refused" | "budget_exceeded" | "no_inference_slot" | "uncertain_model_call" | "unadmitted_model_call" | "request_unencodable" | "route_not_bound" | "compaction_failed" | "incompatible_version" | "model_calls_limit" | "tool_dispatches_limit" | "repairs_limit" | "plan_revisions_limit" | "children_limit" | "active_time_limit" | "step_limit" | "lease_lost" | "run_not_running" | "run_not_found" | "approval_pending" | "parent_not_running" | "assignment_paused" | "assignment_lost" | "assignment_busy" | "outcome_unknown" | "output_too_large" | "command_refused" | "worker_failed" | "plan_missing" | "plan_incomplete" | "criteria_unmet" | "workflow_invalid" | "workflow_node_failed" | "workflow_stalled" | "cancelled" | "cancelled_with_unknown_outcomes" | "children_settling";
 
 export function parseStopCode(value: unknown): StopCode {
   return parseWith(schemas, "StopCode", value) as StopCode;
@@ -10465,6 +10773,14 @@ export async function deleteOpenRouterCredential(options: ClientOptions, body: E
 
 export async function validateOpenRouter(options: ClientOptions, request?: RequestOptions): Promise<ProviderStatus> {
   return parseProviderStatus(await requestJson(options, "POST", `/v1/settings/model-providers/openrouter/validate`, undefined, request, parseErrorResponse));
+}
+
+export async function getModelSource(options: ClientOptions, request?: RequestOptions): Promise<ModelSourceState> {
+  return parseModelSourceState(await requestJson(options, "GET", `/v1/settings/model-source`, undefined, request, parseErrorResponse));
+}
+
+export async function putModelSource(options: ClientOptions, body: ModelSourceUpdate, request?: RequestOptions): Promise<ModelSourceState> {
+  return parseModelSourceState(await requestJson(options, "PUT", `/v1/settings/model-source`, body, request, parseErrorResponse));
 }
 
 export type ListToolsQuery = {

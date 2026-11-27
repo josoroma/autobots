@@ -44,6 +44,8 @@ PROFILE_LABELS = {
     ModelProfileId.DEEPSEEK_FLASH: "DeepSeek",
     ModelProfileId.TERRA: "Terra",
     ModelProfileId.SOL: "Sol",
+    ModelProfileId.LOCAL_BONSAI_2_5: "Bonsai 2.5 (local)",
+    ModelProfileId.LOCAL_INKLING_2_MINI: "Inkling 2 Mini (local)",
 }
 
 

@@ -25,7 +25,7 @@ from autobots.adapters.models.local_server import (
 from autobots.application.loop_policy import LoopStopped
 from autobots.application.model_attempts import FailureClass, ProviderFailure
 from autobots.application.worker_inference import AttemptModel, InferenceSource, frozen_policy
-from autobots.domain.models import ModelProfile
+from autobots.domain.models import ModelProfile, ModelSource
 from fake_openrouter import provider_context
 from test_local_model_route import (
     BONSAI,
@@ -33,6 +33,7 @@ from test_local_model_route import (
     admitting,
     handler,
     local_model,
+    on,
     untouched_catalog,
 )
 from test_loop_middleware import Ledger, Usage, request
@@ -369,6 +370,7 @@ async def test_a_runs_required_and_named_calls_reach_only_the_loopback_at_no_cos
         client_factory=no_openrouter,
         local_client=client,
         local_transport=server.transport,
+        source_check=on(ModelSource.LOCAL),
     )
     policy = frozen_policy({"version": 1, "bindings": {"executor": BONSAI.id.value}})
     model = AttemptModel(source, uuid4(), policy)

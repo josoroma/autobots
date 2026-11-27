@@ -6,9 +6,11 @@ The lifespan opens the pool and sets it here, then closes it. Handlers read thes
 """
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from fastapi import FastAPI, Request
 
+from autobots.adapters.models.local_health import DIGESTS, Digests
 from autobots.adapters.tool_registry import catalog
 from autobots.api.errors import ApiError
 from autobots.api.membership import DenyAllMembership, MembershipStore
@@ -60,6 +62,11 @@ class AppResources:
     probe_times: ProbeTimes = field(default_factory=ProbeTimes)
     listener_slots: ListenerSlots = field(default_factory=ListenerSlots)
     pool: Pool | None = None
+    # The owner's llama-server, as Settings and Home check it (Decision 0041 A13). None reads the
+    # port from the environment, and a transport is for tests only.
+    local_port: int | None = None
+    local_transport: Any = None
+    local_digests: Digests = field(default_factory=lambda: DIGESTS)
 
 
 def resources_of(app: FastAPI) -> AppResources:

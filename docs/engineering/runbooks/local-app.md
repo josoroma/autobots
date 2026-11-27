@@ -108,6 +108,11 @@ The API also needs `AUTOBOTS_CONFIG_ROOT`, the absolute directory holding any `.
 
 Only a user's **Run** reaches the credential gate. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser. With one, the goal is queued, and only a worker with [the inference switch](operations.md#turning-on-inference) runs it.
 
+**Model source** sits above it ([Decision 0041](../decisions/0041-local-model-source.md) A1, A13). OpenRouter is the default. The owner can switch to **Local** once a local profile is offered, as Bonsai 2.5 is after migration `20261127000070`. Until then the switch is refused, and the refusal names the roles that aren't covered.
+- **On Local:** every role uses the Local default profile, and no OpenRouter key is needed or read. Nothing is sent to OpenRouter, its catalog and key checks included. The panel shows the runtime's health, and Home's model chip reads "Local model ready" once [the owner's server](#the-owners-local-model-server) is running.
+- **A switch doesn't move a run.** A run frozen on the other source pauses with `model_source_disabled`. Switch back and resume it, or cancel it and continue it as a linked new run. Switching back restores OpenRouter's saved default and overrides.
+- **Migrations:** the setting needs migrations `20261127000068` to `20261127000071` applied to the install, which the owner does.
+
 ## The owner's local model server
 
 A local profile's calls go to `llama-server` on this Mac. Neither the Studio nor a hook starts it or downloads weights, so the owner does both ([Decision 0041](../decisions/0041-local-model-source.md) A4, A5).

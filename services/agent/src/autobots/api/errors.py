@@ -29,6 +29,7 @@ from autobots.application.profiles import DisplayNameInvalid
 from autobots.application.provider_settings import (
     EnvironmentManaged,
     InvalidKey,
+    SourceIsLocal,
     StaleVersion,
     ValidationUnavailable,
 )
@@ -123,6 +124,10 @@ WORDING: Final[Mapping[type, Wording]] = MappingProxyType(
             }
         ),
         ModelNotReady: Wording("Model-backed work needs a usable OpenRouter key."),
+        SourceIsLocal: Wording(
+            "Model source is Local, so nothing is sent to OpenRouter. Switch to OpenRouter to "
+            "check a key."
+        ),
         ToolsUnavailable: Wording(
             "A tool this Expert grants is unavailable in this install. See Tools for what it needs."
         ),

@@ -30,7 +30,7 @@ from autobots.adapters.models.local_server import (
     base_url,
     check_served,
 )
-from autobots.domain.models import MODEL_CALL_SECONDS, ModelProfile, ModelRole, RolePolicy
+from autobots.domain.models import ModelProfile, ModelRole, RolePolicy, limits_for
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 PROVIDER_ROUTING: Mapping[str, bool] = {"require_parameters": True, "allow_fallbacks": False}
@@ -142,9 +142,10 @@ def local_chat_model(
     attempt: PreparedAttempt, port: int, *, client: LoopbackClient | None = None
 ) -> ChatOpenRouter:
     """The same class on a loopback client: no key, no retries and no OpenRouter routing flags.
-    The request timeout sits above the loop's bound on a call, so that bound decides."""
+    The request timeout sits above the route's bound on a call, so that bound decides (Decision
+    0041 A11)."""
     loopback = client or LoopbackClient(
-        attempt.profile, port, MODEL_CALL_SECONDS + REQUEST_MARGIN_SECONDS
+        attempt.profile, port, limits_for(attempt.profile).call_seconds + REQUEST_MARGIN_SECONDS
     )
     return ChatOpenRouter(
         model=attempt.profile.wire_id,
@@ -184,7 +185,7 @@ NO_SDK_RETRIES = RetryConfig("none", BackoffStrategy(1, 1, 1.0, 1), False)
 # The SDK's own HTTP client otherwise gives up after httpx's 5 seconds, and a model can take longer
 # than that to reply. This sits above the goal loop's bound on a call, so that bound decides.
 REQUEST_TIMEOUT_MS = 130_000
-# A local request's timeout sits this far above the loop's bound on a call (MODEL_CALL_SECONDS).
+# A local request's timeout sits this far above the route's bound on a call (`limits_for`).
 REQUEST_MARGIN_SECONDS = 30.0
 
 

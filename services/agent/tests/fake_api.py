@@ -116,6 +116,16 @@ class FakeDatabase:
         """Scripted ahead of earlier answers, so a test can replace a default."""
         self.answers.insert(0, (fragment, list(rows)))
 
+    def saved_policy(self, default: object, overrides: object, source: str = "openrouter") -> None:
+        """A saved model policy row on a Model source (Decision 0041 A1), as admission reads it
+        and as the source alone is read."""
+        self.answer("select model_source from app_private.model_policies", (source,))
+        self.answer(
+            "select default_profile, role_overrides, model_source, local_profile "
+            "from app_private.model_policies",
+            (default, overrides, source, None),
+        )
+
     def written(self, table: str) -> list[object]:
         """The values of each insert into `table`, in order."""
         return [values for text, values in self.statements if f"insert into {table} " in text]

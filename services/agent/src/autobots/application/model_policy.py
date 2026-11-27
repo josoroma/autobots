@@ -14,7 +14,9 @@ from autobots.application.provider_settings import policy_overrides_json
 from autobots.application.sql import SqlConnection, optional_row
 from autobots.domain.errors import FixedRefusal, RefusalKind
 from autobots.domain.models import (
+    PROFILES,
     ModelProfileId,
+    ModelSource,
     UnknownModelProfile,
     require_offered,
     resolve_role_policy,
@@ -40,9 +42,14 @@ class ChoiceNotApproved(FixedRefusal):
 
 @dataclass(frozen=True)
 class StoredPolicy:
+    """`default_profile` and `role_overrides` are OpenRouter's, kept while Local is on, so switching
+    back restores them. `local_profile` is the Local default (Decision 0041 A1, A8)."""
+
     version: int = 0
     default_profile: str | None = None
     role_overrides: Mapping[str, str] = field(default_factory=dict)
+    model_source: ModelSource = ModelSource.OPENROUTER
+    local_profile: str | None = None
 
 
 def validated_choice(
@@ -60,17 +67,42 @@ def validated_choice(
     return chosen_default, overrides
 
 
+def refused_on_every_source(
+    default_profile: ModelProfileId | None, role_overrides: Mapping[str, ModelProfileId]
+) -> None:
+    """What no Model source would accept, refused before anything is read: a role or profile
+    outside the approved set, and an OpenRouter profile not offered for new runs. A local profile
+    waits for the workspace's source (Decision 0041 A1). Raises ChoiceNotApproved, then
+    ProfileNotOffered."""
+    overrides = {role: profile.value for role, profile in role_overrides.items()}
+    try:
+        resolve_role_policy(
+            workspace_default=None if default_profile is None else default_profile.value,
+            workspace_role_overrides=overrides,
+        )
+    except UnknownModelProfile as unknown:
+        raise ChoiceNotApproved(str(unknown)) from None
+    named = [*([default_profile] if default_profile else []), *role_overrides.values()]
+    require_offered([profile for profile in named if not PROFILES[profile].is_local])
+
+
 async def read_model_policy(connection: SqlConnection, workspace_id: UUID) -> StoredPolicy:
     row = await optional_row(
         connection,
         ModelPolicyRow,
-        "select version, default_profile, role_overrides from app_private.model_policies "
-        "where workspace_id = %s",
+        "select version, default_profile, role_overrides, model_source, local_profile "
+        "from app_private.model_policies where workspace_id = %s",
         (workspace_id,),
     )
     if row is None:
         return StoredPolicy()
-    return StoredPolicy(row.version, row.default_profile, row.role_overrides or {})
+    return StoredPolicy(
+        row.version,
+        row.default_profile,
+        row.role_overrides or {},
+        ModelSource(row.model_source),
+        row.local_profile,
+    )
 
 
 async def save_model_policy(
@@ -99,6 +131,7 @@ async def save_model_policy(
             "default_profile = excluded.default_profile, role_overrides = excluded.role_overrides",
             (workspace_id, current + 1, default_profile, policy_overrides_json(role_overrides)),
         )
+    # Saved only on OpenRouter, whose choices these are (model_policy_routes).
     return StoredPolicy(current + 1, default_profile, role_overrides)
 
 
