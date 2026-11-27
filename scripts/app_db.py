@@ -542,8 +542,9 @@ def lookup_cases(stack: AppStack, cases: Cases) -> None:
     caveat = "Concurrent admission on a live route wasn''t tested."
     stated = rows(stack, "select string_agg(profile || '=' || (position('" + caveat + "' in limits) > 0)::text, ',' order by profile) "
                          "from agent_runtime.route_qualifications where status = 'qualified_with_limits';")
-    # US-23.7: Bonsai 2.5's local route, qualified again by migration 70, states it too.
-    expected = 'local_bonsai_2_5_27b=true,openrouter_deepseek_flash=true,openrouter_sol=true,openrouter_terra=true'
+    # US-23.7 and US-23.8: Bonsai 2.5's and Inkling 2 Mini's local routes, qualified by migrations 70 and 72, state it too.
+    expected = ('local_bonsai_2_5_27b=true,local_inkling_2_mini=true,openrouter_deepseek_flash=true,openrouter_sol=true,'
+                'openrouter_terra=true')
     cases.check('every qualified route says concurrent admission was not tested', expected, stated, stated == expected)
 
 

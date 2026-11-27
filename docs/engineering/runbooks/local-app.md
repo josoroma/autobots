@@ -108,10 +108,10 @@ The API also needs `AUTOBOTS_CONFIG_ROOT`, the absolute directory holding any `.
 
 Only a user's **Run** reaches the credential gate. Without a key it returns `credentials_required`, and the draft stays in this tab's `sessionStorage`. No credential is stored in the browser. With one, the goal is queued, and only a worker with [the inference switch](operations.md#turning-on-inference) runs it.
 
-**Model source** sits above it ([Decision 0041](../decisions/0041-local-model-source.md) A1, A13). OpenRouter is the default. The owner can switch to **Local** once a local profile is offered, as Bonsai 2.5 is after migration `20261127000070`. Until then the switch is refused, and the refusal names the roles that aren't covered.
+**Model source** sits above it ([Decision 0041](../decisions/0041-local-model-source.md) A1, A13). OpenRouter is the default. The owner can switch to **Local** once a local profile is offered, as Bonsai 2.5 is after migration `20261127000070` and Inkling 2 Mini after `20261127000072`. The switch keeps the saved Local default, or else the first offered profile, and the model policy's default chooses between them on Local. Serve only the Local default's model, since one fits in memory beside the Studio. Until then the switch is refused, and the refusal names the roles that aren't covered.
 - **On Local:** every role uses the Local default profile, and no OpenRouter key is needed or read. Nothing is sent to OpenRouter, its catalog and key checks included. The panel shows the runtime's health, and Home's model chip reads "Local model ready" once [the owner's server](#the-owners-local-model-server) is running.
 - **A switch doesn't move a run.** A run frozen on the other source pauses with `model_source_disabled`. Switch back and resume it, or cancel it and continue it as a linked new run. Switching back restores OpenRouter's saved default and overrides.
-- **Migrations:** the setting needs migrations `20261127000068` to `20261127000071` applied to the install, which the owner does.
+- **Migrations:** the setting needs migrations `20261127000068` to `20261127000072` applied to the install, which the owner does.
 
 ## The owner's local model server
 
@@ -155,7 +155,7 @@ services/agent/.venv/bin/python -m autobots.operations.route_qualification --pro
 
 Expected: about 39 calls in three trials of US-3.4's twelve fixtures, then measurements at about 8K, 32K and 64K prompt tokens, in roughly half an hour on this Mac. It prints `"spent_usd": "0.00"` and whether the profile is `offerable`. `.checks/route-qualification/report-local_bonsai_2_5_27b.json` keeps every trial, the pins, the server's build and peak footprint, and the sentence a migration records. `--no-measure` skips the measurements, which only a change of server, weights or flags calls for again, and `--port` names another port. A wrong model or no server refuses with nothing sent. A required or named tool call is held to a JSON schema by the route itself ([Decision 0041](../decisions/0041-local-model-source.md) A18), so the suite qualifies the route as runs send it. Move the earlier report and ledger aside first, since a new run writes over the report and adds its calls to the ledger.
 
-**Stopping it:** `Ctrl-C` in its terminal. A local profile is offered on the Local source only once its qualification is recorded by migration as `qualified_with_limits`. Bonsai 2.5's is, by migration `20261127000070` (US-23.7), which the owner applies to the install. Its report records each fixture's verdicts in three trials, US$0.00 and the sentence the migration stores, and Inkling 2 Mini has none.
+**Stopping it:** `Ctrl-C` in its terminal. A local profile is offered on the Local source only once its qualification is recorded by migration as `qualified_with_limits`. Bonsai 2.5's is, by migration `20261127000070` (US-23.7), and Inkling 2 Mini's by `20261127000072` (US-23.8), which the owner applies to the install. Each call gets its route's own output cap, 4,096 tokens for Bonsai and 8,192 for Inkling, which reasons before every reply. Its report records each fixture's verdicts in three trials, US$0.00 and the sentence the migration stores.
 
 ## Boundaries
 

@@ -589,3 +589,49 @@ async def test_on_local_the_key_gate_answers_ready_without_reading_any_key() -> 
     assert [text for text, _ in database.statements] == [
         "select model_source from app_private.model_policies where workspace_id = %s"
     ] * 2
+
+
+# US-23.8: both local profiles offered, either the Local default
+
+INKLING_QUALIFIED = {
+    **BONSAI_QUALIFIED,
+    "profile": ModelProfileId.LOCAL_INKLING_2_MINI.value,
+    "canonical_id": PROFILES[ModelProfileId.LOCAL_INKLING_2_MINI].canonical_id,
+    "limits": "Not passed in every trial, so disabled: schema_nested passed 2 of 3.",
+}
+
+
+def test_either_offered_profile_can_be_the_local_default_and_answers_every_role() -> None:
+    inkling = ModelProfileId.LOCAL_INKLING_2_MINI
+    offered = frozenset({BONSAI.id, inkling})
+    for chosen, cap in ((inkling, 8_192), (BONSAI.id, 4_096)):
+        saved = WorkspacePolicy(None, None, ModelSource.LOCAL, chosen.value, offered)
+        policy = saved.for_new_work(require_offer=True)
+        assert set(policy.bindings.values()) == {chosen}
+        assert limits_for(PROFILES[chosen]).output_tokens == cap
+        with pytest.raises(PolicyNotOffered):
+            saved.for_new_work(run_role_overrides={"coder": chosen.value}, require_offer=True)
+
+
+def test_a_switch_to_local_can_name_inkling_and_the_panel_offers_both(
+    api_client: ApiClient,
+) -> None:
+    api_client.database.answer(QUALIFICATIONS, BONSAI_QUALIFIED, INKLING_QUALIFIED)
+    api_client.database.answer(BROWSING, (True,))
+    on_runtime(api_client, Runtime(None))
+    api_client.database.answer(SWITCH_LOCK, (2, None))
+    status, body = put_source(
+        api_client,
+        {"expected_version": 2, "source": "local", "local_profile": "local_inkling_2_mini"},
+    )
+    assert status == 200
+    (write,) = [
+        values
+        for text, values in api_client.database.statements
+        if text.startswith("insert into app_private.model_policies")
+    ]
+    assert write == (WORKSPACE, 3, "local", "local_inkling_2_mini")
+    shown = {item["profile"]: item for item in body["local_profiles"]}
+    assert shown[BONSAI.id.value]["offered"] and shown["local_inkling_2_mini"]["offered"]
+    assert "schema_nested passed 2 of 3" in shown["local_inkling_2_mini"]["limits"]
+    assert body["roles_uncovered"] == []

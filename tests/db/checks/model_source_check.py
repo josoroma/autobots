@@ -12,15 +12,16 @@ from uuid import uuid4
 
 import psycopg
 from autobots.application.model_policy import read_model_policy, save_model_policy
-from autobots.application.model_source import switch_model_source
+from autobots.application.model_source import save_local_default, switch_model_source
 from autobots.application.run_admission import PolicyNotOffered, saved_workspace_policy
 from autobots.application.runs import admit_run
 from autobots.application.worker_inference import InferenceSource, frozen_policy
-from autobots.domain.models import ModelProfileId, ModelSource
+from autobots.domain.models import PROFILES, ModelProfileId, ModelSource, limits_for
 from psycopg.types.json import Jsonb
 
 URL = os.environ['AUTOBOTS_DATABASE_URL']
 BONSAI = ModelProfileId.LOCAL_BONSAI_2_5.value
+INKLING = ModelProfileId.LOCAL_INKLING_2_MINI.value
 cases: list[dict[str, Any]] = []
 
 
@@ -95,6 +96,31 @@ async def main() -> None:
         refusal, _ = await source._refusal(db, workspace, on_local)
         check('on OpenRouter, a run frozen on Local is refused too', 'model_source_disabled', refusal,
               refusal == 'model_source_disabled')
+
+        # US-23.8: with Inkling 2 Mini offered too (migration 72), either is the Local default, and it answers every role.
+        async def frozen(goal: str) -> dict[str, Any]:
+            policy = (await saved_workspace_policy(db, workspace)).for_new_work(require_offer=True)
+            admitted = await admit_run(db, workspace_id=workspace, actor_id=uuid4(), idempotency_key=str(uuid4()),
+                                       goal_text=goal, limit_micro_usd=1000, policy=policy)
+            return (await (await db.execute('select policy_snapshot from public.runs where id = %s',
+                                            (admitted.run_id,))).fetchone())[0]
+
+        inkling = await switch_model_source(db, workspace, expected_version=back.version, source=ModelSource.LOCAL,
+                                            local_profile=ModelProfileId.LOCAL_INKLING_2_MINI)
+        on_inkling = await frozen('on Inkling')
+        cap = limits_for(PROFILES[ModelProfileId.LOCAL_INKLING_2_MINI]).output_tokens
+        check('a switch to Local can choose Inkling 2 Mini, and it answers every role', 'every role Inkling 2 Mini, 8,192 tokens',
+              (inkling.local_profile, set(on_inkling['bindings'].values()), cap),
+              inkling.local_profile == INKLING and set(on_inkling['bindings'].values()) == {INKLING} and cap == 8_192)
+        bonsai = await save_local_default(db, workspace, expected_version=inkling.version,
+                                          local_profile=ModelProfileId.LOCAL_BONSAI_2_5)
+        on_bonsai = await frozen('on Bonsai')
+        cap = limits_for(PROFILES[ModelProfileId.LOCAL_BONSAI_2_5]).output_tokens
+        check('saving Bonsai 2.5 as the Local default moves the next run to it', 'every role Bonsai 2.5, 4,096 tokens',
+              (bonsai.local_profile, set(on_bonsai['bindings'].values()), cap),
+              bonsai.local_profile == BONSAI and set(on_bonsai['bindings'].values()) == {BONSAI} and cap == 4_096)
+        await switch_model_source(db, workspace, expected_version=bonsai.version, source=ModelSource.OPENROUTER,
+                                  local_profile=None)
     print(json.dumps({'cases': cases}))
 
 

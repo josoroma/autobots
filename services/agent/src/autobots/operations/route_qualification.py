@@ -41,7 +41,7 @@ from autobots.adapters.models.factory import (
 )
 from autobots.adapters.models.local_server import local_port
 from autobots.adapters.models.openrouter_metadata import catalog_fetcher
-from autobots.domain.models import PROFILES, ModelProfile, ModelRole
+from autobots.domain.models import PROFILES, ModelProfile, ModelRole, limits_for
 from autobots.logs import configure_logging, forbid_remote_tracing
 from autobots.operations import local_route_measurements
 from autobots.operations.cli import Refused, command, counts_argument
@@ -232,8 +232,12 @@ async def qualify_local(
         ) from None
     ledger = Ledger(out / f"ledger-{profile_id}.json", 0)
     built_at = time.monotonic()
+    # The route's own output cap, as a run on it sends (Decision 0041 A11). A model that reasons
+    # before every reply, as Inkling 2 Mini does, needs that room, and the suite qualifies the
+    # route as the gateway sends it (A7, A18). The truncation fixture still asks for its own cap.
+    output_tokens = limits_for(profile).output_tokens
 
-    def build(max_tokens: int = OUTPUT_TOKENS) -> Any:
+    def build(max_tokens: int = output_tokens) -> Any:
         attempt = PreparedAttempt(profile, ModelRole.EXECUTOR, "local", {"max_tokens": max_tokens})
         loopback = client(profile, port) if client is not None else None
         return local_chat_model(attempt, port, client=loopback)
@@ -262,6 +266,7 @@ async def qualify_local(
         },
         "port": port,
         "call_seconds": LOCAL_CALL_SECONDS,
+        "output_tokens": output_tokens,
         "spent_usd": "0.00",
         "committed_micro_usd": ledger.committed(),
         "calls": len(ledger.entries),

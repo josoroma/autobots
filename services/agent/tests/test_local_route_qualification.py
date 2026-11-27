@@ -210,6 +210,28 @@ async def test_the_suite_sends_required_and_named_calls_through_the_routes_const
     assert all("authorization" not in r.headers for r in server.requests)
 
 
+@pytest.mark.parametrize(
+    ("profile", "cap"),
+    [(BONSAI, 4_096), (PROFILES[ModelProfileId.LOCAL_INKLING_2_MINI], 8_192)],
+    ids=["bonsai", "inkling"],
+)
+@pytest.mark.asyncio
+async def test_each_call_gets_the_routes_own_output_cap(
+    tmp_path: Path, profile: ModelProfile, cap: int
+) -> None:
+    """Decision 0041 A11: the suite sends what a run on the route sends, so a model that reasons
+    before every reply has its route's room. Only the truncation fixture asks for less."""
+    server = FakeSuiteServer(profile.wire_id)
+    report = await qualified(server, tmp_path, profile.id.value)
+    asked = [
+        json.loads(r.content).get("max_tokens")
+        for r in server.requests
+        if r.url.path.endswith("/completions")
+    ]
+    assert set(asked) == {cap, 16} and asked.count(16) == 3
+    assert report["output_tokens"] == cap
+
+
 def _fixture_names() -> list[tuple[str, object]]:
     return [
         (name, None)

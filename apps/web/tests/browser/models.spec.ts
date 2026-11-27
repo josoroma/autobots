@@ -83,8 +83,8 @@ test("each profile shows catalog prices, capabilities and the fetch time, apart 
 });
 
 // US-23.3, Decision 0041 A13: on OpenRouter, the Model source panel shows what Local would offer,
-// above the provider panel and the policy. Migration 70 stores Bonsai 2.5's qualification, and no
-// llama-server answers on the fixture's port.
+// above the provider panel and the policy. Migrations 70 and 72 store Bonsai 2.5's and Inkling 2
+// Mini's qualifications, and no llama-server answers on the fixture's port.
 test("the Model source panel sits above the provider panel and shows each local profile", async ({
   page,
 }) => {
@@ -98,9 +98,10 @@ test("the Model source panel sits above the provider panel and shows each local 
   await expect(
     panel.locator('[data-local-profile="local_bonsai_2_5_27b"]'),
   ).toContainText("Qualified 2026-11-27");
+  // US-23.8: migration 72 stores Inkling 2 Mini's qualification, so both local profiles are offered.
   await expect(
     panel.locator('[data-local-profile="local_inkling_2_mini"]'),
-  ).toContainText("isn't offered");
+  ).toContainText("Qualified 2026-11-27");
   await expect(panel.locator('[data-source-field="runtime"]')).toContainText(
     "127.0.0.1:",
   );

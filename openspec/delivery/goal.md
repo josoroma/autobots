@@ -7,7 +7,7 @@ markers are preserved across refreshes.
 
 | Field | Value |
 |---|---|
-| Target | US-23.3 |
+| Target | US-23.8 |
 | Kind | story |
 | Focus | - |
 | Status | ACTIVE |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-23.3 | us-23-3-model-source-setting-settings | READY | The Model source setting in Settings → Models |
+| 1 | US-23.8 | us-23-8-inkling-2-mini-s | READY | Inkling 2 Mini's route qualified at its own output cap, and offered on Local beside Bonsai 2.5 |
 
 ## Next Action
 
 Action: propose
-Story: US-23.3
-Change: us-23-3-model-source-setting-settings
-Command: /ohmyorch:opsx-propose us-23-3-model-source-setting-settings for US-23.3; then set US-23.3 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-23.3 is READY and has no OpenSpec change
+Story: US-23.8
+Change: us-23-8-inkling-2-mini-s
+Command: /ohmyorch:opsx-propose us-23-8-inkling-2-mini-s for US-23.8; then set US-23.8 to IN PROGRESS with a Change: line in SPECS.md
+Reason: US-23.8 is READY and has no OpenSpec change
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.

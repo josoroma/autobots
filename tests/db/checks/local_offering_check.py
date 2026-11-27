@@ -1,5 +1,6 @@
-"""US-23.7 on a real database: Bonsai 2.5's route qualification as migration 70 stores it, read the
-way Settings reads it, and the Local source's offering from it (Decision 0041 A7, A18). JSON cases."""
+"""US-23.7 and US-23.8 on a real database: Bonsai 2.5's and Inkling 2 Mini's route qualifications as
+migrations 70 and 72 store them, read the way Settings reads them, and the Local source's offering from
+them (Decision 0041 A7, A18). JSON cases."""
 from __future__ import annotations
 
 import asyncio
@@ -39,8 +40,10 @@ async def main() -> None:
         bonsai, inkling = offers[ModelProfileId.LOCAL_BONSAI_2_5], offers[ModelProfileId.LOCAL_INKLING_2_MINI]
         check('the Local source offers Bonsai 2.5 from its stored row, with its date and limits', 'offered, 2026-11-27',
               (bonsai.offered, bonsai.qualified_on), bonsai.offered and bonsai.qualified_on == date(2026, 11, 27) and bonsai.limits == limits)
-        check("Inkling 2 Mini isn't offered, with a reason", 'not offered, with a reason', (inkling.offered, inkling.reason),
-              not inkling.offered and bool(inkling.reason))
+        # US-23.8: migration 72 stores Inkling 2 Mini's qualification, so it is offered beside Bonsai 2.5.
+        check('the Local source offers Inkling 2 Mini too, with its date and limits', 'offered, 2026-11-27, schema_nested',
+              (inkling.offered, inkling.qualified_on), inkling.offered and inkling.qualified_on == date(2026, 11, 27)
+              and inkling.limits is not None and 'schema_nested passed 2 of 3' in inkling.limits and CAVEAT in inkling.limits)
         check('on OpenRouter, neither local profile is offered', 'neither in OFFERED_FOR_NEW_RUNS', sorted(p.value for p in OFFERED_FOR_NEW_RUNS),
               ModelProfileId.LOCAL_BONSAI_2_5 not in OFFERED_FOR_NEW_RUNS and ModelProfileId.LOCAL_INKLING_2_MINI not in OFFERED_FOR_NEW_RUNS)
     print(json.dumps({'cases': cases}))
