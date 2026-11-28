@@ -265,6 +265,25 @@ def test_on_local_the_pickers_list_offered_local_profiles_and_a_role_override_is
     assert api_client.database.changes() == []
 
 
+def test_on_local_saving_no_default_is_refused_and_says_where_to_choose_one(
+    api_client: ApiClient,
+) -> None:
+    arrange(api_client, offered=True)
+    api_client.database.answer(SOURCE, ("local",))
+    api_client.database.answer(POLICY_READ, policy_row(5, "local", BONSAI.id.value))
+    reply = api_client.http.put(
+        "/v1/settings/model-policy",
+        headers=api_client.headers(),
+        json={"expected_version": 5, "default_profile": None, "role_overrides": {}},
+    )
+    assert reply.status_code == 422 and reply.json()["code"] == "model_not_offered"
+    assert reply.json()["message"] == (
+        "On the Local source, choose an offered local model as the workspace default in "
+        "Settings → Models."
+    )
+    assert api_client.database.changes() == []
+
+
 async def listed(database: FakeDatabase) -> ModelList:
     """`GET /v1/models`'s list, with a catalog fetch that fails the test if it's made."""
 

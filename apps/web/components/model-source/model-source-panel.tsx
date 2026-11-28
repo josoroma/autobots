@@ -30,8 +30,9 @@ import { useSubmit } from "@/lib/use-submit";
 const LOST = "Model source couldn't be saved. Reload and try again.";
 
 // Decision 0041 A13: where every model call goes, above the provider panel and the model policy.
-// Any member reads it; only the owner switches, at the version they saw (MP-05).
-export function ModelSourcePanel() {
+// Any member reads it; only the owner switches, at the version they saw (MP-05). `onSwitched`
+// runs once a switch is accepted.
+export function ModelSourcePanel({ onSwitched }: { onSwitched?: () => void }) {
   const read = useSettingsRead(readOf(getModelSource));
   const submit = useSubmit<undefined>();
   const [message, setMessage] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export function ModelSourcePanel() {
       setMessage(
         `Model source is now ${source === "local" ? "Local" : "OpenRouter"}.`,
       );
+      onSwitched?.();
       return;
     }
     setMessage(refusalText(SOURCE_REFUSALS, result.refusal, LOST));

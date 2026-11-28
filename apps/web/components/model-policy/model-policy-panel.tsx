@@ -13,13 +13,23 @@ import { LoadState } from "@/components/ui/load-state";
 import { POLICY_DISCARDED, savedChoiceNotOffered } from "@/lib/model-policy";
 
 // PRD-Studio MD-01 to MD-03: the approved models with their catalog facts, what the saved policy
-// does, and the form that changes it. Every write sends the version this screen loaded.
-export function ModelPolicyPanel() {
+// does, and the form that changes it. Every write sends the version this screen loaded. On Local
+// the models are the offered local profiles and the default is the Local default (Decision 0041
+// A1, A8). `onSaved` runs once a save or a reset is accepted.
+export function ModelPolicyPanel({ onSaved }: { onSaved?: () => void }) {
   const read = usePolicyRead();
   const policy = usePolicyDraft(read.policy);
-  const writes = usePolicyWrites(policy.adopt);
+  const writes = usePolicyWrites((next) => {
+    policy.adopt(next);
+    onSaved?.();
+  });
   const { saved, draft } = policy;
-  if (read.models === null || saved === null || draft === null) {
+  if (
+    read.models === null ||
+    read.source === null ||
+    saved === null ||
+    draft === null
+  ) {
     return (
       <LoadState
         state={read.state}
@@ -39,6 +49,7 @@ export function ModelPolicyPanel() {
       <RoleEffect state={saved} />
       {savedChoiceNotOffered(saved, models) ? <NotOfferedAlert /> : null}
       <PolicyForm
+        local={read.source === "local"}
         models={models}
         saved={saved}
         draft={draft}

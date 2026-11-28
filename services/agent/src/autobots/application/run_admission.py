@@ -89,7 +89,12 @@ async def require_model_ready(check: CredentialCheck, workspace_id: UUID, *, nee
 ROLE_OVERRIDE_ON_LOCAL = (
     "On the Local source, one local model answers every role, so a role override isn't offered."
 )
-NO_LOCAL_DEFAULT = "The Local source has no local profile chosen. Switch Model source again."
+# On Local the workspace default names the one local model, so saving none, or a Local row
+# without one, is refused (Decision 0041 A8).
+NO_LOCAL_DEFAULT = (
+    "On the Local source, choose an offered local model as the workspace default in "
+    "Settings → Models."
+)
 
 
 @dataclass(frozen=True)

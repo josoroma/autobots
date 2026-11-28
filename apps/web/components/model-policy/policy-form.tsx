@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { fieldIds, Select } from "@/components/ui/field";
 import {
   BUILTIN_DEFAULT,
+  CHOOSE_LOCAL,
   choices,
   followingCount,
+  LOCAL_ROLES,
   sourceText,
   WORKSPACE_DEFAULT,
   type PolicyDraft,
@@ -35,11 +37,30 @@ function ProfileOptions({
   ));
 }
 
+// On Local the default is the Local default, so the built-in one isn't offered (Decision 0041 A8).
+// With none saved, the select says so and can't be saved as it is.
+function DefaultNone({ local, value }: { local: boolean; value: string }) {
+  if (!local) {
+    return (
+      <option value={BUILTIN_DEFAULT}>
+        Built-in default (Sol for researcher, Terra otherwise)
+      </option>
+    );
+  }
+  return value === BUILTIN_DEFAULT ? (
+    <option value={BUILTIN_DEFAULT} disabled>
+      {CHOOSE_LOCAL}
+    </option>
+  ) : null;
+}
+
 function WorkspaceDefaultRow({
+  local,
   models,
   value,
   onChange,
 }: {
+  local: boolean;
   models: readonly ModelAvailability[];
   value: string;
   onChange: (profile: string) => void;
@@ -59,9 +80,7 @@ function WorkspaceDefaultRow({
             value={value}
             onChange={(event) => onChange(event.target.value)}
           >
-            <option value={BUILTIN_DEFAULT}>
-              Built-in default (Sol for researcher, Terra otherwise)
-            </option>
+            <DefaultNone local={local} value={value} />
             <ProfileOptions models={models} current={value} />
           </Select>
         </div>
@@ -115,6 +134,8 @@ function RoleOverrideRow({
 }
 
 export interface PolicyFormProps {
+  /** The workspace is on the Local source (Decision 0041 A1, A8). */
+  local: boolean;
   models: readonly ModelAvailability[];
   saved: ModelPolicyState;
   draft: PolicyDraft;
@@ -129,7 +150,7 @@ export interface PolicyFormProps {
 
 /** The workspace default, one override per role, and Save, Discard and Reset all (PRD-Studio MD-02, MD-03). */
 export function PolicyForm(props: PolicyFormProps) {
-  const { models, saved, draft, pending } = props;
+  const { local, models, saved, draft, pending } = props;
   const bindings = saved.policy.bindings;
   return (
     <form
@@ -140,24 +161,31 @@ export function PolicyForm(props: PolicyFormProps) {
       className="space-y-5"
     >
       <WorkspaceDefaultRow
+        local={local}
         models={models}
         value={draft.defaultProfile}
         onChange={props.onDefault}
       />
-      <fieldset className="min-w-0">
-        <legend className="mb-2 text-sm font-semibold">Role overrides</legend>
-        <div className="border-border grid gap-x-8 border-b md:grid-cols-2">
-          {bindings.map((binding) => (
-            <RoleOverrideRow
-              key={binding.role}
-              models={models}
-              binding={binding}
-              value={draft.overrides[binding.role]}
-              onChange={(profile) => props.onOverride(binding.role, profile)}
-            />
-          ))}
-        </div>
-      </fieldset>
+      {local ? (
+        <p data-field="local-roles" className="text-muted-foreground text-body">
+          {LOCAL_ROLES}
+        </p>
+      ) : (
+        <fieldset className="min-w-0">
+          <legend className="mb-2 text-sm font-semibold">Role overrides</legend>
+          <div className="border-border grid gap-x-8 border-b md:grid-cols-2">
+            {bindings.map((binding) => (
+              <RoleOverrideRow
+                key={binding.role}
+                models={models}
+                binding={binding}
+                value={draft.overrides[binding.role]}
+                onChange={(profile) => props.onOverride(binding.role, profile)}
+              />
+            ))}
+          </div>
+        </fieldset>
+      )}
       <div className="border-border flex flex-wrap items-center gap-3 border-t pt-4">
         <Button type="submit" size="lg" disabled={pending}>
           {pending ? "Saving" : "Save policy"}
@@ -171,15 +199,17 @@ export function PolicyForm(props: PolicyFormProps) {
         >
           Discard
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          disabled={pending}
-          onClick={props.onReset}
-        >
-          Reset all
-        </Button>
+        {local ? null : (
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={pending}
+            onClick={props.onReset}
+          >
+            Reset all
+          </Button>
+        )}
         <p
           data-field="policy-summary"
           className="text-muted-foreground ml-auto text-ui tabular-nums"

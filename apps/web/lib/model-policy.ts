@@ -23,6 +23,14 @@ export const WORKSPACE_DEFAULT = "";
 /** The workspace default select's "none": each role takes its built-in default (MD-02). */
 export const BUILTIN_DEFAULT = "";
 
+/**
+ * On Local one offered local profile answers every role (Decision 0041 A8): the workspace default
+ * names it, so there's no built-in default to fall back on and no role override to save.
+ */
+export const CHOOSE_LOCAL = "Choose a local model";
+export const LOCAL_ROLES =
+  "On Local, the workspace default answers every role, so there are no role overrides.";
+
 /** The form's choices, a UI model apart from the contract's ModelPolicyUpdate. */
 export interface PolicyDraft {
   defaultProfile: ModelProfileId | typeof BUILTIN_DEFAULT;

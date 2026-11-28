@@ -17,6 +17,8 @@ import { expect, test } from "./support/fixtures.ts";
 // binds the executor to Sol.
 const TERRA = "openrouter_terra";
 const SOL = "openrouter_sol";
+const BONSAI = "local_bonsai_2_5_27b";
+const INKLING = "local_inkling_2_mini";
 
 function source(page: Page, role: string) {
   return page
@@ -287,6 +289,89 @@ test("on Local the composer, Home and the panel say where model calls go", async
       parse: parseModelSourceState,
     });
     expect(back.source).toBe("openrouter");
+  }
+  const after = await stored(page);
+  expect([after.default_profile, after.role_overrides]).toEqual([
+    before.default_profile,
+    before.role_overrides,
+  ]);
+});
+
+// Decision 0041 A1, A8: a switch in the panel reads the policy again, with no reload. On Local it
+// lists only the offered local profiles, its default names one with no built-in choice, it has no
+// role overrides or Reset all, and saving it is accepted. The save moves the row's one version, and
+// the switch back after it is accepted too (MP-05), restoring OpenRouter's form and saved choices.
+test("a switch in the panel shows the policy of the source it switched to", async ({
+  page,
+}) => {
+  await signIn(page, users.models);
+  const before = await stored(page);
+  await page.goto("/settings/models");
+  const panel = page.locator('[data-panel="model-source"]');
+  const workspaceDefault = page.locator("#workspace-default");
+  const values = () =>
+    workspaceDefault
+      .locator("option")
+      .evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value),
+      );
+  await expect(page.locator(`[data-approved-model="${TERRA}"]`)).toBeVisible();
+  await expect(page.locator("#role-coder")).toBeVisible();
+  try {
+    await panel.locator('[data-source-choice="local"] input').click();
+    await expect(panel.getByRole("status")).toHaveText(
+      "Model source is now Local.",
+    );
+    await expect(page.locator("[data-approved-model]")).toHaveCount(2);
+    await expect(
+      page.locator(`[data-approved-model="${BONSAI}"]`),
+    ).toBeVisible();
+    await expect(
+      page.locator(`[data-approved-model="${INKLING}"]`),
+    ).toBeVisible();
+    await expect(workspaceDefault).toHaveValue(BONSAI);
+    expect(await values()).toEqual([BONSAI, INKLING]);
+    await expect(page.locator('[data-field="local-roles"]')).toHaveText(
+      "On Local, the workspace default answers every role, so there are no role overrides.",
+    );
+    await expect(page.locator("#role-coder")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reset all" })).toHaveCount(
+      0,
+    );
+    await page.getByRole("button", { name: "Save policy" }).click();
+    await expect(page.locator("[data-policy-message]")).toHaveText(
+      "Saved. New runs freeze this, and admitted runs keep theirs.",
+    );
+    await expectNoA11yViolations(page);
+    await panel.locator('[data-source-choice="openrouter"] input').click();
+    await expect(panel.getByRole("status")).toHaveText(
+      "Model source is now OpenRouter.",
+    );
+    await expect(
+      page.locator(`[data-approved-model="${TERRA}"]`),
+    ).toBeVisible();
+    await expect(page.locator(`[data-approved-model="${BONSAI}"]`)).toHaveCount(
+      0,
+    );
+    await expect(workspaceDefault.locator('option[value=""]')).toHaveText(
+      "Built-in default (Sol for researcher, Terra otherwise)",
+    );
+    await expect(page.locator("#role-coder")).toBeVisible();
+  } finally {
+    const now = await getJson(page, {
+      path: "/api/settings/model-source",
+      parse: parseModelSourceState,
+    });
+    if (now.source === "local") {
+      await send(page, {
+        method: "PUT",
+        path: "/api/settings/model-source",
+        data: { expected_version: now.version, source: "openrouter" },
+        key: null,
+        status: 200,
+        parse: parseModelSourceState,
+      });
+    }
   }
   const after = await stored(page);
   expect([after.default_profile, after.role_overrides]).toEqual([
