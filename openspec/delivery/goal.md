@@ -10,7 +10,7 @@ markers are preserved across refreshes.
 | Target | US-23.8 |
 | Kind | story |
 | Focus | - |
-| Status | ACTIVE |
+| Status | COMPLETE |
 | Reason | - |
 | Started | 2026-11-27 |
 | Updated | 2026-11-27 |
@@ -19,15 +19,15 @@ markers are preserved across refreshes.
 
 | # | Story | Change | SPECS status | Title |
 |---|---|---|---|---|
-| 1 | US-23.8 | us-23-8-inkling-2-mini-s | READY | Inkling 2 Mini's route qualified at its own output cap, and offered on Local beside Bonsai 2.5 |
+| 1 | US-23.8 | us-23-8-inkling-2-mini-s | DONE | Inkling 2 Mini's route qualified at its own output cap, and offered on Local beside Bonsai 2.5 |
 
 ## Next Action
 
-Action: propose
-Story: US-23.8
-Change: us-23-8-inkling-2-mini-s
-Command: /ohmyorch:opsx-propose us-23-8-inkling-2-mini-s for US-23.8; then set US-23.8 to IN PROGRESS with a Change: line in SPECS.md
-Reason: US-23.8 is READY and has no OpenSpec change
+Action: complete
+Story: -
+Change: -
+Command: none — every story in the goal is DONE
+Reason: all 1 story/stories are DONE
 
 This is the last computed action, for reading only. `ohmyorch delivery next`
 recomputes it from the repository on every call.
