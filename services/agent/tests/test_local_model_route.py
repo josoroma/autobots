@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from pydantic import SecretStr
 
@@ -333,6 +333,32 @@ async def test_bonsai_turns_thinking_off_and_inklings_reasoning_never_reaches_th
     assert "secret plan" not in json.dumps(
         [message.content, message.tool_calls, message.additional_kwargs, message.response_metadata]
     )
+
+
+@pytest.mark.asyncio
+async def test_leading_system_messages_reach_the_server_as_one_in_order() -> None:
+    """Bonsai 2.5's template refuses a system message after the first, and browser-use sends its
+    instructions as two (Decision 0041 A10)."""
+    server = FakeLlamaServer(BONSAI.wire_id)
+    await local_model(server).ainvoke(
+        [SystemMessage("Prompt."), SystemMessage("Workspace."), HumanMessage("hello")]
+    )
+    assert server.chats()[0]["messages"] == [
+        {"role": "system", "content": "Prompt.\n\nWorkspace."},
+        {"role": "user", "content": "hello"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_one_system_message_and_a_later_one_are_sent_as_they_came() -> None:
+    server = FakeLlamaServer(BONSAI.wire_id)
+    model = local_model(server)
+    await model.ainvoke([SystemMessage("Prompt."), HumanMessage("hello")])
+    await model.ainvoke([HumanMessage("hello"), SystemMessage("Later.")])
+    first, second = server.chats()
+    assert [m["role"] for m in first["messages"]] == ["system", "user"]
+    assert first["messages"][0]["content"] == "Prompt."
+    assert [m["role"] for m in second["messages"]] == ["user", "system"]
 
 
 @pytest.mark.asyncio

@@ -161,6 +161,11 @@ def test_the_transcript_reader_browses_only_youtubes_hosts_and_publishes_prose()
     for step in (
         '"...more"',
         '"Show transcript"',
+        "in one python cell",
+        "ytd-video-description-transcript-section-renderer button",
+        "transcript-segment-view-model, ytd-transcript-segment-renderer",
+        "finish_from_repl(expression='result'), never retyped",
+        "If result has no lines",
         "bot_check",
         "no transcript",
         "<outputs>/transcript.md",

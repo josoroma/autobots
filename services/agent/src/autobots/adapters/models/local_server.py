@@ -11,6 +11,10 @@ server returns in its own field is dropped, so it reaches neither the reply nor 
 costs nothing, which the reply reports as cost 0, so the ledger settles it rather than leaving it
 open.
 
+Leading system messages reach the server as one, their texts joined in order. Bonsai 2.5's chat
+template refuses a system message after the first, and browser-use in the box sends its
+instructions as two, so on Local its browse failed before a step (Decision 0041 A10).
+
 A call that requires a tool call, by `required` or a named tool, is enforced here rather than left
 to the server (Decision 0041 A18): llama.cpp 1.1.0 let Bonsai 2.5 answer such a call in text. The
 tools stay in the prompt with `tool_choice` `none`, so the chat template still describes them, and
@@ -131,6 +135,31 @@ def _local_reply(data: dict[str, Any]) -> dict[str, Any]:
         usage["cost"] = 0
         data["provider"] = LOCAL_PROVIDER
     return data
+
+
+def _system_text(content: object) -> str | None:
+    """A system message's text, from a string or text parts. None for anything else."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list) and all(
+        isinstance(part, dict) and part.get("type") == "text" and isinstance(part.get("text"), str)
+        for part in content
+    ):
+        return "".join(part["text"] for part in content)
+    return None
+
+
+def one_leading_system(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The messages with their leading system messages joined into one, a blank line between
+    each text. A later system message, or one that isn't text, is sent as it came."""
+    count = 0
+    while count < len(messages) and messages[count].get("role") == "system":
+        count += 1
+    texts = [_system_text(message.get("content")) for message in messages[:count]]
+    if count < 2 or any(text is None for text in texts):
+        return messages
+    joined = "\n\n".join(text for text in texts if text is not None)
+    return [{"role": "system", "content": joined}, *messages[count:]]
 
 
 def _named_tool(choice: object) -> str | None:
@@ -321,7 +350,7 @@ class LoopbackClient:
             k: v for k, v in params.items() if k not in OPENROUTER_ONLY and k != "model"
         }
         body["model"] = self.profile.wire_id
-        body["messages"] = messages
+        body["messages"] = one_leading_system(messages)
         if self.profile.local is not None and self.profile.local.thinking:
             body["chat_template_kwargs"] = dict(self.profile.local.thinking)
         allowed = required_tools(body)

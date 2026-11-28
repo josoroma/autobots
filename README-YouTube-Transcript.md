@@ -16,7 +16,7 @@
 
 The Transcript reader turns a YouTube watch address into `transcript.md`, the video's captions as polished prose, and `transcript-timed.md`, every caption line with its timestamp ([Decision 0040](docs/engineering/decisions/0040-polished-transcript.md)). It is an Expert and a workflow seeded by [US-17.5](SPECS.md). It runs on browser-use in Autobots' isolated browser box (US-17.3), which presses buttons and returns a typed result (US-17.4). [Decision 0035](docs/engineering/decisions/0035-browser-use-typing-and-transcripts.md) sets its rules.
 
-This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript, and [two more](#two-polished-runs-on-2026-11-26) polished it into prose.
+This page records the first live run, on the owner's install on 2026-11-20. That run didn't get a transcript. YouTube answered the box's browser with Google's "unusual traffic" check. The Transcript reader stopped there, as it should, and published nothing. [A second run](#a-second-run-on-2026-11-25) read the page and published nothing either, which is why `browse_goal` now saves the file itself. [A third run](#a-third-run-on-2026-11-25) published the whole transcript, and [two more](#two-polished-runs-on-2026-11-26) polished it into prose. [Two local models](#two-local-models-on-2026-11-28) did the same on this Mac at US$0, once the browse task named YouTube's own page selectors and the local route sent one system message.
 
 ## Contents
 
@@ -32,6 +32,7 @@ This page records the first live run, on the owner's install on 2026-11-20. That
 - [A second run, on 2026-11-25](#a-second-run-on-2026-11-25)
 - [A third run, on 2026-11-25](#a-third-run-on-2026-11-25)
 - [Two polished runs, on 2026-11-26](#two-polished-runs-on-2026-11-26)
+- [Two local models, on 2026-11-28](#two-local-models-on-2026-11-28)
 - [What this shows, and what it doesn't](#what-this-shows-and-what-it-doesnt)
 - [Where it is defined](#where-it-is-defined)
 
@@ -44,11 +45,11 @@ This page records the first live run, on the owner's install on 2026-11-20. That
 | **Name** | Transcript reader |
 | **Tools** | `browse_goal` (version 4), `read_run_file`, `append_to_file`, `publish_artifact`. No `save_artifact`, so the model can't write a transcript whole |
 | **Browse domains** | None when seeded. The owner adds `youtube.com`, `ytimg.com`, `ggpht.com` and `gstatic.com`, never `googlevideo.com`, the host that streams the video itself. Adding them is where the owner accepts YouTube's terms on automated access (Decision 0035 Y14) |
-| **Model** | The run's `researcher` route drives each browse step through the admitted endpoint (Y7). The other roles follow the workspace policy |
+| **Model** | The run's `researcher` route drives each browse step through the admitted endpoint (Y7). The other roles follow the workspace policy. On Local, the browse steps reach the local model (Decision 0041 A10) |
 
 Its instructions ask for five things:
 
-1. **One browse.** One `browse_goal` call on the watch address, within those four hosts. It passes an output schema for the title and the lines, each with `time` and `text`. Its task: press "...more" under the video, press "Show transcript", and read every line of the panel in order.
+1. **One browse.** One `browse_goal` call on the watch address, within those four hosts. It passes an output schema for the title and the lines, each with `time` and `text`. Its task is one python cell for browser-use's REPL: open the address, press the description's "Show transcript" button, wait for the panel, read each line's timestamp and text from YouTube's own selectors, and deliver the result from the REPL with `finish_from_repl`, never retyped. If that finds no lines, it presses "...more" and "Show transcript" and reads the panel. When YouTube renames those elements, only the fallback is left.
 2. **A bot check.** If the browse stops with `bot_check`, say so and publish nothing. Never try to pass it.
 3. **No transcript.** If no lines come back, say the video offers no transcript and publish nothing.
 4. **The timed file.** The same `browse_goal` call carries a `save`, so the worker writes `transcript-timed.md` itself: the title as a heading, `Source:` and the address, a note that the lines are YouTube's own captions, then `time text` per line, in order ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)).
@@ -163,6 +164,36 @@ After US-22.1 the owner authorized a run that polishes the same 44-minute video 
 - **The layout.** No timestamps. The title and the source address are at the top, with the note that the text is edited from YouTube's own captions.
 - **Not compared word for word.** The captions had almost no "um" or "uh" to remove, so most of the polishing is punctuation, capitals and paragraphs.
 
+## Two local models, on 2026-11-28
+
+The owner asked for the Transcript reader on a 12-minute video with both local models, one after the other, and for improvements where a run failed. The workspace was on the Local source (Decision 0041), at commit `38dbf78`. Each run chose its model in **Model for this run**, and llama-server served that model alone, by the [runbook's command](docs/engineering/runbooks/local-app.md). Every run used the box's browser within the same four hosts, at US$0.
+
+| | Run | Result | Time | Browse | Model calls | Tokens in / out |
+|---|---|---|---|---|---|---|
+| **Inkling 2 Mini**, Transcript reader version 5 | `34e993b3…` | Failed, `plan_incomplete` | 7 min 44 s | 19 steps, then `max_seconds`, with nothing saved | 24 | 143,681 / 4,667 |
+| **Inkling 2 Mini**, version 6 | `2998a5ae…` | **Succeeded** | 8 min 57 s | 3 steps in 72 s, 99 lines saved | 15 | 186,368 / 5,821 |
+| **Bonsai 2.5**, version 6 | `53373dac…` | Failed, `provider_error` | 1 min 48 s | Refused before its first step | 5, three refused | 6,566 / 756 |
+| **Bonsai 2.5**, version 6, one system message | `12127536…` | **Succeeded** | 10 min 4 s | 2 steps in 61 s, 99 lines saved | 14 | 155,342 / 4,767 |
+
+**Why Inkling's first run failed.** browser-use 1.0.6 drives the page by having the model write Python in its REPL. Told only to press "...more" and "Show transcript" and read the panel, Inkling wrote a cell on each of 19 steps, and the screenshots show the same top of the watch page from step 3 to the end. No description opened and no panel appeared. The browse used its 300 seconds, so nothing was saved and the plan stayed incomplete.
+
+**Version 6.** The owner's Transcript reader was saved as version 6, whose browse task is one python cell with YouTube's own selectors. The transcript button sits in `ytd-video-description-transcript-section-renderer`, and the panel's lines are `transcript-segment-view-model` elements in YouTube's current layout. They were read from the live page first: all 99 lines load at once, from 0:00 to 12:41. The seed now holds the same text (`TRANSCRIPT_TASK`).
+
+**Why Bonsai's first run failed.** pydantic_ai 2.66, inside browser-use, sends each instruction part as its own system message. So every browse request opens with two. Bonsai 2.5's chat template refuses any system message after the first, and llama-server answered HTTP 500 three times. Inkling's template accepts two. The local route now joins leading system messages into one before the server sees them ([`local_server.py`](services/agent/src/autobots/adapters/models/local_server.py), `one_leading_system`). It changes nothing on OpenRouter.
+
+**The files.** Both successful runs saved the same `transcript-timed.md`, byte for byte, with the title, the source, the captions note and 99 timed lines. The prose was checked without printing it:
+
+| | Inkling 2 Mini | Bonsai 2.5 |
+|---|---|---|
+| **Words** | 2,384, in 19 paragraphs | 2,375, in 27 paragraphs |
+| **Captions' words kept** | 2,278 of 2,364 | 2,278 of 2,364 |
+| **Each tenth of the captions** | 94% to 99% of its words, in order | 95% to 99%, in order |
+| **Sections** | Two `append_to_file` calls | Two, a short first one and the rest |
+
+Neither has a timestamp or a repeated paragraph. Both start with the title, the source and the note that the text is edited from YouTube's own captions. Both corrected the captions' misheard "Quen 3.827B" to "Qwen 3.8 27B". One "3.87B" in the captions also left the prose, and which model the speaker meant there wasn't checked.
+
+**What it doesn't show.** These are one run per model on one short video. They were Expert sessions, not the Transcript workflow, so they don't deliver US-23.6, whose live run, replays and example.com browse remain. The prose wasn't compared word for word with YouTube's panel. Inkling was quicker: it generates about 18 tokens a second here, and Bonsai about 12.
+
 ## What this shows, and what it doesn't
 
 **It shows:**
@@ -171,6 +202,7 @@ After US-22.1 the owner authorized a run that polishes the same 44-minute video 
 - **The bot check.** A real bot check stopped the browse at once, nothing was published, and the screenshots were kept.
 - **A whole transcript.** In the third run the worker saved every caption line itself, and the model published the file without a line passing through it ([Decision 0039](docs/engineering/decisions/0039-browse-result-saved-to-a-file.md)).
 - **Polished prose.** In runs 4 and 5 the model wrote the prose a section at a time with `append_to_file`, and kept all but 25 of the captions' words ([Decision 0040](docs/engineering/decisions/0040-polished-transcript.md)).
+- **On this Mac.** Inkling 2 Mini and Bonsai 2.5 each browsed, saved and polished a transcript at US$0, with version 6's browse task ([Two local models](#two-local-models-on-2026-11-28)).
 
 **It doesn't show:**
 - **That it works every time.** YouTube refused the first run before any page loaded, and may refuse a later one. Runs 3 to 5 are successes on one video.
@@ -190,7 +222,7 @@ No transcript text appears here. A video's captions are its creator's work (Deci
 
 ## Where it is defined
 
-- **The Expert and the workflow.** [`services/agent/src/autobots/operations/concept_seed.py`](services/agent/src/autobots/operations/concept_seed.py) holds `TRANSCRIPT_INSTRUCTIONS`, `TRANSCRIPT_SCHEMA` and `WATCH_ADDRESS`.
+- **The Expert and the workflow.** [`services/agent/src/autobots/operations/concept_seed.py`](services/agent/src/autobots/operations/concept_seed.py) holds `TRANSCRIPT_INSTRUCTIONS`, `TRANSCRIPT_TASK`, `TRANSCRIPT_SCHEMA` and `WATCH_ADDRESS`.
 - **The input pattern.** [`services/agent/src/autobots/domain/workflows.py`](services/agent/src/autobots/domain/workflows.py) holds `InputConfig.pattern` and `input_pattern_mismatch`.
 - **browse_goal on browser-use.**
   - [`application/browsing_tool.py`](services/agent/src/autobots/application/browsing_tool.py) holds versions 1 to 4, the engine, the limits and the saved file.

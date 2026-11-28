@@ -113,6 +113,29 @@ TRANSCRIPT_SAVE = (
     "These "
     'lines are YouTube\'s own captions for the video.", "items": "lines", "line": "{time} {text}"}'
 )
+# The browse task names YouTube's transcript button and its panel's selectors, so browser-use reads
+# every line in one python cell and delivers them from its REPL, never retyped (Decision 0035 Y12).
+# Told only to press and read, Inkling 2 Mini never opened the panel on Local; with the selectors,
+# it and Bonsai 2.5 read every line (README-YouTube-Transcript.md, "Two local models"). With no
+# lines, it presses "...more" and "Show transcript" (Decision 0035 Y14).
+TRANSCRIPT_TASK = (
+    "The task, word for word, with <address> as the watch address: Run these lines in one python "
+    "cell, then deliver result with finish_from_repl(expression='result'), never retyped. "
+    "goto_url('<address>'); wait_for_load(); "
+    "wait_for_element('ytd-video-description-transcript-section-renderer button', timeout=15); "
+    "js(\"document.querySelector('ytd-video-description-transcript-section-renderer button')"
+    '?.click()"); '
+    "wait_for_element('transcript-segment-view-model, ytd-transcript-segment-renderer', "
+    "timeout=15); "
+    "result = js(\"return {title: (document.querySelector('h1.ytd-watch-metadata')?.textContent "
+    "|| document.title).trim(), lines: [...document.querySelectorAll('transcript-segment-view-"
+    "model, ytd-transcript-segment-renderer')].map(s => ({time: (s.querySelector('.ytwTranscript"
+    "SegmentViewModelTimestamp, .segment-timestamp')?.textContent || '').trim(), text: (s.query"
+    "Selector('span.ytAttributedStringHost, .segment-text')?.textContent || '').trim()}))"
+    ".filter(l => l.time && l.text)}\"); print(len(result['lines'])). "
+    'If result has no lines, press "...more" under the video, press "Show transcript", read every '
+    "line of the transcript panel in order with js, and deliver that the same way."
+)
 TRANSCRIPT_INSTRUCTIONS = f"""\
 Your goal is a YouTube watch address. Turn that video's transcript into polished prose in \
 <outputs>/transcript.md, beside its timed lines in <outputs>/transcript-timed.md. <outputs> is the \
@@ -120,10 +143,7 @@ outputs path this run says you may write under, such as outputs or outputs/child
 
 1. Make one browse_goal call. Use the watch address as start_url, and as allowed_domains the hosts \
 your browse domains list for YouTube (youtube.com, ytimg.com, ggpht.com and gstatic.com), never \
-googlevideo.com. Pass this output_schema: {TRANSCRIPT_SCHEMA}. The task: open the address, press \
-"...more" under the video to expand its description, press "Show transcript", then read every line \
-of the transcript panel in order, scrolling it to the end, and return the video's title and each \
-line's timestamp and text, delivered from the data your code read and never retyped. Pass this \
+googlevideo.com. Pass this output_schema: {TRANSCRIPT_SCHEMA}. {TRANSCRIPT_TASK} Pass this \
 save, with <address> as the watch address: {TRANSCRIPT_SAVE}
 2. If browse_goal stops with bot_check, stop. Say that YouTube answered with a bot check, and \
 publish nothing. Never try to pass it.
